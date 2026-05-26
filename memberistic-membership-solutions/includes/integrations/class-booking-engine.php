@@ -252,10 +252,6 @@ final class Booking_Engine {
 			return max( 0, (float) $rules['default'] );
 		}
 
-		if ( isset( $booking_type->category ) && 'lane' === sanitize_key( $booking_type->category ) ) {
-			return 100;
-		}
-
 		return isset( $booking_type->member_discount ) ? max( 0, (float) $booking_type->member_discount ) : 0;
 	}
 
