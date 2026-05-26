@@ -23,8 +23,62 @@ final class Content_Restrictions {
 		add_action( 'wp', array( self::class, 'detect_locked_content' ) );
 		add_filter( 'body_class', array( self::class, 'body_class' ) );
 		add_action( 'wp_footer', array( self::class, 'render_overlay' ) );
+		// Server-side gate. Run as early as possible — `the_posts` lets
+		// us redact $post->post_content and $post->post_excerpt IN PLACE
+		// before any theme code (SEO meta, OG/Twitter cards, Schema.org
+		// JSON-LD, RSS feeds, REST responses) reads them. The_content +
+		// the_excerpt filters below are a belt-and-braces backup in
+		// case any code path bypasses the post object cache.
+		add_filter( 'the_posts', array( self::class, 'redact_locked_posts' ), 5, 2 );
+		add_filter( 'the_content', array( self::class, 'filter_locked_content' ), 999 );
+		add_filter( 'the_excerpt', array( self::class, 'filter_locked_content' ), 999 );
+		// REST: hide content + excerpt on locked posts for non-eligible callers.
+		add_filter( 'rest_prepare_post', array( self::class, 'filter_rest_response' ), 10, 2 );
+		add_filter( 'rest_prepare_page', array( self::class, 'filter_rest_response' ), 10, 2 );
 		add_action( 'memberistic_membership_created', array( self::class, 'sync_roles_for_membership' ) );
 		add_action( 'memberistic_membership_activated', array( self::class, 'sync_roles_for_membership' ) );
+	}
+
+	/**
+	 * Redact post_content + post_excerpt on locked posts BEFORE any
+	 * downstream code can read them off the post object. Targets only
+	 * the main query and skips admin/feed/REST contexts (REST is
+	 * handled by filter_rest_response so the response shape stays
+	 * consistent with WP's REST schema).
+	 */
+	public static function redact_locked_posts( $posts, $query ) {
+		if ( is_admin() || ! is_array( $posts ) || empty( $posts ) ) {
+			return $posts;
+		}
+		if ( $query && ( $query->is_admin || $query->is_feed || defined( 'REST_REQUEST' ) && REST_REQUEST ) ) {
+			return $posts;
+		}
+		if ( $query && ! $query->is_main_query() ) {
+			return $posts;
+		}
+		foreach ( $posts as $i => $post ) {
+			if ( ! ( $post instanceof \WP_Post ) ) {
+				continue;
+			}
+			if ( ! in_array( $post->post_type, array( 'post', 'page' ), true ) ) {
+				continue;
+			}
+			if ( self::is_memberistic_page( $post->ID ) ) {
+				continue;
+			}
+			$plans = array_filter( array_map( 'absint', (array) get_post_meta( $post->ID, '_memberistic_required_plans', true ) ) );
+			if ( ! $plans || self::current_user_has_any_plan( $plans ) ) {
+				continue;
+			}
+			$names  = self::plan_names( $plans );
+			$teaser = $names
+				? sprintf( __( 'Members-only content. Available for: %s.', 'memberistic' ), implode( ', ', $names ) )
+				: __( 'Members-only content. Available for active members only.', 'memberistic' );
+			$posts[ $i ]->post_content = $teaser;
+			$posts[ $i ]->post_excerpt = $teaser;
+			self::$locked_post = $post->ID;
+		}
+		return $posts;
 	}
 
 	public static function add_meta_boxes() {
@@ -119,6 +173,77 @@ final class Content_Restrictions {
 			</div>
 		</div>
 		<?php
+	}
+
+	/**
+	 * Replace the body of locked posts with a short teaser before output.
+	 * Runs late (priority 999) so blocks/shortcodes have already been
+	 * processed but the cached overlay-only behavior no longer leaks the
+	 * full HTML to the browser. Operates only on the actual locked post
+	 * inside the main query — does not affect sidebars or related posts.
+	 */
+	public static function filter_locked_content( $content ) {
+		if ( is_admin() || is_feed() ) {
+			return $content;
+		}
+		if ( ! in_the_loop() || ! is_main_query() || ! is_singular( array( 'post', 'page' ) ) ) {
+			return $content;
+		}
+		$post_id = get_the_ID();
+		if ( ! $post_id || self::is_memberistic_page( $post_id ) ) {
+			return $content;
+		}
+		$plans = array_filter( array_map( 'absint', (array) get_post_meta( $post_id, '_memberistic_required_plans', true ) ) );
+		if ( ! $plans || self::current_user_has_any_plan( $plans ) ) {
+			return $content;
+		}
+		// Caller is not eligible. Mark for the cosmetic overlay (still
+		// useful as a visual hint), but replace the body so the source
+		// view does not contain the gated text.
+		self::$locked_post = $post_id;
+		$url = memberistic_get_page_url( 'plans_page_id', 'memberistic-memberships', home_url( '/' ) );
+		$names = self::plan_names( $plans );
+		$detail = $names
+			? sprintf( __( 'This content is available for: %s.', 'memberistic' ), implode( ', ', $names ) )
+			: __( 'This content is available for active members only.', 'memberistic' );
+		ob_start();
+		?>
+		<div class="memberistic-content-teaser" style="padding:24px;border:1px solid #e5e7eb;border-radius:8px;background:#f9fafb;">
+			<h3 style="margin:0 0 8px;"><?php esc_html_e( 'Members-only content', 'memberistic' ); ?></h3>
+			<p style="margin:0 0 14px;color:#4b5563;"><?php echo esc_html( $detail ); ?></p>
+			<a href="<?php echo esc_url( $url ); ?>" style="display:inline-block;padding:10px 16px;background:#0f2044;color:#fff;border-radius:6px;text-decoration:none;font-weight:700;"><?php esc_html_e( 'View Membership Plans', 'memberistic' ); ?></a>
+		</div>
+		<?php
+		return (string) ob_get_clean();
+	}
+
+	/**
+	 * REST counterpart: when a locked post is requested via the REST API
+	 * by a caller without an eligible membership, blank out content,
+	 * excerpt and rendered content so the body is not exposed.
+	 */
+	public static function filter_rest_response( $response, $post ) {
+		if ( ! $post || ! ( $post instanceof \WP_Post ) ) {
+			return $response;
+		}
+		if ( self::is_memberistic_page( $post->ID ) ) {
+			return $response;
+		}
+		$plans = array_filter( array_map( 'absint', (array) get_post_meta( $post->ID, '_memberistic_required_plans', true ) ) );
+		if ( ! $plans || self::current_user_has_any_plan( $plans ) ) {
+			return $response;
+		}
+		$data = $response->get_data();
+		foreach ( array( 'content', 'excerpt' ) as $field ) {
+			if ( isset( $data[ $field ] ) && is_array( $data[ $field ] ) ) {
+				$data[ $field ]['rendered']  = '';
+				$data[ $field ]['raw']       = '';
+				$data[ $field ]['protected'] = true;
+			}
+		}
+		$data['memberistic_restricted'] = true;
+		$response->set_data( $data );
+		return $response;
 	}
 
 	public static function sync_roles_for_membership( $membership_id ) {
