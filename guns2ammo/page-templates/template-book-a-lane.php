@@ -247,31 +247,4 @@ if ( ! $g2a_is_member ) : ?>
   </div>
 </section>
 
-<script>
-// Generate calendar (May 2026)
-const cal = document.getElementById('cal');
-const dows = ['S','M','T','W','T','F','S'];
-let html = dows.map(d=>`<div class="dow">${d}</div>`).join('');
-const start = new Date(2026, 4, 1).getDay(); // Friday
-for (let i=0; i<start; i++) html += '<div class="day muted"></div>';
-for (let d=1; d<=31; d++) {
-  const has = d % 3 !== 0 ? 'has-slots' : '';
-  const sel = d === 14 ? 'selected' : '';
-  const muted = d < 9 ? 'muted' : '';
-  html += `<div class="day ${has} ${sel} ${muted}">${d}</div>`;
-}
-cal.innerHTML = html;
-cal.addEventListener('click', e => {
-  const d = e.target.closest('.day:not(.muted)');
-  if (!d) return;
-  cal.querySelectorAll('.day').forEach(x => x.classList.remove('selected'));
-  d.classList.add('selected');
-});
-document.querySelectorAll('.slots button:not(.taken)').forEach(b => {
-  b.addEventListener('click', () => {
-    document.querySelectorAll('.slots button').forEach(x => x.classList.remove('active'));
-    b.classList.add('active');
-  });
-});
-</script>
 <?php get_footer();
