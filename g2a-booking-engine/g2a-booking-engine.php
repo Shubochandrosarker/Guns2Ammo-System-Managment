@@ -33,7 +33,7 @@ if ( ! defined( 'ABSPATH' ) ) {
  * G2AB_REST_NAMESPACE — REST API namespace.
  */
 define( 'G2AB_VERSION', '1.5.1' );
-define( 'G2AB_DB_VERSION', '1.4.0' );
+define( 'G2AB_DB_VERSION', '1.5.0' );
 define( 'G2AB_FILE', __FILE__ );
 define( 'G2AB_PATH', plugin_dir_path( __FILE__ ) );
 define( 'G2AB_URL', plugin_dir_url( __FILE__ ) );
