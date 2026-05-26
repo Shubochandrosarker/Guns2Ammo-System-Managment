@@ -29,3 +29,21 @@ if ( ! function_exists( 'memberistic_get_brand_label' ) ) {
 		return WordPressistic\Memberistic\memberistic_get_brand_label();
 	}
 }
+
+if ( ! function_exists( 'memberistic_secret_setting_keys' ) ) {
+	function memberistic_secret_setting_keys() {
+		return WordPressistic\Memberistic\memberistic_secret_setting_keys();
+	}
+}
+
+if ( ! function_exists( 'memberistic_setting_is_locked_by_constant' ) ) {
+	function memberistic_setting_is_locked_by_constant( $key ) {
+		return WordPressistic\Memberistic\memberistic_setting_is_locked_by_constant( $key );
+	}
+}
+
+if ( ! function_exists( 'memberistic_mask_secret' ) ) {
+	function memberistic_mask_secret( $value ) {
+		return WordPressistic\Memberistic\memberistic_mask_secret( $value );
+	}
+}

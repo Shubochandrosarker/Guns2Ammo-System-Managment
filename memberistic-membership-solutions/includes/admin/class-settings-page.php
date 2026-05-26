@@ -67,6 +67,13 @@ final class Settings_Page {
 	 */
 	public static function sanitize_settings( $settings ) {
 		$settings = is_array( $settings ) ? $settings : array();
+		// Read current settings once so secret-field sanitization can
+		// preserve existing values when the incoming payload sends a
+		// masked placeholder or a blank.
+		$existing = get_option( 'memberistic_settings', array() );
+		if ( ! is_array( $existing ) ) {
+			$existing = array();
+		}
 
 		// Only surface the admin notice when we're actually in an admin screen
 		// (the REST controller also uses this sanitizer and shouldn't pollute
@@ -87,10 +94,10 @@ final class Settings_Page {
 			'stripe_enabled'           => isset( $settings['stripe_enabled'] ) ? memberistic_sanitize_yes_no( $settings['stripe_enabled'] ) : 'no',
 			'stripe_mode'              => isset( $settings['stripe_mode'] ) && 'live' === $settings['stripe_mode'] ? 'live' : 'test',
 			'stripe_test_publishable_key' => isset( $settings['stripe_test_publishable_key'] ) ? memberistic_sanitize_text( $settings['stripe_test_publishable_key'] ) : '',
-			'stripe_test_secret_key'      => isset( $settings['stripe_test_secret_key'] ) ? memberistic_sanitize_text( $settings['stripe_test_secret_key'] ) : '',
+			'stripe_test_secret_key'      => self::sanitize_secret_field( 'stripe_test_secret_key', $settings, $existing ),
 			'stripe_live_publishable_key' => isset( $settings['stripe_live_publishable_key'] ) ? memberistic_sanitize_text( $settings['stripe_live_publishable_key'] ) : '',
-			'stripe_live_secret_key'      => isset( $settings['stripe_live_secret_key'] ) ? memberistic_sanitize_text( $settings['stripe_live_secret_key'] ) : '',
-			'stripe_webhook_secret'       => isset( $settings['stripe_webhook_secret'] ) ? memberistic_sanitize_text( $settings['stripe_webhook_secret'] ) : '',
+			'stripe_live_secret_key'      => self::sanitize_secret_field( 'stripe_live_secret_key', $settings, $existing ),
+			'stripe_webhook_secret'       => self::sanitize_secret_field( 'stripe_webhook_secret', $settings, $existing ),
 			'woocommerce_enabled'         => isset( $settings['woocommerce_enabled'] ) ? memberistic_sanitize_yes_no( $settings['woocommerce_enabled'] ) : 'no',
 			'woocommerce_webhook_secret'  => isset( $settings['woocommerce_webhook_secret'] ) ? memberistic_sanitize_text( $settings['woocommerce_webhook_secret'] ) : '',
 			'email_from_name'             => isset( $settings['email_from_name'] ) ? memberistic_sanitize_text( $settings['email_from_name'] ) : 'Memberistic',
@@ -192,5 +199,44 @@ final class Settings_Page {
 		);
 
 		return apply_filters( 'memberistic_required_pages', $pages );
+	}
+
+	/**
+	 * Sanitize a secret-bearing field with three protections:
+	 *  1. If a wp-config.php constant overrides this key, refuse to
+	 *     persist anything — keep the existing option (or empty), and
+	 *     surface an admin notice that the constant takes precedence.
+	 *  2. If the incoming value looks like our own masked placeholder
+	 *     (the format produced by memberistic_mask_secret() for the
+	 *     REST GET response), preserve the existing stored value
+	 *     instead of overwriting it with stars.
+	 *  3. Otherwise sanitize normally and store the raw secret.
+	 */
+	private static function sanitize_secret_field( $key, $incoming, $existing ) {
+		$existing_value = isset( $existing[ $key ] ) ? (string) $existing[ $key ] : '';
+
+		if ( memberistic_setting_is_locked_by_constant( $key ) ) {
+			if ( function_exists( 'add_settings_error' ) && is_admin() && ! ( defined( 'REST_REQUEST' ) && REST_REQUEST ) ) {
+				add_settings_error(
+					'memberistic_settings',
+					'secret_locked_by_constant',
+					sprintf(
+						/* translators: %s = setting key */
+						__( 'The setting "%s" is locked by a wp-config.php constant and was not updated.', 'memberistic' ),
+						$key
+					),
+					'warning'
+				);
+			}
+			return $existing_value;
+		}
+
+		$value = isset( $incoming[ $key ] ) ? (string) $incoming[ $key ] : '';
+		// Masked placeholder coming back from the React app — preserve
+		// the existing secret rather than blanking it.
+		if ( '' !== $existing_value && false !== strpos( $value, '****' ) ) {
+			return $existing_value;
+		}
+		return memberistic_sanitize_text( $value );
 	}
 }
