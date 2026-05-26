@@ -35,6 +35,11 @@ class G2AB_Email_Engine {
 	 * + admin per template config.
 	 */
 	public function send_event( $event, $booking, $context = array() ) {
+		if ( self::is_disabled() ) {
+			do_action( 'g2ab_email_suppressed', $event, $booking, 'kill_switch' );
+			return false;
+		}
+
 		$tpl = $this->get_template( $event );
 		if ( empty( $tpl ) || empty( $tpl['enabled'] ) ) return false;
 
@@ -51,21 +56,49 @@ class G2AB_Email_Engine {
 		$attachments = apply_filters( 'g2ab_email_attachments', array(), $event, $booking, $context );
 
 		$results = array();
+		$override = self::recipient_override();
 
 		// Customer.
 		if ( ! empty( $tpl['recipient_customer'] ) && ! empty( $tags['customer_email'] ) ) {
-			$results['customer'] = wp_mail( $tags['customer_email'], $subject, $body, $headers, $attachments );
+			$to = $override ? $override : $tags['customer_email'];
+			$customer_subject = $override ? '[REROUTED -> ' . $tags['customer_email'] . '] ' . $subject : $subject;
+			$results['customer'] = wp_mail( $to, $customer_subject, $body, $headers, $attachments );
 		}
 
 		// Admin.
 		if ( ! empty( $tpl['recipient_admin'] ) ) {
-			$admin_email = get_option( self::OPTION_ADMIN_TO, get_option( 'admin_email' ) );
+			$admin_email = $override ? $override : get_option( self::OPTION_ADMIN_TO, get_option( 'admin_email' ) );
 			$admin_subject = '[Admin] ' . $subject;
 			$results['admin'] = wp_mail( $admin_email, $admin_subject, $body, $headers, $attachments );
 		}
 
 		do_action( 'g2ab_email_sent', $event, $booking, $tpl, $results );
 		return $results;
+	}
+
+	/**
+	 * Global kill-switch. Set the G2AB_EMAIL_DISABLED constant in
+	 * wp-config.php (recommended for staging/dev) or toggle the
+	 * g2ab_emails_disabled option from the admin to suppress all outbound
+	 * booking emails without changing template config.
+	 */
+	public static function is_disabled() {
+		if ( defined( 'G2AB_EMAIL_DISABLED' ) && G2AB_EMAIL_DISABLED ) {
+			return true;
+		}
+		return (bool) get_option( 'g2ab_emails_disabled', false );
+	}
+
+	/**
+	 * Optional staging override that reroutes every outbound recipient
+	 * to a single staff inbox. The original recipient is preserved in the
+	 * subject line so the staging mailbox stays auditable.
+	 */
+	public static function recipient_override() {
+		$value = defined( 'G2AB_EMAIL_OVERRIDE_RECIPIENT' )
+			? G2AB_EMAIL_OVERRIDE_RECIPIENT
+			: (string) get_option( 'g2ab_email_override_recipient', '' );
+		return ( $value && is_email( $value ) ) ? $value : '';
 	}
 
 	/**
@@ -99,6 +132,15 @@ class G2AB_Email_Engine {
 	 * Send a custom email (used by reminder cron + AI auto-reply).
 	 */
 	public function send_custom( $to, $subject, $body, $attachments = array() ) {
+		if ( self::is_disabled() ) {
+			do_action( 'g2ab_email_suppressed', 'custom', $to, 'kill_switch' );
+			return false;
+		}
+		$override = self::recipient_override();
+		if ( $override ) {
+			$subject = '[REROUTED -> ' . $to . '] ' . $subject;
+			$to      = $override;
+		}
 		$body = $this->wrap_html( $body, $subject );
 		$headers = array(
 			'Content-Type: text/html; charset=UTF-8',

@@ -133,6 +133,25 @@ final class Email_Service {
 			return false;
 		}
 
+		// Global kill-switch. Use the MEMBERISTIC_EMAIL_DISABLED constant in
+		// wp-config.php (recommended for staging/dev) or the
+		// memberistic_emails_disabled option for an admin-toggleable switch.
+		if ( ( defined( 'MEMBERISTIC_EMAIL_DISABLED' ) && MEMBERISTIC_EMAIL_DISABLED )
+			|| (bool) get_option( 'memberistic_emails_disabled', false ) ) {
+			Email_Logs_Repository::log(
+				array(
+					'membership_id' => (int) $membership['id'],
+					'person_id'     => (int) $person['id'],
+					'template'      => $template,
+					'recipient'     => $person['email'],
+					'subject'       => '',
+					'status'        => 'suppressed',
+					'error_message' => __( 'Suppressed: email kill-switch is enabled.', 'memberistic' ),
+				)
+			);
+			return false;
+		}
+
 		// Allow integrators to short-circuit individual templates per membership.
 		$should_send = apply_filters( 'memberistic_should_send_email', true, $template, $membership, $person, $extra_context );
 		if ( ! $should_send ) {
@@ -142,14 +161,24 @@ final class Email_Service {
 		$context = self::build_context( $membership, $person, $extra_context );
 		$message = self::build_message( $template, $context );
 
-		$sent = wp_mail( $person['email'], $message['subject'], $message['body'], self::headers() );
+		// Staging override: redirect all outbound to a single staff inbox.
+		$recipient = $person['email'];
+		$override  = defined( 'MEMBERISTIC_EMAIL_OVERRIDE_RECIPIENT' )
+			? MEMBERISTIC_EMAIL_OVERRIDE_RECIPIENT
+			: (string) get_option( 'memberistic_email_override_recipient', '' );
+		if ( $override && is_email( $override ) ) {
+			$recipient          = $override;
+			$message['subject'] = '[REROUTED -> ' . $person['email'] . '] ' . $message['subject'];
+		}
+
+		$sent = wp_mail( $recipient, $message['subject'], $message['body'], self::headers() );
 
 		Email_Logs_Repository::log(
 			array(
 				'membership_id' => (int) $membership['id'],
 				'person_id'     => (int) $person['id'],
 				'template'      => $template,
-				'recipient'     => $person['email'],
+				'recipient'     => $recipient,
 				'subject'       => $message['subject'],
 				'status'        => $sent ? 'sent' : 'failed',
 				'error_message' => $sent ? '' : __( 'wp_mail() returned false.', 'memberistic' ),
