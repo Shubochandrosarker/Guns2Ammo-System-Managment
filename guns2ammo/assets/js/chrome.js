@@ -40,17 +40,59 @@
     var burger = document.getElementById('g2a-burger');
     var drawer = document.getElementById('g2a-mobile');
     var mclose = document.getElementById('g2a-mclose');
+    var FOCUSABLE_SEL = 'a[href], button:not([disabled]), input:not([disabled]), [tabindex]:not([tabindex="-1"])';
+    var lastFocus = null;
+
+    var focusableInDrawer = function () {
+      if (!drawer) return [];
+      return Array.prototype.slice.call(drawer.querySelectorAll(FOCUSABLE_SEL));
+    };
+    var trapTab = function (e) {
+      if (e.key !== 'Tab' || !drawer || !drawer.classList.contains('open')) return;
+      var f = focusableInDrawer();
+      if (!f.length) return;
+      var first = f[0], last = f[f.length - 1];
+      if (e.shiftKey && document.activeElement === first) {
+        e.preventDefault(); last.focus();
+      } else if (!e.shiftKey && document.activeElement === last) {
+        e.preventDefault(); first.focus();
+      }
+    };
     var openDrawer = function () {
       if (!drawer) return;
+      lastFocus = document.activeElement;
       drawer.classList.add('open');
+      drawer.setAttribute('aria-hidden', 'false');
       document.body.classList.add('g2a-noscroll');
       if (burger) burger.setAttribute('aria-expanded', 'true');
+      // Hide the rest of the page from assistive tech while the
+      // drawer is the modal context.
+      Array.prototype.forEach.call(document.body.children, function (el) {
+        if (el !== drawer && el.id !== 'g2a-skip-link' && !el.classList.contains('g2a-skip-link')) {
+          el.setAttribute('data-g2a-inerted', el.getAttribute('inert') || '');
+          el.setAttribute('inert', '');
+          el.setAttribute('aria-hidden', 'true');
+        }
+      });
+      // Move focus into the drawer.
+      var f = focusableInDrawer();
+      if (f.length) f[0].focus(); else drawer.focus();
     };
     var closeDrawer = function () {
       if (!drawer) return;
       drawer.classList.remove('open');
+      drawer.setAttribute('aria-hidden', 'true');
       document.body.classList.remove('g2a-noscroll');
       if (burger) burger.setAttribute('aria-expanded', 'false');
+      Array.prototype.forEach.call(document.body.children, function (el) {
+        if (el.hasAttribute('data-g2a-inerted')) {
+          var prev = el.getAttribute('data-g2a-inerted');
+          el.removeAttribute('data-g2a-inerted');
+          if (prev) el.setAttribute('inert', prev); else el.removeAttribute('inert');
+          el.removeAttribute('aria-hidden');
+        }
+      });
+      if (lastFocus && lastFocus.focus) lastFocus.focus();
     };
     if (burger && drawer) {
       burger.setAttribute('aria-expanded', 'false');
@@ -67,6 +109,7 @@
     }
     document.addEventListener('keydown', function (e) {
       if (e.key === 'Escape' && drawer && drawer.classList.contains('open')) closeDrawer();
+      trapTab(e);
     });
     // Safety: never leave the drawer stuck open when resizing up to desktop.
     window.addEventListener('resize', function () {
@@ -82,14 +125,10 @@
     }
     var logoutLink = document.getElementById('g2a-logout');
     if (logoutLink) logoutLink.addEventListener('click', function (e) {
-      e.preventDefault();
-      try { localStorage.removeItem('g2a-auth'); } catch (err) {}
-      location.reload();
+      // Let WordPress' real logout handle session teardown; the chrome
+      // UI follows the body.logged-in class that WP emits. No
+      // localStorage-driven UI fake.
     });
-    window.g2aAuth = function (on) {
-      try { on ? localStorage.setItem('g2a-auth', '1') : localStorage.removeItem('g2a-auth'); } catch (err) {}
-      location.reload();
-    };
 
     /* ===== Live Open/Closed pill ===== */
     var liveEl = document.getElementById('g2a-live-status');
