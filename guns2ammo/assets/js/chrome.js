@@ -95,7 +95,8 @@
     var liveEl = document.getElementById('g2a-live-status');
     if (liveEl) {
       var fmt = function (m) { var h = Math.floor(m / 60); var am = h < 12; var h12 = h % 12 || 12; return h12 + (am ? 'am' : 'pm'); };
-      var ranges = { 0: [720, 1080], 1: [600, 1080], 2: [600, 1080], 3: [600, 1080], 4: [600, 1080], 5: null, 6: [540, 1200] };
+      // Hours (minutes from midnight). Sun(0): 12-6 / Mon-Thu(1-4): 10-6 / Fri(5): 10-7 / Sat(6): 10-7.
+      var ranges = { 0: [720, 1080], 1: [600, 1080], 2: [600, 1080], 3: [600, 1080], 4: [600, 1080], 5: [600, 1140], 6: [600, 1140] };
       var update = function () {
         var now = new Date();
         var day = now.getDay();
@@ -107,7 +108,7 @@
         var lbl = document.getElementById('g2a-live-label');
         var tm  = document.getElementById('g2a-live-time');
         if (lbl) lbl.textContent = open ? 'Open Now' : 'Closed';
-        if (tm)  tm.textContent  = open ? ' Until ' + fmt(r[1]) : (day === 5 ? ' Friday' : (r ? ' Today ' + fmt(r[0]) + '-' + fmt(r[1]) : 'Closed'));
+        if (tm)  tm.textContent  = open ? ' Until ' + fmt(r[1]) : (r ? ' Today ' + fmt(r[0]) + '-' + fmt(r[1]) : 'Closed');
       };
       update();
       setInterval(update, 60000);

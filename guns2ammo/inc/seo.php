@@ -109,7 +109,8 @@ add_action( 'wp_head', function () {
 		],
 		'openingHoursSpecification' => [
 			[ '@type' => 'OpeningHoursSpecification', 'dayOfWeek' => [ 'Monday', 'Tuesday', 'Wednesday', 'Thursday' ], 'opens' => '10:00', 'closes' => '18:00' ],
-			[ '@type' => 'OpeningHoursSpecification', 'dayOfWeek' => 'Saturday', 'opens' => '09:00', 'closes' => '20:00' ],
+			[ '@type' => 'OpeningHoursSpecification', 'dayOfWeek' => 'Friday',   'opens' => '10:00', 'closes' => '19:00' ],
+			[ '@type' => 'OpeningHoursSpecification', 'dayOfWeek' => 'Saturday', 'opens' => '10:00', 'closes' => '19:00' ],
 			[ '@type' => 'OpeningHoursSpecification', 'dayOfWeek' => 'Sunday',   'opens' => '12:00', 'closes' => '18:00' ],
 		],
 		'aggregateRating' => [

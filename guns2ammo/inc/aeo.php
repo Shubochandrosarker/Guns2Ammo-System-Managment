@@ -73,7 +73,7 @@ function g2a_llms_txt( $full = false ) {
 	$out  = "# Guns 2 Ammo\n\n";
 	$out .= "> Mesa, Arizona indoor shooting range, FFL-licensed firearm store, and NRA-certified training facility. Book a lane, train for an Arizona CCW permit, shoot a machine gun, buy or sell firearms, and join a range membership.\n\n";
 	$out .= "Guns 2 Ammo is a locally owned indoor shooting range and gun store at 6030 E Main St, Suite 103, Mesa, AZ 85205. Phone: (602) 715-2677. Email: sales@guns2ammo.com. ";
-	$out .= "Hours: MondayThursday 10am6pm, Friday closed (range maintenance), Saturday 9am8pm, Sunday 12pm6pm. ";
+	$out .= "Hours: MondayThursday 10am6pm, Friday 10am7pm, Saturday 10am7pm, Sunday 12pm6pm. ";
 	$out .= "Rated 4.7 stars across 449+ Google reviews. Serving Mesa, Phoenix, Gilbert, Tempe, Chandler, Scottsdale, Apache Junction, Queen Creek and the greater Phoenix East Valley in Maricopa County, Arizona.\n\n";
 
 	$out .= "## Range & Memberships\n";
@@ -115,7 +115,7 @@ function g2a_llms_txt( $full = false ) {
 		$out .= "The range sits on East Main Street in east Mesa, a short drive from Apache Junction, Gilbert and the wider East Valley.\n\n";
 
 		$out .= "### Hours\n";
-		$out .= "Monday 10am6pm, Tuesday 10am6pm, Wednesday 10am6pm, Thursday 10am6pm, Friday closed for range maintenance, Saturday 9am8pm, Sunday 12pm6pm. The last lane booking each day is taken one hour before close.\n\n";
+		$out .= "Monday 10am6pm, Tuesday 10am6pm, Wednesday 10am6pm, Thursday 10am6pm, Friday 10am7pm, Saturday 10am7pm, Sunday 12pm6pm. The last lane booking each day is taken one hour before close.\n\n";
 
 		$out .= "### Memberships in detail\n";
 		$out .= "- Defender  \$29.99/month or \$299.99/year. Individual membership for 1 person. Includes unlimited range time, online lane reservations, and member profile and waiver tracking.\n";
@@ -124,7 +124,7 @@ function g2a_llms_txt( $full = false ) {
 		$out .= "All memberships include unlimited range time during open hours and can be cancelled at any time with no contract. Members shoot lane time free and receive discounted rentals, ammunition and course tuition. Law enforcement, active military and veterans receive 15% off any plan with valid ID.\n\n";
 
 		$out .= "### Walk-in range pricing\n";
-		$out .= "Lane rental is \$25 per hour (\$60 full day) plus \$10 per additional shooter. Handgun rental \$15, long-gun rental \$25. Eye and ear protection and paper targets are included. Members shoot lane time free.\n\n";
+		$out .= "Lane rental is \$20 per hour with each additional shooter \$15 per lane (up to 3 shooters per lane). Handgun rentals start at \$15, rifle rentals start at \$25. Eye and ear protection and paper targets are available at check-in. Members on qualifying plans receive included lane time and discounted guest rates.\n\n";
 
 		$out .= "### Training courses\n";
 		$out .= "Basic Handgun, Arizona CCW Certification, California CCW (live-fire component), Church Security, Women's Intro, Defensive Pistol, Rifle Fundamentals, Refuse To Be A Victim, and Youth Firearm Safety. The Arizona CCW course is held on Saturdays and covers laws, regulations and safe handling. Members save on course tuition.\n\n";
