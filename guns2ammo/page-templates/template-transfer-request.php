@@ -115,8 +115,10 @@ if ( function_exists( 'g2a_faq_schema' ) && function_exists( 'g2a_emit_jsonld' )
       <div class="val">Guns 2 Ammo<br><span style="font-size:16px;">Attn: FFL Receiving</span></div>
       <div class="label">Address</div>
       <div class="val brass" style="font-size:20px;">6030 E Main St<br>Mesa, AZ 85205</div>
+      <?php $g2a_ffl = get_theme_mod( 'g2a_ffl_license', '' ); if ( $g2a_ffl ) : ?>
       <div class="label">FFL License Number</div>
-      <div class="val brass" style="font-family:var(--font-mono); font-size:16px; letter-spacing:0.08em;">9-86-013-00-0J-12345</div>
+      <div class="val brass" style="font-family:var(--font-mono); font-size:16px; letter-spacing:0.08em;"><?php echo esc_html( $g2a_ffl ); ?></div>
+      <?php endif; ?>
     </div>
     <div class="box">
       <div class="label" style="margin-bottom:10px;">Transfer Fees</div>

@@ -25,6 +25,7 @@ add_action( 'customize_register', function ( $wp_customize ) {
 		'g2a_social_yt'    => [ 'label' => 'YouTube URL',   'default' => '' ],
 		'g2a_meta_home'    => [ 'label' => 'Home meta description', 'default' => '' ],
 		'g2a_og_image'     => [ 'label' => 'Default OG image URL',  'default' => '' ],
+		'g2a_ffl_license'  => [ 'label' => 'FFL License #',         'default' => '' ],
 	];
 
 	foreach ( $fields as $id => $f ) {

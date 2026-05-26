@@ -83,7 +83,9 @@ get_header();
         <div class="feat">Pickup typically same day</div>
         <div class="feat">No outbound transfer fee for purchases here</div>
       </div>
-      <div class="small">FFL #: 9-86-013-00-0J-12345</div>
+      <?php $g2a_ffl = get_theme_mod( 'g2a_ffl_license', '' ); if ( $g2a_ffl ) : ?>
+      <div class="small">FFL #: <?php echo esc_html( $g2a_ffl ); ?></div>
+      <?php endif; ?>
     </div>
   </div>
 </header>
@@ -195,8 +197,10 @@ get_header();
       <div class="val">FFL Receiving</div>
       <div class="label">ADDRESS</div>
       <div class="val brass" style="font-size:22px;">6030 E Main St<br>Mesa, AZ 85205</div>
+      <?php $g2a_ffl = get_theme_mod( 'g2a_ffl_license', '' ); if ( $g2a_ffl ) : ?>
       <div class="label">FFL LICENSE NUMBER</div>
-      <div class="val brass" style="font-family: var(--font-mono); font-size:18px; letter-spacing:0.1em;">9-86-013-00-0J-12345</div>
+      <div class="val brass" style="font-family: var(--font-mono); font-size:18px; letter-spacing:0.1em;"><?php echo esc_html( $g2a_ffl ); ?></div>
+      <?php endif; ?>
       <a class="btn btn-brass" style="margin-top:10px; width:100%;" href="<?php echo esc_url( home_url( '/transfer-request/' ) ); ?>">Start Your Transfer Request</a>
     </div>
   </div>
