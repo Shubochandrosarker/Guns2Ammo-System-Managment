@@ -154,6 +154,15 @@ final class Stripe_Service {
 		exit;
 	}
 
+	/**
+	 * Pre-payment lookup ONLY. Returns the current user id, or a matching
+	 * existing user, or 0. Does NOT create a new WP user — that would
+	 * fire wp_new_user_notification() (and consume the email_exists()
+	 * uniqueness slot) for any visitor who clicks Checkout, including
+	 * spray attackers who supply someone else's email. User creation is
+	 * deferred to ensure_user_for_completed_checkout(), invoked from
+	 * handle_checkout_completed() after Stripe confirms payment.
+	 */
 	private static function resolve_checkout_user( $email, $full_name ) {
 		$current_user_id = get_current_user_id();
 
@@ -167,32 +176,65 @@ final class Stripe_Service {
 			return (int) $existing_user_id;
 		}
 
-		$email_parts   = explode( '@', $email );
-		$username_base = sanitize_user( $email_parts[0], true );
-		$username      = $username_base ?: 'memberistic-member';
-		$suffix        = 1;
+		return 0;
+	}
 
-		while ( username_exists( $username ) ) {
-			$username = $username_base . '-' . $suffix;
-			$suffix++;
-		}
-
-		$user_id = wp_insert_user(
-			array(
-				'user_login'   => $username,
-				'user_email'   => $email,
-				'display_name' => $full_name,
-				'user_pass'    => wp_generate_password( 24, true, true ),
-				'role'         => 'subscriber',
-			)
-		);
-
-		if ( is_wp_error( $user_id ) ) {
+	/**
+	 * Post-payment user provisioning. Called from handle_checkout_completed
+	 * once Stripe confirms a successful checkout. Creates the WP user if
+	 * one didn't exist at checkout time and links it back to the
+	 * membership + person rows.
+	 */
+	private static function ensure_user_for_completed_checkout( $membership_id ) {
+		$membership = Memberships_Repository::get( $membership_id );
+		if ( ! $membership ) {
 			return 0;
 		}
 
-		if ( function_exists( 'wp_new_user_notification' ) ) {
-			wp_new_user_notification( (int) $user_id, null, 'user' );
+		if ( ! empty( $membership['primary_user_id'] ) ) {
+			return (int) $membership['primary_user_id'];
+		}
+
+		$person = People_Repository::get_primary_by_membership( (int) $membership_id );
+		if ( empty( $person['email'] ) || ! is_email( $person['email'] ) ) {
+			return 0;
+		}
+
+		$email     = (string) $person['email'];
+		$full_name = isset( $person['full_name'] ) ? (string) $person['full_name'] : '';
+
+		$existing = email_exists( $email );
+		if ( $existing ) {
+			$user_id = (int) $existing;
+		} else {
+			$email_parts   = explode( '@', $email );
+			$username_base = sanitize_user( $email_parts[0], true );
+			$username      = $username_base ?: 'memberistic-member';
+			$suffix        = 1;
+			while ( username_exists( $username ) ) {
+				$username = $username_base . '-' . $suffix;
+				$suffix++;
+			}
+			$user_id = wp_insert_user(
+				array(
+					'user_login'   => $username,
+					'user_email'   => $email,
+					'display_name' => $full_name,
+					'user_pass'    => wp_generate_password( 24, true, true ),
+					'role'         => 'subscriber',
+				)
+			);
+			if ( is_wp_error( $user_id ) ) {
+				return 0;
+			}
+			if ( function_exists( 'wp_new_user_notification' ) ) {
+				wp_new_user_notification( (int) $user_id, null, 'user' );
+			}
+		}
+
+		Memberships_Repository::update( (int) $membership_id, array( 'primary_user_id' => (int) $user_id ) );
+		if ( ! empty( $person['id'] ) ) {
+			People_Repository::update( (int) $person['id'], array( 'wp_user_id' => (int) $user_id ) );
 		}
 
 		return (int) $user_id;
@@ -406,6 +448,11 @@ final class Stripe_Service {
 		if ( ! $membership ) {
 			return false;
 		}
+
+		// User creation is deferred from checkout-start to here so an
+		// unauthenticated visitor can't spray wp_new_user_notification
+		// at arbitrary emails by hitting the checkout endpoint.
+		self::ensure_user_for_completed_checkout( $membership_id );
 
 		$billing_cycle = $membership['billing_cycle'];
 		$start_date    = current_time( 'mysql' );
