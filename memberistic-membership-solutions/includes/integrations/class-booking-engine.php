@@ -85,7 +85,7 @@ final class Booking_Engine {
 		$pricing['membership_source']       = 'memberistic';
 		$pricing['discount_label']          = sprintf(
 			/* translators: %s: discount percentage */
-			__( 'Guns 2 Ammo Member Discount Applied: %s%%', 'memberistic' ),
+			__( 'Members Hub Discount Applied: %s%%', 'memberistic' ),
 			rtrim( rtrim( number_format( $percent, 2 ), '0' ), '.' )
 		);
 

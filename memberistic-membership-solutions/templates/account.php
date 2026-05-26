@@ -52,7 +52,7 @@ $lane_url    = home_url( '/book-a-lane/' );
 	// Dynamic QR payload — encodes this member's verification details, so a
 	// scan at the range desk reveals their name, email and membership level.
 	$qr_payload  = implode( "\n", array(
-		'GUNS 2 AMMO — MEMBER VERIFICATION',
+		'MEMBERS HUB — MEMBER VERIFICATION',
 		'Name: ' . $display,
 		'Email: ' . $member_email,
 		'Membership: ' . $current['plan_name'] . ' (' . ucfirst( (string) $current['billing_cycle'] ) . ')',

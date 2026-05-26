@@ -220,7 +220,7 @@ final class Shortcodes {
 		?>
 		<div class="memberistic-frontend memberistic-auth-shell">
 			<div class="memberistic-auth-card">
-				<div class="memberistic-auth-logo"><span class="memberistic-auth-mark"></span>GUNS 2 AMMO</div>
+				<div class="memberistic-auth-logo"><span class="memberistic-auth-mark"></span><?php esc_html_e( 'MEMBERS HUB', 'memberistic' ); ?></div>
 				<h2 class="memberistic-auth-title"><?php esc_html_e( 'MEMBER LOGIN', 'memberistic' ); ?></h2>
 				<p class="memberistic-auth-sub"><?php esc_html_e( 'Welcome back. Access your range account.', 'memberistic' ); ?></p>
 
