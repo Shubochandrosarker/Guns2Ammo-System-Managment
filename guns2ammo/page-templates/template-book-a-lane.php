@@ -157,89 +157,21 @@ if ( ! $g2a_is_member ) : ?>
   <?php echo g2a_plugin_section( 'g2a_lane_booking' ); ?>
 </section>
 <?php else : ?>
-<section class="bk-layout">
-  <div>
-    <div class="step">
-      <div class="hd">
-        <span class="num">1</span>
-        <div><h3>SELECT DATE</h3><div class="sub">Reservations open 30 days out</div></div>
-      </div>
-      <div class="cal-head">
-        <button></button>
-        <span class="month">May 2026</span>
-        <button></button>
-      </div>
-      <div class="cal" id="cal"></div>
-    </div>
-
-    <div class="step">
-      <div class="hd">
-        <span class="num">2</span>
-        <div><h3>SELECT TIME</h3><div class="sub">Each session is 60 minutes</div></div>
-      </div>
-      <div class="slots">
-        <button class="taken">10:00 AM</button>
-        <button>11:00 AM</button>
-        <button>12:00 PM</button>
-        <button class="taken">1:00 PM</button>
-        <button class="active">2:00 PM</button>
-        <button>3:00 PM</button>
-        <button>4:00 PM</button>
-        <button class="taken">5:00 PM</button>
-        <button>6:00 PM</button>
-        <button>7:00 PM</button>
-        <button>8:00 PM</button>
-        <button class="taken">9:00 PM</button>
-      </div>
-    </div>
-
-    <div class="step">
-      <div class="hd">
-        <span class="num">3</span>
-        <div><h3>SHOOTERS &amp; LANES</h3><div class="sub">Up to 2 shooters per lane</div></div>
-      </div>
-      <div style="display:grid; grid-template-columns:1fr 1fr; gap:32px; align-items:center;">
-        <div class="stepper"><button></button><span class="v">2</span><button>+</button><span class="l">Shooters</span></div>
-        <div class="stepper"><button></button><span class="v">1</span><button>+</button><span class="l">Lanes</span></div>
-      </div>
-    </div>
-
-    <div class="step">
-      <div class="hd">
-        <span class="num">4</span>
-        <div><h3>SHOOTER DETAILS</h3><div class="sub">Required for waiver &amp; check-in</div></div>
-      </div>
-      <div class="fields">
-        <div><label>Full Name</label><input class="field" placeholder="Joseph Hartwell"></div>
-        <div><label>Email Address</label><input class="field" type="email" placeholder="you@example.com"></div>
-        <div><label>Phone Number</label><input class="field" placeholder="(480) 555-0199"></div>
-        <div><label>Experience Level</label>
-          <select class="field" style="background-color: var(--color-void);">
-            <option>First Time</option><option>Beginner</option><option>Intermediate</option><option>Advanced</option><option>Law Enforcement / Military</option>
-          </select>
-        </div>
-        <div style="grid-column:1 / -1;"><label>Bringing Your Own Firearm?</label>
-          <div style="display:flex; gap:10px;">
-            <button class="btn btn-brass btn-sm" style="background:var(--color-brass); color:#111; flex:1;">Yes  Personal Firearm</button>
-            <button class="btn btn-ghost btn-sm" style="flex:1;">No  Renting</button>
-          </div>
-        </div>
-      </div>
-    </div>
+<section class="bk-layout" style="display:block;">
+  <div class="bk-promo" style="text-align:center; padding:48px 32px;">
+    <span class="bk-promo__tag" style="display:inline-block;">Online Booking</span>
+    <h3 class="bk-promo__h" style="margin:16px 0;">RESERVATIONS TEMPORARILY OFFLINE</h3>
+    <p class="bk-promo__p" style="max-width:560px; margin:0 auto 24px;">
+      The online lane reservation system is loading. Please call the
+      range to book a lane and we will get you on the floor.
+    </p>
+    <a class="btn btn-ember btn-lg" href="tel:<?php echo esc_attr( preg_replace( '/[^0-9+]/', '', get_theme_mod( 'g2a_phone', '(602) 715-2677' ) ) ); ?>">
+      Call <?php echo esc_html( get_theme_mod( 'g2a_phone', '(602) 715-2677' ) ); ?>
+    </a>
+    <p style="margin-top:14px; font-size:12px; color: var(--color-silver);">
+      Walk-ins welcome during open hours.
+    </p>
   </div>
-
-  <aside class="summary">
-    <h4>RESERVATION</h4>
-    <div class="row"><span class="l">Date</span><span class="v">Thu  May 14, 2026</span></div>
-    <div class="row"><span class="l">Time</span><span class="v">2:00 PM  60 min</span></div>
-    <div class="row"><span class="l">Lanes</span><span class="v">1 Lane</span></div>
-    <div class="row"><span class="l">Shooters</span><span class="v">2 People</span></div>
-    <div class="row"><span class="l">RSO</span><span class="v">Included</span></div>
-    <div class="row"><span class="l">Eye / Ear Protection</span><span class="v">Free</span></div>
-    <div class="total"><span class="l">Estimated Total</span><span class="v">$47</span></div>
-    <a class="btn btn-ember" style="margin-top:16px;">Confirm Reservation </a>
-    <p style="margin-top:14px; font-size:12px; color: var(--color-silver); text-align:center;">No charge until check-in. Free cancellation up to 2 hours before.</p>
-  </aside>
 </section>
 <?php endif; ?>
 
