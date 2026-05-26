@@ -324,7 +324,7 @@ $g2a_mg4_desc           = get_post_meta( $g2a_page_id, 'mg_fourth_weapon_desc', 
     <div class="prop">
       <div class="ic"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2" fill="currentColor"/></svg></div>
       <h3>6-Lane Indoor Range</h3>
-      <p>Climate-controlled, 25-yard, pistol &amp; rifle approved. Lanes 1, 2, 7 ADA-accessible.</p>
+      <p>Climate-controlled, 25-yard, pistol &amp; rifle approved. Lanes 1 and 2 ADA-accessible.</p>
     </div>
     <div class="prop">
       <div class="ic"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M12 2 L20 5 V12 C20 17 16 21 12 22 C8 21 4 17 4 12 V5 Z"/><path d="M9 12 L11 14 L15 10"/></svg></div>
