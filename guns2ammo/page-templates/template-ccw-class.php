@@ -1,9 +1,16 @@
 <?php
 /**
- * Template Name: Free CCW Class
+ * Template Name: Free CCW Class (DEPRECATED — do not assign)
  *
- * Landing page for the free Arizona CCW class bundled with every machine gun
- * package. Assign to a Page with slug: free-ccw-class
+ * DEPRECATED 2026-05: per the Guns 2 Ammo content cleanup doc, the
+ * "Free Arizona CCW Class with Machine Gun Package" tie-in has been
+ * retired. The machine gun experience is now positioned as an
+ * entertainment/experience product and no longer bundles a CCW class.
+ *
+ * This template is left in the theme so any existing WP page still
+ * assigned to it does not 404, but no new page should use it. To
+ * fully remove: unpublish any page using this template in WP admin,
+ * then delete this file in a follow-up release.
  *
  * @package guns2ammo
  */

@@ -32,7 +32,7 @@ $modules = [
 ];
 
 $faq = [
-	[ 'q' => 'How long is the Arizona CCW class?', 'a' => 'The full certification is an eight-hour course  typically a single Saturday or Sunday  combining classroom instruction, a live-fire range block, and a written exam.' ],
+	[ 'q' => 'How long is the Arizona CCW Course?', 'a' => 'The full certification is an eight-hour course  typically a single Saturday or Sunday  combining classroom instruction, a live-fire range block, and a written exam.' ],
 	[ 'q' => 'Do I have to pass a shooting test?', 'a' => 'Yes, there is a live-fire qualification course of fire. It is designed to be achievable for new shooters, and instructors coach you through it. The pass rate is above 98%.' ],
 	[ 'q' => 'What should I bring to class?', 'a' => 'Valid Arizona photo ID, closed-toe shoes, and a high-neck shirt for the range. Your personal carry firearm and holster are welcome; rentals and ammunition are included if you prefer.' ],
 ];
