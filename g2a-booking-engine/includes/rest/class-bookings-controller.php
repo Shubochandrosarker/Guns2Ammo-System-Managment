@@ -24,7 +24,7 @@ final class G2AB_REST_Bookings_Controller {
 		register_rest_route( G2AB_REST_NAMESPACE, '/availability', array(
 			'methods' => WP_REST_Server::READABLE,
 			'callback' => array( $this, 'get_availability' ),
-			'permission_callback' => '__return_true',
+			'permission_callback' => array( $this, 'permission_public_read' ),
 			'args' => array(
 				'resource_id'     => array( 'required' => true, 'sanitize_callback' => 'absint', 'validate_callback' => static fn( $v ) => $v > 0 ),
 				'date'            => array( 'required' => true, 'sanitize_callback' => 'sanitize_text_field', 'validate_callback' => static fn( $v ) => (bool) preg_match( '/^\d{4}-\d{2}-\d{2}$/', (string) $v ) ),
@@ -38,12 +38,12 @@ final class G2AB_REST_Bookings_Controller {
 		register_rest_route( G2AB_REST_NAMESPACE, '/resources', array(
 			'methods' => WP_REST_Server::READABLE,
 			'callback' => array( $this, 'list_resources' ),
-			'permission_callback' => '__return_true',
+			'permission_callback' => array( $this, 'permission_public_read' ),
 		) );
 		register_rest_route( G2AB_REST_NAMESPACE, '/payment-methods', array(
 			'methods' => WP_REST_Server::READABLE,
 			'callback' => array( $this, 'list_payment_methods' ),
-			'permission_callback' => '__return_true',
+			'permission_callback' => array( $this, 'permission_public_read' ),
 		) );
 		register_rest_route( G2AB_REST_NAMESPACE, '/bookings', array(
 			'methods' => WP_REST_Server::CREATABLE,
@@ -60,6 +60,50 @@ final class G2AB_REST_Bookings_Controller {
 			'callback' => array( $this, 'confirm_payment' ),
 			'permission_callback' => '__return_true',
 		) );
+	}
+
+	/**
+	 * Permission gate for the three public read endpoints
+	 * (/availability, /resources, /payment-methods). Logged-in users
+	 * pass through; anonymous callers get a per-IP transient rate
+	 * limit so a scraper can't enumerate the full schedule, resource
+	 * list, or gateway config in a tight loop.
+	 *
+	 * Window: 60 hits / 60 seconds / IP. Adjust via the
+	 * g2ab_public_read_rate_limit filter (array of [hits, window_seconds]).
+	 */
+	public function permission_public_read( WP_REST_Request $request ) {
+		if ( is_user_logged_in() ) {
+			return true;
+		}
+		list( $hits_cap, $window ) = (array) apply_filters( 'g2ab_public_read_rate_limit', array( 60, 60 ) );
+		$hits_cap = max( 1, (int) $hits_cap );
+		$window   = max( 5, (int) $window );
+
+		$ip  = function_exists( 'g2ab_get_client_ip' ) ? g2ab_get_client_ip() : (string) ( $_SERVER['REMOTE_ADDR'] ?? '' );
+		$key = 'g2ab_rlpub_' . md5( $ip );
+		$hits = (int) get_transient( $key );
+
+		if ( $hits >= $hits_cap ) {
+			return new WP_Error(
+				'g2ab_rate_limited',
+				__( 'Too many requests. Try again in a moment.', 'g2a-booking' ),
+				array( 'status' => 429 )
+			);
+		}
+
+		// WordPress REST may invoke permission_callback more than once per
+		// request (route matching + dispatch). Increment the transient at
+		// most once per request — keyed by the request object identity
+		// so a long-lived PHP-FPM process still increments on every new
+		// HTTP request.
+		static $seen = array();
+		$rid = spl_object_id( $request );
+		if ( ! isset( $seen[ $rid ] ) ) {
+			$seen[ $rid ] = true;
+			set_transient( $key, $hits + 1, $window );
+		}
+		return true;
 	}
 
 	public function permission_create_booking( WP_REST_Request $request ) {
