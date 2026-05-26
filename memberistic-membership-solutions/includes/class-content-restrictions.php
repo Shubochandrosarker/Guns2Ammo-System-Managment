@@ -1,0 +1,222 @@
+<?php
+/**
+ * Membership content restrictions and role sync.
+ *
+ * @package Memberistic
+ */
+
+namespace WordPressistic\Memberistic;
+
+use WordPressistic\Memberistic\Database\Memberships_Repository;
+use WordPressistic\Memberistic\Database\Plans_Repository;
+
+if ( ! defined( 'ABSPATH' ) ) {
+	exit;
+}
+
+final class Content_Restrictions {
+	private static $locked_post = null;
+
+	public static function register() {
+		add_action( 'add_meta_boxes', array( self::class, 'add_meta_boxes' ) );
+		add_action( 'save_post', array( self::class, 'save_post' ) );
+		add_action( 'wp', array( self::class, 'detect_locked_content' ) );
+		add_filter( 'body_class', array( self::class, 'body_class' ) );
+		add_action( 'wp_footer', array( self::class, 'render_overlay' ) );
+		add_action( 'memberistic_membership_created', array( self::class, 'sync_roles_for_membership' ) );
+		add_action( 'memberistic_membership_activated', array( self::class, 'sync_roles_for_membership' ) );
+	}
+
+	public static function add_meta_boxes() {
+		foreach ( array( 'post', 'page' ) as $type ) {
+			add_meta_box( 'memberistic-content-access', __( 'Memberistic Access', 'memberistic' ), array( self::class, 'render_meta_box' ), $type, 'side', 'default' );
+		}
+	}
+
+	public static function render_meta_box( $post ) {
+		$selected = array_filter( array_map( 'absint', (array) get_post_meta( $post->ID, '_memberistic_required_plans', true ) ) );
+		$plans    = Plans_Repository::get_all( array( 'status' => 'active' ) );
+		wp_nonce_field( 'memberistic_save_content_access', 'memberistic_content_access_nonce' );
+		echo '<p>' . esc_html__( 'Restrict this content to selected membership plans.', 'memberistic' ) . '</p>';
+		if ( empty( $plans ) ) {
+			echo '<p><em>' . esc_html__( 'No active plans found.', 'memberistic' ) . '</em></p>';
+			return;
+		}
+		foreach ( $plans as $plan ) {
+			printf(
+				'<label style="display:block;margin:8px 0;"><input type="checkbox" name="memberistic_required_plans[]" value="%1$d" %2$s> %3$s</label>',
+				(int) $plan['id'],
+				checked( in_array( (int) $plan['id'], $selected, true ), true, false ),
+				esc_html( $plan['name'] )
+			);
+		}
+	}
+
+	public static function save_post( $post_id ) {
+		if ( defined( 'DOING_AUTOSAVE' ) && DOING_AUTOSAVE ) {
+			return;
+		}
+		if ( ! isset( $_POST['memberistic_content_access_nonce'] ) || ! wp_verify_nonce( sanitize_text_field( wp_unslash( $_POST['memberistic_content_access_nonce'] ) ), 'memberistic_save_content_access' ) ) {
+			return;
+		}
+		if ( ! current_user_can( 'edit_post', $post_id ) ) {
+			return;
+		}
+		$plans = isset( $_POST['memberistic_required_plans'] ) ? array_map( 'absint', (array) wp_unslash( $_POST['memberistic_required_plans'] ) ) : array();
+		$plans = array_values( array_filter( array_unique( $plans ) ) );
+		if ( $plans ) {
+			update_post_meta( $post_id, '_memberistic_required_plans', $plans );
+		} else {
+			delete_post_meta( $post_id, '_memberistic_required_plans' );
+		}
+	}
+
+	public static function detect_locked_content() {
+		if ( is_admin() || ! is_singular( array( 'post', 'page' ) ) ) {
+			return;
+		}
+		$post_id = get_queried_object_id();
+
+		// Never restrict Memberistic's own functional pages.
+		if ( self::is_memberistic_page( $post_id ) ) {
+			return;
+		}
+
+		$plans = array_filter( array_map( 'absint', (array) get_post_meta( $post_id, '_memberistic_required_plans', true ) ) );
+		if ( ! $plans || self::current_user_has_any_plan( $plans ) ) {
+			return;
+		}
+		self::$locked_post = $post_id;
+	}
+
+	public static function body_class( $classes ) {
+		if ( self::$locked_post ) {
+			$classes[] = 'memberistic-content-locked';
+		}
+		return $classes;
+	}
+
+	public static function render_overlay() {
+		if ( ! self::$locked_post ) {
+			return;
+		}
+		$plans = self::plan_names( array_filter( array_map( 'absint', (array) get_post_meta( self::$locked_post, '_memberistic_required_plans', true ) ) ) );
+		$url   = memberistic_get_page_url( 'plans_page_id', 'memberistic-memberships', home_url( '/' ) );
+		?>
+		<style>
+			body.memberistic-content-locked > *:not(.memberistic-restriction-overlay){filter:blur(4px);pointer-events:none;user-select:none;}
+			.memberistic-restriction-overlay{position:fixed;inset:0;z-index:99999;background:rgba(15,32,68,.48);backdrop-filter:blur(10px);display:flex;align-items:center;justify-content:center;padding:24px;}
+			.memberistic-restriction-modal{background:#fff;border:1px solid rgba(15,32,68,.18);border-radius:8px;box-shadow:0 24px 70px rgba(15,32,68,.3);max-width:520px;padding:30px;text-align:left;}
+			.memberistic-restriction-modal h2{color:#0f2044;font-size:28px;line-height:1.2;margin:0 0 10px;}
+			.memberistic-restriction-modal p{color:#4b5563;font-size:16px;margin:0 0 18px;}
+			.memberistic-restriction-modal a{background:#0f2044;border-radius:6px;color:#fff;display:inline-block;font-weight:800;padding:13px 18px;text-decoration:none;}
+		</style>
+		<div class="memberistic-restriction-overlay" role="dialog" aria-modal="true">
+			<div class="memberistic-restriction-modal">
+				<h2><?php esc_html_e( 'Membership Required', 'memberistic' ); ?></h2>
+				<p><?php echo esc_html( $plans ? sprintf( __( 'This content is available for: %s.', 'memberistic' ), implode( ', ', $plans ) ) : __( 'This content is available for active members only.', 'memberistic' ) ); ?></p>
+				<a href="<?php echo esc_url( $url ); ?>"><?php esc_html_e( 'View Membership Plans', 'memberistic' ); ?></a>
+			</div>
+		</div>
+		<?php
+	}
+
+	public static function sync_roles_for_membership( $membership_id ) {
+		$membership = Memberships_Repository::get( absint( $membership_id ) );
+		if ( ! is_array( $membership ) || empty( $membership['primary_user_id'] ) ) {
+			return;
+		}
+		if ( ! in_array( $membership['status'], array( 'active', 'comped', 'trial' ), true ) ) {
+			return;
+		}
+		$user = get_user_by( 'id', (int) $membership['primary_user_id'] );
+		if ( ! $user ) {
+			return;
+		}
+		if ( ! get_role( 'memberistic_member' ) ) {
+			add_role( 'memberistic_member', __( 'Membership User', 'memberistic' ), array( 'read' => true ) );
+		}
+		$user->add_role( 'memberistic_member' );
+		$plan = Plans_Repository::get( (int) $membership['plan_id'] );
+		if ( $plan ) {
+			$role = 'memberistic_plan_' . sanitize_key( $plan['slug'] );
+			if ( ! get_role( $role ) ) {
+				add_role( $role, sprintf( __( 'Membership User - %s', 'memberistic' ), $plan['name'] ), array( 'read' => true ) );
+			}
+			$user->add_role( $role );
+			update_user_meta( $user->ID, 'memberistic_active_plan_id', (int) $plan['id'] );
+			update_user_meta( $user->ID, 'memberistic_active_plan_name', $plan['name'] );
+		}
+	}
+
+	private static function current_user_has_any_plan( $plan_ids ) {
+		if ( current_user_can( 'manage_options' ) ) {
+			return true;
+		}
+		$user_id = get_current_user_id();
+		if ( ! $user_id ) {
+			return false;
+		}
+		$membership = Memberships_Repository::get_by_user_id( $user_id );
+		if ( ! $membership || ! in_array( $membership['status'], array( 'active', 'comped', 'trial' ), true ) ) {
+			return false;
+		}
+		return in_array( (int) $membership['plan_id'], $plan_ids, true );
+	}
+
+	private static function plan_names( $ids ) {
+		$names = array();
+		foreach ( $ids as $id ) {
+			$plan = Plans_Repository::get( $id );
+			if ( $plan ) {
+				$names[] = $plan['name'];
+			}
+		}
+		return $names;
+	}
+
+	/**
+	 * Check if a page is one of Memberistic's own functional pages.
+	 * These pages must never be subject to content restriction overlays.
+	 *
+	 * @param int $post_id Post ID.
+	 */
+	private static function is_memberistic_page( $post_id ) {
+		$page_keys = array(
+			'plans_page_id',
+			'checkout_page_id',
+			'account_page_id',
+			'renewal_page_id',
+			'login_page_id',
+			'thank_you_page_id',
+			'failed_payment_page_id',
+			'staff_dashboard_page_id',
+		);
+
+		foreach ( $page_keys as $key ) {
+			if ( absint( memberistic_get_setting( $key, 0 ) ) === $post_id ) {
+				return true;
+			}
+		}
+
+		// Also match by known Memberistic page slugs as a fallback.
+		$post = get_post( $post_id );
+		if ( $post ) {
+			$memberistic_slugs = array(
+				'memberistic-memberships',
+				'memberistic-checkout',
+				'memberistic-account',
+				'memberistic-renewal',
+				'memberistic-login',
+				'memberistic-thank-you',
+				'memberistic-payment-failed',
+				'memberistic-staff-dashboard',
+			);
+			if ( in_array( $post->post_name, $memberistic_slugs, true ) ) {
+				return true;
+			}
+		}
+
+		return false;
+	}
+}

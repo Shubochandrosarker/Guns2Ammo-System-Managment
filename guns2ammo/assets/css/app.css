@@ -1,0 +1,598 @@
+/* GUNS 2 AMMO  App-level overrides (small) */
+
+/* Hide page content until preloader hands off */
+html.g2a-loading body > *:not(#g2a-preloader) { visibility: hidden; }
+
+/* Preloader */
+#g2a-preloader {
+  position: fixed; inset: 0; z-index: 9999;
+  background: var(--color-void);
+  display: grid; place-items: center;
+  transition: opacity 380ms var(--ease-out), visibility 380ms;
+}
+#g2a-preloader.done { opacity: 0; visibility: hidden; pointer-events: none; }
+#g2a-preloader .pl-stack { display: flex; flex-direction: column; align-items: center; gap: 22px; }
+#g2a-preloader .pl-logo {
+  font-family: var(--font-display); font-size: 36px; color: var(--color-white);
+  letter-spacing: 0.06em; display: flex; align-items: center; gap: 14px;
+}
+#g2a-preloader .pl-logo .mark {
+  width: 28px; height: 28px; border: 1.5px solid var(--color-brass);
+  display: inline-grid; place-items: center; transform: rotate(45deg);
+  animation: plspin 1.6s var(--ease-out) infinite;
+}
+#g2a-preloader .pl-logo .mark::after { content: ""; width: 6px; height: 6px; background: var(--color-brass); }
+#g2a-preloader .pl-bar {
+  width: 220px; height: 2px; background: var(--color-hairline-bright);
+  position: relative; overflow: hidden;
+}
+#g2a-preloader .pl-bar::after {
+  content: ""; position: absolute; inset: 0;
+  background: linear-gradient(90deg, transparent, var(--color-brass), var(--color-ember), transparent);
+  animation: plsweep 1.4s var(--ease-out) infinite;
+}
+#g2a-preloader .pl-meta {
+  font-family: var(--font-mono); font-size: 10px; letter-spacing: 0.32em;
+  text-transform: uppercase; color: var(--color-silver);
+}
+@keyframes plspin {
+  0%, 100% { transform: rotate(45deg) scale(1); }
+  50% { transform: rotate(225deg) scale(1.08); }
+}
+@keyframes plsweep {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(100%); }
+}
+
+/* Lazy fade-in for images with native loading=lazy */
+img[loading="lazy"] { opacity: 0; transition: opacity 480ms var(--ease-out); }
+img[loading="lazy"].is-loaded,
+img[loading="lazy"][data-loaded="1"] { opacity: 1; }
+
+/* IntersectionObserver-driven reveal */
+[data-reveal] { opacity: 0; transform: translateY(20px); transition: opacity 700ms var(--ease-out), transform 700ms var(--ease-out); }
+[data-reveal].is-in { opacity: 1; transform: none; }
+@media (prefers-reduced-motion: reduce) {
+  [data-reveal], .fade-up, #g2a-preloader { animation: none !important; transition: none !important; }
+  [data-reveal] { opacity: 1; transform: none; }
+}
+
+/* Page padding to clear fixed nav */
+.g2a-body main { padding-top: 0; }
+.g2a-body[data-no-hero] main { padding-top: 80px; }
+
+/* WordPress core block resets we don't want bleeding through */
+.wp-block-image figure { margin: 0; }
+.alignfull, .alignwide { margin-left: 0; margin-right: 0; }
+
+/* ====================================================================
+   RESPONSIVE SAFETY NET  global guards so no template overflows.
+   Per-template deep responsive passes happen in later phases; this
+   layer catches the common breakage (overflow, oversized type, fixed
+   widths, un-scrollable tables) site-wide.
+   ==================================================================== */
+
+/* Kill horizontal scroll on every page */
+html, body { max-width: 100%; overflow-x: hidden; }
+
+/* Media never breaks its container */
+img, video, iframe, svg, canvas { max-width: 100%; height: auto; }
+
+/* Containers/wraps stay fluid even if a template hardcodes a max-width */
+.container, .wrap, .sec-wrap { width: 100%; box-sizing: border-box; }
+
+/* Wide data tables scroll instead of overflowing on small screens */
+@media (max-width: 720px) {
+  .dtable, table { display: block; width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch; }
+}
+
+/* Tablet and below  tighten oversized section padding */
+@media (max-width: 768px) {
+  section[class] { padding-left: 20px; padding-right: 20px; }
+  .container, .wrap, .sec-wrap { padding-left: 0; padding-right: 0; }
+}
+
+/* Phones  fluid display type so big Bebas headlines never overflow */
+@media (max-width: 600px) {
+  section[class] { padding-left: 16px; padding-right: 16px; }
+  .hl-display { font-size: clamp(40px, 13vw, 68px) !important; line-height: 0.95 !important; }
+  .display, h1 { word-break: break-word; overflow-wrap: anywhere; hyphens: auto; }
+  /* Every hero: tame padding, drop forced full-height, fluid headline */
+  .hero, .bk-hero, .ccw-hero, .mg-hero, .gw-hero, .ph-hero, .sg-hero, .ar-hero,
+  .col-hero, .cr-hero, .pi-hero, .fc-hero, .sy-hero, .si-hero, .gs-hero, .cx-hero,
+  .tr-hero, .lg-hero, .lt-hero, .kh-hero, .shop-hero, .kh-x-hero, .sp-hero {
+    padding-left: 16px !important; padding-right: 16px !important;
+    padding-top: 108px !important; padding-bottom: 56px !important;
+    min-height: auto !important;
+  }
+  h1 { font-size: clamp(38px, 11vw, 62px) !important; line-height: 0.98 !important; }
+  /* iOS: 16px inputs prevent auto-zoom on focus */
+  input, select, textarea, .field { font-size: 16px !important; }
+  /* Forms & calendars: full-width, never clipped */
+  form, .fields, .form-row { width: 100%; }
+  .summary { position: static !important; }
+  /* CTA groups wrap cleanly and go full-width */
+  .ctas, .actions, .bk-trust { flex-wrap: wrap; }
+  .ctas .btn, .actions .btn { flex: 1 1 100%; }
+  /* Plugin sections never overflow on phones */
+  .g2a-plugin-host, .memberistic-frontend, .g2ab-booking { padding-left: 0 !important; padding-right: 0 !important; }
+  .memberistic-plan-grid, .g2ab-form, .g2ab-layout-stacked { grid-template-columns: 1fr !important; display: block !important; }
+}
+
+/* Very small phones  calendar day cells stay legible */
+@media (max-width: 380px) {
+  .cal { gap: 3px; }
+  .cal .day { font-size: 12px; }
+}
+
+/* ====================================================================
+   RESPONSIVE PASS 2  full device coverage.
+   Loaded after tokens.css so these rules win the cascade. Targets the
+   header/nav, mobile drawer, every hero, the booking flow, plan cards
+   and the footer across tablet, phone and small-phone breakpoints.
+   ==================================================================== */
+
+/* Lock background scroll while the mobile drawer is open */
+body.g2a-noscroll { overflow: hidden; }
+
+/* ---- Mobile drawer: slide-in, always above the nav, fully scrollable ---- */
+.g2a-mobile {
+  z-index: 300; transform: translateX(100%);
+  transition: transform 320ms var(--ease-out);
+  display: flex !important; visibility: hidden;
+  -webkit-overflow-scrolling: touch;
+}
+.g2a-mobile.open { transform: translateX(0); visibility: visible; }
+@media (max-width: 600px) {
+  .g2a-mobile { padding: 22px 20px 40px; }
+  .g2a-mobile a { font-size: 26px; padding: 15px 4px; }
+}
+
+/* ---- Header / nav: keep it usable from tablet down to small phones ---- */
+@media (max-width: 1100px) {
+  .g2a-nav .hamburger { display: grid !important; place-items: center; }
+  .g2a-nav .links, .g2a-nav .phone { display: none !important; }
+}
+@media (max-width: 768px) {
+  .g2a-nav { padding: 0 18px; height: 72px; }
+  .g2a-nav .right { gap: 12px; }
+}
+@media (max-width: 600px) {
+  .g2a-nav { padding: 0 14px; height: 64px; }
+  .g2a-nav .logo { font-size: 19px; gap: 8px; }
+  .g2a-nav .logo .mark { width: 20px; height: 20px; }
+  .g2a-nav .live-status, .g2a-nav .right > .btn { display: none !important; }
+  .g2a-nav .hamburger { width: 42px; height: 42px; }
+}
+/* Clear the fixed header on interior (no-hero) pages at every size */
+.g2a-body[data-no-hero] main { padding-top: 72px; }
+@media (max-width: 600px) { .g2a-body[data-no-hero] main { padding-top: 64px; } }
+
+/* ---- Heroes: tame oversized type/padding on tablets and phones ---- */
+@media (max-width: 768px) {
+  .hero, .bk-hero, .ccw-hero, .mg-hero, .gw-hero, .ph-hero, .sg-hero, .ar-hero,
+  .col-hero, .cr-hero, .pi-hero, .fc-hero, .sy-hero, .si-hero, .gs-hero, .cx-hero,
+  .tr-hero, .lg-hero, .lt-hero, .kh-hero, .shop-hero, .kh-x-hero, .sp-hero, .sm-hero {
+    padding-top: 110px !important; padding-bottom: 48px !important;
+    padding-left: 22px !important; padding-right: 22px !important;
+    min-height: auto !important;
+  }
+  .bk-hero h1, .gw-hero h1, .ph-hero h1, .sm-hero h1 { font-size: clamp(40px, 9vw, 72px) !important; }
+}
+@media (max-width: 600px) {
+  .bk-hero, .ph-hero { display: block !important; }
+  .bk-trust { gap: 12px 18px; margin-top: 20px; }
+  .bk-trust .it { font-size: 10px; }
+}
+
+/* ---- Homepage hero: stack cleanly, no overlap, readable type ---- */
+@media (max-width: 768px) {
+  /* Drop the flex centering so content flows top-to-bottom as a block */
+  .hero { display: block !important; text-align: center; }
+  .hero .inner { max-width: 100% !important; width: 100% !important; }
+  .hero h1 { margin-top: 16px !important; }
+  .hero-trust { margin-top: 28px !important; }
+}
+@media (max-width: 600px) {
+  .hero { padding-top: 104px !important; padding-bottom: 44px !important; }
+  .hl-display { font-size: clamp(34px, 11.5vw, 56px) !important; line-height: 1.0 !important; }
+  .hero .eb-pill {
+    font-size: 9px; letter-spacing: 0.12em; padding: 7px 13px;
+    max-width: 100%; white-space: normal; line-height: 1.4; border-radius: 14px;
+  }
+  .hero .lead { font-size: 15px !important; margin: 16px auto 22px !important; }
+  .hero .ctas .btn { flex: 1 1 100%; }
+  /* Trust strip stacks vertically, centered  never beside the headline */
+  .hero .trust-strip { flex-direction: column; gap: 10px !important; padding: 0; }
+  .hero .trust-strip .item { justify-content: center; font-size: 10px; }
+  .hero-scroll-wrap { display: none; }
+}
+
+/* ---- Book A Lane: calendar, slots, stepper, fields, summary ---- */
+@media (max-width: 980px) {
+  .bk-layout { grid-template-columns: 1fr !important; gap: 28px; padding: 48px 22px; }
+  .summary { position: static !important; }
+}
+@media (max-width: 600px) {
+  .bk-layout { padding: 36px 16px; }
+  .step { padding: 22px 18px; }
+  .step h3 { font-size: 26px; }
+  .cal { gap: 5px; }
+  .slots { grid-template-columns: repeat(3, 1fr) !important; }
+  /* Shooters/Lanes steppers stack instead of squeezing side-by-side */
+  .step > div[style*="grid-template-columns:1fr 1fr"],
+  .step > div[style*="grid-template-columns: 1fr 1fr"] {
+    grid-template-columns: 1fr !important; gap: 20px !important;
+  }
+  .fields { grid-template-columns: 1fr !important; }
+  .bk-promo__in { flex-direction: column; align-items: flex-start; }
+}
+@media (max-width: 420px) {
+  .slots { grid-template-columns: repeat(2, 1fr) !important; }
+}
+
+/* ---- Membership / pricing plan cards ---- */
+@media (max-width: 980px) {
+  .plans-wrap { grid-template-columns: 1fr !important; max-width: 480px !important; }
+  .plan.popular { transform: none !important; }
+}
+@media (max-width: 600px) {
+  .plans-wrap { padding: 24px 16px; gap: 18px; }
+  .plan { padding: 28px 22px; }
+  .plan .price { font-size: 52px; }
+  .toggle-row, .toggle-state { flex-wrap: wrap; }
+}
+
+/* ---- Footer ---- */
+@media (max-width: 900px) { .g2a-foot .grid { grid-template-columns: 1fr 1fr !important; } }
+@media (max-width: 540px) {
+  .g2a-foot .grid { grid-template-columns: 1fr !important; }
+  .g2a-foot { padding-left: 20px; padding-right: 20px; }
+  .newsletter-band { grid-template-columns: 1fr !important; }
+  .g2a-foot .strip { flex-direction: column; gap: 8px; text-align: center; }
+}
+
+/* ---- Quick-view modal stays inside the viewport ---- */
+@media (max-width: 780px) {
+  .qv-modal { grid-template-columns: 1fr !important; max-height: 92vh; overflow-y: auto; }
+}
+
+/* ====================================================================
+   WooCommerce critical layout repair
+   Loaded after tokens.css so cart, checkout, account and product screens
+   keep the branded shell without WooCommerce's legacy floats squeezing UI.
+   ==================================================================== */
+
+.woocommerce-cart .section[data-no-hero],
+.woocommerce-checkout .section[data-no-hero],
+.woocommerce-account .section[data-no-hero] {
+  padding-top: 116px !important;
+  padding-bottom: 70px !important;
+}
+
+.woocommerce-cart .g2a-wc-page,
+.woocommerce-checkout .g2a-wc-page,
+.woocommerce-account .g2a-wc-page {
+  width: 100% !important;
+  max-width: 1180px !important;
+  margin: 0 auto !important;
+  padding: 0 !important;
+  box-sizing: border-box;
+}
+
+.woocommerce-cart .g2a-wc-page::after,
+.woocommerce-checkout .g2a-wc-page::after,
+.woocommerce-account .g2a-wc-page::after {
+  content: "";
+  display: block;
+  clear: both;
+}
+
+.woocommerce-cart .woocommerce-cart-form,
+.woocommerce-cart table.shop_table,
+.woocommerce-checkout form.checkout,
+.woocommerce-checkout table.shop_table,
+.woocommerce-account .woocommerce {
+  width: 100% !important;
+  max-width: 100% !important;
+  box-sizing: border-box;
+}
+
+.woocommerce-cart .cart-collaterals {
+  display: grid !important;
+  grid-template-columns: minmax(0, 1fr) minmax(340px, 46%);
+  gap: 28px;
+  align-items: start;
+  width: 100% !important;
+  margin-top: 28px;
+}
+
+.woocommerce-cart .cart-collaterals::before,
+.woocommerce-cart .cart-collaterals::after {
+  display: none !important;
+}
+
+.woocommerce-cart .cart-collaterals .cart_totals {
+  grid-column: 2;
+  width: 100% !important;
+  float: none !important;
+  margin: 0 !important;
+  box-sizing: border-box;
+}
+
+.woocommerce-cart table.cart td.actions {
+  padding: 18px !important;
+}
+
+.woocommerce-cart table.cart td.actions .coupon {
+  display: flex !important;
+  align-items: stretch;
+  gap: 10px;
+  float: none !important;
+  width: auto !important;
+}
+
+.woocommerce-cart table.cart td.actions .coupon .input-text {
+  width: min(260px, 100%) !important;
+  min-width: 190px;
+  height: 44px;
+  margin: 0 !important;
+}
+
+.woocommerce-cart table.cart td.actions button[name="update_cart"] {
+  margin-left: auto !important;
+  min-height: 44px;
+}
+
+.woocommerce-checkout .woocommerce-info {
+  margin: 0 0 28px !important;
+  padding: 18px 22px !important;
+}
+
+.woocommerce-checkout form.checkout {
+  display: grid !important;
+  grid-template-columns: minmax(0, 1fr) minmax(360px, 42%);
+  gap: 34px;
+  align-items: start;
+}
+
+.woocommerce-checkout form.checkout .col2-set {
+  grid-column: 1;
+  display: grid !important;
+  grid-template-columns: 1fr 1fr;
+  gap: 24px 28px;
+  width: 100% !important;
+  float: none !important;
+}
+
+.woocommerce-checkout form.checkout .col2-set::before,
+.woocommerce-checkout form.checkout .col2-set::after {
+  display: none !important;
+}
+
+.woocommerce-checkout form.checkout .col2-set .col-1,
+.woocommerce-checkout form.checkout .col2-set .col-2 {
+  float: none !important;
+  width: 100% !important;
+  max-width: none !important;
+  margin: 0 !important;
+  box-sizing: border-box;
+}
+
+.woocommerce-checkout form.checkout #order_review_heading,
+.woocommerce-checkout form.checkout #order_review {
+  grid-column: 2;
+  width: 100% !important;
+  float: none !important;
+  clear: none !important;
+  margin: 0 !important;
+  box-sizing: border-box;
+}
+
+.woocommerce-checkout form.checkout #order_review_heading {
+  align-self: end;
+  margin-bottom: -18px !important;
+}
+
+.woocommerce form .form-row,
+.woocommerce-checkout form.checkout .form-row,
+.woocommerce-account form .form-row {
+  float: none !important;
+  width: 100% !important;
+  max-width: none !important;
+  margin: 0 0 18px !important;
+  padding: 0 !important;
+  box-sizing: border-box;
+}
+
+.woocommerce form .form-row-first,
+.woocommerce form .form-row-last {
+  width: 100% !important;
+}
+
+.woocommerce form .form-row label,
+.woocommerce form .form-row .woocommerce-input-wrapper {
+  display: block;
+  width: 100%;
+}
+
+.woocommerce form .input-text,
+.woocommerce form select,
+.woocommerce form textarea,
+.woocommerce .select2-container,
+.woocommerce .select2-container .select2-selection--single {
+  width: 100% !important;
+  min-height: 46px;
+  box-sizing: border-box;
+}
+
+.woocommerce form textarea {
+  min-height: 126px;
+}
+
+.woocommerce form .form-row label {
+  margin-bottom: 8px;
+  font-family: var(--font-ui);
+  line-height: 1.35;
+}
+
+.woocommerce-account .woocommerce {
+  display: grid;
+  grid-template-columns: 260px minmax(0, 1fr);
+  gap: 24px;
+  padding: 0 !important;
+}
+
+.woocommerce-account .woocommerce-MyAccount-navigation,
+.woocommerce-account .woocommerce-MyAccount-content {
+  float: none !important;
+  width: 100% !important;
+  box-sizing: border-box;
+}
+
+.woocommerce-account .woocommerce-EditAccountForm {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 18px 24px;
+}
+
+.woocommerce-account .woocommerce-EditAccountForm fieldset,
+.woocommerce-account .woocommerce-EditAccountForm p:last-child {
+  grid-column: 1 / -1;
+}
+
+.single-product .g2a-single .wrap {
+  width: min(1180px, calc(100vw - 48px));
+  box-sizing: border-box;
+}
+
+.single-product div.product {
+  align-items: start;
+}
+
+.single-product div.product div.images {
+  max-width: 560px;
+}
+
+.single-product div.product div.images .woocommerce-product-gallery__wrapper {
+  display: block !important;
+}
+
+.single-product div.product div.images .woocommerce-product-gallery__image {
+  display: block;
+  width: 100%;
+}
+
+.single-product div.product div.images img {
+  display: block;
+  max-height: 620px;
+  width: 100% !important;
+  height: auto !important;
+  object-fit: contain;
+}
+
+.single-product .related.products ul.products,
+.single-product .upsells.products ul.products,
+.single-product div.product .related.products ul.products,
+.single-product div.product .upsells.products ul.products {
+  display: grid !important;
+  grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+  gap: 18px !important;
+}
+
+.single-product .related.products ul.products li.product,
+.single-product .upsells.products ul.products li.product,
+.single-product div.product .related.products ul.products li.product,
+.single-product div.product .upsells.products ul.products li.product {
+  width: auto !important;
+  min-width: 0 !important;
+  max-width: none !important;
+  margin: 0 !important;
+  float: none !important;
+}
+
+@media (max-width: 1100px) {
+  .woocommerce-checkout form.checkout {
+    grid-template-columns: 1fr;
+  }
+
+  .woocommerce-checkout form.checkout #order_review_heading,
+  .woocommerce-checkout form.checkout #order_review {
+    grid-column: 1;
+  }
+
+  .woocommerce-checkout form.checkout #order_review_heading {
+    margin: 8px 0 -12px !important;
+  }
+
+  .woocommerce-account .woocommerce {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 900px) {
+  .woocommerce-cart .cart-collaterals {
+    grid-template-columns: 1fr;
+  }
+
+  .woocommerce-cart .cart-collaterals .cart_totals {
+    grid-column: 1;
+  }
+
+  .single-product .related.products ul.products,
+  .single-product .upsells.products ul.products,
+  .single-product div.product .related.products ul.products,
+  .single-product div.product .upsells.products ul.products {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  }
+}
+
+@media (max-width: 720px) {
+  .woocommerce-cart .section[data-no-hero],
+  .woocommerce-checkout .section[data-no-hero],
+  .woocommerce-account .section[data-no-hero] {
+    padding-top: 92px !important;
+    padding-bottom: 54px !important;
+  }
+
+  .woocommerce-checkout form.checkout .col2-set,
+  .woocommerce-account .woocommerce-EditAccountForm {
+    grid-template-columns: 1fr;
+  }
+
+  .woocommerce-cart table.cart td.actions,
+  .woocommerce-cart table.cart td.actions .coupon {
+    display: grid !important;
+    grid-template-columns: 1fr;
+    width: 100% !important;
+  }
+
+  .woocommerce-cart table.cart td.actions .coupon .input-text,
+  .woocommerce-cart table.cart td.actions .button,
+  .woocommerce-cart table.cart td.actions button[name="update_cart"] {
+    width: 100% !important;
+    margin: 0 !important;
+  }
+
+  .single-product .g2a-single {
+    padding-left: 16px !important;
+    padding-right: 16px !important;
+  }
+
+  .single-product .g2a-single .wrap {
+    width: 100%;
+  }
+
+  .single-product div.product div.images {
+    max-width: none;
+  }
+}
+
+@media (max-width: 520px) {
+  .single-product .related.products ul.products,
+  .single-product .upsells.products ul.products,
+  .single-product div.product .related.products ul.products,
+  .single-product div.product .upsells.products ul.products {
+    grid-template-columns: 1fr !important;
+  }
+}
