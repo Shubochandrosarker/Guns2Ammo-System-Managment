@@ -345,8 +345,24 @@ final class Stripe_Service {
 	}
 
 	public static function process_webhook_event( $event ) {
-		$type = isset( $event['type'] ) ? $event['type'] : '';
-		$obj  = isset( $event['data']['object'] ) && is_array( $event['data']['object'] ) ? $event['data']['object'] : array();
+		$type     = isset( $event['type'] ) ? $event['type'] : '';
+		$event_id = isset( $event['id'] ) ? sanitize_text_field( (string) $event['id'] ) : '';
+		$obj      = isset( $event['data']['object'] ) && is_array( $event['data']['object'] ) ? $event['data']['object'] : array();
+
+		// Idempotency: Stripe retries on 5xx (and occasionally double-sends
+		// on success). Without dedup, every retry creates a duplicate
+		// Payments row, a duplicate Activity row, and a duplicate
+		// membership_activated / payment_received email. Track event_id
+		// in a transient (object-cache fronted in production); skip
+		// processing on a repeat.
+		if ( '' !== $event_id ) {
+			$dedup_key = 'memberistic_stripe_evt_' . md5( $event_id );
+			if ( false !== get_transient( $dedup_key ) ) {
+				do_action( 'memberistic_stripe_webhook_event_duplicate', $event_id, $type );
+				return true;
+			}
+			set_transient( $dedup_key, time(), 7 * DAY_IN_SECONDS );
+		}
 
 		do_action( 'memberistic_stripe_webhook_event', $type, $obj, $event );
 
