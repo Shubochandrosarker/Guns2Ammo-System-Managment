@@ -1,0 +1,341 @@
+/* G2AB Migration Tool — admin styles
+ * Premium feel: subtle shadows, smooth transitions, clear typographic hierarchy.
+ * v1.1.0
+ */
+
+.g2ab-mig-wrap { max-width: 1200px; margin: 0 auto; }
+
+/* Header */
+.g2ab-mig-header {
+	background: linear-gradient(135deg, #1B5E20 0%, #2E7D32 100%);
+	color: #fff;
+	padding: 28px 32px;
+	border-radius: 8px;
+	margin: 20px 0 28px;
+	box-shadow: 0 4px 14px rgba(27, 94, 32, 0.2);
+}
+.g2ab-mig-header h1 {
+	color: #fff;
+	margin: 0 0 6px;
+	font-size: 28px;
+	font-weight: 600;
+	letter-spacing: -0.5px;
+	display: flex;
+	align-items: center;
+	gap: 12px;
+}
+.g2ab-mig-icon {
+	display: inline-flex;
+	width: 40px;
+	height: 40px;
+	background: rgba(255,255,255,0.18);
+	border-radius: 50%;
+	align-items: center;
+	justify-content: center;
+	font-size: 22px;
+}
+.g2ab-mig-subtitle {
+	color: rgba(255,255,255,0.88);
+	margin: 0 0 22px;
+	font-size: 14px;
+	max-width: 720px;
+}
+
+/* Stepper */
+.g2ab-mig-stepper {
+	display: flex;
+	gap: 0;
+	background: rgba(0,0,0,0.18);
+	padding: 6px;
+	border-radius: 6px;
+}
+.g2ab-mig-step {
+	flex: 1;
+	display: flex;
+	align-items: center;
+	gap: 10px;
+	padding: 8px 14px;
+	border-radius: 4px;
+	color: rgba(255,255,255,0.5);
+	font-size: 13px;
+	font-weight: 500;
+	transition: all 0.2s ease;
+}
+.g2ab-mig-step--active { background: rgba(255,255,255,0.95); color: #1B5E20; }
+.g2ab-mig-step--done   { color: rgba(255,255,255,0.95); }
+.g2ab-mig-step--done .g2ab-mig-step-num { background: rgba(255,255,255,0.25); }
+.g2ab-mig-step-num {
+	width: 24px; height: 24px;
+	background: rgba(255,255,255,0.15);
+	border-radius: 50%;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	font-size: 12px;
+	font-weight: 700;
+}
+.g2ab-mig-step--active .g2ab-mig-step-num { background: #1B5E20; color: #fff; }
+
+/* Cards */
+.g2ab-mig-card {
+	background: #fff;
+	border: 1px solid #e0e3e5;
+	border-radius: 8px;
+	padding: 28px 32px;
+	margin-bottom: 24px;
+	box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+}
+.g2ab-mig-card h2 {
+	margin: 0 0 8px;
+	font-size: 20px;
+	font-weight: 600;
+	color: #1d2327;
+}
+.g2ab-mig-card h3 {
+	margin: 24px 0 12px;
+	font-size: 15px;
+	font-weight: 600;
+	color: #2c3338;
+}
+.g2ab-mig-help {
+	color: #50575e;
+	margin: 0 0 20px;
+	font-size: 13px;
+	line-height: 1.55;
+}
+
+/* Source grid */
+.g2ab-mig-source-grid {
+	display: grid;
+	grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+	gap: 16px;
+	margin: 16px 0 24px;
+}
+.g2ab-mig-source {
+	background: #fafafa;
+	border: 2px solid #e0e3e5;
+	border-radius: 8px;
+	padding: 20px;
+	display: flex;
+	flex-direction: column;
+	gap: 12px;
+	transition: all 0.2s ease;
+}
+.g2ab-mig-source--available { background: #fff; border-color: #c8e6c9; }
+.g2ab-mig-source--available:hover {
+	border-color: #1B5E20;
+	box-shadow: 0 4px 12px rgba(27, 94, 32, 0.08);
+	transform: translateY(-2px);
+}
+.g2ab-mig-source--unavailable { opacity: 0.55; }
+.g2ab-mig-source--soon { opacity: 1; background: #f8f9fb; border-style: dashed; }
+.g2ab-mig-source--soon .g2ab-mig-source-body p { color: #646970; }
+.g2ab-mig-source--soon .g2ab-mig-source-btn.disabled {
+	pointer-events: none;
+	color: #646970;
+	border-color: #dcdcde;
+	background: #f6f7f7;
+}
+.g2ab-mig-source-icon {
+	width: 44px; height: 44px;
+	border-radius: 8px;
+	color: #fff;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	font-weight: 700;
+	font-size: 20px;
+}
+.g2ab-mig-source-body h3 { margin: 0 0 4px; font-size: 16px; }
+.g2ab-mig-source-body p  { margin: 0; font-size: 12px; color: #50575e; line-height: 1.5; }
+.g2ab-mig-source-stats {
+	display: flex;
+	gap: 14px;
+	flex-wrap: wrap;
+	margin-top: 8px;
+	font-size: 12px;
+	color: #2c3338;
+}
+.g2ab-mig-source-stats strong { color: #1B5E20; font-size: 14px; }
+.g2ab-mig-source-stats--muted { color: #888; }
+.g2ab-mig-source-btn { align-self: flex-start; margin-top: 4px !important; }
+
+/* CSV upload */
+.g2ab-mig-csv-upload {
+	background: #f7f9fb;
+	border: 1px dashed #c8d3da;
+	border-radius: 8px;
+	padding: 22px;
+	margin-top: 20px;
+}
+.g2ab-mig-csv-upload h3 { margin-top: 0; }
+.g2ab-mig-csv-upload form { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+
+/* Counts grid */
+.g2ab-mig-counts {
+	display: grid;
+	grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+	gap: 12px;
+	margin: 16px 0 28px;
+}
+.g2ab-mig-count {
+	background: #f7f9fb;
+	border: 1px solid #e0e3e5;
+	border-radius: 6px;
+	padding: 16px;
+	text-align: center;
+}
+.g2ab-mig-count-num {
+	font-size: 28px;
+	font-weight: 700;
+	color: #1B5E20;
+	line-height: 1.1;
+}
+.g2ab-mig-count-label {
+	font-size: 12px;
+	color: #50575e;
+	margin-top: 4px;
+	font-weight: 500;
+	letter-spacing: 0.02em;
+}
+
+/* Warnings */
+.g2ab-mig-warnings {
+	background: #fff8e1;
+	border-left: 4px solid #f9a825;
+	padding: 14px 18px;
+	border-radius: 4px;
+	margin: 16px 0;
+}
+.g2ab-mig-warnings h3 { margin: 0 0 8px; color: #6d4c00; font-size: 13px; text-transform: uppercase; letter-spacing: 0.05em; }
+.g2ab-mig-warnings ul { margin: 0; padding-left: 20px; font-size: 13px; color: #5d4200; }
+.g2ab-mig-warnings pre { background: #fff; padding: 10px; border-radius: 4px; font-size: 12px; margin: 8px 0 0; max-height: 180px; overflow: auto; }
+
+/* Tables */
+.g2ab-mig-table {
+	width: 100%;
+	border-collapse: collapse;
+	background: #fff;
+	border-radius: 6px;
+	overflow: hidden;
+	margin: 12px 0;
+	font-size: 13px;
+}
+.g2ab-mig-table th, .g2ab-mig-table td {
+	padding: 10px 14px;
+	text-align: left;
+	border-bottom: 1px solid #f0f1f3;
+}
+.g2ab-mig-table thead th {
+	background: #f7f9fb;
+	font-weight: 600;
+	color: #2c3338;
+	border-bottom: 2px solid #e0e3e5;
+}
+.g2ab-mig-table tbody tr:hover { background: #fafbfc; }
+.g2ab-mig-table code { background: #eef0f1; padding: 2px 6px; border-radius: 3px; font-size: 12px; }
+
+/* Action row */
+.g2ab-mig-actions {
+	display: flex;
+	gap: 10px;
+	flex-wrap: wrap;
+	margin-top: 24px;
+	padding-top: 20px;
+	border-top: 1px solid #f0f1f3;
+}
+
+/* Progress bar */
+.g2ab-mig-progress {
+	margin: 20px 0;
+	padding: 18px;
+	background: #f7f9fb;
+	border-radius: 6px;
+}
+.g2ab-mig-progress-bar {
+	background: #e0e3e5;
+	height: 14px;
+	border-radius: 8px;
+	overflow: hidden;
+	margin-bottom: 12px;
+}
+.g2ab-mig-progress-fill {
+	background: linear-gradient(90deg, #1B5E20, #43A047);
+	height: 100%;
+	transition: width 0.4s ease;
+	border-radius: 8px;
+	box-shadow: 0 0 8px rgba(67, 160, 71, 0.4);
+}
+.g2ab-mig-progress-stats {
+	display: flex;
+	gap: 18px;
+	font-size: 13px;
+	color: #50575e;
+}
+.g2ab-mig-progress-stats strong { color: #1B5E20; font-size: 16px; font-weight: 700; }
+.g2ab-mig-status-line {
+	display: block;
+	margin-top: 10px;
+	font-size: 12px;
+	color: #50575e;
+	font-style: italic;
+}
+
+/* Log */
+.g2ab-mig-log-wrap { margin-top: 20px; }
+.g2ab-mig-log-wrap summary { cursor: pointer; font-weight: 600; color: #2c3338; padding: 6px 0; }
+.g2ab-mig-log {
+	background: #1d2327;
+	color: #c4c8cc;
+	padding: 16px;
+	border-radius: 6px;
+	font-family: 'SFMono-Regular', Consolas, Monaco, monospace;
+	font-size: 12px;
+	line-height: 1.5;
+	max-height: 400px;
+	overflow: auto;
+	margin: 8px 0 0;
+	white-space: pre-wrap;
+}
+
+/* Complete badge */
+.g2ab-mig-complete-badge {
+	display: inline-block;
+	background: #1B5E20;
+	color: #fff;
+	padding: 6px 16px;
+	border-radius: 20px;
+	font-size: 12px;
+	font-weight: 600;
+	letter-spacing: 0.05em;
+	text-transform: uppercase;
+	margin-bottom: 12px;
+}
+.g2ab-mig-complete h2 { font-size: 22px; }
+
+/* Status badges */
+.g2ab-mig-badge {
+	display: inline-block;
+	padding: 3px 10px;
+	border-radius: 12px;
+	font-size: 11px;
+	font-weight: 600;
+	letter-spacing: 0.03em;
+	text-transform: uppercase;
+}
+.g2ab-mig-badge--completed   { background: #e8f5e9; color: #1B5E20; }
+.g2ab-mig-badge--failed      { background: #ffebee; color: #c62828; }
+.g2ab-mig-badge--running     { background: #e3f2fd; color: #1565c0; }
+.g2ab-mig-badge--pending     { background: #fff3e0; color: #e65100; }
+.g2ab-mig-badge--rolled_back { background: #f5f5f5; color: #616161; }
+
+/* History card spacing */
+.g2ab-mig-history { margin-top: 32px; }
+.g2ab-mig-history h2 { margin-bottom: 12px; }
+
+/* Responsive */
+@media (max-width: 782px) {
+	.g2ab-mig-stepper { flex-direction: column; }
+	.g2ab-mig-step-label { display: block; }
+	.g2ab-mig-source-grid { grid-template-columns: 1fr; }
+}

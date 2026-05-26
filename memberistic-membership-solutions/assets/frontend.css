@@ -1,0 +1,1204 @@
+.memberistic-frontend {
+	box-sizing: border-box;
+}
+
+.memberistic-frontend *,
+.memberistic-frontend *::before,
+.memberistic-frontend *::after {
+	box-sizing: border-box;
+}
+
+.memberistic-plans-grid-wrap {
+	--memberistic-brand: #0f2044;
+	color: #111827;
+	margin: 32px auto;
+	max-width: 1180px;
+	width: 100%;
+}
+
+.memberistic-billing-toggle {
+	align-items: center;
+	display: flex;
+	gap: 6px;
+	justify-content: center;
+	margin-bottom: 22px;
+}
+
+.memberistic-billing-toggle button {
+	background: #f3f4f6;
+	border: 1px solid #d1d5db;
+	border-radius: 6px;
+	color: #374151;
+	cursor: pointer;
+	font-weight: 700;
+	line-height: 1;
+	padding: 10px 14px;
+}
+
+.memberistic-billing-toggle button.is-active {
+	background: var(--memberistic-brand);
+	border-color: var(--memberistic-brand);
+	color: #fff;
+}
+
+.memberistic-plan-grid {
+	display: grid;
+	gap: 18px;
+	grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.memberistic-plan-card {
+	background: #fff;
+	border: 1px solid rgba(15, 32, 68, 0.18);
+	border-radius: 8px;
+	box-shadow: 0 12px 30px rgba(15, 32, 68, 0.06);
+	display: flex;
+	flex-direction: column;
+	min-height: 100%;
+	padding: 24px;
+	position: relative;
+	transition: border-color .18s ease, box-shadow .18s ease, transform .18s ease;
+	overflow: hidden;
+}
+
+.memberistic-plan-card::before {
+	background: linear-gradient(90deg, #00c857, var(--memberistic-brand));
+	content: "";
+	height: 3px;
+	left: 0;
+	position: absolute;
+	right: 0;
+	top: 0;
+	transform: scaleX(.28);
+	transform-origin: left center;
+	transition: transform .2s ease;
+}
+
+.memberistic-plan-card:hover {
+	border-color: var(--memberistic-brand);
+	box-shadow: 0 20px 48px rgba(15, 32, 68, 0.14);
+	transform: translateY(-3px);
+}
+
+.memberistic-plan-card:hover::before {
+	transform: scaleX(1);
+}
+
+.memberistic-plan-card.is-featured {
+	border-color: var(--memberistic-brand);
+	box-shadow: 0 12px 32px rgba(15, 32, 68, 0.12);
+}
+
+.memberistic-featured-badge {
+	background: #00c857;
+	border-radius: 999px;
+	color: #07220f;
+	font-size: 12px;
+	font-weight: 800;
+	padding: 6px 10px;
+	position: absolute;
+	right: 18px;
+	top: 18px;
+}
+
+.memberistic-plan-card h3 {
+	color: var(--memberistic-brand);
+	font-size: 26px;
+	line-height: 1.2;
+	margin: 0 0 10px;
+	padding-right: 90px;
+}
+
+.memberistic-plan-description {
+	color: #4b5563;
+	margin: 0 0 16px;
+	min-height: 48px;
+}
+
+.memberistic-plan-price {
+	align-items: baseline;
+	display: flex;
+	gap: 6px;
+	margin: 4px 0 10px;
+}
+
+.memberistic-price-value {
+	color: #111827;
+	font-size: 34px;
+	font-weight: 900;
+	line-height: 1;
+}
+
+.memberistic-price-cycle {
+	color: #6b7280;
+	font-weight: 700;
+}
+
+.memberistic-included-people {
+	color: #374151;
+	font-weight: 700;
+	margin: 8px 0 12px;
+}
+
+.memberistic-benefits {
+	display: grid;
+	gap: 8px;
+	list-style: none;
+	margin: 0 0 20px;
+	padding: 0;
+}
+
+.memberistic-benefits li {
+	color: #374151;
+	padding-left: 22px;
+	position: relative;
+}
+
+.memberistic-benefits li::before {
+	color: #00a846;
+	content: "+";
+	font-weight: 900;
+	left: 0;
+	position: absolute;
+	top: 0;
+}
+
+.memberistic-plan-button {
+	background: var(--memberistic-brand, #0f2044) !important;
+	border: 1px solid var(--memberistic-brand, #0f2044) !important;
+	border-radius: 6px;
+	color: #fff !important;
+	cursor: pointer;
+	display: block;
+	font-weight: 800;
+	margin-top: auto;
+	padding: 12px 16px;
+	text-align: center;
+	text-decoration: none;
+}
+
+.memberistic-plan-button:hover,
+.memberistic-plan-button:focus {
+	color: #fff;
+	filter: brightness(1.08);
+}
+
+.memberistic-placeholder {
+	background: #fff;
+	border: 1px solid #d8dee8;
+	border-radius: 8px;
+	margin: 32px auto;
+	max-width: 780px;
+	padding: 24px;
+}
+
+.memberistic-account {
+	color: #111827;
+	margin: 32px auto;
+	max-width: 980px;
+}
+
+.memberistic-account-summary {
+	align-items: center;
+	background: #f8fafc;
+	border: 1px solid #d8dee8;
+	border-radius: 8px;
+	display: flex;
+	justify-content: space-between;
+	margin: 0 0 18px;
+	padding: 18px;
+}
+
+.memberistic-account-summary h3 {
+	color: #0f2044;
+	margin: 4px 0 0;
+}
+
+.memberistic-account-nav {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 10px;
+	margin: 0 0 18px;
+}
+
+.memberistic-account-nav a {
+	background: #0f2044;
+	border-radius: 6px;
+	color: #fff;
+	font-weight: 800;
+	padding: 9px 12px;
+	text-decoration: none;
+}
+
+.memberistic-account-section {
+	border-top: 1px solid #e5eaf1;
+	margin-top: 20px;
+	padding-top: 18px;
+}
+
+.memberistic-account table {
+	border-collapse: collapse;
+	width: 100%;
+}
+
+.memberistic-account th,
+.memberistic-account td {
+	border-bottom: 1px solid #e5eaf1;
+	padding: 10px;
+	text-align: left;
+}
+
+.memberistic-checkout {
+	margin: 32px auto;
+	max-width: 760px;
+}
+
+.memberistic-checkout h2 {
+	color: var(--memberistic-brand, #0f2044);
+	font-size: 30px;
+	line-height: 1.2;
+	margin: 0 0 18px;
+}
+
+.memberistic-checkout-form {
+	background: #fff;
+	border: 1px solid #d8dee8;
+	border-radius: 8px;
+	display: grid;
+	gap: 14px;
+	padding: 24px;
+}
+
+.memberistic-checkout-form label {
+	display: grid;
+	gap: 6px;
+}
+
+.memberistic-checkout-form label span {
+	color: #374151;
+	font-weight: 800;
+}
+
+.memberistic-checkout-form input,
+.memberistic-checkout-form select,
+.memberistic-checkout-form textarea {
+	border: 1px solid #cbd5e1;
+	border-radius: 6px;
+	color: #111827;
+	font-size: 16px;
+	min-height: 44px;
+	padding: 10px 12px;
+	width: 100%;
+}
+
+.memberistic-checkbox-line {
+	align-items: start;
+	display: grid !important;
+	gap: 10px !important;
+	grid-template-columns: 18px minmax(0, 1fr);
+}
+
+.memberistic-checkbox-line input {
+	min-height: auto;
+	margin-top: 4px;
+	width: auto;
+}
+
+.memberistic-login-card,
+.memberistic-result {
+	background: #fff;
+	border: 1px solid #d8dee8;
+	border-radius: 8px;
+	box-shadow: 0 18px 40px rgba(15, 32, 68, 0.1);
+	color: #111827;
+	margin: 34px auto;
+	max-width: 720px;
+	padding: 32px;
+}
+
+.memberistic-login-card h2,
+.memberistic-result h2 {
+	color: #0f2044;
+	font-size: 30px;
+	line-height: 1.15;
+	margin: 8px 0 10px;
+}
+
+.memberistic-login-card p,
+.memberistic-result p {
+	color: #4b5563;
+	font-size: 16px;
+	margin: 0 0 18px;
+}
+
+.memberistic-result-icon {
+	align-items: center;
+	background: #0f2044;
+	border-radius: 8px;
+	color: #fff;
+	display: inline-flex;
+	font-weight: 900;
+	height: 48px;
+	justify-content: center;
+	width: 48px;
+}
+
+.memberistic-result--success .memberistic-result-icon {
+	background: #00a846;
+}
+
+.memberistic-result--failed .memberistic-result-icon {
+	background: #b91c1c;
+}
+
+.memberistic-login-card .login-username,
+.memberistic-login-card .login-password {
+	display: grid;
+	gap: 7px;
+	margin: 0 0 14px;
+}
+
+.memberistic-login-card label {
+	color: #334155;
+	font-weight: 800;
+}
+
+.memberistic-login-card input[type="text"],
+.memberistic-login-card input[type="password"] {
+	border: 1px solid #cbd5e1;
+	border-radius: 6px;
+	font-size: 16px;
+	min-height: 44px;
+	padding: 10px 12px;
+	width: 100%;
+}
+
+.memberistic-login-card .button,
+.memberistic-login-card input[type="submit"] {
+	background: #0f2044 !important;
+	border: 0 !important;
+	border-radius: 6px !important;
+	color: #fff !important;
+	cursor: pointer;
+	font-weight: 800;
+	min-height: 44px;
+	padding: 10px 18px !important;
+}
+
+.memberistic-result-actions {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 10px;
+}
+
+.memberistic-secondary-button {
+	background: #f8fafc;
+	border: 1px solid #cbd5e1;
+	border-radius: 6px;
+	color: #0f2044;
+	font-weight: 800;
+	padding: 12px 16px;
+	text-decoration: none;
+}
+
+.memberistic-staff-dashboard {
+	--memberistic-brand: #0f2044;
+	color: #111827;
+	margin: 28px auto;
+	max-width: 1220px;
+	width: 100%;
+}
+
+.memberistic-staff-header {
+	align-items: center;
+	background: #0f2044;
+	border-radius: 8px;
+	color: #fff;
+	display: flex;
+	justify-content: space-between;
+	margin-bottom: 18px;
+	padding: 22px 24px;
+}
+
+.memberistic-staff-header p {
+	color: #00c857;
+	font-weight: 800;
+	letter-spacing: 0;
+	margin: 0 0 4px;
+	text-transform: uppercase;
+}
+
+.memberistic-staff-header h2 {
+	color: #fff;
+	font-size: 30px;
+	line-height: 1.15;
+	margin: 0;
+}
+
+.memberistic-staff-user {
+	background: rgba(255, 255, 255, 0.12);
+	border: 1px solid rgba(255, 255, 255, 0.22);
+	border-radius: 6px;
+	font-weight: 800;
+	padding: 10px 12px;
+}
+
+.memberistic-staff-notice {
+	border-radius: 6px;
+	font-weight: 800;
+	margin-bottom: 14px;
+	padding: 12px 14px;
+}
+
+.memberistic-staff-notice--success {
+	background: #d1fae5;
+	color: #065f46;
+}
+
+.memberistic-staff-notice--error {
+	background: #fee2e2;
+	color: #991b1b;
+}
+
+.memberistic-staff-kpis {
+	display: grid;
+	gap: 12px;
+	grid-template-columns: repeat(4, minmax(0, 1fr));
+	margin-bottom: 18px;
+}
+
+.memberistic-staff-kpis div,
+.memberistic-staff-panel {
+	background: #fff;
+	border: 1px solid #d8dee8;
+	border-radius: 8px;
+	box-shadow: 0 10px 24px rgba(15, 32, 68, 0.06);
+}
+
+.memberistic-staff-kpis div {
+	padding: 18px;
+}
+
+.memberistic-staff-kpis span {
+	color: #64748b;
+	display: block;
+	font-size: 13px;
+	font-weight: 800;
+	margin-bottom: 8px;
+}
+
+.memberistic-staff-kpis strong {
+	color: #0f2044;
+	display: block;
+	font-size: 30px;
+	line-height: 1;
+}
+
+.memberistic-staff-grid {
+	display: grid;
+	gap: 18px;
+	grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr);
+}
+
+.memberistic-staff-grid--bottom {
+	margin-top: 18px;
+}
+
+.memberistic-staff-panel {
+	padding: 20px;
+}
+
+.memberistic-staff-panel h3 {
+	color: #0f2044;
+	font-size: 20px;
+	line-height: 1.2;
+	margin: 0 0 14px;
+}
+
+.memberistic-staff-form {
+	display: grid;
+	gap: 12px;
+	grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.memberistic-staff-form label,
+.memberistic-staff-search {
+	display: grid;
+	gap: 6px;
+}
+
+.memberistic-staff-form span {
+	color: #334155;
+	font-weight: 800;
+}
+
+.memberistic-staff-form input,
+.memberistic-staff-form select,
+.memberistic-staff-form textarea,
+.memberistic-staff-search input,
+.memberistic-staff-search select {
+	border: 1px solid #cbd5e1;
+	border-radius: 6px;
+	color: #111827;
+	min-height: 42px;
+	padding: 9px 10px;
+	width: 100%;
+}
+
+.memberistic-staff-wide,
+.memberistic-staff-form button {
+	grid-column: 1 / -1;
+}
+
+.memberistic-staff-search {
+	grid-template-columns: minmax(0, 1fr) 160px 90px;
+	margin-bottom: 14px;
+}
+
+.memberistic-staff-search button,
+.memberistic-staff-member button {
+	background: #0f2044;
+	border: 0;
+	border-radius: 6px;
+	color: #fff;
+	cursor: pointer;
+	font-weight: 800;
+	min-height: 42px;
+	padding: 9px 12px;
+}
+
+.memberistic-staff-list {
+	display: grid;
+	gap: 10px;
+}
+
+.memberistic-staff-member {
+	align-items: center;
+	border: 1px solid #e2e8f0;
+	border-radius: 8px;
+	display: flex;
+	gap: 12px;
+	justify-content: space-between;
+	padding: 12px;
+}
+
+.memberistic-staff-member strong,
+.memberistic-staff-member span,
+.memberistic-staff-member small {
+	display: block;
+}
+
+.memberistic-staff-member strong {
+	color: #0f2044;
+}
+
+.memberistic-staff-member span,
+.memberistic-staff-member small {
+	color: #64748b;
+}
+
+.memberistic-staff-empty {
+	background: #f8fafc;
+	border-radius: 6px;
+	color: #64748b;
+	margin: 0;
+	padding: 16px;
+}
+
+.memberistic-staff-table-wrap {
+	overflow-x: auto;
+}
+
+.memberistic-staff-panel table {
+	border-collapse: collapse;
+	width: 100%;
+}
+
+.memberistic-staff-panel th,
+.memberistic-staff-panel td {
+	border-bottom: 1px solid #e2e8f0;
+	padding: 10px;
+	text-align: left;
+	vertical-align: top;
+}
+
+.memberistic-staff-panel th {
+	color: #334155;
+	font-size: 13px;
+	text-transform: uppercase;
+}
+
+.memberistic-staff-panel small {
+	color: #64748b;
+}
+
+.memberistic-toast {
+	align-items: center;
+	background: #fff;
+	border: 1px solid #d8dee8;
+	border-left: 5px solid #00a846;
+	border-radius: 8px;
+	box-shadow: 0 18px 48px rgba(15, 32, 68, 0.2);
+	display: flex;
+	gap: 18px;
+	justify-content: space-between;
+	opacity: 0;
+	padding: 16px 18px;
+	position: fixed;
+	right: 24px;
+	top: 92px;
+	transform: translateY(-10px);
+	transition: opacity .18s ease, transform .18s ease;
+	width: min(420px, calc(100% - 32px));
+	z-index: 99999;
+}
+
+.memberistic-toast.is-visible {
+	opacity: 1;
+	transform: translateY(0);
+}
+
+.memberistic-toast[data-memberistic-toast="error"] {
+	border-left-color: #b91c1c;
+}
+
+.memberistic-toast strong {
+	color: #0f2044;
+	display: block;
+	margin-bottom: 4px;
+}
+
+.memberistic-toast p {
+	color: #475569;
+	margin: 0;
+}
+
+.memberistic-toast button {
+	background: #0f2044;
+	border: 0;
+	border-radius: 6px;
+	color: #fff;
+	cursor: pointer;
+	font-weight: 800;
+	padding: 9px 12px;
+}
+
+@media (max-width: 900px) {
+	.memberistic-plan-grid {
+		grid-template-columns: 1fr;
+	}
+
+	.memberistic-plan-description {
+		min-height: 0;
+	}
+
+	.memberistic-account-summary {
+		align-items: flex-start;
+		flex-direction: column;
+		gap: 12px;
+	}
+
+	.memberistic-account table {
+		display: block;
+		overflow-x: auto;
+	}
+
+	.memberistic-staff-header {
+		align-items: flex-start;
+		flex-direction: column;
+		gap: 12px;
+	}
+
+	.memberistic-staff-kpis,
+	.memberistic-staff-grid,
+	.memberistic-staff-form,
+	.memberistic-staff-search {
+		grid-template-columns: 1fr;
+	}
+
+	.memberistic-staff-wide,
+	.memberistic-staff-form button {
+		grid-column: auto;
+	}
+
+	.memberistic-staff-member {
+		align-items: flex-start;
+		flex-direction: column;
+	}
+}
+
+/* ── Checkout price summary ── */
+.memberistic-price-summary {
+	align-items: center;
+	background: #f0f4ff;
+	border: 1px solid #c7d4f0;
+	border-radius: 6px;
+	display: flex;
+	justify-content: space-between;
+	padding: 12px 14px;
+}
+
+.memberistic-price-summary strong {
+	color: #0f2044;
+	font-size: 16px;
+}
+
+.memberistic-summary-price {
+	color: #0f2044;
+	font-size: 18px;
+	font-weight: 900;
+}
+
+.memberistic-summary-placeholder {
+	color: #6b7280;
+	font-style: italic;
+}
+
+/* ── Membership status badge (shortcode) ── */
+.memberistic-status-badge {
+	border-radius: 999px;
+	display: inline-block;
+	font-size: 13px;
+	font-weight: 800;
+	padding: 5px 10px;
+}
+
+.memberistic-status-none {
+	background: #f3f4f6;
+	color: #6b7280;
+}
+
+/* ── Expiring notice ── */
+.memberistic-expiring-notice {
+	background: #fffbeb;
+	border: 1px solid #fcd34d;
+	border-radius: 6px;
+	color: #92400e;
+	font-weight: 700;
+	margin: 12px 0;
+	padding: 12px 16px;
+}
+
+.memberistic-expiring-notice p {
+	margin: 0;
+}
+
+.memberistic-expiring-notice a {
+	color: #0f2044;
+	font-weight: 800;
+	margin-left: 8px;
+	text-decoration: underline;
+}
+
+/* ── Account tab people table empty state ── */
+.memberistic-account-empty {
+	color: #6b7280;
+	font-style: italic;
+	padding: 12px 0;
+}
+
+/* ── Plan card annual savings badge ── */
+.memberistic-annual-savings {
+	background: #d1fae5;
+	border-radius: 999px;
+	color: #065f46;
+	display: inline-block;
+	font-size: 12px;
+	font-weight: 800;
+	margin-bottom: 10px;
+	padding: 4px 10px;
+}
+
+/* ── Account alert banners ── */
+.memberistic-account-alert {
+	border-radius: 6px;
+	font-weight: 700;
+	margin-bottom: 16px;
+	padding: 12px 16px;
+}
+
+.memberistic-account-alert--warning {
+	background: #fef9c3;
+	border: 1px solid #fde047;
+	color: #713f12;
+}
+
+.memberistic-account-alert--info {
+	background: #eff6ff;
+	border: 1px solid #bfdbfe;
+	color: #1e40af;
+}
+
+.memberistic-account-alert a {
+	color: inherit;
+	font-weight: 800;
+	margin-left: 8px;
+	text-decoration: underline;
+}
+
+.memberistic-account-summary small {
+	color: #6b7280;
+}
+
+/* ── Placeholder with button ── */
+.memberistic-placeholder a.memberistic-plan-button {
+	display: inline-block;
+	margin-top: 12px;
+}
+
+/* Login page style aligned to Guns2Ammo UI v2 */
+.memberistic-auth-shell {
+	background: radial-gradient(circle at 30% 20%, rgba(201, 168, 76, 0.08), transparent 50%), radial-gradient(circle at 70% 80%, rgba(255, 75, 31, 0.05), transparent 50%), #0a0a0a;
+	margin: 24px auto;
+	max-width: 760px;
+	padding: 26px;
+	position: relative;
+}
+
+.memberistic-auth-shell::after {
+	background-image: linear-gradient(180deg, rgba(10, 10, 10, 0.92), rgba(10, 10, 10, 0.96)), url("https://staging10.guns2ammo.com/wp-content/uploads/2026/01/ChatGPT-Image-Jan-19-2026-08_00_26-PM.webp");
+	background-position: center;
+	background-size: cover;
+	content: "";
+	inset: 0;
+	opacity: 0.55;
+	position: absolute;
+	z-index: 0;
+}
+
+.memberistic-auth-card {
+	background: rgba(14, 14, 14, 0.9);
+	border: 1px solid rgba(201, 168, 76, 0.35);
+	box-shadow: 0 20px 50px rgba(0, 0, 0, 0.45);
+	margin: 0 auto;
+	max-width: 540px;
+	padding: 30px;
+	position: relative;
+	z-index: 1;
+}
+
+.memberistic-auth-logo {
+	color: #d5d5d5;
+	font-size: 12px;
+	font-weight: 700;
+	letter-spacing: 0.18em;
+	text-align: center;
+	text-transform: uppercase;
+}
+
+.memberistic-auth-mark {
+	background: #c9a84c;
+	display: inline-block;
+	height: 10px;
+	margin-right: 8px;
+	width: 10px;
+}
+
+.memberistic-auth-title {
+	color: #fff;
+	font-size: 44px;
+	letter-spacing: 0.04em;
+	line-height: 1;
+	margin: 14px 0 6px;
+	text-align: center;
+}
+
+.memberistic-auth-sub {
+	color: #c3c3c3;
+	font-size: 14px;
+	margin: 0 0 24px;
+	text-align: center;
+}
+
+.memberistic-auth-form {
+	display: grid;
+	gap: 8px;
+}
+
+.memberistic-auth-label {
+	color: #b9b9b9;
+	font-size: 11px;
+	font-weight: 700;
+	letter-spacing: 0.16em;
+	text-transform: uppercase;
+}
+
+.memberistic-auth-field {
+	background: #121212;
+	border: 1px solid #4a4a4a;
+	color: #f3f3f3;
+	font-size: 15px;
+	min-height: 46px;
+	padding: 10px 12px;
+	width: 100%;
+}
+
+.memberistic-auth-field:focus {
+	border-color: #c9a84c;
+	outline: none;
+}
+
+.memberistic-auth-row {
+	align-items: center;
+	display: flex;
+	justify-content: space-between;
+	margin: 8px 0 16px;
+}
+
+.memberistic-auth-check,
+.memberistic-auth-check input {
+	color: #c9c9c9;
+	font-size: 13px;
+}
+
+.memberistic-auth-forgot {
+	color: #d5b35c;
+	font-size: 11px;
+	font-weight: 700;
+	letter-spacing: 0.14em;
+	text-decoration: none;
+	text-transform: uppercase;
+}
+
+.memberistic-auth-forgot:hover {
+	color: #fff;
+}
+
+.memberistic-auth-btn {
+	border: 1px solid transparent;
+	display: block;
+	font-size: 13px;
+	font-weight: 800;
+	letter-spacing: 0.12em;
+	padding: 13px 14px;
+	text-align: center;
+	text-decoration: none;
+	text-transform: uppercase;
+	width: 100%;
+}
+
+.memberistic-auth-btn--primary {
+	background: #ff4b1f;
+	border-color: #ff4b1f;
+	color: #fff;
+}
+
+.memberistic-auth-btn--primary:hover {
+	filter: brightness(1.08);
+}
+
+.memberistic-auth-btn--secondary {
+	background: #c9a84c;
+	border-color: #c9a84c;
+	color: #0a0a0a;
+}
+
+.memberistic-auth-divider {
+	color: #909090;
+	font-size: 10px;
+	font-weight: 700;
+	letter-spacing: 0.24em;
+	margin: 18px 0 12px;
+	text-align: center;
+	text-transform: uppercase;
+}
+
+.memberistic-auth-alt {
+	color: #9e9e9e;
+	font-size: 10px;
+	font-weight: 700;
+	letter-spacing: 0.18em;
+	margin-top: 8px;
+	text-align: center;
+	text-transform: uppercase;
+}
+
+/* Checkout page style aligned to Guns2Ammo UI v2 */
+.memberistic-co-shell {
+	color: #ececec;
+	margin: 0 auto;
+	max-width: 760px;
+	padding: 100px 24px 70px;
+}
+
+.memberistic-co-step-pip {
+	align-items: center;
+	color: #9b9b9b;
+	display: flex;
+	font-size: 11px;
+	font-weight: 700;
+	gap: 8px;
+	justify-content: center;
+	letter-spacing: 0.2em;
+	margin-bottom: 14px;
+	text-transform: uppercase;
+}
+
+.memberistic-co-step-pip .dot {
+	background: #5a5a5a;
+	border-radius: 50%;
+	height: 8px;
+	width: 8px;
+}
+
+.memberistic-co-step-pip .dot.cur {
+	background: #c9a84c;
+}
+
+.memberistic-co-title {
+	color: #fff;
+	font-size: clamp(36px, 6vw, 54px);
+	letter-spacing: 0.04em;
+	line-height: 1;
+	margin: 0 0 8px;
+	text-align: center;
+}
+
+.memberistic-co-sub {
+	color: #c3c3c3;
+	font-size: 15px;
+	margin: 0 auto 34px;
+	max-width: 50ch;
+	text-align: center;
+}
+
+.memberistic-co-summary,
+.memberistic-co-section {
+	background: #141414;
+	border: 1px solid #3a3a3a;
+	padding: 24px;
+}
+
+.memberistic-co-summary {
+	margin-bottom: 20px;
+}
+
+.memberistic-co-summary .row {
+	align-items: center;
+	display: flex;
+	gap: 14px;
+	justify-content: space-between;
+}
+
+.memberistic-co-summary .name {
+	color: #fff;
+	font-size: 30px;
+	font-weight: 800;
+	letter-spacing: 0.04em;
+	line-height: 1;
+}
+
+.memberistic-co-summary .tag {
+	color: #d5b35c;
+	font-size: 10px;
+	font-weight: 700;
+	letter-spacing: 0.2em;
+	margin-top: 4px;
+	text-transform: uppercase;
+}
+
+.memberistic-co-summary .price {
+	color: #d5b35c;
+	font-size: 36px;
+	font-weight: 800;
+}
+
+.memberistic-co-summary .price span {
+	color: #aaa;
+	font-size: 13px;
+	font-weight: 600;
+	margin-left: 4px;
+}
+
+.memberistic-co-form {
+	display: grid;
+	gap: 14px;
+}
+
+.memberistic-co-section h3 {
+	align-items: center;
+	color: #fff;
+	display: flex;
+	font-size: 20px;
+	font-weight: 700;
+	gap: 12px;
+	letter-spacing: 0.06em;
+	margin: 0 0 16px;
+	text-transform: uppercase;
+}
+
+.memberistic-co-section h3 .n {
+	border: 1px solid #c9a84c;
+	color: #d5b35c;
+	display: inline-grid;
+	height: 28px;
+	place-items: center;
+	width: 28px;
+}
+
+.memberistic-co-label {
+	color: #b9b9b9;
+	display: block;
+	font-size: 11px;
+	font-weight: 700;
+	letter-spacing: 0.16em;
+	margin-bottom: 6px;
+	margin-top: 8px;
+	text-transform: uppercase;
+}
+
+.memberistic-co-form input,
+.memberistic-co-form select {
+	background: #0f0f0f;
+	border: 1px solid #4a4a4a;
+	color: #f3f3f3;
+	min-height: 46px;
+	padding: 10px 12px;
+}
+
+.memberistic-co-form input:focus,
+.memberistic-co-form select:focus {
+	border-color: #c9a84c;
+	outline: none;
+}
+
+.memberistic-co-note {
+	color: #bfbfbf;
+	margin: 0;
+}
+
+.memberistic-co-section--terms {
+	background: rgba(201, 168, 76, 0.06);
+	border-color: rgba(201, 168, 76, 0.35);
+}
+
+.memberistic-co-submit-wrap {
+	padding: 20px 0 6px;
+}
+
+@media (max-width: 768px) {
+	.memberistic-auth-card {
+		padding: 22px;
+	}
+
+	.memberistic-auth-title {
+		font-size: 34px;
+	}
+
+	.memberistic-co-shell {
+		padding: 72px 14px 54px;
+	}
+
+	.memberistic-co-summary .row {
+		align-items: flex-start;
+		flex-direction: column;
+	}
+
+	.memberistic-co-summary .name {
+		font-size: 24px;
+	}
+
+	.memberistic-co-summary .price {
+		font-size: 30px;
+	}
+}

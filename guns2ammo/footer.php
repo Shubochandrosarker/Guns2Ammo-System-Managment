@@ -1,0 +1,110 @@
+<?php
+/**
+ * Footer  Guns 2 Ammo child theme
+ */
+if ( ! defined( 'ABSPATH' ) ) exit;
+
+$phone   = get_theme_mod( 'g2a_phone', '(602) 715-2677' );
+$email   = get_theme_mod( 'g2a_email', 'sales@guns2ammo.com' );
+$addr1   = get_theme_mod( 'g2a_addr1', '6030 E Main St, Suite 103' );
+$addr2   = get_theme_mod( 'g2a_addr2', 'Mesa, AZ 85205' );
+$rating  = get_theme_mod( 'g2a_rating', '4.7' );
+$reviews = get_theme_mod( 'g2a_review_count', '449+' );
+?>
+</main><!-- /#g2a-main -->
+
+<section class="g2a-news" style="background:#151419; padding: 56px 32px; border-top:1px solid var(--color-hairline);">
+	<div class="newsletter-band" style="max-width: 1280px; margin: 0 auto;">
+		<div>
+			<h3>GET RANGE UPDATES</h3>
+			<p>New inventory, training schedules, and exclusive member pricing  straight to your inbox.</p>
+		</div>
+		<form onsubmit="event.preventDefault(); this.querySelector('button').textContent='JOINED';" aria-label="Newsletter signup">
+			<input type="email" placeholder="your@email.com" required aria-label="Email">
+			<button type="submit">JOIN <span style="font-size:14px;">-></span></button>
+		</form>
+	</div>
+</section>
+
+<footer class="g2a-foot" role="contentinfo">
+	<div class="grid">
+		<div>
+			<div class="brand"><span class="mark"></span>GUNS&nbsp;2&nbsp;AMMO</div>
+			<div style="color: var(--color-fog); font-size:14px; max-width:32ch; margin-bottom:22px; line-height: 1.65;">Mesa's most-trusted indoor shooting range, FFL-licensed firearms store, and NRA-certified training facility. Since 2014.</div>
+			<div style="display:inline-flex; align-items:center; gap:12px; padding: 10px 16px; border:1px solid var(--color-hairline-bright); margin-bottom: 18px;">
+				<span style="color: var(--color-brass-bright); font-family: var(--font-mono); font-size: 14px; letter-spacing: 0.08em;">*****</span>
+				<span style="font-family: var(--font-condensed); font-weight:600; font-size:18px; color: var(--color-white);"><?php echo esc_html( $rating ); ?></span>
+				<span style="font-family: var(--font-mono); font-size:11px; letter-spacing:0.16em; color: var(--color-silver); text-transform: uppercase;"><?php echo esc_html( $reviews ); ?> Google</span>
+			</div>
+			<div style="display:flex; gap:10px;">
+				<a href="<?php echo esc_url( get_theme_mod( 'g2a_social_fb', '#' ) ); ?>" aria-label="Facebook" style="width:36px; height:36px; border:1px solid var(--color-hairline-bright); border-radius:50%; display:grid; place-items:center; color: var(--color-fog);"><svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M24 12.07C24 5.4 18.63 0 12 0S0 5.4 0 12.07c0 6.02 4.39 11.01 10.13 11.93v-8.44H7.08v-3.49h3.05V9.41c0-3.02 1.79-4.69 4.53-4.69 1.31 0 2.69.23 2.69.23v2.96h-1.51c-1.49 0-1.96.93-1.96 1.88v2.27h3.33l-.53 3.49h-2.8V24c5.74-.92 10.13-5.91 10.13-11.93z"/></svg></a>
+				<a href="<?php echo esc_url( get_theme_mod( 'g2a_social_ig', '#' ) ); ?>" aria-label="Instagram" style="width:36px; height:36px; border:1px solid var(--color-hairline-bright); border-radius:50%; display:grid; place-items:center; color: var(--color-fog);"><svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 0C8.74 0 8.33.01 7.05.07 5.78.13 4.9.33 4.14.63a5.88 5.88 0 0 0-2.13 1.38A5.88 5.88 0 0 0 .63 4.14C.33 4.9.13 5.78.07 7.05.01 8.33 0 8.74 0 12s.01 3.67.07 4.95c.06 1.27.26 2.15.56 2.91.31.79.73 1.46 1.38 2.13a5.88 5.88 0 0 0 2.13 1.38c.76.3 1.64.5 2.91.56C8.33 23.99 8.74 24 12 24s3.67-.01 4.95-.07c1.27-.06 2.15-.26 2.91-.56a5.88 5.88 0 0 0 2.13-1.38 5.88 5.88 0 0 0 1.38-2.13c.3-.76.5-1.64.56-2.91.06-1.28.07-1.69.07-4.95s-.01-3.67-.07-4.95c-.06-1.27-.26-2.15-.56-2.91a5.88 5.88 0 0 0-1.38-2.13A5.88 5.88 0 0 0 19.86.63C19.1.33 18.22.13 16.95.07 15.67.01 15.26 0 12 0Zm0 5.84A6.16 6.16 0 1 1 5.84 12 6.16 6.16 0 0 1 12 5.84ZM12 16a4 4 0 1 0-4-4 4 4 0 0 0 4 4Zm6.4-11.85a1.44 1.44 0 1 0 1.44 1.44 1.44 1.44 0 0 0-1.44-1.44Z"/></svg></a>
+				<a href="<?php echo esc_url( get_theme_mod( 'g2a_social_x', '#' ) ); ?>" aria-label="X" style="width:36px; height:36px; border:1px solid var(--color-hairline-bright); border-radius:50%; display:grid; place-items:center; color: var(--color-fog);"><svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M18 2h3l-7.5 8.5L22 22h-6.8l-5.3-7-6.1 7H1l8-9.2L1.6 2h7l4.8 6.4L18 2z"/></svg></a>
+				<a href="<?php echo esc_url( get_theme_mod( 'g2a_social_yt', '#' ) ); ?>" aria-label="YouTube" style="width:36px; height:36px; border:1px solid var(--color-hairline-bright); border-radius:50%; display:grid; place-items:center; color: var(--color-fog);"><svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M23.5 6.2a3 3 0 0 0-2.1-2.1C19.5 3.6 12 3.6 12 3.6s-7.5 0-9.4.5A3 3 0 0 0 .5 6.2C0 8.1 0 12 0 12s0 3.9.5 5.8a3 3 0 0 0 2.1 2.1c1.9.5 9.4.5 9.4.5s7.5 0 9.4-.5a3 3 0 0 0 2.1-2.1c.5-1.9.5-5.8.5-5.8s0-3.9-.5-5.8ZM9.6 15.6V8.4l6.2 3.6-6.2 3.6Z"/></svg></a>
+			</div>
+		</div>
+		<div>
+			<h5>QUICK ACCESS</h5>
+			<ul>
+				<li><a href="<?php echo esc_url( home_url( '/book-a-lane/' ) ); ?>">Book a Lane</a></li>
+				<li><a href="<?php echo esc_url( home_url( '/memberships/' ) ); ?>">Membership</a></li>
+				<li><a href="<?php echo esc_url( home_url( '/training/' ) ); ?>">Training Courses</a></li>
+				<li><a href="<?php echo esc_url( home_url( '/transfers/' ) ); ?>">Firearm Transfers</a></li>
+				<li><a href="<?php echo esc_url( home_url( '/sell-your-gun/' ) ); ?>">Sell Your Gun</a></li>
+				<li><a href="<?php echo esc_url( home_url( '/machine-gun/' ) ); ?>">Machine Gun Packages</a></li>
+				<li><a href="<?php echo esc_url( home_url( '/get-support/' ) ); ?>">Get Support</a></li>
+			</ul>
+		</div>
+		<div>
+			<h5>COLLECTIONS</h5>
+			<ul>
+				<li><a href="<?php echo esc_url( home_url( '/collections/' ) ); ?>">All Collections</a></li>
+				<li><a href="<?php echo esc_url( home_url( '/collections/handguns/' ) ); ?>">Handguns</a></li>
+				<li><a href="<?php echo esc_url( home_url( '/collections/rifles/' ) ); ?>">Rifles</a></li>
+				<li><a href="<?php echo esc_url( home_url( '/collections/ammunition/' ) ); ?>">Ammunition</a></li>
+				<li><a href="<?php echo esc_url( home_url( '/collections/magazines/' ) ); ?>">Magazines</a></li>
+				<li><a href="<?php echo esc_url( home_url( '/shop/' ) ); ?>">All Products</a></li>
+			</ul>
+		</div>
+		<div>
+			<h5>VISIT US</h5>
+			<ul>
+				<li style="font-family: var(--font-condensed); font-weight:600; font-size:15px; color: var(--color-white); line-height:1.4;"><?php echo esc_html( $addr1 ); ?><br><?php echo esc_html( $addr2 ); ?></li>
+				<li><a href="tel:<?php echo esc_attr( preg_replace( '/[^0-9+]/', '', '+1' . $phone ) ); ?>" style="color: var(--color-brass-bright); display:inline-flex; align-items:center; gap:8px;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M22 16.92V20a2 2 0 0 1-2.18 2 19.86 19.86 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6A19.86 19.86 0 0 1 2.12 4.18 2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg> <?php echo esc_html( $phone ); ?></a></li>
+				<li><a href="mailto:<?php echo esc_attr( $email ); ?>" style="color: var(--color-brass-bright); display:inline-flex; align-items:center; gap:8px;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="1"/><path d="m3 7 9 6 9-6"/></svg> <?php echo esc_html( $email ); ?></a></li>
+				<li style="display:flex; gap:14px; align-items:center; flex-wrap:wrap; padding-top:8px;">
+					<a href="<?php echo esc_url( get_theme_mod( 'g2a_directions_url', 'https://www.google.com/maps/dir/?api=1&destination=Guns+2+Ammo%2C+6030+E+Main+St+%23103%2C+Mesa%2C+AZ+85205%2C+United+States&destination_place_id=ChIJaSRMhpGvK4cR4kE_E-jZvKE' ) ); ?>" target="_blank" rel="noopener" style="display:inline-flex; align-items:center; gap:6px;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 2 C8 2 5 5 5 9 c0 6 7 13 7 13 s7-7 7-13 c0-4-3-7-7-7 z"/><circle cx="12" cy="9" r="2.5"/></svg>Get Directions</a>
+					<a href="<?php echo esc_url( home_url( '/contact/' ) ); ?>" style="display:inline-flex; align-items:center; gap:6px;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18"/></svg>Contact</a>
+				</li>
+			</ul>
+		</div>
+	</div>
+	<div class="strip">
+		<span> <?php echo esc_html( date( 'Y' ) ); ?> Guns 2 Ammo  Mesa, Arizona  FFL Licensed</span>
+		<span><a href="<?php echo esc_url( home_url( '/privacy-policy/' ) ); ?>">Privacy</a>  <a href="<?php echo esc_url( home_url( '/terms-and-conditions/' ) ); ?>">Terms</a>  <a href="<?php echo esc_url( home_url( '/refund-and-returns-policy/' ) ); ?>">Refunds</a>  <a href="<?php echo esc_url( home_url( '/range-safety/' ) ); ?>">Range Rules</a>  <a href="<?php echo esc_url( home_url( '/sitemap/' ) ); ?>">Sitemap</a></span>
+	</div>
+</footer>
+
+<!-- Quick-view modal (mounted once, populated by chrome.js) -->
+<div class="qv-backdrop" id="g2a-qv" role="dialog" aria-modal="true" aria-hidden="true">
+	<div class="qv-modal">
+		<div class="qv-image" id="g2a-qv-img" data-pl="PRODUCT IMAGE PLACEHOLDER"></div>
+		<div class="qv-body">
+			<button class="qv-close" id="g2a-qv-close" aria-label="Close"></button>
+			<div class="qv-brand" id="g2a-qv-brand">BRAND</div>
+			<h3 class="qv-title" id="g2a-qv-title">Product</h3>
+			<div class="qv-price"><span id="g2a-qv-price">$0</span> <span class="was" id="g2a-qv-was"></span></div>
+			<div class="star-rating" style="color: var(--color-brass-bright); font-family: var(--font-mono); font-size:13px; letter-spacing:0.1em; margin-top:8px;">* * * * *</div>
+			<p class="qv-desc" id="g2a-qv-desc">Description.</p>
+			<div class="qv-meta" id="g2a-qv-meta"></div>
+			<div style="display:flex; gap:10px; flex-wrap:wrap;">
+				<a class="btn btn-ember" id="g2a-qv-cart">Add To Cart</a>
+				<a class="btn btn-brass" id="g2a-qv-detail">View Full Details -></a>
+			</div>
+		</div>
+	</div>
+</div>
+
+<?php wp_footer(); ?>
+</body>
+</html>

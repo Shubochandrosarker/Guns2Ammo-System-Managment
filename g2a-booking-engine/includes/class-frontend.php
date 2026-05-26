@@ -1,0 +1,995 @@
+<?php
+/**
+ * Frontend orchestrator.
+ *
+ * Renders the new "Calendly-style" two-column booking experience:
+ *   LEFT  — service info card (title, badges, description, feature bullets).
+ *   RIGHT — date calendar + time slots → details form → confirmation.
+ *
+ * The visual design is driven entirely by saved options (the Form Customizer
+ * tab in Settings) so the same plugin can be styled per site without code.
+ *
+ * Phase 1 shortcodes:
+ *   [g2a_lane_booking]      — full booking flow.
+ *   [g2a_booking_form]      — alias that routes a saved form/type into the flow.
+ *
+ * @package G2AB
+ */
+
+if ( ! defined( 'ABSPATH' ) ) {
+	exit;
+}
+
+final class G2AB_Frontend {
+
+	private static $instance = null;
+	private $enqueued = false;
+
+	public static function instance() {
+		if ( null === self::$instance ) {
+			self::$instance = new self();
+		}
+		return self::$instance;
+	}
+
+	private function __construct() {
+		add_shortcode( 'g2a_lane_booking', array( $this, 'render_lane_booking' ) );
+		add_shortcode( 'g2a_ladies_tuesday_booking', array( $this, 'render_ladies_tuesday_booking' ) );
+		add_shortcode( 'g2a_classes_booking', array( $this, 'render_classes_booking' ) );
+		add_shortcode( 'g2a_resource_booking', array( $this, 'render_resource_booking' ) );
+		add_shortcode( 'g2a_booking_form', array( $this, 'render_booking_form' ) );
+		add_action( 'wp_enqueue_scripts', array( $this, 'register_assets' ), 5 );
+		add_action( 'wp_enqueue_scripts', array( $this, 'maybe_enqueue_return_assets' ), 20 );
+	}
+
+	public function register_assets() {
+		wp_register_style(
+			'g2ab-frontend',
+			G2AB_URL . 'assets/css/frontend.css',
+			array(),
+			G2AB_VERSION
+		);
+		wp_register_script(
+			'g2ab-frontend',
+			G2AB_URL . 'assets/js/frontend.js',
+			array(),
+			G2AB_VERSION,
+			true
+		);
+	}
+
+	public function maybe_enqueue_return_assets() {
+		if ( isset( $_GET['g2ab_paid'] ) || isset( $_GET['g2ab_cancel'] ) || isset( $_GET['g2ab_pay'] ) ) {
+			$this->enqueue_assets();
+		}
+	}
+
+	private function enqueue_assets() {
+		if ( $this->enqueued ) {
+			return;
+		}
+		wp_enqueue_style( 'g2ab-frontend' );
+		wp_enqueue_script( 'g2ab-frontend' );
+		wp_localize_script(
+			'g2ab-frontend',
+			'G2AB_DATA',
+			array(
+				'rest_url'       => esc_url_raw( rest_url( G2AB_REST_NAMESPACE . '/' ) ),
+				'rest_namespace' => G2AB_REST_NAMESPACE,
+				'nonce'          => wp_create_nonce( 'wp_rest' ),
+				'currency'       => get_option( 'g2ab_currency', 'USD' ),
+			)
+		);
+		$this->enqueued = true;
+	}
+
+	private function mark_booking_page_dynamic() {
+		if ( ! defined( 'DONOTCACHEPAGE' ) ) define( 'DONOTCACHEPAGE', true );
+		if ( ! defined( 'DONOTCACHEOBJECT' ) ) define( 'DONOTCACHEOBJECT', true );
+		if ( ! defined( 'DONOTCACHEDB' ) ) define( 'DONOTCACHEDB', true );
+		nocache_headers();
+	}
+
+	/**
+	 * Read all design-token options and return a sanitised tokens array.
+	 *
+	 * Each token has a sensible default that matches the reference design
+	 * (dark gradient, blue accent, rounded corners, Inter typography).
+	 */
+	private function get_design_tokens() {
+		$tokens = array(
+			'theme'           => sanitize_key( get_option( 'g2ab_form_theme', 'midnight' ) ),
+			'layout'          => sanitize_key( get_option( 'g2ab_form_layout', 'split' ) ),
+			'primary'         => $this->sanitize_color( get_option( 'g2ab_form_primary', '#5B7BFF' ) ),
+			'accent'          => $this->sanitize_color( get_option( 'g2ab_form_accent', '#7C9CFF' ) ),
+			'bg'              => $this->sanitize_color( get_option( 'g2ab_form_bg', '#0B1020' ) ),
+			'surface'         => $this->sanitize_color( get_option( 'g2ab_form_surface', '#121833' ) ),
+			'surface2'        => $this->sanitize_color( get_option( 'g2ab_form_surface2', '#0E1530' ) ),
+			'text'            => $this->sanitize_color( get_option( 'g2ab_form_text', '#FFFFFF' ) ),
+			'muted'           => $this->sanitize_color( get_option( 'g2ab_form_muted', '#8B93B4' ) ),
+			'border'          => $this->sanitize_color( get_option( 'g2ab_form_border', 'rgba(255,255,255,0.08)' ) ),
+			'radius'          => $this->sanitize_radius( get_option( 'g2ab_form_radius', '16' ) ),
+			'radius_pill'     => $this->sanitize_radius( get_option( 'g2ab_form_radius_pill', '999' ) ),
+			'font'            => sanitize_key( get_option( 'g2ab_form_font', 'inter' ) ),
+			'animations'      => (int) get_option( 'g2ab_form_animations', 1 ),
+			'show_pricing'    => (int) get_option( 'g2ab_form_show_pricing', 1 ),
+			'show_lane_grid'  => (int) get_option( 'g2ab_form_show_lane_grid', 1 ),
+			'title_override'  => sanitize_text_field( get_option( 'g2ab_form_title', '' ) ),
+			'subtitle'        => sanitize_text_field( get_option( 'g2ab_form_subtitle', '' ) ),
+			'description'     => wp_kses_post( get_option( 'g2ab_form_description', '' ) ),
+			'features'        => array_filter( array_map( 'trim', preg_split( '/\r?\n/', (string) get_option( 'g2ab_form_features', "Instant confirmation email\nReschedule or cancel anytime\nNo spam — just your booking" ) ) ) ),
+			'badge_duration'  => (int) get_option( 'g2ab_form_badge_duration', 1 ),
+			'badge_price'     => (int) get_option( 'g2ab_form_badge_price', 1 ),
+			'continue_label'  => sanitize_text_field( get_option( 'g2ab_form_continue_label', __( 'Continue', 'g2a-booking' ) ) ),
+			'submit_label'    => sanitize_text_field( get_option( 'g2ab_form_submit_label', '' ) ),
+			'shadow'          => sanitize_text_field( get_option( 'g2ab_form_shadow', '0 30px 80px rgba(8,12,32,0.45)' ) ),
+		);
+		return apply_filters( 'g2ab_form_design_tokens', $tokens );
+	}
+
+	private function sanitize_color( $value ) {
+		$value = trim( (string) $value );
+		if ( '' === $value ) return '';
+		if ( preg_match( '/^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$/', $value ) ) {
+			return $value;
+		}
+		if ( preg_match( '/^rgba?\(\s*\d+\s*,\s*\d+\s*,\s*\d+(\s*,\s*[\d.]+)?\s*\)$/', $value ) ) {
+			return $value;
+		}
+		return '';
+	}
+
+	private function sanitize_radius( $value ) {
+		$value = preg_replace( '/[^0-9.]/', '', (string) $value );
+		if ( '' === $value ) return '16';
+		return (string) min( 999, max( 0, (float) $value ) );
+	}
+
+	private function font_family_for( $key ) {
+		$stacks = array(
+			'system'  => '-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif',
+			'inter'   => '"Inter","Segoe UI",Roboto,Helvetica,Arial,sans-serif',
+			'manrope' => '"Manrope","Inter","Segoe UI",sans-serif',
+			'rubik'   => '"Rubik","Inter","Segoe UI",sans-serif',
+			'dmsans'  => '"DM Sans","Inter","Segoe UI",sans-serif',
+		);
+		return $stacks[ $key ] ?? $stacks['inter'];
+	}
+
+	private function font_link_for( $key ) {
+		$urls = array(
+			'inter'   => 'https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap',
+			'manrope' => 'https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700&display=swap',
+			'rubik'   => 'https://fonts.googleapis.com/css2?family=Rubik:wght@400;500;600;700&display=swap',
+			'dmsans'  => 'https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700&display=swap',
+		);
+		return $urls[ $key ] ?? '';
+	}
+
+	private function resource_type_for_booking_type( $booking_type ) {
+		$settings = isset( $booking_type->settings ) ? json_decode( (string) $booking_type->settings, true ) : array();
+		$configured = is_array( $settings ) && ! empty( $settings['resource_type'] ) ? sanitize_key( $settings['resource_type'] ) : '';
+		if ( in_array( $configured, array( 'lane', 'classroom', 'instructor', 'package' ), true ) ) {
+			return $configured;
+		}
+		$category = isset( $booking_type->category ) ? sanitize_key( $booking_type->category ) : 'lane';
+		return 'class' === $category ? 'classroom' : 'lane';
+	}
+
+	private function resource_label_for_type( $type ) {
+		$labels = array(
+			'classroom'  => __( 'Classroom', 'g2a-booking' ),
+			'instructor' => __( 'Instructor', 'g2a-booking' ),
+			'package'    => __( 'Package', 'g2a-booking' ),
+			'lane'       => __( 'Lane', 'g2a-booking' ),
+		);
+		return $labels[ $type ] ?? __( 'Resource', 'g2a-booking' );
+	}
+
+	private function get_form_for_booking_type( $booking_type, $form_slug = '' ) {
+		global $wpdb;
+		$form_table = $wpdb->prefix . 'g2ab_forms';
+		if ( $form_slug ) {
+			$form = $wpdb->get_row( $wpdb->prepare( "SELECT * FROM {$form_table} WHERE slug = %s AND is_active = 1", $form_slug ) );
+			if ( $form ) return $form;
+		}
+		if ( ! empty( $booking_type->form_id ) ) {
+			$form = $wpdb->get_row( $wpdb->prepare( "SELECT * FROM {$form_table} WHERE id = %d AND is_active = 1", (int) $booking_type->form_id ) );
+			if ( $form ) return $form;
+		}
+		return $wpdb->get_row( $wpdb->prepare( "SELECT * FROM {$form_table} WHERE slug = %s AND is_active = 1", 'default-lane-booking' ) );
+	}
+
+	private function display_pricing_for_booking_type( $booking_type ) {
+		$subtotal = round( (float) $booking_type->base_price, 2 );
+		$pricing  = array(
+			'subtotal'        => $subtotal,
+			'discount_amount' => 0.0,
+			'total'           => $subtotal,
+			'discount_label'  => '',
+		);
+		$pricing = apply_filters( 'g2ab_booking_display_pricing', $pricing, $booking_type, 1, get_current_user_id() );
+		$pricing['subtotal']        = max( 0, round( (float) ( $pricing['subtotal'] ?? $subtotal ), 2 ) );
+		$pricing['discount_amount'] = max( 0, min( $pricing['subtotal'], round( (float) ( $pricing['discount_amount'] ?? 0 ), 2 ) ) );
+		$pricing['total']           = max( 0, round( (float) ( $pricing['total'] ?? ( $pricing['subtotal'] - $pricing['discount_amount'] ) ), 2 ) );
+		$pricing['discount_label']  = sanitize_text_field( $pricing['discount_label'] ?? '' );
+		return $pricing;
+	}
+
+	/**
+	 * Main shortcode renderer.
+	 */
+	public function render_lane_booking( $atts = array() ) {
+		$atts = shortcode_atts(
+			array(
+				'booking_type' => 'lane-booking',
+				'form'         => 'default-lane-booking',
+				'theme'        => '',
+			),
+			$atts,
+			'g2a_lane_booking'
+		);
+
+		$this->mark_booking_page_dynamic();
+		$this->enqueue_assets();
+
+		global $wpdb;
+
+		$bt_table     = $wpdb->prefix . 'g2ab_booking_types';
+		$booking_type = $wpdb->get_row( $wpdb->prepare( "SELECT * FROM {$bt_table} WHERE slug = %s AND is_active = 1", $atts['booking_type'] ) );
+		if ( ! $booking_type ) {
+			return $this->render_error( __( 'Booking type not configured. Visit G2A Booking → Booking Types.', 'g2a-booking' ) );
+		}
+
+		$requested      = $booking_type;
+		$viewer_member  = $this->current_user_is_member();
+		$requested_only = ! empty( $requested->members_only );
+		if ( $requested_only && ! $viewer_member ) {
+			$public = $this->get_public_lane_booking_type();
+			if ( $public ) {
+				$booking_type = $public;
+			}
+		}
+
+		$resource_type  = $this->resource_type_for_booking_type( $booking_type );
+		$resource_label = $this->resource_label_for_type( $resource_type );
+
+		$resources = $wpdb->get_results( $wpdb->prepare(
+			"SELECT id, name, slug, capacity FROM {$wpdb->prefix}g2ab_resources WHERE type = %s AND is_active = 1 ORDER BY sort_order ASC, name ASC",
+			$resource_type
+		) );
+		if ( empty( $resources ) ) {
+			return $this->render_error( sprintf(
+				/* translators: %s resource label */
+				__( 'No %s resources are configured. Visit G2A Booking → Resources.', 'g2a-booking' ),
+				strtolower( $resource_label )
+			) );
+		}
+
+		$form         = $this->get_form_for_booking_type( $booking_type, $atts['form'] );
+		$display_pric = $this->display_pricing_for_booking_type( $booking_type );
+
+		$fields = array();
+		if ( $form ) {
+			$fields = $wpdb->get_results( $wpdb->prepare(
+				"SELECT * FROM {$wpdb->prefix}g2ab_form_fields WHERE form_id = %d ORDER BY sort_order ASC",
+				(int) $form->id
+			) );
+		}
+
+		$tokens      = $this->get_design_tokens();
+		$override    = $atts['theme'] ? sanitize_key( $atts['theme'] ) : $tokens['theme'];
+		$tokens['theme'] = $override;
+
+		$instance_id = 'g2ab-' . substr( md5( uniqid( 'g2ab', true ) ), 0, 12 );
+		$today       = current_time( 'Y-m-d' );
+		$max_days    = (int) get_option( 'g2ab_max_booking_advance_days', 90 );
+
+		// Optional Google font link (rendered once per page).
+		$font_url = $this->font_link_for( $tokens['font'] );
+		if ( $font_url ) {
+			static $printed = array();
+			if ( empty( $printed[ $tokens['font'] ] ) ) {
+				printf( '<link rel="stylesheet" href="%s" />', esc_url( $font_url ) );
+				$printed[ $tokens['font'] ] = true;
+			}
+		}
+
+		$service_title    = $tokens['title_override'] ?: $booking_type->name;
+		$service_subtitle = $tokens['subtitle'] ?: '';
+		$service_desc     = $tokens['description'] ?: '';
+		$price_total      = (float) $display_pric['total'];
+		$price_label      = $price_total <= 0 ? __( 'FREE', 'g2a-booking' ) : sprintf( '$%s', number_format( $price_total, 2 ) );
+
+		ob_start();
+		?>
+		<div id="<?php echo esc_attr( $instance_id ); ?>"
+			class="g2ab g2ab-booking g2ab-theme-<?php echo esc_attr( $tokens['theme'] ); ?> g2ab-layout-<?php echo esc_attr( $tokens['layout'] ); ?> <?php echo $tokens['animations'] ? 'g2ab-animate' : 'g2ab-static'; ?>"
+			data-booking-type-id="<?php echo (int) $booking_type->id; ?>"
+			data-form-id="<?php echo $form ? (int) $form->id : 0; ?>"
+			data-resource-label="<?php echo esc_attr( $resource_label ); ?>"
+			data-resource-type="<?php echo esc_attr( $resource_type ); ?>"
+			data-duration="<?php echo (int) $booking_type->duration_min; ?>"
+			data-today="<?php echo esc_attr( $today ); ?>"
+			data-max-days="<?php echo (int) $max_days; ?>"
+			style="<?php echo esc_attr( $this->build_css_vars( $tokens ) ); ?>">
+
+			<div class="g2ab-shell">
+
+				<!-- LEFT: service info card -->
+				<aside class="g2ab-aside">
+					<div class="g2ab-card g2ab-aside__card">
+						<div class="g2ab-aside__badges">
+							<?php if ( $tokens['badge_duration'] ) : ?>
+								<span class="g2ab-pill"><?php echo esc_html( (int) $booking_type->duration_min . ' ' . __( 'MIN', 'g2a-booking' ) ); ?></span>
+							<?php endif; ?>
+							<?php if ( $tokens['badge_price'] ) : ?>
+								<span class="g2ab-pill g2ab-pill--accent"><?php echo esc_html( $price_label ); ?></span>
+							<?php endif; ?>
+						</div>
+
+						<h2 class="g2ab-aside__title"><?php echo esc_html( $service_title ); ?></h2>
+
+						<?php if ( $service_subtitle ) : ?>
+							<p class="g2ab-aside__subtitle"><?php echo esc_html( $service_subtitle ); ?></p>
+						<?php endif; ?>
+
+						<?php if ( $service_desc ) : ?>
+							<div class="g2ab-aside__desc"><?php echo wp_kses_post( wpautop( $service_desc ) ); ?></div>
+						<?php endif; ?>
+
+						<?php if ( ! empty( $tokens['features'] ) ) : ?>
+							<ul class="g2ab-aside__features">
+								<?php foreach ( $tokens['features'] as $feature ) : ?>
+									<li>
+										<span class="g2ab-dot" aria-hidden="true"></span>
+										<span><?php echo esc_html( $feature ); ?></span>
+									</li>
+								<?php endforeach; ?>
+							</ul>
+						<?php endif; ?>
+
+						<?php if ( $tokens['show_pricing'] && (float) $display_pric['discount_amount'] > 0 ) : ?>
+							<p class="g2ab-aside__discount-note">
+								<?php
+								printf(
+									/* translators: 1: original price, 2: discount label */
+									esc_html__( 'Original $%1$s. %2$s applied.', 'g2a-booking' ),
+									esc_html( number_format( (float) $display_pric['subtotal'], 2 ) ),
+									esc_html( $display_pric['discount_label'] ?: __( 'Member discount', 'g2a-booking' ) )
+								);
+								?>
+							</p>
+						<?php endif; ?>
+					</div>
+				</aside>
+
+				<!-- RIGHT: booking stage -->
+				<main class="g2ab-stage">
+
+					<!-- ─────────────────────────────────────────────────
+					     STAGE 1 — Pick a time
+					     ───────────────────────────────────────────────── -->
+					<section class="g2ab-stage__panel is-active" data-stage="time" aria-labelledby="<?php echo esc_attr( $instance_id ); ?>-stage-title">
+						<header class="g2ab-stage__head">
+							<h3 id="<?php echo esc_attr( $instance_id ); ?>-stage-title" class="g2ab-stage__title"><?php esc_html_e( 'Choose a date &amp; time', 'g2a-booking' ); ?></h3>
+							<p class="g2ab-stage__meta">
+								<?php
+								/* translators: %s site timezone */
+								printf( esc_html__( 'Times shown in %s', 'g2a-booking' ), esc_html( wp_timezone_string() ) );
+								?>
+							</p>
+						</header>
+
+						<?php if ( count( $resources ) > 1 && $tokens['show_lane_grid'] ) : ?>
+							<div class="g2ab-resource-row">
+								<label class="g2ab-field-label" for="<?php echo esc_attr( $instance_id ); ?>-resource">
+									<?php /* translators: %s resource label */ printf( esc_html__( 'Select %s', 'g2a-booking' ), esc_html( $resource_label ) ); ?>
+								</label>
+								<div class="g2ab-resource-grid">
+									<?php foreach ( $resources as $idx => $res ) : ?>
+										<button type="button"
+											class="g2ab-chip<?php echo 0 === $idx ? ' is-selected' : ''; ?>"
+											data-resource-id="<?php echo (int) $res->id; ?>"
+											data-resource-name="<?php echo esc_attr( $res->name ); ?>">
+											<?php echo esc_html( $res->name ); ?>
+										</button>
+									<?php endforeach; ?>
+								</div>
+							</div>
+						<?php else : ?>
+							<input type="hidden" data-single-resource-id value="<?php echo (int) $resources[0]->id; ?>" />
+							<input type="hidden" data-single-resource-name value="<?php echo esc_attr( $resources[0]->name ); ?>" />
+						<?php endif; ?>
+
+						<div class="g2ab-pick">
+							<div class="g2ab-pick__cal">
+								<div class="g2ab-cal" data-calendar>
+									<header class="g2ab-cal__head">
+										<button type="button" class="g2ab-cal__nav" data-cal-prev aria-label="<?php esc_attr_e( 'Previous month', 'g2a-booking' ); ?>">‹</button>
+										<div class="g2ab-cal__title" data-cal-title></div>
+										<button type="button" class="g2ab-cal__nav" data-cal-next aria-label="<?php esc_attr_e( 'Next month', 'g2a-booking' ); ?>">›</button>
+									</header>
+									<div class="g2ab-cal__dow">
+										<?php
+										$dow_labels = array( __( 'Mon', 'g2a-booking' ), __( 'Tue', 'g2a-booking' ), __( 'Wed', 'g2a-booking' ), __( 'Thu', 'g2a-booking' ), __( 'Fri', 'g2a-booking' ), __( 'Sat', 'g2a-booking' ), __( 'Sun', 'g2a-booking' ) );
+										foreach ( $dow_labels as $label ) {
+											echo '<span>' . esc_html( strtoupper( $label ) ) . '</span>';
+										}
+										?>
+									</div>
+									<div class="g2ab-cal__grid" data-cal-grid></div>
+								</div>
+							</div>
+							<div class="g2ab-pick__slots">
+								<p class="g2ab-pick__hint" data-slots-hint><?php esc_html_e( 'Pick a date to see available times', 'g2a-booking' ); ?></p>
+								<div class="g2ab-slots" data-slots></div>
+							</div>
+						</div>
+
+						<footer class="g2ab-stage__foot">
+							<div class="g2ab-stage__summary" data-summary-pill hidden></div>
+							<button type="button" class="g2ab-btn g2ab-btn--primary" data-go-form disabled>
+								<?php echo esc_html( $tokens['continue_label'] ); ?>
+							</button>
+						</footer>
+					</section>
+
+					<!-- ─────────────────────────────────────────────────
+					     STAGE 2 — Your details
+					     ───────────────────────────────────────────────── -->
+					<section class="g2ab-stage__panel" data-stage="form">
+						<header class="g2ab-stage__head">
+							<button type="button" class="g2ab-back" data-back-time>
+								<span aria-hidden="true">‹</span> <?php esc_html_e( 'Back', 'g2a-booking' ); ?>
+							</button>
+							<h3 class="g2ab-stage__title"><?php esc_html_e( 'Your details', 'g2a-booking' ); ?></h3>
+							<p class="g2ab-stage__meta" data-summary-line></p>
+						</header>
+
+						<form class="g2ab-form" novalidate
+							action="javascript:void(0);"
+							method="post"
+							onsubmit="return false;"
+							data-g2ab-form="1">
+							<?php $this->render_form_fields( $fields ); ?>
+
+							<div class="g2ab-form__error" data-form-error hidden></div>
+
+							<footer class="g2ab-stage__foot">
+								<button type="button" class="g2ab-btn g2ab-btn--ghost" data-back-time>
+									<?php esc_html_e( 'Back', 'g2a-booking' ); ?>
+								</button>
+								<button type="submit" class="g2ab-btn g2ab-btn--primary">
+									<?php echo esc_html( $tokens['submit_label'] ?: sprintf( /* translators: %s resource label */ __( 'Reserve my %s', 'g2a-booking' ), strtolower( $resource_label ) ) ); ?>
+								</button>
+							</footer>
+						</form>
+					</section>
+
+					<!-- ─────────────────────────────────────────────────
+					     STAGE 3 — Done
+					     ───────────────────────────────────────────────── -->
+					<section class="g2ab-stage__panel" data-stage="done">
+						<div class="g2ab-done">
+							<div class="g2ab-done__check" aria-hidden="true">
+								<svg viewBox="0 0 64 64" width="64" height="64"><circle cx="32" cy="32" r="30" fill="none" stroke="currentColor" stroke-width="3"/><path d="M20 33 L29 42 L45 24" fill="none" stroke="currentColor" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+							</div>
+							<h3 class="g2ab-done__title"><?php esc_html_e( 'Booking confirmed', 'g2a-booking' ); ?></h3>
+							<p class="g2ab-done__msg" data-done-msg></p>
+							<p class="g2ab-done__id"><?php esc_html_e( 'Confirmation:', 'g2a-booking' ); ?> <code data-done-uuid></code></p>
+						</div>
+					</section>
+
+				</main>
+			</div>
+		</div>
+		<?php $this->render_inline_bootstrap( $instance_id ); ?>
+		<?php
+		return ob_get_clean();
+	}
+
+	/**
+	 * Build a `style=""` attribute value with CSS custom properties.
+	 */
+	private function build_css_vars( $tokens ) {
+		$vars = array(
+			'--g2ab-primary'  => $tokens['primary'],
+			'--g2ab-accent'   => $tokens['accent'],
+			'--g2ab-bg'       => $tokens['bg'],
+			'--g2ab-surface'  => $tokens['surface'],
+			'--g2ab-surface2' => $tokens['surface2'],
+			'--g2ab-text'     => $tokens['text'],
+			'--g2ab-muted'    => $tokens['muted'],
+			'--g2ab-border'   => $tokens['border'],
+			'--g2ab-radius'   => $tokens['radius'] . 'px',
+			'--g2ab-radius-pill' => $tokens['radius_pill'] . 'px',
+			'--g2ab-shadow'   => $tokens['shadow'],
+			'--g2ab-font'     => $this->font_family_for( $tokens['font'] ),
+		);
+		$out = '';
+		foreach ( $vars as $k => $v ) {
+			if ( '' !== $v ) {
+				$out .= $k . ':' . str_replace( array( ';', '"' ), '', (string) $v ) . ';';
+			}
+		}
+		return $out;
+	}
+
+	/**
+	 * Form fields renderer — unchanged structure, restyled by the new CSS.
+	 */
+	private function render_form_fields( $fields ) {
+		if ( empty( $fields ) ) {
+			echo '<p class="g2ab-muted">' . esc_html__( 'No form fields configured.', 'g2a-booking' ) . '</p>';
+			return;
+		}
+
+		foreach ( $fields as $field ) {
+			$key      = sanitize_key( $field->field_key );
+			$type     = sanitize_key( $field->field_type );
+			$label    = esc_html( $field->label );
+			$required = (int) $field->is_required ? 'required' : '';
+			$req_mark = (int) $field->is_required ? ' <span class="g2ab-req">*</span>' : '';
+			$id       = 'g2ab-f-' . $key;
+			$name     = 'fields[' . $key . ']';
+			$ph       = $field->placeholder ? esc_attr( $field->placeholder ) : '';
+			$help     = $field->help_text ? '<small class="g2ab-help">' . esc_html( $field->help_text ) . '</small>' : '';
+			$opts     = json_decode( (string) $field->options, true );
+			$opts     = is_array( $opts ) ? $opts : array();
+
+			echo '<div class="g2ab-field g2ab-field--' . esc_attr( $type ) . '">';
+
+			switch ( $type ) {
+				case 'text':
+				case 'email':
+				case 'phone':
+				case 'number':
+					$input_type = 'phone' === $type ? 'tel' : $type;
+					echo '<label class="g2ab-field-label" for="' . esc_attr( $id ) . '">' . $label . $req_mark . '</label>'; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
+					echo '<input type="' . esc_attr( $input_type ) . '" id="' . esc_attr( $id ) . '" name="' . esc_attr( $name ) . '" class="g2ab-input" placeholder="' . $ph . '" ' . esc_attr( $required ) . ' />';
+					echo $help; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
+					break;
+				case 'date':
+				case 'time':
+					echo '<label class="g2ab-field-label" for="' . esc_attr( $id ) . '">' . $label . $req_mark . '</label>'; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
+					echo '<input type="' . esc_attr( $type ) . '" id="' . esc_attr( $id ) . '" name="' . esc_attr( $name ) . '" class="g2ab-input" ' . esc_attr( $required ) . ' />';
+					break;
+				case 'dropdown':
+					echo '<label class="g2ab-field-label" for="' . esc_attr( $id ) . '">' . $label . $req_mark . '</label>'; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
+					echo '<select id="' . esc_attr( $id ) . '" name="' . esc_attr( $name ) . '" class="g2ab-input" ' . esc_attr( $required ) . '>';
+					echo '<option value="">' . esc_html__( '— Select —', 'g2a-booking' ) . '</option>';
+					foreach ( $opts as $opt ) {
+						$v = $opt['value'] ?? '';
+						$l = $opt['label'] ?? '';
+						echo '<option value="' . esc_attr( $v ) . '">' . esc_html( $l ) . '</option>';
+					}
+					echo '</select>';
+					break;
+				case 'radio':
+					echo '<fieldset><legend class="g2ab-field-label">' . $label . $req_mark . '</legend>'; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
+					foreach ( $opts as $opt ) {
+						$v = $opt['value'] ?? '';
+						$l = $opt['label'] ?? '';
+						echo '<label class="g2ab-radio"><input type="radio" name="' . esc_attr( $name ) . '" value="' . esc_attr( $v ) . '" ' . esc_attr( $required ) . ' /> ' . esc_html( $l ) . '</label>';
+					}
+					echo '</fieldset>';
+					break;
+				case 'checkbox':
+				case 'waiver':
+				case 'terms':
+					echo '<label class="g2ab-checkbox"><input type="checkbox" name="' . esc_attr( $name ) . '" value="1" ' . esc_attr( $required ) . ' /> <span>' . $label . $req_mark . '</span></label>'; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
+					break;
+				case 'hidden':
+					echo '<input type="hidden" name="' . esc_attr( $name ) . '" value="' . esc_attr( $field->placeholder ?? '' ) . '" />';
+					break;
+				default:
+					echo '<label class="g2ab-field-label" for="' . esc_attr( $id ) . '">' . $label . $req_mark . '</label>'; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
+					echo '<input type="text" id="' . esc_attr( $id ) . '" name="' . esc_attr( $name ) . '" class="g2ab-input" />';
+			}
+			echo '</div>';
+		}
+	}
+
+	/**
+	 * Alias shortcode that routes a saved form/booking-type into the flow.
+	 */
+	public function render_booking_form( $atts = array() ) {
+		$atts = shortcode_atts(
+			array(
+				'id'           => 0,
+				'type'         => '',
+				'booking_type' => '',
+				'form'         => '',
+				'theme'        => '',
+			),
+			$atts,
+			'g2a_booking_form'
+		);
+
+		global $wpdb;
+		$form_slug    = sanitize_title( $atts['form'] );
+		$booking_slug = sanitize_title( $atts['booking_type'] ?: $atts['type'] );
+
+		if ( ! $form_slug && (int) $atts['id'] > 0 ) {
+			$form = $wpdb->get_row( $wpdb->prepare(
+				"SELECT * FROM {$wpdb->prefix}g2ab_forms WHERE id = %d AND is_active = 1",
+				(int) $atts['id']
+			) );
+			if ( $form ) $form_slug = $form->slug;
+		}
+
+		if ( ! $booking_slug && (int) $atts['id'] > 0 ) {
+			$bt = $wpdb->get_row( $wpdb->prepare(
+				"SELECT slug FROM {$wpdb->prefix}g2ab_booking_types WHERE form_id = %d AND is_active = 1 ORDER BY id ASC LIMIT 1",
+				(int) $atts['id']
+			) );
+			if ( $bt ) $booking_slug = $bt->slug;
+		}
+
+		return $this->render_lane_booking( array(
+			'booking_type' => $booking_slug ?: 'lane-booking',
+			'form'         => $form_slug ?: 'default-lane-booking',
+			'theme'        => sanitize_key( $atts['theme'] ),
+		) );
+	}
+
+	public function render_ladies_tuesday_booking( $atts = array() ) {
+		$atts = shortcode_atts(
+			array(
+				'booking_type' => 'ladies-tuesday',
+				'form'         => 'ladies-tuesday-booking',
+				'theme'        => '',
+			),
+			$atts,
+			'g2a_ladies_tuesday_booking'
+		);
+		return $this->render_lane_booking( $atts );
+	}
+
+	public function render_classes_booking( $atts = array() ) {
+		$atts = shortcode_atts(
+			array(
+				'booking_type' => 'ccw-class',
+				'form'         => 'default-class-booking',
+				'theme'        => '',
+			),
+			$atts,
+			'g2a_classes_booking'
+		);
+		return $this->render_lane_booking( $atts );
+	}
+
+	public function render_resource_booking( $atts = array() ) {
+		$atts = shortcode_atts(
+			array(
+				'booking_type' => 'resource-booking',
+				'form'         => 'default-resource-booking',
+				'theme'        => '',
+			),
+			$atts,
+			'g2a_resource_booking'
+		);
+		return $this->render_lane_booking( $atts );
+	}
+
+	private function render_error( $msg ) {
+		return '<div class="g2ab g2ab-error"><p>' . esc_html( $msg ) . '</p></div>';
+	}
+
+	private function current_user_is_member() {
+		$user_id = get_current_user_id();
+		$allowed = false;
+		if ( $user_id ) {
+			if ( function_exists( 'pmpro_hasMembershipLevel' ) ) {
+				$allowed = (bool) pmpro_hasMembershipLevel( null, $user_id );
+			} elseif ( function_exists( 'memberistic_user_has_active_membership' ) ) {
+				$allowed = (bool) memberistic_user_has_active_membership( $user_id );
+			} elseif ( get_user_meta( $user_id, 'memberistic_active_plan_id', true ) ) {
+				$allowed = true;
+			} else {
+				$allowed = current_user_can( 'manage_g2ab_bookings' );
+			}
+		}
+		return (bool) apply_filters( 'g2ab_user_is_member', $allowed, $user_id, (object) array( 'members_only' => 1 ), '' );
+	}
+
+	private function get_public_lane_booking_type() {
+		global $wpdb;
+		return $wpdb->get_row( $wpdb->prepare(
+			"SELECT * FROM {$wpdb->prefix}g2ab_booking_types WHERE slug = %s AND is_active = 1 AND members_only = 0 LIMIT 1",
+			'lane-booking'
+		) );
+	}
+
+	/**
+	 * Per-instance inline JS. Selects its root by id so page-builders and
+	 * caching plugins can't break the binding by inserting nodes between
+	 * the wrapper and the script.
+	 */
+	private function render_inline_bootstrap( $instance_id ) {
+		$config = array(
+			'rest_url'    => esc_url_raw( rest_url( G2AB_REST_NAMESPACE . '/' ) ),
+			'nonce'       => wp_create_nonce( 'wp_rest' ),
+			'instance_id' => $instance_id,
+			'i18n'        => array(
+				'loading'  => __( 'Loading available times…', 'g2a-booking' ),
+				'no_slots' => __( 'No times available on this date.', 'g2a-booking' ),
+				'closed'   => __( 'Closed on this date.', 'g2a-booking' ),
+				'submitting' => __( 'Reserving…', 'g2a-booking' ),
+				'failed'   => __( 'Could not complete booking. Please try again.', 'g2a-booking' ),
+				'pick_first' => __( 'Please choose a date and time first.', 'g2a-booking' ),
+				'months'   => array(
+					__( 'January', 'g2a-booking' ), __( 'February', 'g2a-booking' ), __( 'March', 'g2a-booking' ), __( 'April', 'g2a-booking' ),
+					__( 'May', 'g2a-booking' ), __( 'June', 'g2a-booking' ), __( 'July', 'g2a-booking' ), __( 'August', 'g2a-booking' ),
+					__( 'September', 'g2a-booking' ), __( 'October', 'g2a-booking' ), __( 'November', 'g2a-booking' ), __( 'December', 'g2a-booking' ),
+				),
+			),
+		);
+		?>
+		<script>
+		// ── Global safety net (runs once per page) ─────────────────────────
+		// Catches submit on any .g2ab-form even if the per-instance bootstrap
+		// below never runs (page-builder removes the script, JS minifier
+		// breaks the IIFE, etc). Without this, the form would submit as
+		// GET and dump all fields into the URL.
+		//
+		// IMPORTANT: only preventDefault() here — never stopPropagation().
+		// This is a capture-phase listener, so stopPropagation() would block
+		// the event from ever reaching the per-instance submit handler below
+		// and the "Reserve" button would silently do nothing.
+		if (!window.__g2abFormGuard) {
+			window.__g2abFormGuard = true;
+			document.addEventListener('submit', function(e){
+				var form = e.target;
+				if (form && form.nodeType === 1 && (form.classList.contains('g2ab-form') || form.getAttribute('data-g2ab-form') === '1')) {
+					e.preventDefault();
+				}
+			}, true);
+		}
+
+		(function(config){
+			var root = config.instance_id ? document.getElementById(config.instance_id) : null;
+			if (!root || !root.classList || !root.classList.contains('g2ab-booking') || root.dataset.g2abBooted) return;
+			root.dataset.g2abBooted = '1';
+
+			var $ = function(sel, ctx){ return (ctx || root).querySelector(sel); };
+			var $$ = function(sel, ctx){ return Array.prototype.slice.call((ctx || root).querySelectorAll(sel)); };
+			function headers(hasBody){ var h = {}; if (hasBody !== false) h['Content-Type'] = 'application/json'; if (config.nonce) h['X-WP-Nonce'] = config.nonce; return h; }
+			function pad(n){ return n < 10 ? '0'+n : ''+n; }
+			function ymd(d){ return d.getFullYear() + '-' + pad(d.getMonth()+1) + '-' + pad(d.getDate()); }
+
+			// ── state ───────────────────────────────────────────────
+			var singleId = root.querySelector('[data-single-resource-id]');
+			var singleName = root.querySelector('[data-single-resource-name]');
+			var firstChip = root.querySelector('.g2ab-chip.is-selected');
+			var state = {
+				resourceId: singleId ? parseInt(singleId.value, 10) : (firstChip ? parseInt(firstChip.dataset.resourceId, 10) : 0),
+				resourceName: singleName ? singleName.value : (firstChip ? firstChip.dataset.resourceName : ''),
+				date: '',
+				slot: null,
+				viewYear: 0,
+				viewMonth: 0
+			};
+
+			// ── stage navigation ────────────────────────────────────
+			function showStage(name){
+				$$('.g2ab-stage__panel').forEach(function(p){
+					var active = p.dataset.stage === name;
+					p.classList.toggle('is-active', active);
+				});
+			}
+
+			// ── calendar render ─────────────────────────────────────
+			function renderCalendar(){
+				var grid = $('[data-cal-grid]');
+				var titleEl = $('[data-cal-title]');
+				if (!grid || !titleEl) return;
+				var months = config.i18n.months;
+				var year = state.viewYear, month = state.viewMonth;
+				titleEl.textContent = months[month] + ' ' + year;
+
+				// Build day list. Week starts Monday (locale-friendly default for ranges).
+				var first = new Date(year, month, 1);
+				var startDay = (first.getDay() + 6) % 7; // 0 = Mon
+				var daysInMonth = new Date(year, month + 1, 0).getDate();
+				var today = root.dataset.today;
+				var maxDays = parseInt(root.dataset.maxDays || '90', 10);
+				var maxDate = new Date();
+				maxDate.setDate(maxDate.getDate() + maxDays);
+
+				var html = '';
+				for (var i = 0; i < startDay; i++) {
+					html += '<button class="g2ab-cal__cell is-empty" type="button" disabled></button>';
+				}
+				for (var d = 1; d <= daysInMonth; d++) {
+					var cellDate = new Date(year, month, d);
+					var iso = ymd(cellDate);
+					var isPast = iso < today;
+					var isTooFar = cellDate > maxDate;
+					var disabled = isPast || isTooFar;
+					var selected = iso === state.date;
+					var cls = 'g2ab-cal__cell' + (disabled ? ' is-disabled' : ' is-clickable') + (selected ? ' is-selected' : '');
+					html += '<button class="' + cls + '" type="button" data-date="' + iso + '"' + (disabled ? ' disabled' : '') + '>' + d + '</button>';
+				}
+				grid.innerHTML = html;
+			}
+
+			function shiftMonth(delta){
+				var d = new Date(state.viewYear, state.viewMonth + delta, 1);
+				state.viewYear = d.getFullYear();
+				state.viewMonth = d.getMonth();
+				renderCalendar();
+			}
+
+			// ── slot loading ────────────────────────────────────────
+			function loadSlots(){
+				var box = $('[data-slots]');
+				var hint = $('[data-slots-hint]');
+				if (!box) return;
+				if (!state.resourceId || !state.date) {
+					box.innerHTML = '';
+					if (hint) { hint.style.display = ''; hint.textContent = config.i18n.pick_first || 'Pick a date'; }
+					return;
+				}
+				if (hint) { hint.style.display = ''; hint.textContent = config.i18n.loading; }
+				box.innerHTML = '';
+				fetch(config.rest_url + 'availability?resource_id=' + encodeURIComponent(state.resourceId) + '&date=' + encodeURIComponent(state.date) + '&duration=' + encodeURIComponent(root.dataset.duration || 60), { headers: headers(false) })
+					.then(function(r){ return r.json(); })
+					.then(function(json){
+						var data = json && json.success ? json.data : null;
+						if (hint) hint.style.display = 'none';
+						if (!data) { box.innerHTML = '<p class="g2ab-muted">' + config.i18n.no_slots + '</p>'; return; }
+						if (data.closed) { box.innerHTML = '<p class="g2ab-muted">' + config.i18n.closed + '</p>'; return; }
+						if (!data.slots || !data.slots.length) { box.innerHTML = '<p class="g2ab-muted">' + config.i18n.no_slots + '</p>'; return; }
+						data.slots.forEach(function(slot){
+							var btn = document.createElement('button');
+							btn.type = 'button';
+							btn.className = 'g2ab-slot';
+							btn.textContent = slot.label;
+							btn.disabled = !slot.available;
+							btn.dataset.start = slot.start;
+							btn.dataset.end = slot.end;
+							if (slot.available) {
+								btn.addEventListener('click', function(){
+									$$('.g2ab-slot', box).forEach(function(s){ s.classList.remove('is-selected'); });
+									btn.classList.add('is-selected');
+									state.slot = { start: slot.start, end: slot.end, label: slot.label };
+									updateSummary();
+									var go = $('[data-go-form]');
+									if (go) go.disabled = false;
+								});
+							}
+							box.appendChild(btn);
+						});
+					})
+					.catch(function(){
+						if (hint) hint.style.display = 'none';
+						box.innerHTML = '<p class="g2ab-muted">' + config.i18n.no_slots + '</p>';
+					});
+			}
+
+			function updateSummary(){
+				var pill = $('[data-summary-pill]');
+				var line = $('[data-summary-line]');
+				if (!state.slot) {
+					if (pill) { pill.hidden = true; pill.textContent = ''; }
+					if (line) line.textContent = '';
+					return;
+				}
+				var human = '';
+				try {
+					var dt = new Date(state.slot.start.replace(' ', 'T'));
+					human = dt.toLocaleDateString(undefined, { weekday:'long', month:'short', day:'numeric' }) + ' · ' + state.slot.label;
+				} catch (e) { human = state.slot.start; }
+				if (pill) { pill.hidden = false; pill.textContent = (state.resourceName ? state.resourceName + ' · ' : '') + human; }
+				if (line) line.textContent = (state.resourceName ? state.resourceName + ' · ' : '') + human;
+			}
+
+			// ── event bindings ──────────────────────────────────────
+			// Lane / resource chip selector
+			$$('.g2ab-chip').forEach(function(chip){
+				chip.addEventListener('click', function(){
+					$$('.g2ab-chip').forEach(function(c){ c.classList.remove('is-selected'); });
+					chip.classList.add('is-selected');
+					state.resourceId = parseInt(chip.dataset.resourceId, 10);
+					state.resourceName = chip.dataset.resourceName || '';
+					state.slot = null;
+					var go = $('[data-go-form]'); if (go) go.disabled = true;
+					loadSlots();
+					updateSummary();
+				});
+			});
+
+			// Calendar nav
+			var prev = $('[data-cal-prev]'); if (prev) prev.addEventListener('click', function(){ shiftMonth(-1); });
+			var next = $('[data-cal-next]'); if (next) next.addEventListener('click', function(){ shiftMonth(1); });
+
+			// Calendar day click
+			var grid = $('[data-cal-grid]');
+			if (grid) {
+				grid.addEventListener('click', function(e){
+					var cell = e.target.closest('.g2ab-cal__cell.is-clickable');
+					if (!cell || !grid.contains(cell)) return;
+					state.date = cell.dataset.date;
+					state.slot = null;
+					var go = $('[data-go-form]'); if (go) go.disabled = true;
+					$$('.g2ab-cal__cell', grid).forEach(function(c){ c.classList.remove('is-selected'); });
+					cell.classList.add('is-selected');
+					loadSlots();
+				});
+			}
+
+			// Continue → form
+			var goBtn = $('[data-go-form]');
+			if (goBtn) goBtn.addEventListener('click', function(){
+				if (!state.slot) return;
+				showStage('form');
+			});
+
+			// Back from form → time
+			$$('[data-back-time]').forEach(function(b){
+				b.addEventListener('click', function(){ showStage('time'); });
+			});
+
+			// Submit form
+			var form = $('.g2ab-form');
+			if (form) {
+				form.addEventListener('submit', function(event){
+					event.preventDefault();
+					var errEl = $('[data-form-error]', form);
+					var submit = form.querySelector('button[type="submit"]');
+					var originalLabel = submit ? submit.textContent : '';
+					if (!state.resourceId || !state.slot) {
+						if (errEl) { errEl.textContent = config.i18n.pick_first; errEl.hidden = false; }
+						return;
+					}
+					var fields = {};
+					new FormData(form).forEach(function(value, key){
+						var m = key.match(/^fields\[(.+)\]$/);
+						if (m) fields[m[1]] = value;
+					});
+					if (errEl) { errEl.hidden = true; errEl.textContent = ''; }
+					if (submit) { submit.disabled = true; submit.textContent = config.i18n.submitting; }
+					fetch(config.rest_url + 'bookings', {
+						method: 'POST',
+						headers: headers(true),
+						body: JSON.stringify({
+							booking_type_id: parseInt(root.dataset.bookingTypeId, 10) || 0,
+							resource_id: state.resourceId,
+							form_id: parseInt(root.dataset.formId, 10) || 0,
+							start_at: state.slot.start,
+							party_size: parseInt(fields.party_size || 1, 10),
+							fields: fields
+						})
+					}).then(function(r){ return r.json().then(function(j){ return {ok:r.ok, body:j}; }); })
+					.then(function(res){
+						if (!res.ok || !res.body || !res.body.success) {
+							var msg = (res.body && res.body.message) || config.i18n.failed;
+							throw new Error(msg);
+						}
+						var data = res.body.data || {};
+						if (data.redirect_url) { window.location.href = data.redirect_url; return; }
+						var msgEl = $('[data-done-msg]'); var uuidEl = $('[data-done-uuid]');
+						if (msgEl) msgEl.textContent = data.message || '';
+						if (uuidEl) uuidEl.textContent = data.uuid || '';
+						showStage('done');
+					})
+					.catch(function(err){
+						if (errEl) { errEl.textContent = err.message || config.i18n.failed; errEl.hidden = false; }
+						if (submit) { submit.disabled = false; submit.textContent = originalLabel; }
+					});
+				});
+			}
+
+			// ── boot ────────────────────────────────────────────────
+			var now = new Date();
+			state.viewYear = now.getFullYear();
+			state.viewMonth = now.getMonth();
+			renderCalendar();
+			showStage('time');
+		})(<?php echo wp_json_encode( $config ); ?>);
+		</script>
+		<?php
+	}
+}
