@@ -36,6 +36,10 @@ final class G2AB_Deactivator {
 			'g2ab_send_booking_reminders',
 			'g2ab_send_notification',
 			'g2ab_daily_reports',
+			// Email-automation module reminder tick — registered in
+			// includes/modules/email-automation/class-email-cron.php
+			// but was previously missing from the deactivation sweep.
+			'g2ab_email_reminder_tick',
 		);
 
 		foreach ( $crons as $cron ) {

@@ -47,10 +47,16 @@ class G2AB_Email_Cron {
 		// Only care about confirmed/paid bookings — reservations not yet paid don't get reminders.
 		$active_statuses = "'reserved','confirmed','paid'";
 
+		// start_at rows are stored as site-local mysql datetimes (via
+		// current_time('mysql')), so the comparison windows MUST also be
+		// site-local. gmdate() renders UTC, so on a non-UTC site (Mesa AZ
+		// is UTC-7 year round) windows were off by the UTC offset and
+		// reminders mis-fired. Use current_time() arithmetic instead.
+		$now_ts = (int) current_time( 'timestamp' );
+
 		// 24h window: start_at between (now+23h) and (now+25h)
-		$now = current_time( 'mysql' );
-		$start_24 = gmdate( 'Y-m-d H:i:s', strtotime( $now ) + ( 23 * HOUR_IN_SECONDS ) );
-		$end_24   = gmdate( 'Y-m-d H:i:s', strtotime( $now ) + ( 25 * HOUR_IN_SECONDS ) );
+		$start_24 = wp_date( 'Y-m-d H:i:s', $now_ts + ( 23 * HOUR_IN_SECONDS ) );
+		$end_24   = wp_date( 'Y-m-d H:i:s', $now_ts + ( 25 * HOUR_IN_SECONDS ) );
 
 		$rows_24 = $wpdb->get_results( $wpdb->prepare(
 			"SELECT * FROM {$bk} WHERE start_at BETWEEN %s AND %s AND status IN ({$active_statuses}) AND id NOT IN ( SELECT booking_id FROM {$lg} WHERE booking_id IS NOT NULL AND event_type = %s )",
@@ -65,8 +71,8 @@ class G2AB_Email_Cron {
 		}
 
 		// 2h window: start_at between (now+1h45m) and (now+2h15m)
-		$start_2 = gmdate( 'Y-m-d H:i:s', strtotime( $now ) + ( 105 * MINUTE_IN_SECONDS ) );
-		$end_2   = gmdate( 'Y-m-d H:i:s', strtotime( $now ) + ( 135 * MINUTE_IN_SECONDS ) );
+		$start_2 = wp_date( 'Y-m-d H:i:s', $now_ts + ( 105 * MINUTE_IN_SECONDS ) );
+		$end_2   = wp_date( 'Y-m-d H:i:s', $now_ts + ( 135 * MINUTE_IN_SECONDS ) );
 
 		$rows_2 = $wpdb->get_results( $wpdb->prepare(
 			"SELECT * FROM {$bk} WHERE start_at BETWEEN %s AND %s AND status IN ({$active_statuses}) AND id NOT IN ( SELECT booking_id FROM {$lg} WHERE booking_id IS NOT NULL AND event_type = %s )",
