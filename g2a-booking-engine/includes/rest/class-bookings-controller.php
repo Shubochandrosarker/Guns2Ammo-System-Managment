@@ -955,6 +955,26 @@ final class G2AB_REST_Bookings_Controller {
 		if ( ! $booking ) {
 			return new WP_Error( 'g2ab_not_found', 'Booking not found.', array( 'status' => 404 ) );
 		}
+
+		// Detect legacy (pre-1.2.4) bookings — they have no stored
+		// confirm_token in metadata. The original public endpoint would
+		// fall through to the gateway round-trip for these, which meant
+		// anyone with the UUID + a guessable session id could flip the
+		// booking to "paid". Staff with manage_g2ab_bookings can still
+		// confirm legacy rows manually; public callers must be told to
+		// contact the range. We surface this BEFORE can_access_booking()
+		// so the customer gets an actionable message instead of a
+		// generic "Invalid confirmation token" 403.
+		$meta_pre      = json_decode( (string) $booking->metadata, true );
+		$has_stored    = is_array( $meta_pre ) && ! empty( $meta_pre['confirm_token'] );
+		if ( ! $has_stored && ! current_user_can( 'manage_g2ab_bookings' ) ) {
+			return new WP_Error(
+				'g2ab_legacy_booking_requires_staff',
+				__( 'This booking predates token-based confirmation. Please contact the range to confirm payment.', 'g2a-booking' ),
+				array( 'status' => 403 )
+			);
+		}
+
 		if ( ! $this->can_access_booking( $booking, $confirm_token ) ) {
 			return new WP_Error(
 				'g2ab_invalid_confirm_token',
@@ -963,38 +983,20 @@ final class G2AB_REST_Bookings_Controller {
 			);
 		}
 
-		// Token gate: returned to the customer in the create response and
-		// stored in metadata. Without it (or for a mismatched value), the
-		// endpoint refuses to drive any state change. Bookings created
-		// before 1.2.4 don't carry a token; staff with manage_g2ab_bookings
-		// can still confirm those manually, but the public endpoint must
-		// not — otherwise anyone with the UUID could confirm a legacy
-		// booking with no auth other than guessing a gateway session id.
-		$meta          = json_decode( (string) $booking->metadata, true );
+		// At this point: caller is staff, the booking owner, or has a
+		// matching token. Re-parse metadata for downstream use.
+		$meta          = is_array( $meta_pre ) ? $meta_pre : array();
 		$stored_token  = isset( $meta['confirm_token'] ) ? (string) $meta['confirm_token'] : '';
-		$has_stored    = '' !== $stored_token;
-		$token_matches = $has_stored && hash_equals( $stored_token, $confirm_token );
+		$token_matches = '' !== $stored_token && hash_equals( $stored_token, $confirm_token );
 
 		if ( in_array( $booking->status, array( 'paid', 'confirmed', 'completed' ), true ) ) {
 			return rest_ensure_response( array( 'success' => true, 'data' => array( 'status' => $booking->status, 'verified' => true ) ) );
 		}
 
-		if ( ! current_user_can( 'manage_g2ab_bookings' ) ) {
-			if ( ! $has_stored ) {
-				return new WP_Error(
-					'g2ab_legacy_booking_requires_staff',
-					__( 'This booking predates token-based confirmation. Please contact the range to confirm payment.', 'g2a-booking' ),
-					array( 'status' => 403 )
-				);
-			}
-			if ( ! $token_matches ) {
-				return new WP_Error(
-					'g2ab_invalid_confirm_token',
-					__( 'Invalid confirmation token.', 'g2a-booking' ),
-					array( 'status' => 403 )
-				);
-			}
-		}
+		// At this point auth is already established by the two gates above
+		// (legacy-requires-staff + can_access_booking). $token_matches is
+		// computed for downstream gateway calls that may need it.
+		unset( $token_matches );
 
 		$gateway_id = $meta['gateway'] ?? '';
 		if ( $gateway_id && class_exists( 'G2AB_Gateway_Manager' ) ) {
