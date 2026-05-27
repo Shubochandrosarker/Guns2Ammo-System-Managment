@@ -472,12 +472,27 @@ final class G2AB_Frontend {
 					     ───────────────────────────────────────────────── -->
 					<section class="g2ab-stage__panel" data-stage="done">
 						<div class="g2ab-done">
+							<canvas class="g2ab-done__confetti" data-confetti aria-hidden="true"></canvas>
 							<div class="g2ab-done__check" aria-hidden="true">
 								<svg viewBox="0 0 64 64" width="64" height="64"><circle cx="32" cy="32" r="30" fill="none" stroke="currentColor" stroke-width="3"/><path d="M20 33 L29 42 L45 24" fill="none" stroke="currentColor" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/></svg>
 							</div>
 							<h3 class="g2ab-done__title"><?php esc_html_e( 'Booking confirmed', 'g2a-booking' ); ?></h3>
 							<p class="g2ab-done__msg" data-done-msg></p>
+							<div class="g2ab-done__recap" data-done-recap hidden>
+								<div class="g2ab-done__recap-row"><span class="g2ab-done__recap-lbl"><?php esc_html_e( 'Lane', 'g2a-booking' ); ?></span><span class="g2ab-done__recap-val" data-done-resource></span></div>
+								<div class="g2ab-done__recap-row"><span class="g2ab-done__recap-lbl"><?php esc_html_e( 'When', 'g2a-booking' ); ?></span><span class="g2ab-done__recap-val" data-done-when></span></div>
+								<div class="g2ab-done__recap-row"><span class="g2ab-done__recap-lbl"><?php esc_html_e( 'Party', 'g2a-booking' ); ?></span><span class="g2ab-done__recap-val" data-done-party></span></div>
+							</div>
 							<p class="g2ab-done__id"><?php esc_html_e( 'Confirmation:', 'g2a-booking' ); ?> <code data-done-uuid></code></p>
+							<div class="g2ab-done__actions">
+								<button type="button" class="g2ab-btn g2ab-btn--primary g2ab-done__again" data-action="book-another">
+									<span class="g2ab-done__again-icon" aria-hidden="true">
+										<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>
+									</span>
+									<span><?php esc_html_e( 'Book Another Lane', 'g2a-booking' ); ?></span>
+								</button>
+								<a class="g2ab-btn g2ab-btn--ghost g2ab-done__home" href="<?php echo esc_url( home_url( '/' ) ); ?>"><?php esc_html_e( 'Done', 'g2a-booking' ); ?></a>
+							</div>
 						</div>
 					</section>
 
@@ -939,7 +954,14 @@ final class G2AB_Frontend {
 					event.preventDefault();
 					var errEl = $('[data-form-error]', form);
 					var submit = form.querySelector('button[type="submit"]');
-					var originalLabel = submit ? submit.textContent : '';
+					// Stash the resting label on the dataset on first submit
+					// so the "Book Another Lane" reset can restore it after
+					// the success path leaves the button in its "Reserving…"
+					// state.
+					if (submit && !submit.dataset.labelOriginal) {
+						submit.dataset.labelOriginal = submit.textContent;
+					}
+					var originalLabel = submit ? (submit.dataset.labelOriginal || submit.textContent) : '';
 					if (!state.resourceId || !state.slot) {
 						if (errEl) { errEl.textContent = config.i18n.pick_first; errEl.hidden = false; }
 						return;
@@ -973,13 +995,139 @@ final class G2AB_Frontend {
 						var msgEl = $('[data-done-msg]'); var uuidEl = $('[data-done-uuid]');
 						if (msgEl) msgEl.textContent = data.message || '';
 						if (uuidEl) uuidEl.textContent = data.uuid || '';
+						populateRecap(fields);
 						showStage('done');
+						fireConfetti();
 					})
 					.catch(function(err){
 						if (errEl) { errEl.textContent = err.message || config.i18n.failed; errEl.hidden = false; }
 						if (submit) { submit.disabled = false; submit.textContent = originalLabel; }
 					});
 				});
+			}
+
+			// ── done stage helpers ──────────────────────────────────
+			// Pretty-prints the data already in `state` + the field map into the
+			// confirmation recap card. Robust to missing fields: each row is
+			// individually hidden when its source value is empty.
+			function populateRecap(fields) {
+				var recap = $('[data-done-recap]'); if (!recap) return;
+				var resourceEl = $('[data-done-resource]');
+				var whenEl     = $('[data-done-when]');
+				var partyEl    = $('[data-done-party]');
+				if (resourceEl) resourceEl.textContent = state.resourceName || '—';
+				if (whenEl && state.slot) {
+					try {
+						var dt = new Date(state.slot.start.replace(' ', 'T'));
+						whenEl.textContent = dt.toLocaleDateString(undefined, { weekday: 'long', month: 'short', day: 'numeric' }) + ' · ' + state.slot.label;
+					} catch (e) { whenEl.textContent = state.slot.start; }
+				}
+				if (partyEl && fields) {
+					var n = parseInt(fields.party_size || 1, 10);
+					partyEl.textContent = n + (n === 1 ? ' shooter' : ' shooters');
+				}
+				recap.hidden = false;
+			}
+
+			// Lightweight canvas confetti. Burst once, ~110 particles, ~1.5s
+			// settle. Skips on prefers-reduced-motion. No external dep.
+			function fireConfetti() {
+				if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+				var cvs = $('[data-confetti]'); if (!cvs) return;
+				var doneEl = cvs.parentElement; if (!doneEl) return;
+				var w = doneEl.clientWidth, h = doneEl.clientHeight;
+				cvs.width  = w * (window.devicePixelRatio || 1);
+				cvs.height = h * (window.devicePixelRatio || 1);
+				cvs.style.width = w + 'px'; cvs.style.height = h + 'px';
+				var ctx = cvs.getContext('2d');
+				ctx.scale(window.devicePixelRatio || 1, window.devicePixelRatio || 1);
+				var brand = getComputedStyle(doneEl).getPropertyValue('--g2ab-primary').trim() || '#E8802F';
+				var accent = getComputedStyle(doneEl).getPropertyValue('--g2ab-accent').trim() || '#C9A84C';
+				var palette = [brand, accent, '#ffffff', '#5B7BFF', '#9DE05B'];
+				var parts = [];
+				var N = 110;
+				for (var i = 0; i < N; i++) {
+					parts.push({
+						x: w / 2 + (Math.random() - 0.5) * 30,
+						y: h * 0.35,
+						vx: (Math.random() - 0.5) * 8,
+						vy: -Math.random() * 9 - 4,
+						g: 0.32 + Math.random() * 0.18,
+						w: 5 + Math.random() * 6,
+						h: 8 + Math.random() * 10,
+						r: Math.random() * Math.PI,
+						vr: (Math.random() - 0.5) * 0.35,
+						c: palette[(Math.random() * palette.length) | 0],
+						life: 0
+					});
+				}
+				var start = performance.now();
+				var maxLife = 1500;
+				function frame(t) {
+					var elapsed = t - start;
+					ctx.clearRect(0, 0, w, h);
+					var alive = false;
+					for (var i = 0; i < parts.length; i++) {
+						var p = parts[i];
+						p.x += p.vx; p.y += p.vy; p.vy += p.g; p.r += p.vr; p.life = elapsed;
+						if (p.life >= maxLife || p.y > h + 40) continue;
+						alive = true;
+						ctx.save();
+						ctx.globalAlpha = Math.max(0, 1 - (p.life / maxLife));
+						ctx.translate(p.x, p.y); ctx.rotate(p.r);
+						ctx.fillStyle = p.c;
+						ctx.fillRect(-p.w / 2, -p.h / 2, p.w, p.h);
+						ctx.restore();
+					}
+					if (alive) requestAnimationFrame(frame);
+					else ctx.clearRect(0, 0, w, h);
+				}
+				requestAnimationFrame(frame);
+			}
+
+			// Reset just enough state for a SECOND booking by the same user,
+			// pre-filling the resource + date so the second flow takes 2
+			// clicks instead of 5. Time slot is intentionally cleared (the
+			// previous slot is now taken). The form values from the first
+			// booking are preserved so the customer doesn't have to retype
+			// their name/email/phone.
+			function bookAnother() {
+				// Clear the previous slot — staying on the same date so the
+				// customer doesn't have to navigate the calendar again.
+				state.slot = null;
+				// Reset the submit button + error region so the form can
+				// fire again. The "Continue" button is enabled by slot
+				// selection, so it's reset implicitly.
+				var form = root.querySelector('[data-form]');
+				if (form) {
+					var submit = form.querySelector('button[type="submit"]');
+					if (submit) {
+						submit.disabled = false;
+						// Restore the resting label captured on first submit
+						// (the success path leaves it at "Reserving…").
+						if (submit.dataset.labelOriginal) {
+							submit.textContent = submit.dataset.labelOriginal;
+						}
+					}
+					var errEl = form.querySelector('[data-form-error]');
+					if (errEl) { errEl.hidden = true; errEl.textContent = ''; }
+				}
+				var go = $('[data-go-form]'); if (go) go.disabled = true;
+				// Re-pull availability for the same date so the just-booked
+				// slot is visually marked taken and the customer can pick a
+				// different one.
+				if (state.date) {
+					try { loadSlots(); } catch (e) {}
+				}
+				showStage('time');
+				// Smooth-scroll the booking root into view so the next pick
+				// is obvious on mobile.
+				try { root.scrollIntoView({ behavior: 'smooth', block: 'start' }); } catch (e) {}
+			}
+
+			var againBtn = root.querySelector('[data-action="book-another"]');
+			if (againBtn) {
+				againBtn.addEventListener('click', function () { bookAnother(); });
 			}
 
 			// ── boot ────────────────────────────────────────────────
