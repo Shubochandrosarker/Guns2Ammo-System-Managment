@@ -157,23 +157,37 @@
       // Mesa hours (minutes from midnight). Sun(0): 12-6 / Mon-Thu(1-4): 10-6 / Fri(5): 10-7 / Sat(6): 10-7.
       var ranges = { 0: [720, 1080], 1: [600, 1080], 2: [600, 1080], 3: [600, 1080], 4: [600, 1080], 5: [600, 1140], 6: [600, 1140] };
       function mesaNow() {
-        // Pull just the parts we need from the en-US locale formatted
-        // string in the America/Phoenix zone. Works on every modern
-        // browser (Intl is in evergreen + Safari 14+).
+        // Robust Mesa-time read. Earlier version used
+        // hourCycle: 'h23', which Safari + some Firefox builds
+        // ignore — formatToParts then returns a 12-hour-clock hour
+        // without an AM/PM marker, so 12:55pm parsed as "12" with
+        // min 55 and the comparator was fine BUT 1pm parsed as "1"
+        // and worked, while edge cases (midnight, single-digit
+        // hours) ended up as NaN → comparator always false → pill
+        // stuck on "Closed". Using `hour12: false` is universally
+        // honored and the source string is HH:MM which we parse
+        // with a regex.
         try {
-          var parts = new Intl.DateTimeFormat('en-US', {
+          var d = new Date();
+          var time = d.toLocaleString('en-US', {
             timeZone: 'America/Phoenix',
-            weekday: 'short', hour: '2-digit', minute: '2-digit', hourCycle: 'h23'
-          }).formatToParts(new Date());
-          var map = {};
-          parts.forEach(function (p) { map[p.type] = p.value; });
+            hour: '2-digit', minute: '2-digit', hour12: false
+          });
+          // time is "HH:MM" or "HH:MM:SS" or "24:00" — match HH:MM only.
+          var m = time.match(/(\d{1,2}):(\d{2})/);
+          var hr  = m ? parseInt(m[1], 10) : 0;
+          var min = m ? parseInt(m[2], 10) : 0;
+          if (hr === 24) hr = 0; // some engines report 24:00 for midnight
+          // Weekday separately — short en-US ("Mon", "Tue", …)
+          var wd = d.toLocaleString('en-US', {
+            timeZone: 'America/Phoenix',
+            weekday: 'short'
+          });
           var wdMap = { Sun: 0, Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6 };
-          var day = wdMap[map.weekday] != null ? wdMap[map.weekday] : new Date().getDay();
-          var hr  = parseInt(map.hour, 10);   // 0–23
-          var min = parseInt(map.minute, 10); // 0–59
+          var day = wdMap[wd] != null ? wdMap[wd] : d.getDay();
           return { day: day, mins: hr * 60 + min };
         } catch (e) {
-          // Fallback: visitor's local time (best effort if Intl is missing)
+          // Last-resort fallback — visitor's local time
           var now = new Date();
           return { day: now.getDay(), mins: now.getHours() * 60 + now.getMinutes() };
         }

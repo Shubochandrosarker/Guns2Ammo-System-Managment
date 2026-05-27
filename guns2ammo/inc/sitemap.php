@@ -2,20 +2,26 @@
 /**
  * Branded XML sitemap + human HTML sitemap.
  *
- * Exposes one master sitemap index at /sitemap.xml and per-type
- * sub-sitemaps for pages, posts, products, FAQs, and locations.
- * Mirrors the structure of wordpressistic.com/sitemap.xml but
- * branded for Guns 2 Ammo.
+ * Coexistence model: this file is the SINGLE OWNER of /sitemap.xml
+ * on the public site. To make sure that's true regardless of
+ * RankMath / Yoast / WP-core sitemap state, we:
  *
- * Coexistence with RankMath:
- *   - We disable WP core's wp-sitemap.xml output (the theme owns
- *     the sitemap).
- *   - RankMath's own sitemap module is left ALONE (the client says
- *     they're not using it). If RankMath's sitemap is on, this
- *     theme sitemap still serves at /sitemap.xml — that's fine
- *     because RankMath registers at /sitemap_index.xml (different
- *     path); both can coexist. The robots.txt only references the
- *     theme one.
+ *   1. Disable WP core's wp_sitemaps_enabled (the `/wp-sitemap.xml`).
+ *   2. Disable RankMath's sitemap module via its own filter.
+ *   3. Intercept the URL DIRECTLY in `parse_request` priority 0 —
+ *      not through `add_rewrite_rule`. Rewrite rules require a
+ *      manual Permalinks → Save to flush, and the client just
+ *      reported the URL showing a white page (rewrites hadn't
+ *      flushed). The direct intercept needs zero setup and ignores
+ *      whatever rewrite state the site is in.
+ *
+ * Exposes:
+ *   /sitemap.xml              — master index
+ *   /sitemap-pages.xml        — published pages (no account/cart/etc.)
+ *   /sitemap-posts.xml        — blog posts
+ *   /sitemap-products.xml     — WooCommerce products
+ *   /sitemap-product-cats.xml — product categories
+ *   /sitemap-faqs.xml         — /faqs/
  *
  * @package guns2ammo
  */
@@ -23,48 +29,55 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-/* Turn off WP core's auto sitemap — we own /sitemap.xml */
+/* Turn off WP core's wp-sitemap.xml — we own /sitemap.xml */
 add_filter( 'wp_sitemaps_enabled', '__return_false' );
 
-add_action( 'init', 'g2a_sitemap_register_rewrites' );
-function g2a_sitemap_register_rewrites() {
-	add_rewrite_rule( '^sitemap\.xml$',                       'index.php?g2a_sitemap=index',    'top' );
-	add_rewrite_rule( '^sitemap-pages\.xml$',                 'index.php?g2a_sitemap=pages',    'top' );
-	add_rewrite_rule( '^sitemap-posts\.xml$',                 'index.php?g2a_sitemap=posts',    'top' );
-	add_rewrite_rule( '^sitemap-products\.xml$',              'index.php?g2a_sitemap=products', 'top' );
-	add_rewrite_rule( '^sitemap-product-cats\.xml$',          'index.php?g2a_sitemap=productcats', 'top' );
-	add_rewrite_rule( '^sitemap-faqs\.xml$',                  'index.php?g2a_sitemap=faqs',     'top' );
-}
+/* Turn off RankMath's sitemap module if RM is active. */
+add_filter( 'rank_math/sitemap/enable', '__return_false', 99 );
+add_filter( 'rank_math/sitemap/index/entry', '__return_empty_array', 99 );
 
-add_filter( 'query_vars', function ( $v ) {
-	$v[] = 'g2a_sitemap';
-	return $v;
-} );
-
-add_action( 'template_redirect', 'g2a_sitemap_dispatch' );
-function g2a_sitemap_dispatch() {
-	$which = get_query_var( 'g2a_sitemap' );
-	if ( ! $which ) {
+/* Direct URL intercept — fires before any rewrite / template
+   resolution happens, so no permalink flush required. */
+add_action( 'parse_request', 'g2a_sitemap_intercept', 0 );
+function g2a_sitemap_intercept( $wp ) {
+	$uri = isset( $_SERVER['REQUEST_URI'] )
+		? (string) wp_parse_url( wp_unslash( $_SERVER['REQUEST_URI'] ), PHP_URL_PATH )
+		: '';
+	if ( '' === $uri ) {
 		return;
 	}
+	$uri = strtolower( rtrim( $uri, '/' ) );
+
+	$map = array(
+		'/sitemap.xml'              => 'index',
+		'/sitemap-pages.xml'        => 'pages',
+		'/sitemap-posts.xml'        => 'posts',
+		'/sitemap-products.xml'     => 'products',
+		'/sitemap-product-cats.xml' => 'productcats',
+		'/sitemap-faqs.xml'         => 'faqs',
+	);
+	if ( ! isset( $map[ $uri ] ) ) {
+		return;
+	}
+
 	header( 'Content-Type: application/xml; charset=utf-8' );
 	header( 'X-Robots-Tag: noindex' );
-	nocache_headers();
+	header( 'Cache-Control: public, max-age=3600' );
 
-	switch ( $which ) {
+	switch ( $map[ $uri ] ) {
 		case 'index':       g2a_sitemap_render_index(); break;
 		case 'pages':       g2a_sitemap_render_pages(); break;
 		case 'posts':       g2a_sitemap_render_posts(); break;
 		case 'products':    g2a_sitemap_render_products(); break;
 		case 'productcats': g2a_sitemap_render_product_cats(); break;
 		case 'faqs':        g2a_sitemap_render_faqs(); break;
-		default: status_header( 404 );
 	}
 	exit;
 }
 
 function g2a_sitemap_open() {
 	echo '<?xml version="1.0" encoding="UTF-8"?>' . "\n";
+	echo '<?xml-stylesheet type="text/xsl" href="' . esc_url( home_url( '/?g2a_sitemap_xsl=1' ) ) . '"?>' . "\n";
 }
 
 function g2a_sitemap_render_index() {
@@ -92,12 +105,15 @@ function g2a_sitemap_url_node( $loc, $lastmod = '', $priority = '', $changefreq 
 	echo '</url>';
 }
 
+function g2a_sitemap_excluded_page_slugs() {
+	return array( 'login', 'account', 'my-account', 'checkout', 'cart', 'thank-you', 'payment-failed', 'staff-dashboard', 'g2a-members-login', 'memberistic-account', 'memberistic-checkout', 'membership-checkout' );
+}
+
 function g2a_sitemap_render_pages() {
 	g2a_sitemap_open();
 	echo '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">';
-	// Home
-	g2a_sitemap_url_node( home_url( '/' ), gmdate( 'Y-m-d', current_time( 'timestamp' ) ), '1.0', 'daily' );
-	$exclude_slugs = array( 'login', 'account', 'checkout', 'cart', 'thank-you', 'payment-failed', 'staff-dashboard', 'g2a-members-login', 'memberistic-account', 'memberistic-checkout' );
+	g2a_sitemap_url_node( home_url( '/' ), gmdate( 'Y-m-d' ), '1.0', 'daily' );
+	$exclude = g2a_sitemap_excluded_page_slugs();
 	$q = new WP_Query( array(
 		'post_type'      => 'page',
 		'posts_per_page' => -1,
@@ -107,7 +123,7 @@ function g2a_sitemap_render_pages() {
 		'order'          => 'DESC',
 	) );
 	foreach ( $q->posts as $p ) {
-		if ( in_array( $p->post_name, $exclude_slugs, true ) ) continue;
+		if ( in_array( $p->post_name, $exclude, true ) ) continue;
 		g2a_sitemap_url_node(
 			get_permalink( $p ),
 			get_post_modified_time( 'Y-m-d', true, $p ),
@@ -171,7 +187,10 @@ function g2a_sitemap_render_product_cats() {
 		$terms = get_terms( array( 'taxonomy' => 'product_cat', 'hide_empty' => true ) );
 		if ( ! is_wp_error( $terms ) ) {
 			foreach ( $terms as $t ) {
-				g2a_sitemap_url_node( get_term_link( $t ), '', '0.5', 'weekly' );
+				$url = get_term_link( $t );
+				if ( ! is_wp_error( $url ) ) {
+					g2a_sitemap_url_node( $url, '', '0.5', 'weekly' );
+				}
 			}
 		}
 	}
@@ -181,15 +200,103 @@ function g2a_sitemap_render_product_cats() {
 function g2a_sitemap_render_faqs() {
 	g2a_sitemap_open();
 	echo '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">';
-	g2a_sitemap_url_node( home_url( '/faqs/' ), gmdate( 'Y-m-d', current_time( 'timestamp' ) ), '0.8', 'monthly' );
+	g2a_sitemap_url_node( home_url( '/faqs/' ), gmdate( 'Y-m-d' ), '0.8', 'monthly' );
 	echo '</urlset>';
 }
 
-/* Robots.txt nudge — added by inc/robots.php. */
-add_filter( 'g2a_robots_extra_lines', function ( $lines ) {
-	$lines[] = 'Sitemap: ' . home_url( '/sitemap.xml' );
-	return $lines;
+/* Lightweight XSL stylesheet so the raw XML renders as a readable
+   "WordPressistic-style" sitemap table in the browser instead of
+   showing as plain XML. Served at /?g2a_sitemap_xsl=1 */
+add_action( 'init', function () {
+	if ( isset( $_GET['g2a_sitemap_xsl'] ) ) { // phpcs:ignore WordPress.Security.NonceVerification.Recommended
+		header( 'Content-Type: application/xslt+xml; charset=utf-8' );
+		echo g2a_sitemap_xsl(); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
+		exit;
+	}
 } );
 
-/* Flush on theme activation so /sitemap.xml works immediately. */
+function g2a_sitemap_xsl() {
+	$brand = get_bloginfo( 'name' );
+	$home  = home_url( '/' );
+	ob_start();
+	?>
+<?xml version="1.0" encoding="UTF-8"?>
+<xsl:stylesheet version="1.0"
+	xmlns:xsl="http://www.w3.org/1999/XSL/Transform"
+	xmlns:sm="http://www.sitemaps.org/schemas/sitemap/0.9">
+	<xsl:output method="html" encoding="UTF-8" indent="yes"/>
+	<xsl:template match="/">
+		<html lang="en">
+		<head>
+			<meta charset="utf-8"/>
+			<title><?php echo esc_html( $brand ); ?> — Sitemap</title>
+			<meta name="robots" content="noindex,follow"/>
+			<style>
+				body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;background:#0F1115;color:#fff;margin:0;padding:32px;}
+				.wrap{max-width:1100px;margin:0 auto;}
+				.brand{font-family:Impact,"Bebas Neue",sans-serif;letter-spacing:.04em;font-size:14px;color:#C9A84C;text-transform:uppercase;background:rgba(201,168,76,.12);display:inline-block;padding:6px 14px;border:1px solid #C9A84C;border-radius:999px;margin-bottom:18px;}
+				h1{font-family:Impact,"Bebas Neue",sans-serif;font-size:46px;color:#fff;margin:0 0 8px;letter-spacing:.02em;}
+				h1 span{color:#C9A84C;}
+				p{color:#8E8D96;max-width:60ch;line-height:1.6;}
+				.count{color:#C9A84C;font-family:'Space Mono',monospace;font-size:13px;letter-spacing:.18em;text-transform:uppercase;margin:18px 0;}
+				table{width:100%;border-collapse:separate;border-spacing:0;background:#1A1F26;border:1px solid #2A323D;border-radius:8px;overflow:hidden;}
+				th{background:#0F1115;color:#8E8D96;text-align:left;padding:14px 18px;font-family:'Space Mono',monospace;font-size:11px;letter-spacing:.18em;text-transform:uppercase;border-bottom:1px solid #2A323D;}
+				td{padding:13px 18px;border-bottom:1px solid #2A323D;font-size:14px;color:#CBCAD2;word-break:break-all;}
+				tr:last-child td{border-bottom:0;}
+				tr:hover td{background:rgba(201,168,76,.04);}
+				a{color:#E3C06A;text-decoration:none;}
+				a:hover{color:#fff;text-decoration:underline;}
+				.foot{margin-top:24px;color:#5A6371;font-size:12px;letter-spacing:.06em;}
+				.foot a{color:#C9A84C;}
+			</style>
+		</head>
+		<body>
+		<div class="wrap">
+			<span class="brand">XML Sitemap</span>
+			<h1><?php echo esc_html( $brand ); ?> <span>Sitemap.</span></h1>
+			<p>This is the master sitemap index for guns2ammo.com. Search engines and AI assistants use it to discover every public URL on the site. Built for humans here, machine-readable underneath.</p>
+			<xsl:choose>
+				<xsl:when test="sm:sitemapindex">
+					<div class="count"><xsl:value-of select="count(sm:sitemapindex/sm:sitemap)"/> sub-sitemaps</div>
+					<table>
+						<thead><tr><th>Sitemap</th><th>Last modified</th></tr></thead>
+						<tbody>
+							<xsl:for-each select="sm:sitemapindex/sm:sitemap">
+								<tr>
+									<td><a href="{sm:loc}"><xsl:value-of select="sm:loc"/></a></td>
+									<td><xsl:value-of select="substring(sm:lastmod,1,10)"/></td>
+								</tr>
+							</xsl:for-each>
+						</tbody>
+					</table>
+				</xsl:when>
+				<xsl:otherwise>
+					<div class="count"><xsl:value-of select="count(sm:urlset/sm:url)"/> URLs</div>
+					<table>
+						<thead><tr><th>URL</th><th>Last modified</th><th>Priority</th></tr></thead>
+						<tbody>
+							<xsl:for-each select="sm:urlset/sm:url">
+								<tr>
+									<td><a href="{sm:loc}"><xsl:value-of select="sm:loc"/></a></td>
+									<td><xsl:value-of select="substring(sm:lastmod,1,10)"/></td>
+									<td><xsl:value-of select="sm:priority"/></td>
+								</tr>
+							</xsl:for-each>
+						</tbody>
+					</table>
+				</xsl:otherwise>
+			</xsl:choose>
+			<div class="foot">Generated by the <a href="<?php echo esc_url( $home ); ?>"><?php echo esc_html( $brand ); ?></a> theme · <a href="<?php echo esc_url( home_url( '/llms.txt' ) ); ?>">llms.txt</a> · <a href="<?php echo esc_url( home_url( '/llms-full.txt' ) ); ?>">llms-full.txt</a></div>
+		</div>
+		</body>
+		</html>
+	</xsl:template>
+</xsl:stylesheet>
+	<?php
+	return ob_get_clean();
+}
+
+/* Flush on theme activation so anything that depends on rewrites
+   (the rest of the theme) starts working immediately. The sitemap
+   itself no longer depends on rewrites — kept just for habit. */
 add_action( 'after_switch_theme', 'flush_rewrite_rules' );
