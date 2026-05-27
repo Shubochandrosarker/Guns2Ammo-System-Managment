@@ -259,18 +259,30 @@ final class Content_Restrictions {
 			return;
 		}
 		if ( ! get_role( 'memberistic_member' ) ) {
-			add_role( 'memberistic_member', __( 'Membership User', 'memberistic' ), array( 'read' => true ) );
+			add_role( 'memberistic_member', __( 'Member', 'memberistic' ), array( 'read' => true ) );
 		}
 		$user->add_role( 'memberistic_member' );
 		$plan = Plans_Repository::get( (int) $membership['plan_id'] );
 		if ( $plan ) {
 			$role = 'memberistic_plan_' . sanitize_key( $plan['slug'] );
 			if ( ! get_role( $role ) ) {
-				add_role( $role, sprintf( __( 'Membership User - %s', 'memberistic' ), $plan['name'] ), array( 'read' => true ) );
+				/* translators: %s = plan name (Defender / Patriot / Guardian etc.) */
+				add_role( $role, sprintf( __( 'Member - %s', 'memberistic' ), $plan['name'] ), array( 'read' => true ) );
 			}
 			$user->add_role( $role );
 			update_user_meta( $user->ID, 'memberistic_active_plan_id', (int) $plan['id'] );
 			update_user_meta( $user->ID, 'memberistic_active_plan_name', $plan['name'] );
+		}
+		// Once the customer becomes a member, remove the lower-tier
+		// Walk-in Customer role so the WP user list shows them under
+		// their member classification instead of both.
+		if ( get_role( 'g2a_walkin' ) && in_array( 'g2a_walkin', (array) $user->roles, true ) ) {
+			$user->remove_role( 'g2a_walkin' );
+		}
+		// Also strip the default "Subscriber" role if WP added it — the
+		// member role already grants 'read'.
+		if ( in_array( 'subscriber', (array) $user->roles, true ) ) {
+			$user->remove_role( 'subscriber' );
 		}
 	}
 
