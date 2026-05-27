@@ -101,7 +101,10 @@ function memberistic_mask_secret( $value ) {
  * Get filtered brand label.
  */
 function memberistic_get_brand_label() {
-	$label = (string) memberistic_get_setting( 'brand_label', 'Memberistic' );
+	// Default to the WP site name (e.g. "Guns 2 Ammo") so customer-
+	// facing email + dashboard strings never expose the plugin
+	// author's own brand on a fresh install.
+	$label = (string) memberistic_get_setting( 'brand_label', (string) get_bloginfo( 'name' ) );
 	return apply_filters( 'memberistic_brand_label', $label );
 }
 
