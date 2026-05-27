@@ -75,6 +75,9 @@ add_action( 'wp_enqueue_scripts', function () {
 
 	wp_enqueue_style( 'g2a-tokens', G2A_URI . '/assets/css/tokens.css', [], G2A_VERSION );
 	wp_enqueue_style( 'g2a-app',    G2A_URI . '/assets/css/app.css',    [ 'g2a-tokens' ], G2A_VERSION );
+	// Loaded last so WooCommerce + responsive overrides win on
+	// specificity ties against earlier rules in tokens.css/app.css.
+	wp_enqueue_style( 'g2a-wc-fixes', G2A_URI . '/assets/css/wc-fixes.css', [ 'g2a-app' ], G2A_VERSION );
 
 	// Front-page hero CSS is loaded only where it's needed. Was a 270-line
 	// inline <style> block in front-page.php — non-cacheable + bloated

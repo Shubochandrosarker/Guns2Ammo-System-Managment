@@ -1,0 +1,337 @@
+/*
+ * G2A WooCommerce + responsive fixes (theme 1.15.0+).
+ *
+ * Loaded AFTER tokens.css/app.css so these rules win on specificity.
+ * Each section is scoped tightly so it can only affect the surface it
+ * was written for.
+ */
+
+/* ============================================================
+ * 1. RELATED PRODUCTS — title was rendering huge because the WC
+ *    default h2 + display font was bleeding through some installs.
+ *    Force the loop title to a sane size and clamp it to 2 lines so
+ *    long ammo names don't blow the card height up. Applies to BOTH
+ *    related and upsells grids on the single-product page.
+ * ============================================================ */
+.woocommerce ul.products li.product .woocommerce-loop-product__title,
+.woocommerce-page ul.products li.product .woocommerce-loop-product__title,
+.single-product .related.products ul.products li.product .woocommerce-loop-product__title,
+.single-product .upsells.products ul.products li.product .woocommerce-loop-product__title,
+.single-product div.product .related.products ul.products li.product .woocommerce-loop-product__title,
+.single-product div.product .upsells.products ul.products li.product .woocommerce-loop-product__title {
+  font-family: var(--font-condensed, "Barlow Condensed", "Oswald", sans-serif) !important;
+  font-weight: 600 !important;
+  font-size: 14px !important;
+  line-height: 1.25 !important;
+  letter-spacing: 0.02em !important;
+  text-transform: uppercase !important;
+  color: var(--color-white, #fff) !important;
+  margin: 0 0 6px !important;
+  /* Clamp to 2 lines max with ellipsis so cards stay even-height */
+  display: -webkit-box !important;
+  -webkit-line-clamp: 2 !important;
+  -webkit-box-orient: vertical !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  min-height: 36px;
+}
+@media (min-width: 1100px) {
+  .woocommerce ul.products li.product .woocommerce-loop-product__title { font-size: 15px !important; min-height: 40px; }
+}
+
+/* Related products section heading ("RELATED PRODUCTS" / "YOU MAY
+   ALSO LIKE") — keep the display feel but ensure it doesn't overflow
+   on narrow viewports. */
+.single-product .related.products > h2,
+.single-product .upsells.products > h2,
+.single-product div.product .related.products > h2,
+.single-product div.product .upsells.products > h2 {
+  font-size: clamp(22px, 3vw, 32px) !important;
+  margin: 8px 0 18px !important;
+}
+
+/* Trim price + button sizing inside related/upsell cards so they fit. */
+.single-product .related.products ul.products li.product .price,
+.single-product .upsells.products ul.products li.product .price {
+  font-size: clamp(18px, 2vw, 22px) !important;
+}
+.single-product .related.products ul.products li.product .product-info,
+.single-product .upsells.products ul.products li.product .product-info {
+  padding: 14px !important;
+}
+.single-product .related.products ul.products li.product .product-actions,
+.single-product .upsells.products ul.products li.product .product-actions {
+  padding: 0 14px 14px !important;
+}
+
+/* ============================================================
+ * 2. CHECKOUT FORM — the generic `.form-row { display:grid;
+ *    grid-template-columns:1fr 1fr }` rule in tokens.css was
+ *    accidentally applying to WC's `.form-row` (which wraps a single
+ *    field), so labels landed in column 1 and inputs in column 2.
+ *    Restore stacked-label-above-input layout, then use grid at the
+ *    WRAPPER (.woocommerce-billing-fields__field-wrapper) so name
+ *    pairs sit side-by-side cleanly.
+ * ============================================================ */
+.woocommerce form .form-row,
+.woocommerce-page form .form-row,
+.woocommerce-checkout form .form-row,
+.woocommerce-cart form .form-row {
+  display: block !important;
+  grid-template-columns: none !important;
+  width: 100%;
+  margin: 0 0 16px !important;
+  padding: 0 !important;
+}
+.woocommerce form .form-row label,
+.woocommerce-page form .form-row label,
+.woocommerce-checkout form .form-row label {
+  display: block !important;
+  width: 100% !important;
+  margin: 0 0 6px !important;
+  font-family: var(--font-mono, "Space Mono", monospace) !important;
+  font-size: 11px !important;
+  letter-spacing: 0.18em !important;
+  text-transform: uppercase !important;
+  color: var(--color-silver, #8E8D96) !important;
+}
+.woocommerce form .form-row .woocommerce-input-wrapper,
+.woocommerce-page form .form-row .woocommerce-input-wrapper,
+.woocommerce-checkout form .form-row .woocommerce-input-wrapper {
+  display: block !important;
+  width: 100% !important;
+}
+.woocommerce form .form-row input.input-text,
+.woocommerce form .form-row textarea,
+.woocommerce form .form-row select,
+.woocommerce-page form .form-row input.input-text,
+.woocommerce-checkout form .form-row input.input-text {
+  width: 100% !important;
+  min-height: 46px;
+  padding: 12px 14px !important;
+  font-size: 15px !important;
+}
+
+/* Two-column billing rows on desktop — name pairs, etc. WC marks
+   these as form-row-first / form-row-last and they should sit
+   side-by-side at ≥720px and stack at narrower widths. */
+.woocommerce-checkout .woocommerce-billing-fields__field-wrapper,
+.woocommerce-checkout .woocommerce-shipping-fields__field-wrapper,
+.woocommerce-checkout .woocommerce-additional-fields__field-wrapper {
+  display: grid !important;
+  grid-template-columns: 1fr 1fr !important;
+  gap: 0 18px !important;
+}
+.woocommerce-checkout .woocommerce-billing-fields__field-wrapper > .form-row-wide,
+.woocommerce-checkout .woocommerce-billing-fields__field-wrapper > .notes,
+.woocommerce-checkout .woocommerce-billing-fields__field-wrapper > #billing_country_field,
+.woocommerce-checkout .woocommerce-billing-fields__field-wrapper > #billing_address_1_field,
+.woocommerce-checkout .woocommerce-billing-fields__field-wrapper > #billing_address_2_field,
+.woocommerce-checkout .woocommerce-billing-fields__field-wrapper > #billing_email_field,
+.woocommerce-checkout .woocommerce-billing-fields__field-wrapper > #billing_phone_field,
+.woocommerce-checkout .woocommerce-billing-fields__field-wrapper > #billing_company_field {
+  grid-column: 1 / -1 !important;
+}
+@media (max-width: 720px) {
+  .woocommerce-checkout .woocommerce-billing-fields__field-wrapper,
+  .woocommerce-checkout .woocommerce-shipping-fields__field-wrapper,
+  .woocommerce-checkout .woocommerce-additional-fields__field-wrapper {
+    grid-template-columns: 1fr !important;
+  }
+  .woocommerce-checkout .woocommerce-billing-fields__field-wrapper > * { grid-column: 1 / -1 !important; }
+}
+
+/* select2 dropdowns inside checkout (Country / State) — match the
+   input height + dark theme. */
+.woocommerce-checkout .select2-container .select2-selection--single {
+  height: 46px !important;
+  background: var(--color-void, #0F1115) !important;
+  border: 1px solid var(--color-steel, #2A323D) !important;
+}
+.woocommerce-checkout .select2-container .select2-selection--single .select2-selection__rendered {
+  line-height: 44px !important;
+  color: var(--color-white, #fff) !important;
+  padding-left: 14px !important;
+}
+.woocommerce-checkout .select2-container .select2-selection--single .select2-selection__arrow {
+  height: 44px !important;
+}
+
+/* Stack billing vs. order-review at narrow widths */
+@media (max-width: 980px) {
+  .woocommerce-checkout form.checkout .col2-set { grid-template-columns: 1fr !important; }
+  .woocommerce-checkout #order_review_heading,
+  .woocommerce-checkout #order_review { margin-top: 24px; }
+}
+
+/* ============================================================
+ * 3. CART PAGE — clean coupon row + ensure UPDATE CART always
+ *    looks clickable (was rendering as if disabled because WC
+ *    starts it with `disabled` attr until the cart is modified).
+ *    Restyle disabled state instead of leaving it ghost-grey.
+ * ============================================================ */
+.woocommerce-cart .cart_totals h2 { font-size: clamp(20px, 3vw, 28px) !important; }
+.woocommerce-cart form.woocommerce-cart-form .actions {
+  display: flex !important;
+  flex-wrap: wrap !important;
+  align-items: stretch !important;
+  justify-content: space-between !important;
+  gap: 12px !important;
+  padding: 14px 0 !important;
+}
+.woocommerce-cart form.woocommerce-cart-form .actions .coupon {
+  display: flex !important;
+  flex-wrap: wrap !important;
+  gap: 10px !important;
+  flex: 1 1 auto;
+  align-items: stretch !important;
+}
+.woocommerce-cart form.woocommerce-cart-form .actions .coupon input.input-text {
+  flex: 1 1 200px;
+  min-width: 180px;
+  min-height: 44px;
+  padding: 10px 14px !important;
+}
+.woocommerce-cart form.woocommerce-cart-form .actions button[name="update_cart"],
+.woocommerce-cart form.woocommerce-cart-form .actions .coupon button {
+  min-height: 44px;
+  padding: 10px 22px !important;
+}
+/* Update Cart button: WC ships it as `<button disabled>` until the
+   user changes a qty. Style the disabled state so it reads as
+   "ready to use" but visibly inactive (not a broken grey blob). */
+.woocommerce-cart form.woocommerce-cart-form .actions button[name="update_cart"][disabled],
+.woocommerce-cart form.woocommerce-cart-form .actions button[name="update_cart"]:disabled {
+  opacity: 0.55 !important;
+  cursor: not-allowed !important;
+  background: transparent !important;
+  border: 1px dashed var(--color-brass-dim, #8a7a3e) !important;
+  color: var(--color-brass-dim, #8a7a3e) !important;
+}
+.woocommerce-cart form.woocommerce-cart-form .actions button[name="update_cart"]:not(:disabled) {
+  opacity: 1 !important;
+  cursor: pointer !important;
+}
+
+@media (max-width: 720px) {
+  .woocommerce-cart form.woocommerce-cart-form .actions { flex-direction: column !important; }
+  .woocommerce-cart form.woocommerce-cart-form .actions .coupon { width: 100%; }
+  .woocommerce-cart form.woocommerce-cart-form .actions .coupon input.input-text { flex: 1 1 100%; }
+  .woocommerce-cart form.woocommerce-cart-form .actions button[name="update_cart"] { width: 100%; }
+}
+
+/* Make the cart table itself responsive — collapse to stacked
+   cards under ~620px so the table doesn't overflow horizontally. */
+@media (max-width: 620px) {
+  .woocommerce-cart table.shop_table_responsive,
+  .woocommerce-cart .woocommerce table.cart {
+    border: 0 !important;
+  }
+  .woocommerce-cart table.shop_table_responsive thead { display: none !important; }
+  .woocommerce-cart table.shop_table_responsive tbody tr.cart_item {
+    display: block !important;
+    background: var(--color-gunmetal, #1A1F26) !important;
+    border: 1px solid var(--color-hairline, rgba(255,255,255,.09)) !important;
+    padding: 14px !important;
+    margin: 0 0 12px !important;
+  }
+  .woocommerce-cart table.shop_table_responsive tbody td {
+    display: flex !important;
+    justify-content: space-between !important;
+    align-items: center !important;
+    text-align: right !important;
+    border: 0 !important;
+    padding: 8px 0 !important;
+  }
+  .woocommerce-cart table.shop_table_responsive tbody td::before {
+    content: attr(data-title) !important;
+    font-family: var(--font-mono, monospace) !important;
+    font-size: 11px !important;
+    letter-spacing: 0.18em !important;
+    text-transform: uppercase !important;
+    color: var(--color-silver, #8E8D96) !important;
+    margin-right: 12px !important;
+  }
+  .woocommerce-cart table.shop_table_responsive tbody td.product-thumbnail { justify-content: center !important; }
+  .woocommerce-cart table.shop_table_responsive tbody td.product-thumbnail::before { display: none !important; }
+}
+
+/* ============================================================
+ * 4. CHECKOUT order-review + payment block responsive cleanup
+ * ============================================================ */
+@media (max-width: 720px) {
+  .woocommerce-checkout #order_review table.shop_table { font-size: 14px !important; }
+  .woocommerce-checkout #order_review table.shop_table th,
+  .woocommerce-checkout #order_review table.shop_table td { padding: 10px 8px !important; }
+  .woocommerce-checkout #payment ul.payment_methods li { padding: 12px !important; }
+  .woocommerce-checkout #payment #place_order { width: 100% !important; }
+}
+
+/* ============================================================
+ * 5. SINGLE PRODUCT page responsive — the two-column layout
+ *    (gallery left, summary right) needs to stack at tablet and
+ *    below; quantity + add-to-cart should align cleanly.
+ * ============================================================ */
+@media (max-width: 980px) {
+  .single-product div.product .woocommerce-product-gallery,
+  .single-product div.product .summary {
+    width: 100% !important;
+    float: none !important;
+    margin: 0 0 24px !important;
+  }
+}
+.single-product .summary form.cart {
+  display: flex !important;
+  flex-wrap: wrap !important;
+  gap: 10px !important;
+  align-items: stretch !important;
+}
+.single-product .summary form.cart .quantity { flex: 0 0 auto; }
+.single-product .summary form.cart .quantity .qty {
+  min-height: 48px;
+  width: 80px !important;
+  padding: 10px !important;
+  text-align: center;
+}
+.single-product .summary form.cart .single_add_to_cart_button {
+  flex: 1 1 auto;
+  min-height: 48px;
+}
+@media (max-width: 540px) {
+  .single-product .summary form.cart { flex-direction: column !important; }
+  .single-product .summary form.cart .quantity .qty { width: 100% !important; }
+  .single-product .summary form.cart .single_add_to_cart_button { width: 100% !important; }
+}
+
+/* ============================================================
+ * 6. GLOBAL RESPONSIVE — header, hero h1, nav drawer hardening
+ *    so the theme doesn't break on common mobile widths. iOS
+ *    Safari fixes (input zoom prevention) live in app.css; this
+ *    block is layout-only.
+ * ============================================================ */
+@media (max-width: 980px) {
+  .g2a-news .newsletter-band { grid-template-columns: 1fr !important; gap: 18px !important; text-align: center; }
+  .g2a-foot .grid { grid-template-columns: repeat(2, 1fr) !important; gap: 32px 24px !important; }
+}
+@media (max-width: 640px) {
+  .g2a-foot .grid { grid-template-columns: 1fr !important; }
+  .g2a-news h3 { font-size: clamp(20px, 6vw, 28px) !important; }
+}
+
+/* WooCommerce notices (added-to-cart, coupon errors) — narrow viewport */
+@media (max-width: 540px) {
+  .woocommerce-message,
+  .woocommerce-info,
+  .woocommerce-error {
+    flex-direction: column !important;
+    align-items: stretch !important;
+    text-align: left !important;
+  }
+  .woocommerce-message .button,
+  .woocommerce-info .button { width: 100% !important; margin-top: 10px !important; text-align: center; }
+}
+
+/* Quantity selector — touch-friendly hit target on mobile */
+@media (max-width: 540px) {
+  .woocommerce .quantity .qty { min-height: 44px !important; font-size: 16px !important; }
+}
