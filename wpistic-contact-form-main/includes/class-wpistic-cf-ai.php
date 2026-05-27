@@ -253,17 +253,142 @@ class WPistic_CF_AI {
 	 * @return string
 	 */
 	protected function wpistic_cf_fetch_source_text( $source ) {
+		$source = trim( (string) $source );
+		if ( '' === $source ) {
+			return '';
+		}
+
+		// URL branch — HTTPS only by default, with SSRF blocks for
+		// private + loopback + link-local + cloud-metadata ranges.
+		// Override via the WPISTIC_CF_ai_url_check filter (return WP_Error
+		// to deny, true to allow) when a site genuinely needs to fetch
+		// from an internal endpoint.
 		if ( preg_match( '~^https?://~i', $source ) ) {
-			$res = wp_remote_get( $source, [ 'timeout' => 10 ] );
+			$allowed = self::wpistic_cf_url_is_safe( $source );
+			if ( true !== $allowed ) {
+				return '';
+			}
+			$res = wp_safe_remote_get(
+				$source,
+				array(
+					'timeout'     => 10,
+					'redirection' => 0, // refuse redirects so a 302 → http://169.254.169.254 can't slip through
+					'user-agent'  => 'WPistic-CF-AI/1.0 (+' . home_url( '/' ) . ')',
+				)
+			);
 			if ( is_wp_error( $res ) ) {
+				return '';
+			}
+			$code = (int) wp_remote_retrieve_response_code( $res );
+			if ( $code < 200 || $code >= 400 ) {
 				return '';
 			}
 			return sanitize_textarea_field( (string) wp_remote_retrieve_body( $res ) );
 		}
-		if ( file_exists( $source ) && is_readable( $source ) ) {
-			return sanitize_textarea_field( (string) file_get_contents( $source ) );
+
+		// Local-file branch — restrict to inside ABSPATH (no arbitrary
+		// /etc/passwd reads, no wp-config.php exfil) and require a
+		// real, canonicalised path.
+		$real = realpath( $source );
+		if ( false === $real ) {
+			return '';
 		}
-		return '';
+		$abs = realpath( ABSPATH );
+		if ( false === $abs || 0 !== strpos( $real . DIRECTORY_SEPARATOR, $abs . DIRECTORY_SEPARATOR ) ) {
+			return '';
+		}
+		// Refuse known-sensitive files even inside ABSPATH.
+		$basename = strtolower( basename( $real ) );
+		$blocked  = array( 'wp-config.php', '.htaccess', '.htpasswd', '.env', 'wp-config-sample.php' );
+		if ( in_array( $basename, $blocked, true ) ) {
+			return '';
+		}
+		if ( ! is_readable( $real ) ) {
+			return '';
+		}
+		return sanitize_textarea_field( (string) file_get_contents( $real ) );
+	}
+
+	/**
+	 * SSRF + scheme guard for AI text-source URLs.
+	 *
+	 * Returns true when the URL is safe to fetch, or a WP_Error
+	 * describing why it was rejected. Override via the
+	 * WPISTIC_CF_ai_url_check filter — return true to allow an
+	 * otherwise-blocked URL, or a WP_Error to deny one that would
+	 * otherwise pass.
+	 */
+	public static function wpistic_cf_url_is_safe( $url ) {
+		$parts = wp_parse_url( (string) $url );
+		if ( empty( $parts['host'] ) ) {
+			return new \WP_Error( 'wpcf_ai_url_invalid', 'URL has no host.' );
+		}
+		// Scheme: HTTPS only, with HTTP allowed only for localhost so
+		// people running Ollama at 127.0.0.1:11434 still work.
+		$scheme = strtolower( $parts['scheme'] ?? '' );
+		$host   = strtolower( $parts['host'] );
+		$is_local_host = in_array( $host, array( 'localhost', '127.0.0.1', '::1' ), true );
+		if ( 'https' !== $scheme && ! ( 'http' === $scheme && $is_local_host ) ) {
+			$reject = new \WP_Error( 'wpcf_ai_url_scheme', 'Only https:// URLs are allowed.' );
+			return apply_filters( 'WPISTIC_CF_ai_url_check', $reject, $url, $parts );
+		}
+		// Special-case localhost/127.0.0.1/::1 — local AI providers like
+		// Ollama bind here. Skip the IP-resolution + private-range check
+		// because by definition these targets ARE local; the scheme guard
+		// above already ensured the URL is intentional.
+		if ( $is_local_host ) {
+			return apply_filters( 'WPISTIC_CF_ai_url_check', true, $url, $parts );
+		}
+		// Resolve the host to its IP(s). dns_get_record returns A+AAAA;
+		// gethostbynamel returns IPv4 — combine both for IPv6 coverage.
+		$ips = array();
+		if ( filter_var( $host, FILTER_VALIDATE_IP ) ) {
+			$ips[] = $host;
+		} else {
+			$v4 = gethostbynamel( $host );
+			if ( is_array( $v4 ) ) { $ips = array_merge( $ips, $v4 ); }
+			$v6 = @dns_get_record( $host, DNS_AAAA );
+			if ( is_array( $v6 ) ) {
+				foreach ( $v6 as $rec ) {
+					if ( ! empty( $rec['ipv6'] ) ) { $ips[] = $rec['ipv6']; }
+				}
+			}
+		}
+		if ( empty( $ips ) ) {
+			$reject = new \WP_Error( 'wpcf_ai_url_dns', 'Host does not resolve.' );
+			return apply_filters( 'WPISTIC_CF_ai_url_check', $reject, $url, $parts );
+		}
+		foreach ( $ips as $ip ) {
+			if ( self::wpistic_cf_ip_is_private_or_metadata( $ip ) ) {
+				$reject = new \WP_Error( 'wpcf_ai_url_internal', 'Host resolves to an internal / metadata IP.' );
+				return apply_filters( 'WPISTIC_CF_ai_url_check', $reject, $url, $parts );
+			}
+		}
+		return apply_filters( 'WPISTIC_CF_ai_url_check', true, $url, $parts );
+	}
+
+	/**
+	 * True if the IP is in a private, loopback, link-local, multicast,
+	 * or cloud-metadata range. SSRF-relevant denylist.
+	 */
+	public static function wpistic_cf_ip_is_private_or_metadata( $ip ) {
+		if ( ! filter_var( $ip, FILTER_VALIDATE_IP ) ) {
+			return true; // unparseable → reject
+		}
+		// Cloud-metadata endpoints (AWS / GCP / Azure / DigitalOcean / OpenStack).
+		$metadata = array( '169.254.169.254', 'fd00:ec2::254', '100.100.100.200' );
+		if ( in_array( $ip, $metadata, true ) ) {
+			return true;
+		}
+		// PHP's FILTER_VALIDATE_IP with NO_PRIV_RANGE | NO_RES_RANGE
+		// returns FALSE for any private/reserved IP — which is exactly
+		// what we want to reject.
+		$is_public = filter_var(
+			$ip,
+			FILTER_VALIDATE_IP,
+			FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE
+		);
+		return false === $is_public;
 	}
 
 	/**
