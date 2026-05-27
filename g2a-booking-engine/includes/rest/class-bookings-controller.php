@@ -535,6 +535,27 @@ final class G2AB_REST_Bookings_Controller {
 			return (int) $existing->ID;
 		}
 
+		// Guest booking — should we auto-create a WP user account?
+		// Default: NO. Auto-creation triggers wp_new_user_notification()
+		// which sends every guest booker an unsolicited "Your account
+		// has been created. Set your password." email. That confuses
+		// first-time customers who never asked for a login.
+		//
+		// Sites that DO want the historical behavior (e.g. to drive
+		// member sign-up) can opt in via the g2ab_create_user_on_booking
+		// option (admin checkbox) or the constant / filter below.
+		$create_user = (bool) apply_filters(
+			'g2ab_create_user_on_booking',
+			(bool) get_option( 'g2ab_create_user_on_booking', false )
+		);
+		if ( ! $create_user ) {
+			// Booking still saves with customer_name + customer_email +
+			// customer_phone on the row; we just don't make a WP user
+			// for them. user_id stays 0 on the booking, matching the
+			// guest-checkout convention.
+			return 0;
+		}
+
 		$name_parts = $this->split_customer_name( $customer_name );
 		$base_login = sanitize_user( current( explode( '@', $customer_email ) ), true );
 		if ( '' === $base_login ) {
