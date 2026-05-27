@@ -7,6 +7,9 @@ function g2a_tc_save_fields( $post_id ) {
 	if ( defined( 'DOING_AUTOSAVE' ) && DOING_AUTOSAVE ) {
 		return;
 	}
+	if ( wp_is_post_revision( $post_id ) || wp_is_post_autosave( $post_id ) ) {
+		return;
+	}
 	if ( ! isset( $_POST['g2a_tc_nonce'] ) || ! wp_verify_nonce( sanitize_text_field( wp_unslash( $_POST['g2a_tc_nonce'] ) ), 'g2a_tc_save_fields' ) ) {
 		return;
 	}
@@ -43,15 +46,34 @@ function g2a_tc_sanitize_field( $value, $field ) {
 		case 'repeater':
 			$clean = [];
 			if ( is_array( $value ) ) {
+				// Hard cap so an admin can't accidentally save a million rows.
+				$max_rows = (int) apply_filters( 'g2a_tc_repeater_max_rows', 200, $field );
+				$count    = 0;
 				foreach ( $value as $row ) {
 					if ( ! is_array( $row ) ) {
 						continue;
 					}
+					if ( ++$count > $max_rows ) {
+						break;
+					}
 					$item = [];
 					foreach ( $field['fields'] as $sub ) {
-						$sub_id = $sub['id'];
+						$sub_id  = $sub['id'];
 						$sub_val = isset( $row[ $sub_id ] ) ? $row[ $sub_id ] : '';
-						$item[ $sub_id ] = 'url' === $sub['type'] ? esc_url_raw( $sub_val ) : sanitize_text_field( $sub_val );
+						$sub_type = $sub['type'] ?? 'text';
+						switch ( $sub_type ) {
+							case 'image':
+								$item[ $sub_id ] = absint( $sub_val );
+								break;
+							case 'url':
+								$item[ $sub_id ] = esc_url_raw( $sub_val );
+								break;
+							case 'textarea':
+								$item[ $sub_id ] = sanitize_textarea_field( $sub_val );
+								break;
+							default:
+								$item[ $sub_id ] = sanitize_text_field( $sub_val );
+						}
 					}
 					$clean[] = $item;
 				}

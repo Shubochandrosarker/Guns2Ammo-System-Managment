@@ -19,6 +19,12 @@ function g2a_tc_admin_assets( $hook ) {
 	if ( 'post.php' !== $hook && 'post-new.php' !== $hook ) {
 		return;
 	}
+	// Only on Pages (the meta box is registered on 'page' only) — avoids
+	// adding the media-uploader weight to unrelated CPT edit screens.
+	$screen = function_exists( 'get_current_screen' ) ? get_current_screen() : null;
+	if ( $screen && 'page' !== $screen->post_type ) {
+		return;
+	}
 	wp_enqueue_media();
 }
 add_action( 'admin_enqueue_scripts', 'g2a_tc_admin_assets' );
@@ -54,14 +60,27 @@ function g2a_tc_render_meta_box( $post ) {
 		$(document).on('click', '.g2a-tc-upload', function(e){
 			e.preventDefault();
 			var button = $(this);
-			var target = button.prev('input');
+			// Find the matching hidden input — scope to the same .g2a-tc-field
+			// container so the selector works both for top-level fields and
+			// for fields nested inside a repeater row.
+			var field = button.closest('.g2a-tc-field');
+			var target = field.find('input[type="text"], input[type="hidden"]').first();
+			if (!target.length) target = button.prev('input');
 			var frame = wp.media({ title: 'Select Image', button: { text: 'Use this image' }, multiple: false });
 			frame.on('select', function(){
 				var item = frame.state().get('selection').first().toJSON();
 				target.val(item.id);
-				button.closest('.g2a-tc-field').find('.g2a-tc-preview').html('<img src="'+item.url+'" style="max-width:180px;height:auto;"/>');
+				field.find('.g2a-tc-preview').html('<img src="'+item.url+'" style="max-width:180px;height:auto;"/>');
 			});
 			frame.open();
+		});
+
+		// Clear-image button (added below) — empties the hidden input + preview.
+		$(document).on('click', '.g2a-tc-clear-image', function(e){
+			e.preventDefault();
+			var field = $(this).closest('.g2a-tc-field');
+			field.find('input[type="text"], input[type="hidden"]').first().val('');
+			field.find('.g2a-tc-preview').empty();
 		});
 
 		$(document).on('click', '.g2a-tc-repeater-add', function(e){
@@ -96,8 +115,9 @@ function g2a_tc_render_field( $post_id, $field ) {
 			echo '<textarea name="' . esc_attr( $id ) . '" rows="4" style="width:100%;">' . esc_textarea( (string) $value ) . '</textarea>';
 			break;
 		case 'image':
-			echo '<input type="text" name="' . esc_attr( $id ) . '" value="' . esc_attr( (string) $value ) . '" style="width:80%;margin-right:8px;" />';
-			echo '<button class="button g2a-tc-upload">Upload</button>';
+			echo '<input type="text" name="' . esc_attr( $id ) . '" value="' . esc_attr( (string) $value ) . '" placeholder="Attachment ID" style="width:120px;margin-right:8px;" readonly />';
+			echo '<button class="button g2a-tc-upload">' . esc_html__( 'Upload / Pick', 'g2a-theme-control' ) . '</button>';
+			echo ' <button class="button g2a-tc-clear-image" type="button">' . esc_html__( 'Clear', 'g2a-theme-control' ) . '</button>';
 			echo '<div class="g2a-tc-preview" style="margin-top:8px;">';
 			if ( $value ) {
 				echo wp_get_attachment_image( (int) $value, 'thumbnail' );
@@ -128,14 +148,38 @@ function g2a_tc_render_field( $post_id, $field ) {
 }
 
 function g2a_tc_render_repeater_row( $id, $subfields, $index, $row ) {
-	echo '<div class="g2a-tc-repeater-row" style="padding:10px;border:1px solid #ddd;margin-bottom:8px;">';
+	echo '<div class="g2a-tc-repeater-row" style="padding:12px;border:1px solid #ddd;margin-bottom:8px;background:#fafafa;">';
 	foreach ( $subfields as $sub ) {
-		$sub_id = $sub['id'];
-		$label  = $sub['label'];
-		$val    = isset( $row[ $sub_id ] ) ? $row[ $sub_id ] : '';
-		echo '<p><label style="display:block;">' . esc_html( $label ) . '</label>';
-		echo '<input type="text" name="' . esc_attr( $id ) . '[' . esc_attr( $index ) . '][' . esc_attr( $sub_id ) . ']" value="' . esc_attr( (string) $val ) . '" style="width:100%;" /></p>';
+		$sub_id   = $sub['id'];
+		$label    = $sub['label'];
+		$type     = $sub['type'] ?? 'text';
+		$val      = isset( $row[ $sub_id ] ) ? $row[ $sub_id ] : '';
+		$name     = $id . '[' . $index . '][' . $sub_id . ']';
+		echo '<div class="g2a-tc-field" style="margin-bottom:10px;">';
+		echo '<label style="display:block;font-weight:600;margin-bottom:4px;">' . esc_html( $label ) . '</label>';
+		switch ( $type ) {
+			case 'textarea':
+				echo '<textarea name="' . esc_attr( $name ) . '" rows="3" style="width:100%;">' . esc_textarea( (string) $val ) . '</textarea>';
+				break;
+			case 'image':
+				echo '<input type="text" name="' . esc_attr( $name ) . '" value="' . esc_attr( (string) $val ) . '" placeholder="Attachment ID" style="width:120px;margin-right:8px;" readonly />';
+				echo '<button class="button g2a-tc-upload">' . esc_html__( 'Upload / Pick', 'g2a-theme-control' ) . '</button>';
+				echo ' <button class="button g2a-tc-clear-image" type="button">' . esc_html__( 'Clear', 'g2a-theme-control' ) . '</button>';
+				echo '<div class="g2a-tc-preview" style="margin-top:8px;">';
+				if ( $val ) {
+					echo wp_get_attachment_image( (int) $val, 'thumbnail' );
+				}
+				echo '</div>';
+				break;
+			case 'url':
+				echo '<input type="url" name="' . esc_attr( $name ) . '" value="' . esc_attr( (string) $val ) . '" style="width:100%;" />';
+				break;
+			default:
+				echo '<input type="text" name="' . esc_attr( $name ) . '" value="' . esc_attr( (string) $val ) . '" style="width:100%;" />';
+				break;
+		}
+		echo '</div>';
 	}
-	echo '<p><button class="button-link-delete g2a-tc-repeater-remove">Remove</button></p>';
+	echo '<p style="text-align:right;margin:0;"><button class="button-link-delete g2a-tc-repeater-remove">' . esc_html__( '× Remove This Item', 'g2a-theme-control' ) . '</button></p>';
 	echo '</div>';
 }

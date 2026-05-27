@@ -30,6 +30,72 @@ $g2a_mg_ccw_replace      = get_post_meta( $g2a_page_id, 'mg_ccw_remove_text', tr
   </svg>
 </header>
 
+<?php
+/* Machine Gun Inventory — data-driven from the G2A Theme Control
+ * repeater field "Machine Gun Inventory". Edit at:
+ *   WP Admin → Pages → (this page) → G2A Theme Control → Machine Gun Inventory
+ * Each row supports: name, image, caliber, RPM, magazine, category,
+ * price, description, "is_featured" flag (1 = show in hero row),
+ * detail-page URL. Falls back to a clear admin-only empty state when
+ * no items have been added yet, so the page never reads as broken.
+ */
+$g2a_mg_items   = (array) get_post_meta( $g2a_page_id, 'mg_inventory_items', true );
+$g2a_mg_items   = array_values( array_filter( $g2a_mg_items, function( $r ) {
+	return is_array( $r ) && ! empty( $r['name'] );
+} ) );
+$g2a_mg_featured = array_values( array_filter( $g2a_mg_items, function( $r ) {
+	return ! empty( $r['is_featured'] );
+} ) );
+$g2a_mg_rest     = array_values( array_filter( $g2a_mg_items, function( $r ) {
+	return empty( $r['is_featured'] );
+} ) );
+
+/* Helper: render one weapon card from a repeater row. */
+function g2a_render_mg_card( $row, $tag_index = 0 ) {
+	$name     = isset( $row['name'] )        ? $row['name']        : '';
+	$cal      = isset( $row['caliber'] )     ? $row['caliber']     : '';
+	$rpm      = isset( $row['rpm'] )         ? $row['rpm']         : '';
+	$mag      = isset( $row['magazine'] )    ? $row['magazine']    : '';
+	$cat      = isset( $row['category'] )    ? $row['category']    : '';
+	$price    = isset( $row['price'] )       ? $row['price']       : '';
+	$desc     = isset( $row['description'] ) ? $row['description'] : '';
+	$link     = isset( $row['link'] )        ? esc_url( $row['link'] ) : '';
+	$img_id   = isset( $row['image'] )       ? (int) $row['image'] : 0;
+	$img_html = $img_id ? wp_get_attachment_image( $img_id, 'large', false, array( 'style' => 'width:100%;height:160px;object-fit:cover;margin-bottom:16px;' ) ) : '';
+	$tag_num  = str_pad( (string) $tag_index, 2, '0', STR_PAD_LEFT );
+	?>
+	<article class="weapon">
+		<?php echo $img_html; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- wp_get_attachment_image is safe. ?>
+		<div>
+			<span class="tag"><?php echo esc_html( $tag_num ); ?><?php echo $cat ? ' / ' . esc_html( strtoupper( $cat ) ) : ''; ?></span>
+			<h3>
+				<?php if ( $link ) : ?>
+					<a href="<?php echo $link; ?>" style="color:inherit;text-decoration:none;"><?php echo esc_html( $name ); ?></a>
+				<?php else : ?>
+					<?php echo esc_html( $name ); ?>
+				<?php endif; ?>
+			</h3>
+			<?php if ( $cal ) : ?><div class="cal"><?php echo esc_html( $cal ); ?></div><?php endif; ?>
+		</div>
+		<?php if ( $rpm || $mag || $cal || $price ) : ?>
+		<div class="specs">
+			<?php if ( $rpm )   : ?><div><div class="v"><?php echo esc_html( $rpm );   ?></div><div class="l">RPM</div></div><?php endif; ?>
+			<?php if ( $mag )   : ?><div><div class="v"><?php echo esc_html( $mag );   ?></div><div class="l">MAGAZINE</div></div><?php endif; ?>
+			<?php if ( $cal )   : ?><div><div class="v"><?php echo esc_html( $cal );   ?></div><div class="l">CALIBER</div></div><?php endif; ?>
+			<?php if ( $price ) : ?><div><div class="v"><?php echo esc_html( $price ); ?></div><div class="l">STARTING</div></div><?php endif; ?>
+		</div>
+		<?php endif; ?>
+		<?php if ( $desc ) : ?>
+			<p style="color:var(--color-fog);font-size:13px;line-height:1.6;margin:0 0 16px;"><?php echo esc_html( $desc ); ?></p>
+		<?php endif; ?>
+		<?php if ( $link ) : ?>
+			<a class="add" href="<?php echo $link; ?>">EXPLORE <?php echo esc_html( strtoupper( $name ) ); ?> </a>
+		<?php endif; ?>
+	</article>
+	<?php
+}
+?>
+
 <section class="weapons">
   <div class="weapons-head">
     <div><span class="eyebrow"> The Arsenal</span><h2 style="margin-top:18px;">THREE PLATFORMS.<br>ONE STANDARD.</h2></div>
@@ -37,52 +103,34 @@ $g2a_mg_ccw_replace      = get_post_meta( $g2a_page_id, 'mg_ccw_remove_text', tr
   </div>
 
   <div class="weapons-grid">
-    <article class="weapon" id="mp5">
-      <div>
-        <span class="tag">01 / SUBMACHINE GUN</span>
-        <h3><a href="<?php echo esc_url( home_url( '/machine-gun/mp5/' ) ); ?>" style="color:inherit;text-decoration:none;">MP5</a></h3>
-        <div class="cal">919MM  ROLLER-DELAYED BLOWBACK</div>
-      </div>
-      <div class="specs">
-        <div><div class="v">800</div><div class="l">RPM</div></div>
-        <div><div class="v">25 RD</div><div class="l">MAGAZINE</div></div>
-        <div><div class="v">9MM</div><div class="l">CALIBER</div></div>
-        <div><div class="v">$249</div><div class="l">STARTING</div></div>
-      </div>
-      <a class="add" href="<?php echo esc_url( home_url( '/machine-gun/mp5/' ) ); ?>">EXPLORE THE MP5 </a>
-    </article>
-
-    <article class="weapon" id="m16">
-      <div>
-        <span class="tag">02 / RIFLE</span>
-        <h3><a href="<?php echo esc_url( home_url( '/machine-gun/m16/' ) ); ?>" style="color:inherit;text-decoration:none;">M16</a></h3>
-        <div class="cal">5.56 NATO  DIRECT IMPINGEMENT</div>
-      </div>
-      <div class="specs">
-        <div><div class="v">700</div><div class="l">RPM</div></div>
-        <div><div class="v">30 RD</div><div class="l">MAGAZINE</div></div>
-        <div><div class="v">5.56</div><div class="l">CALIBER</div></div>
-        <div><div class="v">$329</div><div class="l">STARTING</div></div>
-      </div>
-      <a class="add" href="<?php echo esc_url( home_url( '/machine-gun/m16/' ) ); ?>">EXPLORE THE M16 </a>
-    </article>
-
-    <article class="weapon" id="ak47">
-      <div>
-        <span class="tag">03 / RIFLE</span>
-        <h3><a href="<?php echo esc_url( home_url( '/machine-gun/ak-47/' ) ); ?>" style="color:inherit;text-decoration:none;">AK-47</a></h3>
-        <div class="cal">7.6239  LONG-STROKE PISTON</div>
-      </div>
-      <div class="specs">
-        <div><div class="v">600</div><div class="l">RPM</div></div>
-        <div><div class="v">30 RD</div><div class="l">MAGAZINE</div></div>
-        <div><div class="v">7.62</div><div class="l">CALIBER</div></div>
-        <div><div class="v">$349</div><div class="l">STARTING</div></div>
-      </div>
-      <a class="add" href="<?php echo esc_url( home_url( '/machine-gun/ak-47/' ) ); ?>">EXPLORE THE AK-47 </a>
-    </article>
+    <?php if ( ! empty( $g2a_mg_featured ) ) : ?>
+        <?php foreach ( $g2a_mg_featured as $i => $row ) {
+            g2a_render_mg_card( $row, $i + 1 );
+        } ?>
+    <?php elseif ( current_user_can( 'edit_pages' ) ) : ?>
+        <div style="grid-column:1 / -1;padding:24px;border:1px dashed #c9a84c;background:rgba(201,168,76,.08);color:#c9a84c;font-family:ui-monospace,Menlo,Consolas,monospace;font-size:13px;">
+            <strong>Admin note (only you see this):</strong>
+            No featured machine guns yet. Edit this page → "Machine Gun Inventory" panel → add weapons and mark up to 3 with <code>is_featured = 1</code>.
+        </div>
+    <?php else : ?>
+        <p style="color:var(--color-fog);grid-column:1/-1;text-align:center;">Inventory is being updated. Call the range for the current full-auto roster.</p>
+    <?php endif; ?>
   </div>
 </section>
+
+<?php if ( ! empty( $g2a_mg_rest ) ) : ?>
+<section class="weapons" style="border-top:0;padding-top:0;">
+  <div class="weapons-head">
+    <div><span class="eyebrow"> Complete Inventory</span><h2 style="margin-top:18px;">THE FULL ROSTER.</h2></div>
+    <p style="color: var(--color-fog); max-width: 380px;">Our complete machine-gun collection — over twenty platforms across every era and class.</p>
+  </div>
+  <div class="weapons-grid">
+    <?php foreach ( $g2a_mg_rest as $i => $row ) {
+        g2a_render_mg_card( $row, count( $g2a_mg_featured ) + $i + 1 );
+    } ?>
+  </div>
+</section>
+<?php endif; ?>
 
 <section class="tiers" id="tiers">
   <div class="weapons-head" style="max-width:1280px; margin:0 auto 64px;">
