@@ -124,6 +124,15 @@ class WPISTIC_CF_Settings {
 		register_setting( self::GROUP, 'WPISTIC_CF_capture_g2a',     [ 'sanitize_callback' => $bool, 'default' => '1' ] );
 		register_setting( self::GROUP, 'WPISTIC_CF_capture_wpmail',  [ 'sanitize_callback' => $bool, 'default' => '0' ] );
 
+		// Safety — staging / dev controls.
+		register_setting( self::GROUP, 'WPISTIC_CF_emails_disabled', [ 'sanitize_callback' => $bool, 'default' => '0' ] );
+
+		// Trusted proxies — comma-separated IPs or CIDR ranges. When the
+		// HTTP peer (REMOTE_ADDR) matches any entry, X-Forwarded-For /
+		// CF-Connecting-IP are honored. Default empty = never trust
+		// proxy headers (safest on a non-CDN server).
+		register_setting( self::GROUP, 'WPISTIC_CF_trusted_proxies', [ 'sanitize_callback' => 'sanitize_text_field', 'default' => '' ] );
+
 		// Spam — reCAPTCHA v3.
 		register_setting( self::GROUP, 'WPISTIC_CF_spam_recaptcha_enabled',   [ 'sanitize_callback' => $bool, 'default' => '0' ] );
 		register_setting( self::GROUP, 'WPISTIC_CF_spam_recaptcha_site_key',  [ 'sanitize_callback' => 'sanitize_text_field', 'default' => '' ] );
@@ -338,6 +347,27 @@ class WPISTIC_CF_Settings {
 				</td>
 			</tr>
 		</table>
+
+		<h2 style="margin-top:32px;"><?php esc_html_e( 'Safety (staging / dev)', 'wpistic-contact-form' ); ?></h2>
+		<p class="description"><?php esc_html_e( 'Use these to prevent auto-responder emails from going to real customers after restoring a production database to staging. Overridden by the matching wp-config.php constant if defined.', 'wpistic-contact-form' ); ?></p>
+		<?php
+		$emails_disabled_const = defined( 'WPCF_EMAIL_DISABLED' ) && WPCF_EMAIL_DISABLED;
+		?>
+		<table class="form-table" role="presentation">
+			<tr>
+				<th scope="row"><?php esc_html_e( 'Disable all outbound auto-responder email', 'wpistic-contact-form' ); ?></th>
+				<td>
+					<input type="hidden" name="WPISTIC_CF_emails_disabled" value="0">
+					<label>
+						<input type="checkbox" name="WPISTIC_CF_emails_disabled" value="1" <?php checked( get_option( 'WPISTIC_CF_emails_disabled', '0' ), '1' ); ?> <?php disabled( $emails_disabled_const ); ?>>
+						<?php esc_html_e( 'Suppress every auto-responder email and replay-from-dashboard send', 'wpistic-contact-form' ); ?>
+					</label>
+					<?php if ( $emails_disabled_const ) : ?>
+						<p class="description" style="color:#b32d2e;"><?php esc_html_e( 'Locked: WPCF_EMAIL_DISABLED constant is set in wp-config.php.', 'wpistic-contact-form' ); ?></p>
+					<?php endif; ?>
+				</td>
+			</tr>
+		</table>
 		<?php
 	}
 
@@ -479,6 +509,22 @@ class WPISTIC_CF_Settings {
 				<td>
 					<input type="number" min="60" max="86400" class="small-text" id="WPISTIC_CF_spam_rate_limit_window" name="WPISTIC_CF_spam_rate_limit_window" value="<?php echo esc_attr( get_option( 'WPISTIC_CF_spam_rate_limit_window', 3600 ) ); ?>">
 					<p class="description"><?php esc_html_e( 'Default 3600 = 1 hour.', 'wpistic-contact-form' ); ?></p>
+				</td>
+			</tr>
+		</table>
+
+		<h2 style="margin-top:32px;"><?php esc_html_e( 'Trusted proxies', 'wpistic-contact-form' ); ?></h2>
+		<p class="description"><?php esc_html_e( 'Proxy headers (X-Forwarded-For, CF-Connecting-IP) are spoofable. They are honored ONLY when the HTTP peer (REMOTE_ADDR) matches one of the IPs / CIDR ranges below. Empty list = never trust proxy headers, safest on a non-CDN server. Overridden by the WPCF_TRUSTED_PROXIES constant if defined.', 'wpistic-contact-form' ); ?></p>
+		<?php $proxies_const = defined( 'WPCF_TRUSTED_PROXIES' ) ? (string) WPCF_TRUSTED_PROXIES : ''; ?>
+		<table class="form-table" role="presentation">
+			<tr>
+				<th scope="row"><label for="WPISTIC_CF_trusted_proxies"><?php esc_html_e( 'Trusted proxy list', 'wpistic-contact-form' ); ?></label></th>
+				<td>
+					<input type="text" class="large-text code" id="WPISTIC_CF_trusted_proxies" name="WPISTIC_CF_trusted_proxies" value="<?php echo esc_attr( $proxies_const ? $proxies_const : get_option( 'WPISTIC_CF_trusted_proxies', '' ) ); ?>" placeholder="173.245.48.0/20,103.21.244.0/22,103.22.200.0/22" <?php disabled( ! empty( $proxies_const ) ); ?>>
+					<p class="description"><?php esc_html_e( 'Comma-separated list of literal IPs or CIDR ranges. For sites behind Cloudflare paste the Cloudflare IP ranges from https://www.cloudflare.com/ips/. Both IPv4 and IPv6 entries are accepted.', 'wpistic-contact-form' ); ?></p>
+					<?php if ( $proxies_const ) : ?>
+						<p class="description" style="color:#b32d2e;"><?php esc_html_e( 'Locked: WPCF_TRUSTED_PROXIES constant is set in wp-config.php.', 'wpistic-contact-form' ); ?></p>
+					<?php endif; ?>
 				</td>
 			</tr>
 		</table>
