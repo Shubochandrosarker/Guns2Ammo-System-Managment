@@ -7,12 +7,14 @@ if ( ! defined( 'ABSPATH' ) ) exit;
 <html <?php language_attributes(); ?> class="g2a-loading">
 <head>
 <meta charset="<?php bloginfo( 'charset' ); ?>">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#1A191E">
 <?php wp_head(); ?>
 </head>
 <body <?php body_class(); ?>>
 <?php wp_body_open(); ?>
+
+<a class="g2a-skip-link" href="#g2a-main"><?php esc_html_e( 'Skip to main content', 'guns2ammo' ); ?></a>
 
 <!-- Preloader -->
 <div id="g2a-preloader" role="status" aria-label="Loading">

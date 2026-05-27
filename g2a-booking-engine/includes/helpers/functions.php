@@ -136,6 +136,79 @@ function g2ab_get_client_ip() {
  * @param string $event_id Provider-supplied event identifier.
  * @return bool True if event is new (process it), false if duplicate (skip).
  */
+/**
+ * Race-safe payment-row upsert.
+ *
+ * Two paths trigger this: a happy-path SELECT-then-INSERT, and the
+ * recovery path when a concurrent webhook delivery has already
+ * inserted the row in the gap between our SELECT and our INSERT.
+ * With the UNIQUE KEY (gateway, transaction_id) added in DB v1.5.0,
+ * a duplicate INSERT now hits a constraint error instead of silently
+ * creating a second row; we catch that and fall through to UPDATE.
+ *
+ * @param string $gateway        Gateway id (stripe, paypal, fortis, authnet).
+ * @param string $transaction_id Provider transaction id.
+ * @param array  $data           Column data for INSERT (omit gateway/transaction_id).
+ * @return int|false             Payment row id, or false on error.
+ */
+function g2ab_payments_upsert_by_transaction( $gateway, $transaction_id, array $data ) {
+	global $wpdb;
+	$pt = $wpdb->prefix . 'g2ab_payments';
+	$gateway = sanitize_key( (string) $gateway );
+	$transaction_id = (string) $transaction_id;
+	if ( '' === $gateway || '' === $transaction_id ) {
+		return false;
+	}
+
+	$existing = (int) $wpdb->get_var( $wpdb->prepare(
+		"SELECT id FROM {$pt} WHERE gateway = %s AND transaction_id = %s LIMIT 1",
+		$gateway,
+		$transaction_id
+	) );
+
+	if ( $existing > 0 ) {
+		$update = $data;
+		unset( $update['booking_id'], $update['gateway'], $update['transaction_id'], $update['created_at'] );
+		$update['processed_at'] = $update['processed_at'] ?? current_time( 'mysql' );
+		$wpdb->update( $pt, $update, array( 'id' => $existing ) );
+		return $existing;
+	}
+
+	$insert = array_merge(
+		array(
+			'gateway'        => $gateway,
+			'transaction_id' => $transaction_id,
+			'created_at'     => current_time( 'mysql' ),
+		),
+		$data
+	);
+	// Suppress wpdb errors so a UNIQUE KEY collision (concurrent insert)
+	// is not surfaced as a PHP warning during webhook handling.
+	$prev_suppress = $wpdb->suppress_errors( true );
+	$ok = $wpdb->insert( $pt, $insert );
+	$wpdb->suppress_errors( $prev_suppress );
+
+	if ( $ok ) {
+		return (int) $wpdb->insert_id;
+	}
+
+	// INSERT lost the race: another worker beat us to the unique key.
+	// Re-select to find the winner row, then UPDATE it with our data.
+	$existing = (int) $wpdb->get_var( $wpdb->prepare(
+		"SELECT id FROM {$pt} WHERE gateway = %s AND transaction_id = %s LIMIT 1",
+		$gateway,
+		$transaction_id
+	) );
+	if ( $existing > 0 ) {
+		$update = $data;
+		unset( $update['booking_id'], $update['gateway'], $update['transaction_id'], $update['created_at'] );
+		$update['processed_at'] = $update['processed_at'] ?? current_time( 'mysql' );
+		$wpdb->update( $pt, $update, array( 'id' => $existing ) );
+		return $existing;
+	}
+	return false;
+}
+
 function g2ab_webhook_event_is_new( $gateway, $event_id ) {
 	$gateway  = sanitize_key( (string) $gateway );
 	$event_id = sanitize_text_field( (string) $event_id );

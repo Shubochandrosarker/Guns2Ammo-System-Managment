@@ -84,6 +84,20 @@ final class Settings_Controller extends REST_Controller {
 		// Pass through the existing sanitize_callback to normalize defaults.
 		$normalized = Settings_Page::sanitize_settings( $stored );
 
+		// Mask secret fields and surface which ones are locked by a
+		// wp-config.php constant so the React admin can disable the
+		// inputs instead of trying to overwrite them.
+		$locked = array();
+		foreach ( memberistic_secret_setting_keys() as $key ) {
+			if ( isset( $normalized[ $key ] ) ) {
+				$normalized[ $key ] = memberistic_mask_secret( (string) $normalized[ $key ] );
+			}
+			if ( memberistic_setting_is_locked_by_constant( $key ) ) {
+				$locked[] = $key;
+			}
+		}
+		$normalized['_locked_secrets'] = $locked;
+
 		return rest_ensure_response( $normalized );
 	}
 

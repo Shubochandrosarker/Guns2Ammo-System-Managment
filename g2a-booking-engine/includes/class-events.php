@@ -303,6 +303,37 @@ final class G2AB_Events {
 		<?php
 	}
 
+	/**
+	 * Empty-state message for the countdown / list shortcodes.
+	 *
+	 * Public-facing visitors see a short "stay tuned" line so the page
+	 * never reads as broken when the events queue is empty for a given
+	 * type. Logged-in admins additionally see a small bordered admin
+	 * note + direct link into the Events CPT, so staff who hit the
+	 * page after deploy know exactly where to add the first event.
+	 */
+	private function empty_state_message( $type = '', $title = '' ) {
+		$public  = $title
+			? sprintf( esc_html__( '%s — schedule is being finalised. Check back shortly or call the range.', 'g2a-booking' ), esc_html( $title ) )
+			: esc_html__( 'No upcoming events scheduled — check back shortly or call the range.', 'g2a-booking' );
+		$out = '<div class="g2ab-events-shortcode-empty">' . $public . '</div>';
+
+		if ( current_user_can( 'manage_options' ) ) {
+			$new_event_url = esc_url( admin_url( 'post-new.php?post_type=' . self::CPT ) );
+			$type_note     = $type
+				? sprintf( esc_html__( 'No published event found with type "%s".', 'g2a-booking' ), esc_html( $type ) )
+				: esc_html__( 'No published events found.', 'g2a-booking' );
+			$out .= '<div class="g2ab-events-shortcode-admin-note" style="margin-top:10px;padding:12px 14px;border:1px dashed #c9a84c;background:rgba(201,168,76,.08);border-radius:6px;color:#c9a84c;font-size:13px;font-family:ui-monospace,Menlo,Consolas,monospace;">';
+			$out .= '<strong>Admin note (only you see this):</strong> ' . $type_note;
+			$out .= ' <a href="' . $new_event_url . '" style="color:#c9a84c;font-weight:600;">' . esc_html__( 'Add an event →', 'g2a-booking' ) . '</a>';
+			if ( $type ) {
+				$out .= '<br>Set <code>_g2ab_event_type</code> = <code>' . esc_html( $type ) . '</code> and publish a date in the future.';
+			}
+			$out .= '</div>';
+		}
+		return $out;
+	}
+
 	private function next_event_by_type( $type = '' ) {
 		$events = $this->get_events( 50, false );
 		foreach ( $events as $post ) {
@@ -339,7 +370,7 @@ final class G2AB_Events {
 		}
 
 		if ( empty( $rows ) ) {
-			return '<div class="g2ab-events-shortcode-empty">' . esc_html__( 'No upcoming events found.', 'g2a-booking' ) . '</div>';
+			return $this->empty_state_message( $type, '' );
 		}
 
 		ob_start();
@@ -382,7 +413,7 @@ final class G2AB_Events {
 
 		$event = $this->next_event_by_type( (string) $atts['type'] );
 		if ( ! $event || empty( $event['date'] ) ) {
-			return '<div class="g2ab-events-shortcode-empty">' . esc_html__( 'No upcoming events found.', 'g2a-booking' ) . '</div>';
+			return $this->empty_state_message( (string) $atts['type'], (string) $atts['title'] );
 		}
 
 		$time     = ! empty( $event['time'] ) ? $event['time'] : '09:00 AM';

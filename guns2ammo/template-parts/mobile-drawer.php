@@ -6,7 +6,9 @@ if ( ! defined( 'ABSPATH' ) ) exit;
 
 $items = [
 	[ 'Range',      home_url( '/book-a-lane/' ) ],
-	[ 'Training',   home_url( '/arizona-ccw-certification/' ) ],
+	// Training tile points at the training index, not the CCW course.
+	// CCW is a child of Training and reachable from there.
+	[ 'Training',   home_url( '/training/' ) ],
 	[ 'Experience', home_url( '/machine-gun/' ) ],
 	[ 'Shop',       home_url( '/shop/' ) ],
 	[ 'Transfers',  home_url( '/transfers/' ) ],
@@ -16,10 +18,15 @@ $items = [
 ];
 $phone = get_theme_mod( 'g2a_phone', '(602) 715-2677' );
 ?>
-<div class="g2a-mobile" id="g2a-mobile">
+<div class="g2a-mobile" id="g2a-mobile"
+	role="dialog"
+	aria-modal="true"
+	aria-labelledby="g2a-mobile-title"
+	aria-hidden="true"
+	tabindex="-1">
 	<div class="hd">
-		<a class="logo" href="<?php echo esc_url( home_url( '/' ) ); ?>" style="font-family: var(--font-display); font-size:22px; color: var(--color-white); letter-spacing:0.04em; text-decoration:none;">GUNS&nbsp;2&nbsp;AMMO</a>
-		<button class="close" id="g2a-mclose" aria-label="Close menu"></button>
+		<a class="logo" id="g2a-mobile-title" href="<?php echo esc_url( home_url( '/' ) ); ?>" style="font-family: var(--font-display); font-size:22px; color: var(--color-white); letter-spacing:0.04em; text-decoration:none;">GUNS&nbsp;2&nbsp;AMMO</a>
+		<button class="close" id="g2a-mclose" aria-label="<?php esc_attr_e( 'Close menu', 'guns2ammo' ); ?>"></button>
 	</div>
 	<?php foreach ( $items as $i => $it ) : ?>
 		<a href="<?php echo esc_url( $it[1] ); ?>"><small><?php echo str_pad( (string) ( $i + 1 ), 2, '0', STR_PAD_LEFT ); ?></small><?php echo esc_html( $it[0] ); ?></a>

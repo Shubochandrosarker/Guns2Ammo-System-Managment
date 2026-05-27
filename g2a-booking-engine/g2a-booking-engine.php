@@ -3,7 +3,7 @@
  * Plugin Name:       G2A Booking Engine
  * Plugin URI:        https://wordpressistic.com/g2a-booking-engine
  * Description:       Custom booking engine for Guns 2 Ammo - shooting range lanes, firearms classes, and membership-based booking with real-time availability, online payments, pay-in-store support, and built-in Migration Tool (Amelia/Bookly/BookingPress/CSV).
- * Version:           1.5.1
+ * Version:           1.9.0
  * Requires at least: 6.2
  * Requires PHP:      8.0
  * Author:            Wordpressistic
@@ -32,8 +32,8 @@ if ( ! defined( 'ABSPATH' ) ) {
  * G2AB_TEXT_DOMAIN   — Text domain for i18n.
  * G2AB_REST_NAMESPACE — REST API namespace.
  */
-define( 'G2AB_VERSION', '1.5.1' );
-define( 'G2AB_DB_VERSION', '1.4.0' );
+define( 'G2AB_VERSION', '1.9.0' );
+define( 'G2AB_DB_VERSION', '1.6.0' );
 define( 'G2AB_FILE', __FILE__ );
 define( 'G2AB_PATH', plugin_dir_path( __FILE__ ) );
 define( 'G2AB_URL', plugin_dir_url( __FILE__ ) );

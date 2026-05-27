@@ -40,6 +40,22 @@ class G2AB_Email_Engine {
 			return false;
 		}
 
+		// Per-(booking, event) dedup. Without this, fast-fire chains
+		// like booking_created -> booking_confirmed -> booking_paid
+		// happening inside a single request can send a customer 3
+		// emails in 2 seconds (audit C33). Skipping a duplicate
+		// event for the same booking_id within 5 minutes is safe;
+		// the fast-fire case is always within a single request flow.
+		$booking_id = is_object( $booking ) ? (int) ( $booking->id ?? 0 ) : 0;
+		if ( $booking_id > 0 ) {
+			$dedup_key = 'g2ab_evt_' . md5( $event . '|' . $booking_id );
+			if ( false !== get_transient( $dedup_key ) ) {
+				do_action( 'g2ab_email_suppressed', $event, $booking, 'duplicate_event' );
+				return false;
+			}
+			set_transient( $dedup_key, 1, 5 * MINUTE_IN_SECONDS );
+		}
+
 		$tpl = $this->get_template( $event );
 		if ( empty( $tpl ) || empty( $tpl['enabled'] ) ) return false;
 

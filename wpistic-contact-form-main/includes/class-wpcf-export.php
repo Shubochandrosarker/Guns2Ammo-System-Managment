@@ -142,15 +142,46 @@ class WPISTIC_CF_Export {
 		// UTF-8 BOM so Excel opens with the right encoding.
 		fwrite( $out, "\xEF\xBB\xBF" );
 
-		fputcsv( $out, self::columns() );
+		fputcsv( $out, array_map( array( $this, 'neutralize_csv_cell' ), self::columns() ) );
 
 		WPISTIC_CF_Database::each_submission( $args, function ( $row ) use ( $out ) {
 			$counts = WPISTIC_CF_Database::attachment_counts( [ (int) $row->id ] );
 			$count  = $counts[ (int) $row->id ] ?? 0;
-			fputcsv( $out, array_values( $this->build_row( $row, $count ) ) );
+			$cells  = array_map( array( $this, 'neutralize_csv_cell' ), array_values( $this->build_row( $row, $count ) ) );
+			fputcsv( $out, $cells );
 		} );
 
 		fclose( $out );
+	}
+
+	/**
+	 * Neutralise leading characters that turn a CSV cell into a formula
+	 * when opened in Excel / Google Sheets / LibreOffice Calc.
+	 *
+	 * A submitter who types "=cmd|'/c calc'!A1" or "@SUM(1+1)" or
+	 * "+HYPERLINK(...)" into any form field would otherwise have that
+	 * string evaluated the moment an admin opens the exported CSV.
+	 *
+	 * Prefix-with-single-quote is the OWASP-recommended mitigation
+	 * (https://owasp.org/www-community/attacks/CSV_Injection): the
+	 * leading apostrophe tells spreadsheet apps to treat the cell as
+	 * text, and the apostrophe itself is not displayed.
+	 */
+	protected function neutralize_csv_cell( $value ) {
+		if ( is_int( $value ) || is_float( $value ) || is_bool( $value ) || null === $value ) {
+			return $value;
+		}
+		$value = (string) $value;
+		if ( '' === $value ) {
+			return $value;
+		}
+		$first = $value[0];
+		// Plus, minus, equals, at, tab, carriage-return — the six
+		// characters spreadsheet apps interpret as formula prefixes.
+		if ( in_array( $first, array( '=', '+', '-', '@', "\t", "\r" ), true ) ) {
+			return "'" . $value;
+		}
+		return $value;
 	}
 
 	/**

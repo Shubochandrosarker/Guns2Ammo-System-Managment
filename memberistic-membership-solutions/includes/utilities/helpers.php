@@ -18,6 +18,23 @@ if ( ! defined( 'ABSPATH' ) ) {
  * @param mixed  $default Default value.
  */
 function memberistic_get_setting( $key, $default = null ) {
+	// Constant overrides for sensitive secrets. Defining any of these in
+	// wp-config.php (recommended for live keys) takes precedence over the
+	// stored option, and refuse-overwrite logic in the settings save +
+	// REST update paths refuses to clobber the option while a constant
+	// is set. Pattern: define( 'MEMBERISTIC_STRIPE_LIVE_SECRET_KEY', '...' );
+	$constant_map = array(
+		'stripe_test_secret_key'  => 'MEMBERISTIC_STRIPE_TEST_SECRET_KEY',
+		'stripe_live_secret_key'  => 'MEMBERISTIC_STRIPE_LIVE_SECRET_KEY',
+		'stripe_webhook_secret'   => 'MEMBERISTIC_STRIPE_WEBHOOK_SECRET',
+	);
+	if ( isset( $constant_map[ $key ] ) && defined( $constant_map[ $key ] ) ) {
+		$const_val = constant( $constant_map[ $key ] );
+		if ( is_string( $const_val ) && '' !== $const_val ) {
+			return $const_val;
+		}
+	}
+
 	$settings = get_option( 'memberistic_settings', array() );
 
 	if ( ! is_array( $settings ) ) {
@@ -28,10 +45,66 @@ function memberistic_get_setting( $key, $default = null ) {
 }
 
 /**
+ * The list of secret-setting keys that should never be returned in
+ * plain text via the REST settings endpoint, and whose option value
+ * should be refused on save if a wp-config.php constant is in force.
+ *
+ * Filter via memberistic_secret_setting_keys.
+ */
+function memberistic_secret_setting_keys() {
+	return apply_filters(
+		'memberistic_secret_setting_keys',
+		array(
+			'stripe_test_secret_key',
+			'stripe_live_secret_key',
+			'stripe_webhook_secret',
+		)
+	);
+}
+
+/**
+ * Whether a given setting key is currently locked by a wp-config.php constant.
+ */
+function memberistic_setting_is_locked_by_constant( $key ) {
+	$constant_map = array(
+		'stripe_test_secret_key' => 'MEMBERISTIC_STRIPE_TEST_SECRET_KEY',
+		'stripe_live_secret_key' => 'MEMBERISTIC_STRIPE_LIVE_SECRET_KEY',
+		'stripe_webhook_secret'  => 'MEMBERISTIC_STRIPE_WEBHOOK_SECRET',
+	);
+	if ( ! isset( $constant_map[ $key ] ) ) {
+		return false;
+	}
+	$name = $constant_map[ $key ];
+	if ( ! defined( $name ) ) {
+		return false;
+	}
+	$val = constant( $name );
+	return is_string( $val ) && '' !== $val;
+}
+
+/**
+ * Mask a secret for display ("sk_live_***1234").
+ */
+function memberistic_mask_secret( $value ) {
+	if ( ! is_string( $value ) || '' === $value ) {
+		return '';
+	}
+	$len = strlen( $value );
+	if ( $len <= 8 ) {
+		return str_repeat( '*', $len );
+	}
+	$prefix_len = $len > 12 ? 7 : 3;
+	return substr( $value, 0, $prefix_len ) . str_repeat( '*', 4 ) . substr( $value, -4 );
+}
+
+/**
  * Get filtered brand label.
  */
 function memberistic_get_brand_label() {
-	$label = (string) memberistic_get_setting( 'brand_label', 'Memberistic' );
+	// Default to the WP site name (e.g. "Guns 2 Ammo") so customer-
+	// facing email + dashboard strings never expose the plugin
+	// author's own brand on a fresh install.
+	$label = (string) memberistic_get_setting( 'brand_label', (string) get_bloginfo( 'name' ) );
 	return apply_filters( 'memberistic_brand_label', $label );
 }
 

@@ -71,10 +71,17 @@ return [
 		],
 		'Content' => [
 			[ 'id' => 'mg_ccw_remove_text', 'label' => 'CCW Banner Replacement Text', 'type' => 'text' ],
-			[ 'id' => 'mg_inventory_items', 'label' => 'Inventory List', 'type' => 'repeater', 'fields' => [
-				[ 'id' => 'name', 'label' => 'Weapon Name', 'type' => 'text' ],
-				[ 'id' => 'caliber', 'label' => 'Caliber', 'type' => 'text' ],
-				[ 'id' => 'link', 'label' => 'URL', 'type' => 'url' ],
+			[ 'id' => 'mg_inventory_items', 'label' => 'Machine Gun Inventory', 'type' => 'repeater', 'fields' => [
+				[ 'id' => 'name',        'label' => 'Weapon Name',           'type' => 'text' ],
+				[ 'id' => 'image',       'label' => 'Image (Media Library)', 'type' => 'image' ],
+				[ 'id' => 'caliber',     'label' => 'Caliber',               'type' => 'text' ],
+				[ 'id' => 'rpm',         'label' => 'Rate of Fire (RPM)',    'type' => 'text' ],
+				[ 'id' => 'magazine',    'label' => 'Magazine Capacity',     'type' => 'text' ],
+				[ 'id' => 'category',    'label' => 'Category (SMG / Rifle / Pistol)', 'type' => 'text' ],
+				[ 'id' => 'price',       'label' => 'Starting Price',        'type' => 'text' ],
+				[ 'id' => 'description', 'label' => 'Short Description',     'type' => 'textarea' ],
+				[ 'id' => 'is_featured', 'label' => 'Show in Hero Row (1 = yes)', 'type' => 'text' ],
+				[ 'id' => 'link',        'label' => 'Detail Page URL (optional)', 'type' => 'url' ],
 			] ],
 		],
 	],

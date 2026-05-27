@@ -143,6 +143,18 @@ final class G2AB_Frontend_Shortcode_Banner {
 	private function print_styles() {
 		if ( $this->printed ) return;
 		$this->printed = true;
+		// Enqueue the static stylesheet so the browser can cache it
+		// across page loads instead of re-downloading the inline CSS
+		// in every HTML response. Falls back to the inline block
+		// only if the file is missing (older plugin install or asset
+		// pipeline issue).
+		$css_url = defined( 'G2AB_URL' ) ? G2AB_URL . 'assets/css/banner.css' : '';
+		$css_path = defined( 'G2AB_PATH' ) ? G2AB_PATH . 'assets/css/banner.css' : '';
+		if ( $css_url && $css_path && file_exists( $css_path ) ) {
+			$ver = defined( 'G2AB_VERSION' ) ? G2AB_VERSION : null;
+			wp_enqueue_style( 'g2ab-banner', $css_url, array(), $ver );
+			return;
+		}
 		?>
 		<style id="g2ab-banr-styles">
 		.g2ab-banr{position:relative;background:linear-gradient(135deg,#0F1115 0%,#1A1F26 60%,#0F1115 100%);color:#E8E8E8;overflow:hidden;border:1px solid #2A323D;margin:24px 0;font-family:'Inter',system-ui,-apple-system,sans-serif;}

@@ -134,10 +134,26 @@ final class WooCommerce_Bridge {
 			return;
 		}
 
+		// Audit C34: previously the bridge only set status='active' but
+		// never set start_date or renewal_date, so the cron's
+		// get_renewing_in_days() / get_expired() lookups skipped these
+		// rows forever — WooCommerce-purchased memberships never
+		// auto-expired and never received the 30/7/1-day renewal
+		// reminders. Compute both fields the same way the Stripe path
+		// does, and also fire memberistic_membership_activated so the
+		// member-role sync + activation email run consistently across
+		// payment sources.
+		$was_already_active = isset( $membership['status'] ) && 'active' === $membership['status'];
+		$billing_cycle      = ! empty( $membership['billing_cycle'] ) ? $membership['billing_cycle'] : 'monthly';
+		$start_date         = current_time( 'mysql' );
+		$renewal_date       = self::compute_next_renewal( $billing_cycle, $start_date );
+
 		Memberships_Repository::update(
 			$membership_id,
 			array(
 				'status'          => 'active',
+				'start_date'      => $start_date,
+				'renewal_date'    => $renewal_date,
 				'woo_customer_id' => $order->get_customer_id(),
 			)
 		);
@@ -167,5 +183,34 @@ final class WooCommerce_Bridge {
 		);
 
 		do_action( 'memberistic_membership_payment_recorded', $membership_id, $payment_id, 'woocommerce' );
+
+		// Only fire activation on the FIRST completed order; on a
+		// renewal-order the role-sync + welcome email shouldn't re-run.
+		if ( ! $was_already_active ) {
+			do_action( 'memberistic_membership_activated', $membership_id );
+		}
+	}
+
+	/**
+	 * Compute the next renewal date from a billing cycle and start date,
+	 * using site-local time (matches Memberships_Repository conventions
+	 * and avoids the UTC-vs-local drift that gmdate+strtotime introduces
+	 * on non-UTC sites). Shared so the Stripe + WooCommerce + manual
+	 * renewal paths agree.
+	 *
+	 * @param string $billing_cycle 'monthly' / 'annual' / etc.
+	 * @param string $start_mysql   Site-local mysql datetime to start from.
+	 * @return string Site-local mysql datetime of the next renewal.
+	 */
+	public static function compute_next_renewal( $billing_cycle, $start_mysql ) {
+		$tz       = function_exists( 'wp_timezone' ) ? wp_timezone() : new \DateTimeZone( 'UTC' );
+		$interval = ( 'annual' === $billing_cycle || 'yearly' === $billing_cycle ) ? '+1 year' : '+1 month';
+		try {
+			$dt = new \DateTime( $start_mysql, $tz );
+			$dt->modify( $interval );
+			return $dt->format( 'Y-m-d H:i:s' );
+		} catch ( \Throwable $e ) {
+			return wp_date( 'Y-m-d H:i:s', strtotime( $interval, current_time( 'timestamp' ) ) );
+		}
 	}
 }

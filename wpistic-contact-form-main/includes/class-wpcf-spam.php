@@ -285,24 +285,92 @@ class WPISTIC_CF_Spam {
 	 * @return string
 	 */
 	public static function client_ip() {
-		$candidates = [];
-		if ( ! empty( $_SERVER['HTTP_CF_CONNECTING_IP'] ) ) {
-			$candidates[] = sanitize_text_field( wp_unslash( $_SERVER['HTTP_CF_CONNECTING_IP'] ) );
-		}
-		if ( ! empty( $_SERVER['HTTP_X_FORWARDED_FOR'] ) ) {
-			$xff = sanitize_text_field( wp_unslash( $_SERVER['HTTP_X_FORWARDED_FOR'] ) );
-			foreach ( explode( ',', $xff ) as $part ) {
-				$candidates[] = trim( $part );
+		$remote_addr = ! empty( $_SERVER['REMOTE_ADDR'] )
+			? sanitize_text_field( wp_unslash( $_SERVER['REMOTE_ADDR'] ) )
+			: '';
+
+		// Proxy headers (X-Forwarded-For, CF-Connecting-IP) are spoofable.
+		// Trust them only when REMOTE_ADDR matches a configured proxy IP
+		// (or a CIDR range). Allowlist comes from:
+		//   - constant WPCF_TRUSTED_PROXIES (comma-separated string, takes precedence)
+		//   - option  WPISTIC_CF_trusted_proxies (admin setting, same format)
+		//   - filter  WPISTIC_CF_trusted_proxies (array, after both above)
+		// Default = empty allowlist = NEVER trust proxy headers, so a bare
+		// install on a non-proxied server can't be IP-spoofed.
+		if ( self::request_is_from_trusted_proxy( $remote_addr ) ) {
+			if ( ! empty( $_SERVER['HTTP_CF_CONNECTING_IP'] ) ) {
+				$cf = sanitize_text_field( wp_unslash( $_SERVER['HTTP_CF_CONNECTING_IP'] ) );
+				if ( filter_var( $cf, FILTER_VALIDATE_IP ) ) {
+					return $cf;
+				}
+			}
+			if ( ! empty( $_SERVER['HTTP_X_FORWARDED_FOR'] ) ) {
+				$xff = sanitize_text_field( wp_unslash( $_SERVER['HTTP_X_FORWARDED_FOR'] ) );
+				// The left-most non-empty entry is the original client.
+				foreach ( explode( ',', $xff ) as $part ) {
+					$part = trim( $part );
+					if ( $part && filter_var( $part, FILTER_VALIDATE_IP ) ) {
+						return $part;
+					}
+				}
 			}
 		}
-		if ( ! empty( $_SERVER['REMOTE_ADDR'] ) ) {
-			$candidates[] = sanitize_text_field( wp_unslash( $_SERVER['REMOTE_ADDR'] ) );
+
+		return $remote_addr && filter_var( $remote_addr, FILTER_VALIDATE_IP ) ? $remote_addr : '';
+	}
+
+	/**
+	 * Whether the immediate HTTP peer (REMOTE_ADDR) is in the configured
+	 * trusted-proxy allowlist. Each entry may be a literal IPv4/IPv6
+	 * address or a CIDR range like "10.0.0.0/8" or "2400:cb00::/32".
+	 */
+	private static function request_is_from_trusted_proxy( $remote_addr ) {
+		if ( '' === $remote_addr || ! filter_var( $remote_addr, FILTER_VALIDATE_IP ) ) {
+			return false;
 		}
-		foreach ( $candidates as $ip ) {
-			if ( $ip && filter_var( $ip, FILTER_VALIDATE_IP ) ) {
-				return $ip;
+		$raw = '';
+		if ( defined( 'WPCF_TRUSTED_PROXIES' ) ) {
+			$raw = (string) WPCF_TRUSTED_PROXIES;
+		}
+		if ( '' === $raw ) {
+			$raw = (string) get_option( 'WPISTIC_CF_trusted_proxies', '' );
+		}
+		$list = array_filter( array_map( 'trim', explode( ',', $raw ) ) );
+		$list = apply_filters( 'WPISTIC_CF_trusted_proxies', $list );
+		if ( empty( $list ) ) {
+			return false;
+		}
+		foreach ( $list as $entry ) {
+			if ( self::ip_matches_entry( $remote_addr, $entry ) ) {
+				return true;
 			}
 		}
-		return '';
+		return false;
+	}
+
+	/**
+	 * Match an IP against a single allowlist entry (literal or CIDR).
+	 */
+	private static function ip_matches_entry( $ip, $entry ) {
+		if ( false === strpos( $entry, '/' ) ) {
+			return $ip === $entry;
+		}
+		list( $subnet, $bits ) = explode( '/', $entry, 2 );
+		$bits = (int) $bits;
+		$ip_bin     = inet_pton( $ip );
+		$subnet_bin = inet_pton( $subnet );
+		if ( false === $ip_bin || false === $subnet_bin || strlen( $ip_bin ) !== strlen( $subnet_bin ) ) {
+			return false;
+		}
+		$bytes = intdiv( $bits, 8 );
+		$rem   = $bits % 8;
+		if ( $bytes > 0 && substr( $ip_bin, 0, $bytes ) !== substr( $subnet_bin, 0, $bytes ) ) {
+			return false;
+		}
+		if ( 0 === $rem ) {
+			return true;
+		}
+		$mask = chr( 0xff << ( 8 - $rem ) & 0xff );
+		return ( ord( $ip_bin[ $bytes ] ) & ord( $mask ) ) === ( ord( $subnet_bin[ $bytes ] ) & ord( $mask ) );
 	}
 }

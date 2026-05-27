@@ -298,33 +298,29 @@ final class G2AB_Gateway_Paypal {
 		$wpdb->update( $bt, array( 'status' => 'paid', 'paid_amount' => $amount, 'updated_at' => current_time( 'mysql' ) ), array( 'id' => $booking->id ), array( '%s', '%f', '%s' ), array( '%d' ) );
 
 		$pt = $wpdb->prefix . 'g2ab_payments';
-		// Match by capture_id when present; otherwise update the latest pending row.
-		$existing = $capture_id
-			? $wpdb->get_var( $wpdb->prepare( "SELECT id FROM {$pt} WHERE gateway = 'paypal' AND transaction_id = %s LIMIT 1", $capture_id ) )
-			: null;
-		if ( ! $existing ) {
-			$existing = $wpdb->get_var( $wpdb->prepare( "SELECT id FROM {$pt} WHERE booking_id = %d AND gateway = 'paypal' AND status = 'pending' ORDER BY id DESC LIMIT 1", $booking->id ) );
-		}
-		if ( $existing ) {
+		// PayPal: prefer the pending row already created at booking-start
+		// (it carries the right booking_id link). When found, just fill in
+		// the capture_id + flip to succeeded. Otherwise route through the
+		// race-safe upsert so a duplicate webhook delivery can't insert a
+		// second row.
+		$pending = $wpdb->get_var( $wpdb->prepare( "SELECT id FROM {$pt} WHERE booking_id = %d AND gateway = 'paypal' AND status = 'pending' ORDER BY id DESC LIMIT 1", $booking->id ) );
+		if ( $pending ) {
 			$wpdb->update( $pt, array(
-				'transaction_id' => $capture_id,
-				'status' => 'succeeded',
-				'amount' => $amount,
+				'transaction_id'   => $capture_id,
+				'status'           => 'succeeded',
+				'amount'           => $amount,
 				'gateway_response' => wp_json_encode( $res ),
-				'processed_at' => current_time( 'mysql' ),
-			), array( 'id' => $existing ), array( '%s', '%s', '%f', '%s', '%s' ), array( '%d' ) );
-		} else {
-			$wpdb->insert( $pt, array(
-				'booking_id' => (int) $booking->id,
-				'gateway' => 'paypal',
-				'transaction_id' => $capture_id,
-				'amount' => $amount,
-				'currency' => $currency,
-				'status' => 'succeeded',
-				'payment_method' => 'paypal',
+				'processed_at'     => current_time( 'mysql' ),
+			), array( 'id' => $pending ), array( '%s', '%s', '%f', '%s', '%s' ), array( '%d' ) );
+		} elseif ( $capture_id ) {
+			g2ab_payments_upsert_by_transaction( 'paypal', (string) $capture_id, array(
+				'booking_id'       => (int) $booking->id,
+				'amount'           => $amount,
+				'currency'         => $currency,
+				'status'           => 'succeeded',
+				'payment_method'   => 'paypal',
 				'gateway_response' => wp_json_encode( $res ),
-				'processed_at' => current_time( 'mysql' ),
-				'created_at' => current_time( 'mysql' ),
+				'processed_at'     => current_time( 'mysql' ),
 			) );
 		}
 

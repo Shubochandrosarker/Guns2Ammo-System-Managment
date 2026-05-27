@@ -1,0 +1,30 @@
+/* G2A Event Banner styles — extracted from class-shortcode-banner.php */
+		.g2ab-banr{position:relative;background:linear-gradient(135deg,#0F1115 0%,#1A1F26 60%,#0F1115 100%);color:#E8E8E8;overflow:hidden;border:1px solid #2A323D;margin:24px 0;font-family:'Inter',system-ui,-apple-system,sans-serif;}
+		.g2ab-banr__camo{position:absolute;inset:0;opacity:.05;background-image:repeating-linear-gradient(45deg,transparent 0,transparent 12px,#4A5D3A 12px,#4A5D3A 16px),repeating-linear-gradient(-45deg,transparent 0,transparent 18px,#D2691E 18px,#D2691E 22px);pointer-events:none;}
+		.g2ab-banr__grid{position:absolute;inset:0;background-image:linear-gradient(rgba(74,93,58,.08) 1px,transparent 1px),linear-gradient(90deg,rgba(74,93,58,.08) 1px,transparent 1px);background-size:40px 40px;pointer-events:none;}
+		.g2ab-banr__inner{position:relative;display:grid;grid-template-columns:1.2fr 1fr;gap:40px;padding:40px 48px;max-width:1200px;margin:0 auto;align-items:center;}
+		@media (max-width:780px){.g2ab-banr__inner{grid-template-columns:1fr;padding:28px 22px;gap:24px;}}
+		.g2ab-banr__chip{display:inline-block;background:#D2691E;color:#fff;padding:5px 12px;font-size:10px;letter-spacing:.18em;font-weight:700;font-family:'Rajdhani','Oswald',Impact,sans-serif;margin-bottom:14px;border-radius:2px;}
+		.g2ab-banr__title{margin:0 0 18px;font-family:'Rajdhani','Oswald',Impact,sans-serif;font-size:48px;font-weight:700;letter-spacing:.04em;line-height:1.05;color:#fff;text-transform:uppercase;text-shadow:3px 3px 0 #4A5D3A;}
+		@media (max-width:780px){.g2ab-banr__title{font-size:32px;text-shadow:2px 2px 0 #4A5D3A;}}
+		.g2ab-banr__date{display:flex;align-items:baseline;gap:14px;margin-bottom:14px;border-left:4px solid #D2691E;padding-left:14px;}
+		.g2ab-banr__date-day{font-family:'Rajdhani','Oswald',Impact,sans-serif;font-size:28px;font-weight:700;color:#D2691E;letter-spacing:.04em;}
+		.g2ab-banr__date-time{font-size:13px;color:#8A95A5;letter-spacing:.06em;text-transform:uppercase;}
+		.g2ab-banr__meta{display:flex;flex-wrap:wrap;gap:18px;font-size:11px;letter-spacing:.1em;color:#8A95A5;font-weight:700;margin-bottom:24px;}
+		.g2ab-banr__meta span{display:inline-flex;align-items:center;gap:5px;}
+		.g2ab-banr__icon{color:#D2691E;font-weight:400;}
+		.g2ab-banr__cta{display:inline-flex;align-items:center;gap:14px;background:#D2691E;color:#fff !important;padding:18px 32px;text-decoration:none;font-family:'Rajdhani','Oswald',Impact,sans-serif;font-size:16px;letter-spacing:.16em;font-weight:700;text-transform:uppercase;border-radius:2px;transition:all .15s ease;border:2px solid #D2691E;}
+		.g2ab-banr__cta:hover{background:transparent;color:#D2691E !important;letter-spacing:.2em;}
+		.g2ab-banr__cta-arrow{font-size:22px;}
+		.g2ab-banr__right{display:flex;flex-direction:column;gap:24px;}
+		.g2ab-banr__count{background:rgba(0,0,0,.4);padding:18px 20px;border:1px solid #2A323D;border-left:3px solid #D2691E;}
+		.g2ab-banr__count-label{font-size:10px;letter-spacing:.18em;color:#8A95A5;font-weight:700;margin-bottom:12px;}
+		.g2ab-banr__count-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;}
+		.g2ab-banr__count-cell{text-align:center;background:#0F1115;padding:12px 8px;border-radius:2px;border:1px solid #2A323D;}
+		.g2ab-banr__count-cell span{display:block;font-family:'Rajdhani','SF Mono','Monaco',monospace;font-size:36px;font-weight:700;color:#D2691E;line-height:1;}
+		.g2ab-banr__count-cell small{display:block;font-size:9px;color:#8A95A5;letter-spacing:.16em;margin-top:4px;font-weight:700;}
+		.g2ab-banr__seats-row{display:flex;justify-content:space-between;font-size:11px;letter-spacing:.1em;color:#8A95A5;font-weight:700;margin-bottom:8px;}
+		.g2ab-banr__seats-left{color:#4CAF50;}
+		.g2ab-banr__seats-bar{height:8px;background:#0F1115;overflow:hidden;border:1px solid #2A323D;border-radius:1px;}
+		.g2ab-banr__seats-fill{height:100%;background:linear-gradient(90deg,#4A5D3A 0,#D2691E 70%,#C62828 100%);transition:width .4s ease;}
+		.g2ab-banr--empty{padding:30px;background:#1A1F26;color:#8A95A5;text-align:center;border-left:3px solid #D2691E;}

@@ -355,25 +355,15 @@ final class G2AB_Gateway_Authnet {
 			array( '%d' )
 		);
 
-		$payments_table = $wpdb->prefix . 'g2ab_payments';
-		$existing = $wpdb->get_var( $wpdb->prepare( "SELECT id FROM {$payments_table} WHERE booking_id = %d AND gateway = 'authnet' ORDER BY id DESC LIMIT 1", (int) $booking->id ) );
-		$data = array(
-			'transaction_id'   => $transaction_id,
+		g2ab_payments_upsert_by_transaction( 'authnet', (string) $transaction_id, array(
+			'booking_id'       => (int) $booking->id,
 			'amount'           => $amount,
 			'currency'         => strtoupper( $booking->currency ?? 'USD' ),
 			'status'           => 'succeeded',
 			'payment_method'   => 'card',
 			'gateway_response' => wp_json_encode( $details ),
 			'processed_at'     => current_time( 'mysql' ),
-		);
-		if ( $existing ) {
-			$wpdb->update( $payments_table, $data, array( 'id' => (int) $existing ) );
-		} else {
-			$data['booking_id'] = (int) $booking->id;
-			$data['gateway']    = 'authnet';
-			$data['created_at'] = current_time( 'mysql' );
-			$wpdb->insert( $payments_table, $data );
-		}
+		) );
 
 		$wpdb->insert( $wpdb->prefix . 'g2ab_logs', array(
 			'booking_id' => (int) $booking->id,

@@ -2,7 +2,7 @@
 /**
  * Template Name: Login
  *
- * Hosts the Memberistic member login inside the branded theme shell.
+ * Hosts the Members Hub member login inside the branded theme shell.
  * Assign to a Page with slug: login
  *
  * @package guns2ammo

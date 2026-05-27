@@ -24,7 +24,7 @@ final class G2AB_REST_Bookings_Controller {
 		register_rest_route( G2AB_REST_NAMESPACE, '/availability', array(
 			'methods' => WP_REST_Server::READABLE,
 			'callback' => array( $this, 'get_availability' ),
-			'permission_callback' => '__return_true',
+			'permission_callback' => array( $this, 'permission_public_read' ),
 			'args' => array(
 				'resource_id'     => array( 'required' => true, 'sanitize_callback' => 'absint', 'validate_callback' => static fn( $v ) => $v > 0 ),
 				'date'            => array( 'required' => true, 'sanitize_callback' => 'sanitize_text_field', 'validate_callback' => static fn( $v ) => (bool) preg_match( '/^\d{4}-\d{2}-\d{2}$/', (string) $v ) ),
@@ -38,12 +38,12 @@ final class G2AB_REST_Bookings_Controller {
 		register_rest_route( G2AB_REST_NAMESPACE, '/resources', array(
 			'methods' => WP_REST_Server::READABLE,
 			'callback' => array( $this, 'list_resources' ),
-			'permission_callback' => '__return_true',
+			'permission_callback' => array( $this, 'permission_public_read' ),
 		) );
 		register_rest_route( G2AB_REST_NAMESPACE, '/payment-methods', array(
 			'methods' => WP_REST_Server::READABLE,
 			'callback' => array( $this, 'list_payment_methods' ),
-			'permission_callback' => '__return_true',
+			'permission_callback' => array( $this, 'permission_public_read' ),
 		) );
 		register_rest_route( G2AB_REST_NAMESPACE, '/bookings', array(
 			'methods' => WP_REST_Server::CREATABLE,
@@ -60,6 +60,50 @@ final class G2AB_REST_Bookings_Controller {
 			'callback' => array( $this, 'confirm_payment' ),
 			'permission_callback' => '__return_true',
 		) );
+	}
+
+	/**
+	 * Permission gate for the three public read endpoints
+	 * (/availability, /resources, /payment-methods). Logged-in users
+	 * pass through; anonymous callers get a per-IP transient rate
+	 * limit so a scraper can't enumerate the full schedule, resource
+	 * list, or gateway config in a tight loop.
+	 *
+	 * Window: 60 hits / 60 seconds / IP. Adjust via the
+	 * g2ab_public_read_rate_limit filter (array of [hits, window_seconds]).
+	 */
+	public function permission_public_read( WP_REST_Request $request ) {
+		if ( is_user_logged_in() ) {
+			return true;
+		}
+		list( $hits_cap, $window ) = (array) apply_filters( 'g2ab_public_read_rate_limit', array( 60, 60 ) );
+		$hits_cap = max( 1, (int) $hits_cap );
+		$window   = max( 5, (int) $window );
+
+		$ip  = function_exists( 'g2ab_get_client_ip' ) ? g2ab_get_client_ip() : (string) ( $_SERVER['REMOTE_ADDR'] ?? '' );
+		$key = 'g2ab_rlpub_' . md5( $ip );
+		$hits = (int) get_transient( $key );
+
+		if ( $hits >= $hits_cap ) {
+			return new WP_Error(
+				'g2ab_rate_limited',
+				__( 'Too many requests. Try again in a moment.', 'g2a-booking' ),
+				array( 'status' => 429 )
+			);
+		}
+
+		// WordPress REST may invoke permission_callback more than once per
+		// request (route matching + dispatch). Increment the transient at
+		// most once per request — keyed by the request object identity
+		// so a long-lived PHP-FPM process still increments on every new
+		// HTTP request.
+		static $seen = array();
+		$rid = spl_object_id( $request );
+		if ( ! isset( $seen[ $rid ] ) ) {
+			$seen[ $rid ] = true;
+			set_transient( $key, $hits + 1, $window );
+		}
+		return true;
 	}
 
 	public function permission_create_booking( WP_REST_Request $request ) {
@@ -491,6 +535,24 @@ final class G2AB_REST_Bookings_Controller {
 			return (int) $existing->ID;
 		}
 
+		// Guest booking — create a WP user with the "Walk-in Customer"
+		// role by default. Staff can filter walk-ins in the WP user
+		// list separately from members + administrators, and the same
+		// account is automatically upgraded to the matching member
+		// role if the customer later buys a membership.
+		//
+		// Sites that want to skip user creation entirely (older
+		// behavior) can set g2ab_create_user_on_booking = '0' /
+		// false / 'no' or hook the g2ab_create_user_on_booking
+		// filter to return false.
+		$create_user = (bool) apply_filters(
+			'g2ab_create_user_on_booking',
+			(bool) get_option( 'g2ab_create_user_on_booking', true )
+		);
+		if ( ! $create_user ) {
+			return 0;
+		}
+
 		$name_parts = $this->split_customer_name( $customer_name );
 		$base_login = sanitize_user( current( explode( '@', $customer_email ) ), true );
 		if ( '' === $base_login ) {
@@ -505,14 +567,18 @@ final class G2AB_REST_Bookings_Controller {
 		}
 
 		$password = wp_generate_password( 20, true, true );
-		$user_id  = wp_insert_user( array(
+		// Role: walk-in by default. If the g2a_walkin role doesn't
+		// exist yet (plugin activator didn't run after upgrade) fall
+		// back to subscriber so the insert still succeeds.
+		$role = get_role( 'g2a_walkin' ) ? 'g2a_walkin' : 'subscriber';
+		$user_id = wp_insert_user( array(
 			'user_login'   => $user_login,
 			'user_pass'    => $password,
 			'user_email'   => $customer_email,
 			'display_name' => $customer_name,
 			'first_name'   => $name_parts['first_name'],
 			'last_name'    => $name_parts['last_name'],
-			'role'         => 'subscriber',
+			'role'         => $role,
 		) );
 
 		if ( is_wp_error( $user_id ) ) {
@@ -525,8 +591,8 @@ final class G2AB_REST_Bookings_Controller {
 		update_user_meta( $user_id, 'billing_phone', $customer_phone );
 		update_user_meta( $user_id, 'g2ab_customer_created_from_booking', current_time( 'mysql' ) );
 
-		// Email the password-set link. No session is established — the customer
-		// must set their own password if they want to log in.
+		// Email the password-set link so the customer can log in to
+		// view their bookings.
 		wp_new_user_notification( $user_id, null, 'user' );
 
 		return (int) $user_id;
@@ -534,6 +600,24 @@ final class G2AB_REST_Bookings_Controller {
 
 	public function create_booking( WP_REST_Request $request ) {
 		global $wpdb;
+
+		// Idempotency: the caller may supply an Idempotency-Key header
+		// (or X-Idempotency-Key). If the same key has succeeded in the
+		// last 5 minutes we return the original response instead of
+		// creating a second booking. Protects against:
+		//   - user double-clicking the submit button before the JS
+		//     spinner kicks in,
+		//   - a flaky 502 mid-request triggering a client retry,
+		//   - rapid network hiccup that resends the same POST.
+		$idem_key = sanitize_text_field( (string) ( $request->get_header( 'idempotency-key' ) ?: $request->get_header( 'x-idempotency-key' ) ?: '' ) );
+		if ( '' !== $idem_key && strlen( $idem_key ) <= 128 ) {
+			$idem_cache_key = 'g2ab_idem_' . md5( $idem_key );
+			$cached         = get_transient( $idem_cache_key );
+			if ( is_array( $cached ) && isset( $cached['booking_id'], $cached['response'] ) ) {
+				// Return the original successful response verbatim.
+				return rest_ensure_response( $cached['response'] );
+			}
+		}
 
 		$booking_type_id = (int) $request->get_param( 'booking_type_id' );
 		$resource_id     = (int) $request->get_param( 'resource_id' );
@@ -907,6 +991,20 @@ final class G2AB_REST_Bookings_Controller {
 			$this->send_confirmation_email( $customer_email, $customer_name, $resource->name, $start_sql, $uuid );
 		}
 
+		// Cache the response under the caller's idempotency key so a
+		// retry within 5 minutes returns the same response and does
+		// NOT create another booking row.
+		if ( ! empty( $idem_key ) && strlen( $idem_key ) <= 128 ) {
+			set_transient(
+				'g2ab_idem_' . md5( $idem_key ),
+				array(
+					'booking_id' => (int) $booking_id,
+					'response'   => array( 'success' => true, 'data' => $response ),
+				),
+				5 * MINUTE_IN_SECONDS
+			);
+		}
+
 		return rest_ensure_response( array( 'success' => true, 'data' => $response ) );
 	}
 
@@ -955,6 +1053,26 @@ final class G2AB_REST_Bookings_Controller {
 		if ( ! $booking ) {
 			return new WP_Error( 'g2ab_not_found', 'Booking not found.', array( 'status' => 404 ) );
 		}
+
+		// Detect legacy (pre-1.2.4) bookings — they have no stored
+		// confirm_token in metadata. The original public endpoint would
+		// fall through to the gateway round-trip for these, which meant
+		// anyone with the UUID + a guessable session id could flip the
+		// booking to "paid". Staff with manage_g2ab_bookings can still
+		// confirm legacy rows manually; public callers must be told to
+		// contact the range. We surface this BEFORE can_access_booking()
+		// so the customer gets an actionable message instead of a
+		// generic "Invalid confirmation token" 403.
+		$meta_pre      = json_decode( (string) $booking->metadata, true );
+		$has_stored    = is_array( $meta_pre ) && ! empty( $meta_pre['confirm_token'] );
+		if ( ! $has_stored && ! current_user_can( 'manage_g2ab_bookings' ) ) {
+			return new WP_Error(
+				'g2ab_legacy_booking_requires_staff',
+				__( 'This booking predates token-based confirmation. Please contact the range to confirm payment.', 'g2a-booking' ),
+				array( 'status' => 403 )
+			);
+		}
+
 		if ( ! $this->can_access_booking( $booking, $confirm_token ) ) {
 			return new WP_Error(
 				'g2ab_invalid_confirm_token',
@@ -963,38 +1081,20 @@ final class G2AB_REST_Bookings_Controller {
 			);
 		}
 
-		// Token gate: returned to the customer in the create response and
-		// stored in metadata. Without it (or for a mismatched value), the
-		// endpoint refuses to drive any state change. Bookings created
-		// before 1.2.4 don't carry a token; staff with manage_g2ab_bookings
-		// can still confirm those manually, but the public endpoint must
-		// not — otherwise anyone with the UUID could confirm a legacy
-		// booking with no auth other than guessing a gateway session id.
-		$meta          = json_decode( (string) $booking->metadata, true );
+		// At this point: caller is staff, the booking owner, or has a
+		// matching token. Re-parse metadata for downstream use.
+		$meta          = is_array( $meta_pre ) ? $meta_pre : array();
 		$stored_token  = isset( $meta['confirm_token'] ) ? (string) $meta['confirm_token'] : '';
-		$has_stored    = '' !== $stored_token;
-		$token_matches = $has_stored && hash_equals( $stored_token, $confirm_token );
+		$token_matches = '' !== $stored_token && hash_equals( $stored_token, $confirm_token );
 
 		if ( in_array( $booking->status, array( 'paid', 'confirmed', 'completed' ), true ) ) {
 			return rest_ensure_response( array( 'success' => true, 'data' => array( 'status' => $booking->status, 'verified' => true ) ) );
 		}
 
-		if ( ! current_user_can( 'manage_g2ab_bookings' ) ) {
-			if ( ! $has_stored ) {
-				return new WP_Error(
-					'g2ab_legacy_booking_requires_staff',
-					__( 'This booking predates token-based confirmation. Please contact the range to confirm payment.', 'g2a-booking' ),
-					array( 'status' => 403 )
-				);
-			}
-			if ( ! $token_matches ) {
-				return new WP_Error(
-					'g2ab_invalid_confirm_token',
-					__( 'Invalid confirmation token.', 'g2a-booking' ),
-					array( 'status' => 403 )
-				);
-			}
-		}
+		// At this point auth is already established by the two gates above
+		// (legacy-requires-staff + can_access_booking). $token_matches is
+		// computed for downstream gateway calls that may need it.
+		unset( $token_matches );
 
 		$gateway_id = $meta['gateway'] ?? '';
 		if ( $gateway_id && class_exists( 'G2AB_Gateway_Manager' ) ) {

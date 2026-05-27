@@ -138,6 +138,19 @@ final class G2AB_Activator {
 			) );
 		}
 
+		// Walk-in customer: assigned to guests who book a lane without
+		// buying a membership. Visible in the WP user list as
+		// "Walk-in Customer" so staff can filter walk-ins separately
+		// from members + administrators. When the same email later
+		// buys a membership, the role is replaced with the matching
+		// memberistic_* role (see Memberistic Content_Restrictions::
+		// sync_roles_for_membership() — it now also strips g2a_walkin).
+		if ( null === get_role( 'g2a_walkin' ) ) {
+			add_role( 'g2a_walkin', __( 'Walk-in Customer', 'g2a-booking' ), array(
+				'read' => true,
+			) );
+		}
+
 		$admin = get_role( 'administrator' );
 		if ( $admin ) {
 			foreach ( array_keys( $caps ) as $cap ) {

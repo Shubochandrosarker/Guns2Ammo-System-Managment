@@ -75,6 +75,24 @@ img[loading="lazy"][data-loaded="1"] { opacity: 1; }
 /* Kill horizontal scroll on every page */
 html, body { max-width: 100%; overflow-x: hidden; }
 
+/* A11y: skip-to-content link, only visible on keyboard focus. */
+.g2a-skip-link {
+  position: absolute; left: -9999px; top: -9999px;
+  z-index: 100000;
+  background: var(--color-ember, #E8802F); color: #111;
+  padding: 12px 20px; font-weight: 700; text-decoration: none;
+  font-family: var(--font-condensed, system-ui); letter-spacing: 0.04em;
+}
+.g2a-skip-link:focus { left: 12px; top: 12px; outline: 2px solid #fff; }
+
+/* iPad portrait + small laptops: keep input font-size >=16px so iOS
+   Safari doesn't zoom on focus. The 600px breakpoint covered phones
+   only; this widens to coarse-pointer / touch viewports up to 1024px. */
+@media (max-width: 1024px) {
+  input:not([type=checkbox]):not([type=radio]):not([type=range]),
+  select, textarea, .field { font-size: 16px; }
+}
+
 /* Media never breaks its container */
 img, video, iframe, svg, canvas { max-width: 100%; height: auto; }
 

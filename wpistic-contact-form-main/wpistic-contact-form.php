@@ -3,7 +3,7 @@
  * Plugin Name:       WPistic Contact Form
  * Plugin URI:        https://www.wordpressistic.com/marketplace/plugins/wpistic-contact-form/
  * Description:       Collect every contact form and website form submission in one branded WordPress dashboard. View the full submitted data and message, then reply to the sender by email directly from wp-admin.
- * Version:           1.0.0
+ * Version:           1.4.0
  * Requires at least: 6.2
  * Requires PHP:      7.4
  * Author:            Wordpressistic
@@ -30,8 +30,8 @@ if ( ! defined( 'ABSPATH' ) ) {
  * WPISTIC_CF_URL        — URL to plugin directory (trailing slash).
  * WPISTIC_CF_BASENAME   — Plugin basename (folder/file.php) for hooks.
  */
-define( 'WPISTIC_CF_VERSION', '1.0.0' );
-define( 'WPISTIC_CF_DB_VERSION', '1.0.0' );
+define( 'WPISTIC_CF_VERSION', '1.4.0' );
+define( 'WPISTIC_CF_DB_VERSION', '1.1.0' );
 define( 'WPISTIC_CF_FILE', __FILE__ );
 define( 'WPISTIC_CF_PATH', plugin_dir_path( __FILE__ ) );
 define( 'WPISTIC_CF_URL', plugin_dir_url( __FILE__ ) );

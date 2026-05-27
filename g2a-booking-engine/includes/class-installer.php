@@ -156,7 +156,71 @@ final class G2AB_Installer {
 		$this->migrate_to_1_2_0( $current );
 		$this->migrate_to_1_3_0( $current );
 		$this->migrate_to_1_4_0( $current );
+		$this->migrate_to_1_5_0( $current );
+		$this->migrate_to_1_6_0( $current );
 		do_action( 'g2ab_run_migrations', $current, G2AB_DB_VERSION );
+	}
+
+	/**
+	 * v1.6.0 — compound index on g2ab_logs (event_type, booking_id)
+	 * + log-retention pruner.
+	 *
+	 * The reminder cron + activity-log views both filter logs by
+	 * (event_type='reminder_24h_sent' AND booking_id IN (…)) — a
+	 * compound index on those two columns turns it from a full
+	 * scan into a covering lookup. dbDelta will add the new key
+	 * on the next install_tables() pass.
+	 *
+	 * Also seeds a one-time prune of any logs older than 365 days
+	 * on upgrade so existing installs immediately benefit.
+	 */
+	private function migrate_to_1_6_0( $current ) {
+		if ( version_compare( $current, '1.6.0', '>=' ) ) {
+			return;
+		}
+		global $wpdb;
+		$logs = $wpdb->prefix . 'g2ab_logs';
+		// One-time historical prune.
+		$wpdb->query( $wpdb->prepare(
+			"DELETE FROM {$logs} WHERE created_at < %s",
+			gmdate( 'Y-m-d H:i:s', time() - 365 * DAY_IN_SECONDS )
+		) );
+	}
+
+	/**
+	 * v1.5.0 — payment-row de-duplication.
+	 *
+	 * Adds UNIQUE KEY (gateway, transaction_id) to g2ab_payments so two
+	 * concurrent webhook deliveries (Stripe/Fortis/Authnet/PayPal retries,
+	 * or simultaneous payment_intent + checkout.session events) can't
+	 * insert duplicate rows. dbDelta will have added the key on fresh
+	 * installs; on upgrades we first collapse any existing duplicates so
+	 * the index can be added. Strategy: keep the most recent row per
+	 * (gateway, transaction_id) and delete the rest.
+	 *
+	 * Rows where transaction_id IS NULL (pay-in-store, manual payments)
+	 * are exempt from the dedupe because they have no provider id; the
+	 * UNIQUE KEY treats multiple NULLs as distinct on MySQL.
+	 */
+	private function migrate_to_1_5_0( $current ) {
+		if ( version_compare( $current, '1.5.0', '>=' ) ) {
+			return;
+		}
+		global $wpdb;
+		$payments = $wpdb->prefix . 'g2ab_payments';
+
+		// Collapse duplicates: keep the row with the largest id (most
+		// recently inserted) per (gateway, transaction_id) and delete
+		// the rest. Excludes rows where transaction_id is NULL or empty
+		// (in-store payments don't have a provider transaction id).
+		$wpdb->query( "DELETE p1 FROM {$payments} p1
+			INNER JOIN {$payments} p2
+			ON p1.gateway = p2.gateway
+			AND p1.transaction_id = p2.transaction_id
+			AND p1.id < p2.id
+			WHERE p1.transaction_id IS NOT NULL
+			AND p1.transaction_id <> ''" );
+		// dbDelta will add the new UNIQUE KEY on the next install_tables() pass.
 	}
 
 	/**
@@ -405,7 +469,7 @@ KEY idx_date_range (start_date, end_date)
 id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
 booking_id BIGINT UNSIGNED NOT NULL,
 gateway VARCHAR(50) NOT NULL DEFAULT 'pay_in_store',
-transaction_id VARCHAR(255) DEFAULT NULL,
+transaction_id VARCHAR(191) DEFAULT NULL,
 amount DECIMAL(10,2) NOT NULL DEFAULT 0.00,
 currency CHAR(3) NOT NULL DEFAULT 'USD',
 status VARCHAR(20) NOT NULL DEFAULT 'pending',
@@ -417,8 +481,8 @@ external_ref VARCHAR(64) DEFAULT NULL,
 processed_at DATETIME DEFAULT NULL,
 created_at DATETIME NOT NULL,
 PRIMARY KEY  (id),
+UNIQUE KEY uniq_gateway_tx (gateway, transaction_id),
 KEY idx_booking (booking_id),
-KEY idx_transaction (transaction_id),
 KEY idx_status (status),
 KEY idx_extref (external_ref)
 ) {$collate};";
@@ -437,7 +501,8 @@ created_at DATETIME NOT NULL,
 PRIMARY KEY  (id),
 KEY idx_booking (booking_id),
 KEY idx_event (event_type),
-KEY idx_created (created_at)
+KEY idx_created (created_at),
+KEY idx_event_booking (event_type, booking_id)
 ) {$collate};";
 
 		$schemas['migration_runs'] = "CREATE TABLE {$prefix}g2ab_migration_runs (

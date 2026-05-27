@@ -107,6 +107,69 @@ class WPISTIC_CF_Attachments {
 		return max( 1, (int) get_option( 'WPISTIC_CF_att_max_size_mb', 5 ) ) * 1024 * 1024;
 	}
 
+	/**
+	 * Server-executable extensions that must NEVER be accepted as an
+	 * upload, regardless of the admin's allow-list. Catches the classic
+	 * webshell upload paths on every common stack (Apache/PHP, NGINX/PHP,
+	 * Perl, Python CGI, classic ASP, JSP, etc.) and the double-extension
+	 * smuggling trick (evil.php.jpg, etc.).
+	 *
+	 * Filterable via WPISTIC_CF_executable_extensions if a site has a
+	 * legitimate reason to relax the list (it should not).
+	 */
+	public static function executable_extensions() {
+		return apply_filters(
+			'WPISTIC_CF_executable_extensions',
+			array(
+				// PHP family.
+				'php', 'php3', 'php4', 'php5', 'php7', 'php8', 'phtml', 'pht', 'phps', 'phar',
+				// Apache config that can affect serving rules.
+				'htaccess', 'htpasswd', 'user.ini',
+				// Server-parsed HTML.
+				'shtml', 'shtm',
+				// Classic CGI / scripting languages.
+				'cgi', 'pl', 'py', 'rb',
+				// JSP / ASP / ASPX.
+				'jsp', 'jspx', 'asp', 'aspx', 'asa', 'asax', 'cer',
+				// Java + .NET buildables.
+				'jar', 'war',
+				// Windows-executable / shell scripts.
+				'exe', 'msi', 'bat', 'cmd', 'com', 'scr', 'ps1', 'vbs', 'wsf', 'sh',
+				// SVG can carry script payloads.
+				'svg',
+				// Misc embedded scripts.
+				'hta', 'jse',
+			)
+		);
+	}
+
+	/**
+	 * True when ANY dotted segment of the filename matches the executable
+	 * deny list. Comparing every segment (not just PATHINFO_EXTENSION)
+	 * is what blocks the "evil.php.jpg" double-extension trick: pathinfo
+	 * returns "jpg" only, but the apache mod_mime + AddHandler path will
+	 * execute it as PHP on some configs.
+	 */
+	public static function path_has_executable_extension( $filename ) {
+		$filename = (string) $filename;
+		if ( '' === $filename ) {
+			return false;
+		}
+		$deny = array_map( 'strtolower', self::executable_extensions() );
+		// Strip any path component an attacker tried to smuggle in.
+		$basename = basename( $filename );
+		$parts    = explode( '.', $basename );
+		// Skip the first segment (the actual base name, never an extension).
+		array_shift( $parts );
+		foreach ( $parts as $part ) {
+			$part = strtolower( trim( $part ) );
+			if ( '' !== $part && in_array( $part, $deny, true ) ) {
+				return true;
+			}
+		}
+		return false;
+	}
+
 	/* ------------------------------------------------------------------
 	 * Local uploads (shortcode)
 	 * ------------------------------------------------------------------ */
@@ -166,6 +229,18 @@ class WPISTIC_CF_Attachments {
 				continue;
 			}
 			$ext = strtolower( pathinfo( $file['name'], PATHINFO_EXTENSION ) );
+
+			// Defence-in-depth deny list. Runs BEFORE the admin's allow-list
+			// and BEFORE wp_check_filetype_and_ext, so a misconfigured
+			// allow-list (empty / overly broad / matching a server-executable
+			// extension) can never let an uploaded webshell through. Also
+			// catches the classic "evil.php.jpg" + double-extension trick by
+			// scanning every dotted segment.
+			if ( self::path_has_executable_extension( $file['name'] ) ) {
+				$errors[] = sprintf( __( '"%s" is a disallowed file type.', 'wpistic-contact-form' ), $file['name'] );
+				continue;
+			}
+
 			if ( $allowed_ext && ! in_array( $ext, $allowed_ext, true ) ) {
 				$errors[] = sprintf( __( '"%s" is a disallowed file type.', 'wpistic-contact-form' ), $file['name'] );
 				continue;

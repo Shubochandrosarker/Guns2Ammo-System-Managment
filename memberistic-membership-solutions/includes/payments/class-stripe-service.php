@@ -154,6 +154,15 @@ final class Stripe_Service {
 		exit;
 	}
 
+	/**
+	 * Pre-payment lookup ONLY. Returns the current user id, or a matching
+	 * existing user, or 0. Does NOT create a new WP user — that would
+	 * fire wp_new_user_notification() (and consume the email_exists()
+	 * uniqueness slot) for any visitor who clicks Checkout, including
+	 * spray attackers who supply someone else's email. User creation is
+	 * deferred to ensure_user_for_completed_checkout(), invoked from
+	 * handle_checkout_completed() after Stripe confirms payment.
+	 */
 	private static function resolve_checkout_user( $email, $full_name ) {
 		$current_user_id = get_current_user_id();
 
@@ -167,32 +176,65 @@ final class Stripe_Service {
 			return (int) $existing_user_id;
 		}
 
-		$email_parts   = explode( '@', $email );
-		$username_base = sanitize_user( $email_parts[0], true );
-		$username      = $username_base ?: 'memberistic-member';
-		$suffix        = 1;
+		return 0;
+	}
 
-		while ( username_exists( $username ) ) {
-			$username = $username_base . '-' . $suffix;
-			$suffix++;
-		}
-
-		$user_id = wp_insert_user(
-			array(
-				'user_login'   => $username,
-				'user_email'   => $email,
-				'display_name' => $full_name,
-				'user_pass'    => wp_generate_password( 24, true, true ),
-				'role'         => 'subscriber',
-			)
-		);
-
-		if ( is_wp_error( $user_id ) ) {
+	/**
+	 * Post-payment user provisioning. Called from handle_checkout_completed
+	 * once Stripe confirms a successful checkout. Creates the WP user if
+	 * one didn't exist at checkout time and links it back to the
+	 * membership + person rows.
+	 */
+	private static function ensure_user_for_completed_checkout( $membership_id ) {
+		$membership = Memberships_Repository::get( $membership_id );
+		if ( ! $membership ) {
 			return 0;
 		}
 
-		if ( function_exists( 'wp_new_user_notification' ) ) {
-			wp_new_user_notification( (int) $user_id, null, 'user' );
+		if ( ! empty( $membership['primary_user_id'] ) ) {
+			return (int) $membership['primary_user_id'];
+		}
+
+		$person = People_Repository::get_primary_by_membership( (int) $membership_id );
+		if ( empty( $person['email'] ) || ! is_email( $person['email'] ) ) {
+			return 0;
+		}
+
+		$email     = (string) $person['email'];
+		$full_name = isset( $person['full_name'] ) ? (string) $person['full_name'] : '';
+
+		$existing = email_exists( $email );
+		if ( $existing ) {
+			$user_id = (int) $existing;
+		} else {
+			$email_parts   = explode( '@', $email );
+			$username_base = sanitize_user( $email_parts[0], true );
+			$username      = $username_base ?: 'memberistic-member';
+			$suffix        = 1;
+			while ( username_exists( $username ) ) {
+				$username = $username_base . '-' . $suffix;
+				$suffix++;
+			}
+			$user_id = wp_insert_user(
+				array(
+					'user_login'   => $username,
+					'user_email'   => $email,
+					'display_name' => $full_name,
+					'user_pass'    => wp_generate_password( 24, true, true ),
+					'role'         => 'subscriber',
+				)
+			);
+			if ( is_wp_error( $user_id ) ) {
+				return 0;
+			}
+			if ( function_exists( 'wp_new_user_notification' ) ) {
+				wp_new_user_notification( (int) $user_id, null, 'user' );
+			}
+		}
+
+		Memberships_Repository::update( (int) $membership_id, array( 'primary_user_id' => (int) $user_id ) );
+		if ( ! empty( $person['id'] ) ) {
+			People_Repository::update( (int) $person['id'], array( 'wp_user_id' => (int) $user_id ) );
 		}
 
 		return (int) $user_id;
@@ -303,8 +345,24 @@ final class Stripe_Service {
 	}
 
 	public static function process_webhook_event( $event ) {
-		$type = isset( $event['type'] ) ? $event['type'] : '';
-		$obj  = isset( $event['data']['object'] ) && is_array( $event['data']['object'] ) ? $event['data']['object'] : array();
+		$type     = isset( $event['type'] ) ? $event['type'] : '';
+		$event_id = isset( $event['id'] ) ? sanitize_text_field( (string) $event['id'] ) : '';
+		$obj      = isset( $event['data']['object'] ) && is_array( $event['data']['object'] ) ? $event['data']['object'] : array();
+
+		// Idempotency: Stripe retries on 5xx (and occasionally double-sends
+		// on success). Without dedup, every retry creates a duplicate
+		// Payments row, a duplicate Activity row, and a duplicate
+		// membership_activated / payment_received email. Track event_id
+		// in a transient (object-cache fronted in production); skip
+		// processing on a repeat.
+		if ( '' !== $event_id ) {
+			$dedup_key = 'memberistic_stripe_evt_' . md5( $event_id );
+			if ( false !== get_transient( $dedup_key ) ) {
+				do_action( 'memberistic_stripe_webhook_event_duplicate', $event_id, $type );
+				return true;
+			}
+			set_transient( $dedup_key, time(), 7 * DAY_IN_SECONDS );
+		}
 
 		do_action( 'memberistic_stripe_webhook_event', $type, $obj, $event );
 
@@ -348,7 +406,14 @@ final class Stripe_Service {
 
 		$membership_id = (int) $membership['id'];
 		$billing_cycle = $membership['billing_cycle'];
-		$renewal_date  = gmdate( 'Y-m-d H:i:s', strtotime( 'annual' === $billing_cycle ? '+1 year' : '+1 month', time() ) );
+		// Anchor the new renewal off the EXISTING renewal_date if the
+		// member is being renewed before their current term ends — so
+		// they keep the paid time. Falls back to "now" for first-time
+		// invoices or expired memberships. Site-local time throughout.
+		$now_local     = current_time( 'mysql' );
+		$current_rd    = ! empty( $membership['renewal_date'] ) ? $membership['renewal_date'] : '';
+		$anchor        = ( $current_rd && $current_rd > $now_local ) ? $current_rd : $now_local;
+		$renewal_date  = \WordPressistic\Memberistic\Integrations\WooCommerce_Bridge::compute_next_renewal( $billing_cycle, $anchor );
 
 		// Skip the very first invoice that fires on checkout completion — that path is
 		// already handled by checkout.session.completed and creates the start_date row.
@@ -407,9 +472,16 @@ final class Stripe_Service {
 			return false;
 		}
 
+		// User creation is deferred from checkout-start to here so an
+		// unauthenticated visitor can't spray wp_new_user_notification
+		// at arbitrary emails by hitting the checkout endpoint.
+		self::ensure_user_for_completed_checkout( $membership_id );
+
 		$billing_cycle = $membership['billing_cycle'];
 		$start_date    = current_time( 'mysql' );
-		$renewal_date  = gmdate( 'Y-m-d H:i:s', strtotime( 'annual' === $billing_cycle ? '+1 year' : '+1 month', time() ) );
+		// Site-local renewal compute (was UTC-via-gmdate which mis-drifted
+		// on non-UTC sites like Mesa AZ).
+		$renewal_date  = \WordPressistic\Memberistic\Integrations\WooCommerce_Bridge::compute_next_renewal( $billing_cycle, $start_date );
 
 		Memberships_Repository::update(
 			$membership_id,

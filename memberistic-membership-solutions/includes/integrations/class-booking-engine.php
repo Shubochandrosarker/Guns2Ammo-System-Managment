@@ -55,14 +55,21 @@ final class Booking_Engine {
 			return true;
 		}
 
-		return self::get_active_membership_for_email( $customer_email ) ? true : (bool) $allowed;
+		// Audit C27: the previous fallback granted member status
+		// (and the member discount via g2ab_booking_pricing below)
+		// whenever the SUPPLIED EMAIL matched an active membership,
+		// even when the caller wasn't logged in as that member.
+		// Anyone who knew a member's email could book at member
+		// rates by typing it into the guest form. Now: require a
+		// real authenticated user.
+		return (bool) $allowed;
 	}
 
 	public static function g2ab_booking_pricing( $pricing, $booking_type, $party_size, $user_id, $customer_email = '' ) {
+		// Audit C27: same fix as above — discount only applies to
+		// the LOGGED-IN member, not anyone who types a member's
+		// email into the guest form.
 		$membership = self::get_active_membership_for_user( $user_id );
-		if ( ! $membership ) {
-			$membership = self::get_active_membership_for_email( $customer_email );
-		}
 
 		if ( ! $membership ) {
 			return $pricing;

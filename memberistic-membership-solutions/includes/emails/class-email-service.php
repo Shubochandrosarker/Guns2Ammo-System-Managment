@@ -242,6 +242,12 @@ final class Email_Service {
 			'{support_email}'      => (string) memberistic_get_setting( 'email_from_address', get_option( 'admin_email' ) ),
 			'{logo_url}'           => (string) memberistic_get_setting( 'logo_url', '' ),
 			'{brand_label}'        => $brand,
+			// wp_login_url() + wp_lostpassword_url() honor the theme's
+			// login_url / lostpassword_url filters, so members get the
+			// branded /login/ URL instead of /wp-login.php in every
+			// templated email.
+			'{login_url}'          => function_exists( 'wp_login_url' ) ? wp_login_url() : home_url( '/login/' ),
+			'{lostpassword_url}'   => function_exists( 'wp_lostpassword_url' ) ? wp_lostpassword_url() : home_url( '/login/?action=lostpassword' ),
 		);
 
 		return apply_filters( 'memberistic_email_merge_tags', $context, $membership, $person, $extra_context );
@@ -277,7 +283,7 @@ final class Email_Service {
 			),
 			'membership_activated' => array(
 				'subject' => __( 'Your {brand_label} membership is active', 'memberistic' ),
-				'body'    => __( "Hi {member_name},\n\nWelcome to {brand_label}! Your {plan_name} membership ({membership_id}) is now active.\nBilling cycle: {billing_cycle}\nNext renewal: {renewal_date}\n\nManage your membership: {account_url}\nBook a lane: {booking_url}\n\n{business_name}\n{business_phone}", 'memberistic' ),
+				'body'    => __( "Hi {member_name},\n\nWelcome to {brand_label}! Your {plan_name} membership ({membership_id}) is now active.\nBilling cycle: {billing_cycle}\nNext renewal: {renewal_date}\n\nLog in to your account:\n{login_url}\n\nForgot your password? Reset it here:\n{lostpassword_url}\n\nManage your membership: {account_url}\nBook a lane: {booking_url}\n\n{business_name}\n{business_phone}", 'memberistic' ),
 			),
 			'membership_renewed'   => array(
 				'subject' => __( 'Your {brand_label} membership was renewed', 'memberistic' ),
