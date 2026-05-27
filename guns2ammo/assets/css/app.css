@@ -75,15 +75,23 @@ img[loading="lazy"][data-loaded="1"] { opacity: 1; }
 /* Kill horizontal scroll on every page */
 html, body { max-width: 100%; overflow-x: hidden; }
 
-/* A11y: skip-to-content link, only visible on keyboard focus. */
+/* A11y: skip-to-content link — invisible until keyboard focus.
+   Uses the WP screen-reader-text recipe (1×1 clipped box) which
+   survives translators and overflow:hidden parents better than the
+   old left:-9999px positioning. */
 .g2a-skip-link {
-  position: absolute; left: -9999px; top: -9999px;
+  position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+  overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0;
+}
+.g2a-skip-link:focus {
+  position: fixed; left: 12px; top: 12px;
+  width: auto; height: auto; padding: 12px 20px; margin: 0;
+  overflow: visible; clip: auto; white-space: normal;
   z-index: 100000;
   background: var(--color-ember, #E8802F); color: #111;
-  padding: 12px 20px; font-weight: 700; text-decoration: none;
+  font-weight: 700; text-decoration: none; outline: 2px solid #fff;
   font-family: var(--font-condensed, system-ui); letter-spacing: 0.04em;
 }
-.g2a-skip-link:focus { left: 12px; top: 12px; outline: 2px solid #fff; }
 
 /* iPad portrait + small laptops: keep input font-size >=16px so iOS
    Safari doesn't zoom on focus. The 600px breakpoint covered phones
