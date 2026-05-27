@@ -335,3 +335,166 @@
 @media (max-width: 540px) {
   .woocommerce .quantity .qty { min-height: 44px !important; font-size: 16px !important; }
 }
+
+/* ============================================================
+ * 7. CART — coupon row + UPDATE CART alignment (rebuild)
+ *    Previous styling left the disabled UPDATE CART floating below
+ *    the coupon field as a ghost block. Restructure into a single
+ *    horizontal row: coupon input + Apply on the left, Update Cart
+ *    on the right. Stacks on phones.
+ * ============================================================ */
+.woocommerce-cart .woocommerce-cart-form table.cart td.actions {
+  padding: 18px !important;
+  background: var(--color-gunmetal, #1A1F26);
+}
+.woocommerce-cart .woocommerce-cart-form .coupon {
+  display: flex !important;
+  flex: 1 1 60%;
+  gap: 10px !important;
+  align-items: stretch !important;
+  margin-right: auto;
+}
+.woocommerce-cart .woocommerce-cart-form .coupon label { display: none !important; }
+.woocommerce-cart .woocommerce-cart-form .coupon input.input-text {
+  flex: 1 1 auto;
+  min-width: 0 !important;
+  width: auto !important;
+  min-height: 46px;
+  padding: 10px 14px !important;
+  font-size: 15px !important;
+}
+.woocommerce-cart .woocommerce-cart-form .coupon button[name="apply_coupon"] {
+  flex: 0 0 auto;
+  min-height: 46px;
+  padding: 10px 22px !important;
+  white-space: nowrap;
+}
+.woocommerce-cart .woocommerce-cart-form td.actions > button[name="update_cart"] {
+  margin-left: auto;
+  min-height: 46px;
+  padding: 10px 22px !important;
+}
+@media (max-width: 720px) {
+  .woocommerce-cart .woocommerce-cart-form td.actions {
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 10px !important;
+  }
+  .woocommerce-cart .woocommerce-cart-form .coupon { width: 100% !important; flex: 1 1 100% !important; }
+  .woocommerce-cart .woocommerce-cart-form td.actions > button[name="update_cart"] { width: 100% !important; margin: 0 !important; }
+}
+
+/* ============================================================
+ * 8. CHECKOUT — terms checkbox visibility + select2 dropdowns
+ *    1. The "I have read and agree to the website terms" checkbox
+ *       was rendering nearly invisible on the dark theme (white
+ *       checkbox on white -> blends). Now a 22px brass-bordered
+ *       checkbox with a clear filled state on check.
+ *    2. The Arizona / State select2 dropdown text was overflowing
+ *       its container because the height + line-height were
+ *       mismatched. Forced consistent vertical centring.
+ * ============================================================ */
+.woocommerce-terms-and-conditions-wrapper {
+  background: rgba(201, 168, 76, .04);
+  border: 1px solid var(--color-hairline, rgba(255,255,255,.09));
+  padding: 16px 18px !important;
+  margin: 18px 0 !important;
+  border-radius: 4px;
+}
+.woocommerce-checkout p.form-row.validate-required.woocommerce-validated,
+.woocommerce-checkout p.form-row.validate-required {
+  margin: 0 !important;
+}
+.woocommerce-checkout p.form-row.validate-required label.checkbox,
+.woocommerce-checkout #payment p.form-row.validate-required label.checkbox,
+.woocommerce-checkout .wc-terms-and-conditions label {
+  display: flex !important;
+  align-items: flex-start !important;
+  gap: 12px !important;
+  cursor: pointer;
+  color: var(--color-white, #fff) !important;
+  font-size: 14px !important;
+  line-height: 1.5 !important;
+  margin: 0 !important;
+  padding: 4px 0 !important;
+}
+.woocommerce-checkout input#terms,
+.woocommerce-checkout input[name="terms"],
+.woocommerce-checkout .wc-terms-and-conditions input[type="checkbox"] {
+  appearance: none !important;
+  -webkit-appearance: none !important;
+  width: 22px !important;
+  height: 22px !important;
+  min-width: 22px !important;
+  border: 2px solid var(--color-brass, #C9A84C) !important;
+  background: transparent !important;
+  border-radius: 3px !important;
+  cursor: pointer !important;
+  position: relative !important;
+  flex: 0 0 22px !important;
+  margin: 2px 0 0 !important;
+  display: inline-block !important;
+  transition: all 180ms ease;
+}
+.woocommerce-checkout input#terms:checked,
+.woocommerce-checkout input[name="terms"]:checked,
+.woocommerce-checkout .wc-terms-and-conditions input[type="checkbox"]:checked {
+  background: var(--color-brass, #C9A84C) !important;
+  border-color: var(--color-brass, #C9A84C) !important;
+}
+.woocommerce-checkout input#terms:checked::after,
+.woocommerce-checkout input[name="terms"]:checked::after,
+.woocommerce-checkout .wc-terms-and-conditions input[type="checkbox"]:checked::after {
+  content: '';
+  position: absolute;
+  left: 6px;
+  top: 2px;
+  width: 6px;
+  height: 11px;
+  border: solid #111;
+  border-width: 0 2px 2px 0;
+  transform: rotate(45deg);
+}
+.woocommerce-checkout input#terms:focus,
+.woocommerce-checkout input[name="terms"]:focus {
+  outline: 2px solid var(--color-ember, #E8802F) !important;
+  outline-offset: 2px !important;
+}
+
+/* select2 state dropdown — fix Arizona text overflow */
+.woocommerce-checkout .select2-container,
+.woocommerce-checkout .select2-container .select2-selection--single {
+  width: 100% !important;
+  height: 46px !important;
+  display: block;
+}
+.woocommerce-checkout .select2-container .select2-selection__rendered {
+  display: block !important;
+  line-height: 44px !important;
+  padding: 0 28px 0 14px !important;
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+}
+.woocommerce-checkout .select2-container .select2-selection__arrow {
+  height: 44px !important;
+  right: 6px !important;
+}
+.woocommerce-checkout .select2-container .select2-selection__arrow b {
+  border-color: var(--color-brass-bright, #E3C06A) transparent transparent transparent !important;
+}
+.woocommerce-checkout .select2-dropdown {
+  background: var(--color-gunmetal, #1A1F26) !important;
+  border: 1px solid var(--color-steel, #2A323D) !important;
+  color: var(--color-white, #fff) !important;
+}
+.woocommerce-checkout .select2-results__option {
+  padding: 10px 14px !important;
+  background: transparent !important;
+  color: var(--color-fog, #CBCAD2) !important;
+}
+.woocommerce-checkout .select2-results__option--highlighted,
+.woocommerce-checkout .select2-container--default .select2-results__option--highlighted[aria-selected] {
+  background: rgba(201, 168, 76, .12) !important;
+  color: var(--color-white, #fff) !important;
+}

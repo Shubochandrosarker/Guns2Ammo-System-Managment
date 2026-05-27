@@ -139,6 +139,11 @@ require_once G2A_DIR . '/inc/aeo.php';
 /* ---------- Plugin integration (Memberistic + G2A Booking Engine) ---------- */
 require_once G2A_DIR . '/inc/plugins.php';
 require_once G2A_DIR . '/inc/login.php';
+require_once G2A_DIR . '/inc/redirects.php';
+require_once G2A_DIR . '/inc/faqs.php';
+require_once G2A_DIR . '/inc/sitemap.php';
+require_once G2A_DIR . '/inc/llms.php';
+require_once G2A_DIR . '/inc/robots.php';
 
 /* ---------- Compat: repair malformed plugin-update transient ----------
  * Some plugins push entries into the `update_plugins` transient without the

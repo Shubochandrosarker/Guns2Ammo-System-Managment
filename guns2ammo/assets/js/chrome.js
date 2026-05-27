@@ -144,24 +144,50 @@
       // localStorage-driven UI fake.
     });
 
-    /* ===== Live Open/Closed pill ===== */
+    /* ===== Live Open/Closed pill =====
+     * Uses Mesa, AZ local time (America/Phoenix — no DST) so a
+     * visitor in any timezone sees the range's real status. The old
+     * implementation used `new Date()` directly which is the user's
+     * local time, so a Mesa customer in Phoenix saw correct hours
+     * but anyone outside Arizona saw the wrong status.
+     */
     var liveEl = document.getElementById('g2a-live-status');
     if (liveEl) {
       var fmt = function (m) { var h = Math.floor(m / 60); var am = h < 12; var h12 = h % 12 || 12; return h12 + (am ? 'am' : 'pm'); };
-      // Hours (minutes from midnight). Sun(0): 12-6 / Mon-Thu(1-4): 10-6 / Fri(5): 10-7 / Sat(6): 10-7.
+      // Mesa hours (minutes from midnight). Sun(0): 12-6 / Mon-Thu(1-4): 10-6 / Fri(5): 10-7 / Sat(6): 10-7.
       var ranges = { 0: [720, 1080], 1: [600, 1080], 2: [600, 1080], 3: [600, 1080], 4: [600, 1080], 5: [600, 1140], 6: [600, 1140] };
+      function mesaNow() {
+        // Pull just the parts we need from the en-US locale formatted
+        // string in the America/Phoenix zone. Works on every modern
+        // browser (Intl is in evergreen + Safari 14+).
+        try {
+          var parts = new Intl.DateTimeFormat('en-US', {
+            timeZone: 'America/Phoenix',
+            weekday: 'short', hour: '2-digit', minute: '2-digit', hourCycle: 'h23'
+          }).formatToParts(new Date());
+          var map = {};
+          parts.forEach(function (p) { map[p.type] = p.value; });
+          var wdMap = { Sun: 0, Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6 };
+          var day = wdMap[map.weekday] != null ? wdMap[map.weekday] : new Date().getDay();
+          var hr  = parseInt(map.hour, 10);   // 0–23
+          var min = parseInt(map.minute, 10); // 0–59
+          return { day: day, mins: hr * 60 + min };
+        } catch (e) {
+          // Fallback: visitor's local time (best effort if Intl is missing)
+          var now = new Date();
+          return { day: now.getDay(), mins: now.getHours() * 60 + now.getMinutes() };
+        }
+      }
       var update = function () {
-        var now = new Date();
-        var day = now.getDay();
-        var cur = now.getHours() * 60 + now.getMinutes();
-        var r = ranges[day];
-        var open = r && cur >= r[0] && cur < r[1];
+        var m = mesaNow();
+        var r = ranges[m.day];
+        var open = r && m.mins >= r[0] && m.mins < r[1];
         liveEl.classList.toggle('open', !!open);
         liveEl.classList.toggle('closed', !open);
         var lbl = document.getElementById('g2a-live-label');
         var tm  = document.getElementById('g2a-live-time');
         if (lbl) lbl.textContent = open ? 'Open Now' : 'Closed';
-        if (tm)  tm.textContent  = open ? ' Until ' + fmt(r[1]) : (r ? ' Today ' + fmt(r[0]) + '-' + fmt(r[1]) : 'Closed');
+        if (tm)  tm.textContent  = open ? ' Until ' + fmt(r[1]) + ' MST' : (r ? ' Today ' + fmt(r[0]) + '-' + fmt(r[1]) + ' MST' : 'Closed');
       };
       update();
       setInterval(update, 60000);

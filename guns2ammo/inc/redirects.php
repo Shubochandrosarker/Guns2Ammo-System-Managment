@@ -1,0 +1,125 @@
+<?php
+/**
+ * Redirects — clean 404 → permanent map.
+ *
+ * Built from the 27 May 2026 broken-links audit. Old URLs that
+ * routinely 404 across the site are 301'd to the closest live
+ * equivalent so we keep their accumulated SEO equity and stop
+ * hitting visitors with dead-ends.
+ *
+ * Pattern: array of [ 'from' => regex|literal path, 'to' => path,
+ *                     'code' => 301, 'exact' => true|false ].
+ * - Literal paths are matched as exact request URIs.
+ * - Regex paths are matched against REQUEST_URI (path only).
+ *
+ * Adds two more entries for the namespaced membership URLs from
+ * the old Paid Memberships Pro plugin that customers still have
+ * bookmarked.
+ *
+ * @package guns2ammo
+ */
+if ( ! defined( 'ABSPATH' ) ) {
+	exit;
+}
+
+add_action( 'template_redirect', 'g2a_redirects_handle', 1 );
+function g2a_redirects_handle() {
+	if ( is_admin() || wp_doing_ajax() || ( defined( 'REST_REQUEST' ) && REST_REQUEST ) ) {
+		return;
+	}
+
+	// www → bare-host canonical redirect.
+	// The site is configured with https://guns2ammo.com (no www).
+	// Anyone landing on https://www.guns2ammo.com/anything gets a
+	// hard 301 to the same path on the canonical host, preserving
+	// query string. SEO audit was logging www URLs as 404 — this
+	// also fixes that for AI crawlers and shared/bookmarked links.
+	$host = isset( $_SERVER['HTTP_HOST'] ) ? strtolower( (string) wp_unslash( $_SERVER['HTTP_HOST'] ) ) : '';
+	if ( $host && 0 === strpos( $host, 'www.' ) ) {
+		$canonical_host = substr( $host, 4 );
+		$scheme = is_ssl() ? 'https' : 'http';
+		$uri    = isset( $_SERVER['REQUEST_URI'] ) ? (string) wp_unslash( $_SERVER['REQUEST_URI'] ) : '/';
+		$target = $scheme . '://' . $canonical_host . $uri;
+		// 301 because this is a canonical-host redirect — search
+		// engines should consolidate signal on the bare host.
+		wp_redirect( $target, 301 );
+		exit;
+	}
+
+	$path = isset( $_SERVER['REQUEST_URI'] )
+		? (string) wp_parse_url( wp_unslash( $_SERVER['REQUEST_URI'] ), PHP_URL_PATH )
+		: '';
+	if ( '' === $path || '/' === $path ) {
+		return;
+	}
+	$path = '/' . trim( $path, '/' ) . '/';
+
+	$map = g2a_redirect_map();
+
+	if ( isset( $map[ $path ] ) ) {
+		wp_safe_redirect( home_url( $map[ $path ] ), 301 );
+		exit;
+	}
+
+	// Pattern matches — e.g. /membership-checkout/?pmpro_level=N to /memberships/
+	foreach ( g2a_redirect_patterns() as $rule ) {
+		if ( preg_match( $rule['pattern'], $path ) ) {
+			wp_safe_redirect( home_url( $rule['to'] ), 301 );
+			exit;
+		}
+	}
+}
+
+/**
+ * Literal path → target map. Sourced from the May 2026 audit:
+ *   /church-security-training-mesa-packages/ → existing /church-security-training-packages/
+ *   /get-support/                            → existing /contact/
+ *   /faqs/                                   → new FAQs page (this drop)
+ *   /membership-checkout/                    → /memberships/ (legacy PMPro)
+ *   /machine-gun-packages/, /machine-gun-rentals/  → /machine-gun/
+ *   /firearms-transfer-service/              → /transfers/
+ *   /price-and-fees/                         → /pricing/
+ *   /handgun-course/                         → /training/
+ *   /contact-us/                             → /contact/
+ *   /about-our-range/                        → /about/
+ *
+ * Keys MUST start and end with a slash.
+ */
+function g2a_redirect_map() {
+	return apply_filters( 'g2a_redirect_map', array(
+		'/church-security-training-mesa-packages/' => '/church-security-training-packages/',
+		'/get-support/'              => '/contact/',
+		'/contact-us/'               => '/contact/',
+		'/firearms-transfer-service/'=> '/transfers/',
+		'/machine-gun-packages/'     => '/machine-gun/',
+		'/machine-gun-rentals/'      => '/machine-gun/',
+		'/handgun-course/'           => '/training/',
+		'/price-and-fees/'           => '/pricing/',
+		'/about-our-range/'          => '/about/',
+		'/membership-checkout/'      => '/memberships/',
+		'/memberistic-account/'      => '/account/',
+		'/memberistic-memberships/'  => '/memberships/',
+		'/memberistic-checkout/'     => '/memberships/',
+		'/memberistic-login/'        => '/login/',
+		'/memberistic-thank-you/'    => '/account/',
+		'/memberistic-renewal/'      => '/account/',
+	) );
+}
+
+/**
+ * Regex pattern rules — matched in order; first hit wins.
+ */
+function g2a_redirect_patterns() {
+	return apply_filters( 'g2a_redirect_patterns', array(
+		// Legacy PMPro level checkout (/membership-checkout/?pmpro_level=N)
+		array(
+			'pattern' => '#^/membership-checkout/?#i',
+			'to'      => '/memberships/',
+		),
+		// "hello world" old WP starter post
+		array(
+			'pattern' => '#^/hello-world(-\d+)?/?$#i',
+			'to'      => '/blog/',
+		),
+	) );
+}
