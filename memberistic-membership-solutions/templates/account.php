@@ -144,7 +144,7 @@ $lane_url    = home_url( '/book-a-lane/' );
 					<div class="memberistic-acct-stat"><span><?php esc_html_e( 'Member Since', 'memberistic' ); ?></span><strong><?php echo esc_html( $since ); ?></strong></div>
 				</div>
 				<div class="memberistic-acct-actions">
-					<a class="memberistic-acct-action" href="<?php echo esc_url( $lane_url ); ?>">
+					<a class="memberistic-acct-action" href="#book" data-tab="book">
 						<span class="memberistic-acct-ic">◷</span>
 						<span><strong><?php esc_html_e( 'Book A Lane', 'memberistic' ); ?></strong><small><?php esc_html_e( 'Reserve online 24/7', 'memberistic' ); ?></small></span>
 					</a>
@@ -608,6 +608,59 @@ $lane_url    = home_url( '/book-a-lane/' );
 .memberistic-acct-photo-msg.is-err{color:#E8802F;display:block;}
 .memberistic-acct-photo-msg.is-ok{color:#9DE05B;display:block;}
 @media print{ .memberistic-acct-photo-actions{display:none!important;} }
+
+/* ============================================================
+ * MOBILE RESPONSIVE — dashboard, tabs, embedded booking, card.
+ * Most members use a phone, so every panel needs to be usable
+ * under 480px without horizontal scroll.
+ * ============================================================ */
+.memberistic-acct-booking{ width:100%; overflow-x:hidden; }
+.memberistic-acct-booking *{ max-width:100%; box-sizing:border-box; }
+/* Booking-engine grids/calendars stretch correctly on phones */
+.memberistic-acct-booking .g2ab-grid,
+.memberistic-acct-booking .g2ab-row,
+.memberistic-acct-booking .g2ab-cols,
+.memberistic-acct-booking [class*="grid"],
+.memberistic-acct-booking [class*="cols"]{
+  display:grid !important; grid-template-columns:1fr !important; gap:14px !important;
+}
+.memberistic-acct-booking input,
+.memberistic-acct-booking select,
+.memberistic-acct-booking textarea{
+  width:100% !important; min-height:44px; font-size:16px !important;
+}
+.memberistic-acct-booking button{ min-height:44px; }
+.memberistic-acct-booking iframe{ width:100% !important; min-height:560px; border:0; }
+@media (min-width:760px){
+  .memberistic-acct-booking [class*="grid"],
+  .memberistic-acct-booking [class*="cols"]{ grid-template-columns:1fr 1fr !important; }
+}
+
+@media (max-width:680px){
+  .memberistic-acct{ padding:12px !important; }
+  .memberistic-acct-shell{ gap:14px !important; }
+  .memberistic-acct-side{ padding:16px !important; }
+  .memberistic-acct-main{ padding:16px !important; }
+  .memberistic-acct-block{ padding:16px !important; }
+  .memberistic-acct-welcome h2{ font-size:26px !important; line-height:1.1 !important; }
+  .memberistic-acct-nav{ display:grid; grid-template-columns:1fr 1fr; gap:6px; }
+  .memberistic-acct-nav a{ padding:10px 8px !important; font-size:12px !important; }
+  .memberistic-acct-nav .memberistic-acct-navsep{ display:none; }
+  .memberistic-acct-stats{ gap:8px !important; }
+  .memberistic-acct-stat{ padding:14px !important; }
+  .memberistic-acct-stat strong{ font-size:18px !important; }
+  /* Member card scales down so it fits 320–480px phones */
+  .memberistic-acct-pass{ max-width:100% !important; padding:18px !important; }
+  .memberistic-acct-pass__name{ font-size:22px !important; }
+  .memberistic-acct-pass__body{ flex-direction:column !important; gap:18px !important; align-items:center !important; }
+  .memberistic-acct-pass__qr{ width:140px !important; height:140px !important; }
+  .memberistic-acct-pass__photo{ width:72px !important; height:72px !important; }
+}
+@media (max-width:420px){
+  .memberistic-acct-nav{ grid-template-columns:1fr; }
+  .memberistic-acct-stats{ grid-template-columns:1fr !important; }
+  .memberistic-acct-id{ flex-direction:column !important; text-align:center !important; }
+}
 </style>
 <script>
 (function(){
@@ -634,8 +687,109 @@ $lane_url    = home_url( '/book-a-lane/' );
 	});
 	var initial=(location.hash||'').replace('#','');
 	show(initial||'dashboard');
-	var printBtn=root.querySelector('[data-print-card]');
-	if(printBtn){printBtn.addEventListener('click',function(){window.print();});}
+	/* ──────────────────────────────────────────────────────────
+	 * Digital card download
+	 * Builds a SELF-CONTAINED popup window with print-optimized
+	 * light theme + brand strip — every style is inlined, so the
+	 * download works regardless of:
+	 *   • whether the user enables "Background graphics" in print
+	 *   • CORS-restricted QR images (we re-fetch the same URL)
+	 *   • the parent page's CSS being broken / cached badly
+	 *
+	 * Previously the button called window.print() on the dashboard
+	 * itself, which relied on @media print to hide chrome and on
+	 * background-graphics print to keep the dark card readable.
+	 * That produced a blank/black PDF whenever the browser stripped
+	 * backgrounds, which most do by default.
+	 * ────────────────────────────────────────────────────────── */
+	var printBtn = root.querySelector('[data-print-card]');
+	if (printBtn) {
+		printBtn.addEventListener('click', function (e) {
+			e.preventDefault();
+			var pass = document.getElementById('memberistic-acct-pass');
+			if (!pass) return;
+			// Pull the card's data so the popup can rebuild it with
+			// clean inlined CSS instead of cloning live DOM (which
+			// would drag dashboard CSS along and re-create the bug).
+			var brandEl = pass.querySelector('.memberistic-acct-pass__brand');
+			var logoImg = pass.querySelector('.memberistic-acct-pass__logo');
+			var planEl  = pass.querySelector('.memberistic-acct-pass__plan');
+			var photoImg = pass.querySelector('.memberistic-acct-pass__photo img');
+			var nameEl  = pass.querySelector('.memberistic-acct-pass__name');
+			var qrImg   = pass.querySelector('.memberistic-acct-pass__qr-img');
+			var qrSvgEl = pass.querySelector('.memberistic-acct-pass__qr-svg');
+			var metaText = '';
+			pass.querySelectorAll('.memberistic-acct-pass__meta > *').forEach(function (el) {
+				metaText += '<div style="margin-bottom:8px;">' + el.outerHTML.replace(/class="[^"]*"/g, '') + '</div>';
+			});
+			var logoHtml = '';
+			if (logoImg) {
+				logoHtml = '<img src="' + logoImg.src + '" alt="" style="max-height:44px;width:auto;max-width:240px;display:block;">';
+			} else if (brandEl) {
+				logoHtml = '<div style="font-family:Impact,\'Bebas Neue\',Arial Black,sans-serif;font-size:24px;letter-spacing:.04em;color:#C9A84C;">' + (brandEl.textContent || '').trim() + '</div>';
+			}
+			var photoHtml = '';
+			if (photoImg) {
+				photoHtml = '<img src="' + photoImg.src + '" alt="" style="width:130px;height:130px;border-radius:50%;object-fit:cover;border:4px solid #C9A84C;display:block;margin:0 auto 16px;">';
+			}
+			var qrHtml = '';
+			if (qrImg) {
+				qrHtml = '<img src="' + qrImg.src + '" alt="QR" style="width:180px;height:180px;display:block;margin:0 auto;background:#fff;padding:8px;border:1px solid #ddd;">';
+			} else if (qrSvgEl) {
+				qrHtml = '<div style="width:180px;height:180px;margin:0 auto;background:#fff;padding:8px;border:1px solid #ddd;">' + qrSvgEl.innerHTML + '</div>';
+			}
+			var plan = (planEl && planEl.textContent || '').trim();
+			var name = (nameEl && nameEl.textContent || '').trim();
+
+			// Build the popup. Light cream background + brass header
+			// strip so it prints beautifully on ANY printer without
+			// needing "background graphics" enabled.
+			var html =
+				'<!doctype html><html><head><meta charset="utf-8">' +
+				'<title>' + (name || 'Member') + ' — Digital Card</title>' +
+				'<style>' +
+				'@page{size:auto;margin:14mm;}' +
+				'*{box-sizing:border-box;}' +
+				'body{margin:0;padding:32px;background:#F4EFE4;color:#1A1A1A;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif;}' +
+				'.card{max-width:520px;margin:0 auto;background:#fff;border:1px solid #C9A84C;border-radius:8px;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,.08);}' +
+				'.card__head{background:#0F1115;padding:20px 24px;display:flex;justify-content:space-between;align-items:center;border-bottom:3px solid #C9A84C;-webkit-print-color-adjust:exact;print-color-adjust:exact;}' +
+				'.card__head .plan{font-family:Consolas,"Courier New",monospace;font-size:11px;letter-spacing:.22em;color:#C9A84C;text-transform:uppercase;}' +
+				'.card__body{padding:28px 24px;text-align:center;}' +
+				'.card__name{font-family:Impact,"Bebas Neue",Arial Black,sans-serif;font-size:28px;letter-spacing:.04em;color:#0F1115;margin:0 0 4px;text-transform:uppercase;}' +
+				'.card__planlabel{font-family:Consolas,"Courier New",monospace;font-size:11px;letter-spacing:.22em;color:#7C7C82;text-transform:uppercase;margin:0 0 22px;}' +
+				'.card__meta{text-align:left;border-top:1px solid #E6E0CF;padding:18px 24px;background:#FAF6EB;-webkit-print-color-adjust:exact;print-color-adjust:exact;font-size:13px;}' +
+				'.card__meta .memberistic-acct-mini{font-family:Consolas,"Courier New",monospace;font-size:10px;letter-spacing:.18em;text-transform:uppercase;color:#7C7C82;display:block;}' +
+				'.card__meta strong{color:#1A1A1A;font-size:14px;display:block;margin:2px 0 6px;}' +
+				'.card__qrwrap{padding:18px 24px 24px;text-align:center;background:#fff;}' +
+				'.card__note{text-align:center;font-family:Consolas,"Courier New",monospace;font-size:10px;letter-spacing:.22em;text-transform:uppercase;color:#7C7C82;padding:12px 24px 24px;}' +
+				'@media print{body{background:#fff;padding:0;}.card{box-shadow:none;}}' +
+				'</style></head><body>' +
+				'<div class="card">' +
+				'  <div class="card__head"><div>' + logoHtml + '</div><div class="plan">' + plan + '</div></div>' +
+				'  <div class="card__body">' +
+				     photoHtml +
+				'    <h1 class="card__name">' + name + '</h1>' +
+				'    <p class="card__planlabel">' + plan + ' MEMBER</p>' +
+				'  </div>' +
+				'  <div class="card__qrwrap">' + qrHtml + '</div>' +
+				'  <div class="card__meta">' + metaText + '</div>' +
+				'  <div class="card__note">Show at the range desk · or scan the QR</div>' +
+				'</div>' +
+				'<script>window.addEventListener("load",function(){setTimeout(function(){window.focus();window.print();},300);});<\/script>' +
+				'</body></html>';
+
+			var w = window.open('', 'memberistic-card-print', 'width=620,height=820');
+			if (!w) {
+				// Popup blocked — fall back to inline print so the
+				// button is never dead.
+				window.print();
+				return;
+			}
+			w.document.open();
+			w.document.write(html);
+			w.document.close();
+		});
+	}
 
 	/* ──────────────────────────────────────────────────────────
 	 * Lane booking auto-fill
