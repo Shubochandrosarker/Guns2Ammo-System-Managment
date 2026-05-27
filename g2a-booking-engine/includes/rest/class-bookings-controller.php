@@ -535,24 +535,21 @@ final class G2AB_REST_Bookings_Controller {
 			return (int) $existing->ID;
 		}
 
-		// Guest booking — should we auto-create a WP user account?
-		// Default: NO. Auto-creation triggers wp_new_user_notification()
-		// which sends every guest booker an unsolicited "Your account
-		// has been created. Set your password." email. That confuses
-		// first-time customers who never asked for a login.
+		// Guest booking — create a WP user with the "Walk-in Customer"
+		// role by default. Staff can filter walk-ins in the WP user
+		// list separately from members + administrators, and the same
+		// account is automatically upgraded to the matching member
+		// role if the customer later buys a membership.
 		//
-		// Sites that DO want the historical behavior (e.g. to drive
-		// member sign-up) can opt in via the g2ab_create_user_on_booking
-		// option (admin checkbox) or the constant / filter below.
+		// Sites that want to skip user creation entirely (older
+		// behavior) can set g2ab_create_user_on_booking = '0' /
+		// false / 'no' or hook the g2ab_create_user_on_booking
+		// filter to return false.
 		$create_user = (bool) apply_filters(
 			'g2ab_create_user_on_booking',
-			(bool) get_option( 'g2ab_create_user_on_booking', false )
+			(bool) get_option( 'g2ab_create_user_on_booking', true )
 		);
 		if ( ! $create_user ) {
-			// Booking still saves with customer_name + customer_email +
-			// customer_phone on the row; we just don't make a WP user
-			// for them. user_id stays 0 on the booking, matching the
-			// guest-checkout convention.
 			return 0;
 		}
 
@@ -570,14 +567,18 @@ final class G2AB_REST_Bookings_Controller {
 		}
 
 		$password = wp_generate_password( 20, true, true );
-		$user_id  = wp_insert_user( array(
+		// Role: walk-in by default. If the g2a_walkin role doesn't
+		// exist yet (plugin activator didn't run after upgrade) fall
+		// back to subscriber so the insert still succeeds.
+		$role = get_role( 'g2a_walkin' ) ? 'g2a_walkin' : 'subscriber';
+		$user_id = wp_insert_user( array(
 			'user_login'   => $user_login,
 			'user_pass'    => $password,
 			'user_email'   => $customer_email,
 			'display_name' => $customer_name,
 			'first_name'   => $name_parts['first_name'],
 			'last_name'    => $name_parts['last_name'],
-			'role'         => 'subscriber',
+			'role'         => $role,
 		) );
 
 		if ( is_wp_error( $user_id ) ) {
@@ -590,8 +591,8 @@ final class G2AB_REST_Bookings_Controller {
 		update_user_meta( $user_id, 'billing_phone', $customer_phone );
 		update_user_meta( $user_id, 'g2ab_customer_created_from_booking', current_time( 'mysql' ) );
 
-		// Email the password-set link. No session is established — the customer
-		// must set their own password if they want to log in.
+		// Email the password-set link so the customer can log in to
+		// view their bookings.
 		wp_new_user_notification( $user_id, null, 'user' );
 
 		return (int) $user_id;
