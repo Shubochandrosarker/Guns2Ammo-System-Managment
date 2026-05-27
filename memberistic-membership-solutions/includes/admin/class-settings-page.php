@@ -83,7 +83,10 @@ final class Settings_Page {
 		}
 
 		return array(
-			'brand_label'              => isset( $settings['brand_label'] ) ? memberistic_sanitize_text( $settings['brand_label'] ) : 'Memberistic',
+			// Customer-facing brand label. Defaults to the WP site name
+			// (e.g. "Guns 2 Ammo") so out-of-the-box installs never expose
+			// the plugin author's name "Memberistic" in customer mail.
+			'brand_label'              => isset( $settings['brand_label'] ) ? memberistic_sanitize_text( $settings['brand_label'] ) : (string) get_bloginfo( 'name' ),
 			'business_name'            => isset( $settings['business_name'] ) ? memberistic_sanitize_text( $settings['business_name'] ) : '',
 			'business_phone'           => isset( $settings['business_phone'] ) ? memberistic_sanitize_text( $settings['business_phone'] ) : '',
 			'business_address'         => isset( $settings['business_address'] ) ? memberistic_sanitize_textarea( $settings['business_address'] ) : '',
@@ -100,7 +103,10 @@ final class Settings_Page {
 			'stripe_webhook_secret'       => self::sanitize_secret_field( 'stripe_webhook_secret', $settings, $existing ),
 			'woocommerce_enabled'         => isset( $settings['woocommerce_enabled'] ) ? memberistic_sanitize_yes_no( $settings['woocommerce_enabled'] ) : 'no',
 			'woocommerce_webhook_secret'  => isset( $settings['woocommerce_webhook_secret'] ) ? memberistic_sanitize_text( $settings['woocommerce_webhook_secret'] ) : '',
-			'email_from_name'             => isset( $settings['email_from_name'] ) ? memberistic_sanitize_text( $settings['email_from_name'] ) : 'Memberistic',
+			// Email From: name on every Memberistic-sent message. Defaults
+			// to the site name ("Guns 2 Ammo") so emails never arrive
+			// branded as "Memberistic".
+			'email_from_name'             => isset( $settings['email_from_name'] ) ? memberistic_sanitize_text( $settings['email_from_name'] ) : (string) get_bloginfo( 'name' ),
 			'email_from_address'          => isset( $settings['email_from_address'] ) ? sanitize_email( $settings['email_from_address'] ) : get_option( 'admin_email' ),
 			'logo_url'                    => isset( $settings['logo_url'] ) ? esc_url_raw( (string) $settings['logo_url'] ) : '',
 			'accent_brand_color'          => isset( $settings['accent_brand_color'] ) ? memberistic_sanitize_hex_color( $settings['accent_brand_color'], '#1F3A8A' ) : '#1F3A8A',
