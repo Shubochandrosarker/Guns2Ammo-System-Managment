@@ -431,13 +431,31 @@ final class Memberships_Repository {
 	public static function get_renewing_in_days( $days ) {
 		global $wpdb;
 
-		$days  = max( 0, (int) $days );
-		$start = gmdate( 'Y-m-d 00:00:00', strtotime( '+' . $days . ' days', time() ) );
-		$end   = gmdate( 'Y-m-d 23:59:59', strtotime( '+' . $days . ' days', time() ) );
+		// Audit B18 / A7: the original implementation matched
+		// renewal_date against a SINGLE-DAY window
+		// (today+$days 00:00:00 .. today+$days 23:59:59), so if
+		// the daily cron skipped a day (host downtime, no traffic
+		// at run-cron time, container restart) the 30/7/1-day
+		// reminders for that calendar day were silently lost
+		// forever.
+		//
+		// Fix: query the entire window UP TO today+$days. The
+		// caller (Scheduler::run_renewal_reminders) is responsible
+		// for deduping against the email_logs table so members
+		// don't get re-spammed if cron catches up.
+		$days = max( 0, (int) $days );
+		$end  = wp_date( 'Y-m-d 23:59:59', current_time( 'timestamp' ) + ( $days * DAY_IN_SECONDS ) );
+
+		// Only look at rows whose renewal_date is in the future
+		// (anything past has already expired and is handled by
+		// run_auto_expire). For the 30-day window we additionally
+		// require >= today so the same membership doesn't appear
+		// in both 30 and 7 day buckets.
+		$start = wp_date( 'Y-m-d 00:00:00', current_time( 'timestamp' ) );
 
 		return $wpdb->get_results(
 			$wpdb->prepare(
-				'SELECT id, billing_cycle, renewal_date FROM ' . self::table() . ' WHERE status = %s AND renewal_date BETWEEN %s AND %s',
+				'SELECT id, billing_cycle, renewal_date FROM ' . self::table() . ' WHERE status = %s AND renewal_date BETWEEN %s AND %s ORDER BY renewal_date ASC',
 				'active',
 				$start,
 				$end

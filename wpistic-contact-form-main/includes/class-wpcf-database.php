@@ -93,7 +93,8 @@ class WPISTIC_CF_Database {
 			PRIMARY KEY  (id),
 			KEY status (status),
 			KEY form_name (form_name),
-			KEY created_at (created_at)
+			KEY created_at (created_at),
+			KEY sender_email (sender_email)
 		) {$charset};";
 
 		$sql_replies = "CREATE TABLE {$replies} (

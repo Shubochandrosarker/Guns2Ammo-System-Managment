@@ -66,4 +66,40 @@ final class Email_Logs_Repository {
 			ARRAY_A
 		) ?: array();
 	}
+
+	/**
+	 * True when a 'sent' (or 'suppressed') log row exists for the
+	 * given (membership_id, template) combination since $since_mysql.
+	 * Used by the renewal-reminder cron to dedupe across cron runs:
+	 * if the 30-day reminder went out yesterday and cron skipped
+	 * today, we don't re-send it tomorrow.
+	 */
+	public static function was_sent_for_membership( $membership_id, $template, $since_mysql ) {
+		global $wpdb;
+		$count = (int) $wpdb->get_var(
+			$wpdb->prepare(
+				'SELECT COUNT(*) FROM ' . self::table() . ' WHERE membership_id = %d AND template = %s AND status IN (\'sent\',\'suppressed\') AND sent_at >= %s',
+				absint( $membership_id ),
+				sanitize_key( $template ),
+				(string) $since_mysql
+			)
+		);
+		return $count > 0;
+	}
+
+	/**
+	 * Prune log rows older than N days. Called by the daily
+	 * maintenance cron in Scheduler.
+	 */
+	public static function prune_older_than( $days ) {
+		global $wpdb;
+		$days = max( 30, (int) $days );
+		$cut  = wp_date( 'Y-m-d H:i:s', current_time( 'timestamp' ) - $days * DAY_IN_SECONDS );
+		$wpdb->query(
+			$wpdb->prepare(
+				'DELETE FROM ' . self::table() . ' WHERE sent_at < %s',
+				$cut
+			)
+		);
+	}
 }

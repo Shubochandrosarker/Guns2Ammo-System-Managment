@@ -157,7 +157,34 @@ final class G2AB_Installer {
 		$this->migrate_to_1_3_0( $current );
 		$this->migrate_to_1_4_0( $current );
 		$this->migrate_to_1_5_0( $current );
+		$this->migrate_to_1_6_0( $current );
 		do_action( 'g2ab_run_migrations', $current, G2AB_DB_VERSION );
+	}
+
+	/**
+	 * v1.6.0 — compound index on g2ab_logs (event_type, booking_id)
+	 * + log-retention pruner.
+	 *
+	 * The reminder cron + activity-log views both filter logs by
+	 * (event_type='reminder_24h_sent' AND booking_id IN (…)) — a
+	 * compound index on those two columns turns it from a full
+	 * scan into a covering lookup. dbDelta will add the new key
+	 * on the next install_tables() pass.
+	 *
+	 * Also seeds a one-time prune of any logs older than 365 days
+	 * on upgrade so existing installs immediately benefit.
+	 */
+	private function migrate_to_1_6_0( $current ) {
+		if ( version_compare( $current, '1.6.0', '>=' ) ) {
+			return;
+		}
+		global $wpdb;
+		$logs = $wpdb->prefix . 'g2ab_logs';
+		// One-time historical prune.
+		$wpdb->query( $wpdb->prepare(
+			"DELETE FROM {$logs} WHERE created_at < %s",
+			gmdate( 'Y-m-d H:i:s', time() - 365 * DAY_IN_SECONDS )
+		) );
 	}
 
 	/**
@@ -474,7 +501,8 @@ created_at DATETIME NOT NULL,
 PRIMARY KEY  (id),
 KEY idx_booking (booking_id),
 KEY idx_event (event_type),
-KEY idx_created (created_at)
+KEY idx_created (created_at),
+KEY idx_event_booking (event_type, booking_id)
 ) {$collate};";
 
 		$schemas['migration_runs'] = "CREATE TABLE {$prefix}g2ab_migration_runs (
