@@ -77,6 +77,14 @@ add_action( 'wp_enqueue_scripts', function () {
 	wp_enqueue_style( 'g2a-tokens', G2A_URI . '/assets/css/tokens.css', [], G2A_VERSION );
 	wp_enqueue_style( 'g2a-app',    G2A_URI . '/assets/css/app.css',    [ 'g2a-tokens' ], G2A_VERSION );
 
+	// Front-page hero CSS is loaded only where it's needed. Was a 270-line
+	// inline <style> block in front-page.php — non-cacheable + bloated
+	// every home-page response. Now a normal static asset so browsers can
+	// cache it between visits and across pages once it's hit.
+	if ( is_front_page() ) {
+		wp_enqueue_style( 'g2a-front-page', G2A_URI . '/assets/css/front-page.css', [ 'g2a-app' ], G2A_VERSION );
+	}
+
 	wp_enqueue_script( 'g2a-chrome', G2A_URI . '/assets/js/chrome.js', [], G2A_VERSION, true );
 }, 20 );
 
