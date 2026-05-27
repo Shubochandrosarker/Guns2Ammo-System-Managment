@@ -1,14 +1,21 @@
 /* GUNS 2 AMMO  App-level overrides (small) */
 
-/* Hide page content until preloader hands off */
-html.g2a-loading body > *:not(#g2a-preloader) { visibility: hidden; }
-
-/* Preloader */
+/* Preloader — fixed overlay on top of the page. We intentionally
+   DO NOT hide page content via `visibility: hidden` while loading;
+   that would force the browser to wait for our JS to fire before
+   painting anything, and a slow third-party script could leave
+   visitors staring at a blank brand screen for seconds (real-world
+   experience, not lab score).
+   Instead, the preloader sits as a position:fixed overlay on top
+   of the content. Page paints normally underneath; preloader
+   fades out as soon as DOMContentLoaded fires (script in header
+   handles dismissal). Net effect: content appears immediately,
+   preloader feels like a 200ms brand flash. */
 #g2a-preloader {
   position: fixed; inset: 0; z-index: 9999;
   background: var(--color-void);
   display: grid; place-items: center;
-  transition: opacity 380ms var(--ease-out), visibility 380ms;
+  transition: opacity 280ms var(--ease-out), visibility 280ms;
 }
 #g2a-preloader.done { opacity: 0; visibility: hidden; pointer-events: none; }
 #g2a-preloader .pl-stack { display: flex; flex-direction: column; align-items: center; gap: 22px; }

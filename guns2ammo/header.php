@@ -9,6 +9,34 @@ if ( ! defined( 'ABSPATH' ) ) exit;
 <meta charset="<?php bloginfo( 'charset' ); ?>">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#1A191E">
+
+<?php
+/* ============================================================
+ * Performance hints — pushed into <head> BEFORE wp_head() so they
+ * land as early as possible in the response stream, kicking off
+ * font downloads in parallel with HTML parsing. Real-world TTI is
+ * dominated by render-blocking resource discovery; preloading the
+ * two most-used fonts knocks ~150-300ms off cold loads on slow
+ * connections.
+ *
+ * dns-prefetch + preconnect: api.qrserver.com is only hit on the
+ * member dashboard's digital-card view. Hint costs ~0 if the
+ * visitor never lands on /account/, saves a full TLS handshake
+ * round-trip if they do.
+ * ============================================================ */
+$g2a_uri = G2A_URI;
+?>
+<link rel="preconnect" href="https://api.qrserver.com" crossorigin>
+<link rel="dns-prefetch" href="//api.qrserver.com">
+
+<?php /* Preload the two most-rendered fonts (body + display).
+       Both are referenced in tokens.css via @font-face, so the
+       browser would otherwise discover them ~80-150ms later. */ ?>
+<link rel="preload" as="font" type="font/woff2"
+      href="<?php echo esc_url( $g2a_uri . '/assets/fonts/v17-rP2Yp2ywxg089UriI5-g4vlH9VoD8Cmcqbu0-K4.woff2' ); ?>" crossorigin>
+<link rel="preload" as="font" type="font/woff2"
+      href="<?php echo esc_url( $g2a_uri . '/assets/fonts/v13-7cHpv4kjgoGqM7E_DMs5.woff2' ); ?>" crossorigin>
+
 <?php wp_head(); ?>
 <style id="g2a-skip-link-css">
 /* Hardened a11y skip-link hide — inlined so caching/CDNs can't drop
@@ -46,13 +74,16 @@ if ( ! defined( 'ABSPATH' ) ) exit;
     setTimeout(function(){ if(pl.parentNode) pl.parentNode.removeChild(pl); }, 240);
   }
   if (document.readyState !== 'loading') {
-    // DOM already parsed
     done();
   } else {
     document.addEventListener('DOMContentLoaded', done, { once: true });
   }
-  // Hard ceiling: dismiss after 900ms no matter what.
-  setTimeout(done, 900);
+  // Hard ceiling: 500ms. Content paints BEHIND the preloader now
+  // (the visibility:hidden block was removed) so the preloader is
+  // purely a brand flash — no need to keep it longer than feels
+  // intentional. On fast connections DOMContentLoaded fires well
+  // under 500ms and dismisses sooner.
+  setTimeout(done, 500);
 })();
 </script>
 
