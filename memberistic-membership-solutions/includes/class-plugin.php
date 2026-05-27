@@ -32,6 +32,7 @@ final class Plugin {
 			'includes/utilities/global-functions.php',
 			'includes/utilities/formatting.php',
 			'includes/utilities/class-qr.php',
+			'includes/utilities/class-verification.php',
 			'includes/class-capabilities.php',
 			'includes/class-roles.php',
 			'includes/class-content-restrictions.php',
@@ -101,6 +102,9 @@ final class Plugin {
 		add_action( 'init', array( Integrations\Booking_Engine::class, 'register' ) );
 		add_action( 'init', array( Integrations\WooCommerce_Bridge::class, 'register' ) );
 		add_action( 'init', array( Scheduler::class, 'register' ) );
+		// Register Verification before `init` fires so its priority-5 init
+		// hook actually lands in the queue before WP processes priority 5.
+		Utilities\Verification::register();
 		add_action( 'rest_api_init', array( $this, 'register_rest_routes' ) );
 	}
 
@@ -366,5 +370,17 @@ final class Plugin {
 
 		wp_enqueue_style( 'memberistic-frontend', MEMBERISTIC_URL . 'assets/frontend.css', array(), MEMBERISTIC_VERSION );
 		wp_enqueue_script( 'memberistic-frontend', MEMBERISTIC_URL . 'assets/frontend.js', array(), MEMBERISTIC_VERSION, true );
+		// Expose the WP REST root + nonce as window.wpApiSettings so the
+		// account-dashboard photo-upload form can authenticate without
+		// requiring the wp-api script (the official one is heavy +
+		// unnecessary for one fetch).
+		wp_localize_script(
+			'memberistic-frontend',
+			'wpApiSettings',
+			array(
+				'root'  => esc_url_raw( rest_url() ),
+				'nonce' => wp_create_nonce( 'wp_rest' ),
+			)
+		);
 	}
 }

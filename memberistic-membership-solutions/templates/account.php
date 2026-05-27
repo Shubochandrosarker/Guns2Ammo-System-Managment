@@ -60,10 +60,20 @@ $lane_url    = home_url( '/book-a-lane/' );
 		'Status: ' . ucfirst( $status ),
 		'Renews: ' . $renew,
 	) );
-	// Locally-generated SVG QR — no PII sent to any third-party service.
-	$qr_svg      = class_exists( '\WordPressistic\Memberistic\Utilities\QR' )
-		? \WordPressistic\Memberistic\Utilities\QR::svg( $qr_payload, 260, '#ffffff', '#0f2044' )
+	// Dynamic QR — encodes a short verification URL (NOT the PII).
+	// Staff scan -> open the URL -> see CURRENT membership status +
+	// the member's profile photo on a server-rendered card. The QR
+	// payload itself contains no name, email, or member id.
+	$verify_url  = class_exists( '\WordPressistic\Memberistic\Utilities\Verification' ) && $user->ID
+		? \WordPressistic\Memberistic\Utilities\Verification::verify_url( $user->ID )
 		: '';
+	$qr_svg      = ( $verify_url && class_exists( '\WordPressistic\Memberistic\Utilities\QR' ) )
+		? \WordPressistic\Memberistic\Utilities\QR::svg( $verify_url, 260, '#ffffff', '#0f2044' )
+		: '';
+	$photo_id    = class_exists( '\WordPressistic\Memberistic\Utilities\Verification' ) && $user->ID
+		? \WordPressistic\Memberistic\Utilities\Verification::get_profile_image_id( $user->ID )
+		: 0;
+	$photo_url   = $photo_id ? wp_get_attachment_image_url( $photo_id, 'medium' ) : '';
 	?>
 	<div class="memberistic-acct-statusbar">
 		<span class="memberistic-acct-statuspill <?php echo $status_ok ? 'is-ok' : 'is-warn'; ?>">
@@ -85,10 +95,23 @@ $lane_url    = home_url( '/book-a-lane/' );
 	<div class="memberistic-acct-shell">
 		<aside class="memberistic-acct-side">
 			<div class="memberistic-acct-id">
-				<span class="memberistic-acct-avatar"><?php echo esc_html( $initials ? $initials : 'M' ); ?></span>
+				<span class="memberistic-acct-avatar" data-mem-avatar>
+					<?php if ( $photo_url ) : ?>
+						<img src="<?php echo esc_url( $photo_url ); ?>" alt="<?php echo esc_attr( $display ); ?>">
+					<?php else : ?>
+						<?php echo esc_html( $initials ? $initials : 'M' ); ?>
+					<?php endif; ?>
+				</span>
 				<div>
 					<strong><?php echo esc_html( $display ); ?></strong>
 					<span><?php printf( esc_html__( 'Member since %s', 'memberistic' ), esc_html( $since ) ); ?></span>
+					<div class="memberistic-acct-photo-actions" style="margin-top:6px;">
+						<button type="button" class="memberistic-acct-photo-btn" data-mem-photo-trigger><?php echo $photo_id ? esc_html__( 'Change photo', 'memberistic' ) : esc_html__( 'Add photo', 'memberistic' ); ?></button>
+						<?php if ( $photo_id ) : ?>
+							<button type="button" class="memberistic-acct-photo-btn" data-mem-photo-remove><?php esc_html_e( 'Remove', 'memberistic' ); ?></button>
+						<?php endif; ?>
+						<input type="file" accept="image/*" data-mem-photo-input hidden>
+					</div>
 				</div>
 			</div>
 			<div class="memberistic-acct-planpill"><?php echo esc_html( $current['plan_name'] ); ?> <?php esc_html_e( 'Plan', 'memberistic' ); ?></div>
@@ -293,9 +316,14 @@ $lane_url    = home_url( '/book-a-lane/' );
 					<h2><?php esc_html_e( 'Your Digital Member Card', 'memberistic' ); ?></h2>
 					<div class="memberistic-acct-pass" id="memberistic-acct-pass">
 						<div class="memberistic-acct-pass__top">
-							<span class="memberistic-acct-pass__brand">GUNS&nbsp;2&nbsp;AMMO</span>
+							<span class="memberistic-acct-pass__brand"><?php echo esc_html( strtoupper( memberistic_get_brand_label() ) ); ?></span>
 							<span class="memberistic-acct-pass__plan"><?php echo esc_html( strtoupper( $current['plan_name'] ) ); ?></span>
 						</div>
+						<?php if ( $photo_url ) : ?>
+							<div class="memberistic-acct-pass__photo">
+								<img src="<?php echo esc_url( $photo_url ); ?>" alt="<?php echo esc_attr( $display ); ?>">
+							</div>
+						<?php endif; ?>
 						<div class="memberistic-acct-pass__name"><?php echo esc_html( strtoupper( $display ) ); ?></div>
 						<div class="memberistic-acct-pass__body">
 							<div class="memberistic-acct-pass__meta">
@@ -307,8 +335,9 @@ $lane_url    = home_url( '/book-a-lane/' );
 								<strong><?php echo esc_html( $renew ); ?></strong>
 							</div>
 							<div class="memberistic-acct-pass__qr" role="img" aria-label="<?php esc_attr_e( 'Member verification QR code', 'memberistic' ); ?>"><?php
-								// SVG is built in-process from a deterministic local
-								// generator; no PII is sent to any third party.
+								// SVG built in-process; encodes the SHORT verify URL.
+								// Scan it to load /?memberistic_verify=<token> which
+								// renders the member's CURRENT status server-side.
 								echo $qr_svg; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- generated SVG with hard-coded markup
 							?></div>
 						</div>
@@ -466,6 +495,17 @@ $lane_url    = home_url( '/book-a-lane/' );
 	.memberistic-acct-ctas,.memberistic-acct-view:not([data-panel="card"]){display:none!important;}
 	.memberistic-acct-shell{display:block;}
 }
+/* Profile photo: avatar slot, digital-card hero photo, upload controls */
+.memberistic-acct-avatar img{width:100%;height:100%;object-fit:cover;border-radius:50%;}
+.memberistic-acct-pass__photo{width:84px;height:84px;border-radius:50%;overflow:hidden;margin:14px auto 6px;border:3px solid rgba(255,255,255,.18);background:rgba(255,255,255,.06);}
+.memberistic-acct-pass__photo img{width:100%;height:100%;object-fit:cover;display:block;}
+.memberistic-acct-photo-actions{display:flex;gap:8px;flex-wrap:wrap;}
+.memberistic-acct-photo-btn{background:none;border:1px solid rgba(255,255,255,.2);color:inherit;font-size:11px;letter-spacing:.06em;text-transform:uppercase;padding:4px 10px;border-radius:4px;cursor:pointer;}
+.memberistic-acct-photo-btn:hover{background:rgba(255,255,255,.06);}
+.memberistic-acct-photo-msg{font-size:12px;color:var(--ma-muted,#8A95A5);margin-top:6px;display:none;}
+.memberistic-acct-photo-msg.is-err{color:#E8802F;display:block;}
+.memberistic-acct-photo-msg.is-ok{color:#9DE05B;display:block;}
+@media print{ .memberistic-acct-photo-actions{display:none!important;} }
 </style>
 <script>
 (function(){
@@ -494,5 +534,68 @@ $lane_url    = home_url( '/book-a-lane/' );
 	show(initial||'dashboard');
 	var printBtn=root.querySelector('[data-print-card]');
 	if(printBtn){printBtn.addEventListener('click',function(){window.print();});}
+
+	/* ──────────────────────────────────────────────────────────
+	 * Profile photo upload
+	 * Picks a file via the hidden <input type=file>, POSTs to
+	 * /wp-json/memberistic/v1/profile/image, swaps the avatar
+	 * + card photo on success. Reload guarantees the digital
+	 * card + verification page also pick up the new photo.
+	 * ────────────────────────────────────────────────────────── */
+	var photoTrigger = root.querySelector('[data-mem-photo-trigger]');
+	var photoInput   = root.querySelector('[data-mem-photo-input]');
+	var photoRemove  = root.querySelector('[data-mem-photo-remove]');
+	function showMsg(text, kind) {
+		var msg = root.querySelector('.memberistic-acct-photo-msg');
+		if (!msg) {
+			msg = document.createElement('div');
+			msg.className = 'memberistic-acct-photo-msg';
+			var actions = root.querySelector('.memberistic-acct-photo-actions');
+			if (actions && actions.parentNode) actions.parentNode.appendChild(msg);
+		}
+		msg.textContent = text;
+		msg.className = 'memberistic-acct-photo-msg is-' + (kind || 'ok');
+	}
+	function nonce() {
+		return (window.wpApiSettings && window.wpApiSettings.nonce) || '';
+	}
+	function restRoot() {
+		return (window.wpApiSettings && window.wpApiSettings.root) || (location.origin + '/wp-json/');
+	}
+	if (photoTrigger && photoInput) {
+		photoTrigger.addEventListener('click', function(){ photoInput.click(); });
+		photoInput.addEventListener('change', function(){
+			if (!photoInput.files || !photoInput.files[0]) return;
+			var file = photoInput.files[0];
+			if (file.size > 5 * 1024 * 1024) { showMsg('Image too large — please pick something under 5 MB.', 'err'); return; }
+			var fd = new FormData();
+			fd.append('file', file);
+			showMsg('Uploading…', 'ok');
+			fetch(restRoot() + 'memberistic/v1/profile/image', {
+				method: 'POST',
+				credentials: 'include',
+				headers: nonce() ? { 'X-WP-Nonce': nonce() } : {},
+				body: fd
+			}).then(function(r){ return r.json().then(function(j){ return {ok:r.ok, body:j}; }); })
+			  .then(function(res){
+				if (!res.ok || !res.body || !res.body.success) {
+					showMsg((res.body && (res.body.message || res.body.code)) || 'Upload failed.', 'err');
+					return;
+				}
+				showMsg('Photo updated. Reloading…', 'ok');
+				setTimeout(function(){ location.reload(); }, 600);
+			  }).catch(function(){ showMsg('Network error. Try again.', 'err'); });
+		});
+	}
+	if (photoRemove) {
+		photoRemove.addEventListener('click', function(){
+			if (!confirm('Remove your profile photo?')) return;
+			fetch(restRoot() + 'memberistic/v1/profile/image', {
+				method: 'DELETE',
+				credentials: 'include',
+				headers: nonce() ? { 'X-WP-Nonce': nonce() } : {}
+			}).then(function(){ location.reload(); });
+		});
+	}
 })();
 </script>

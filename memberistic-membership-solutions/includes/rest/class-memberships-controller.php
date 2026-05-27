@@ -34,6 +34,27 @@ final class Memberships_Controller extends REST_Controller {
 	 * Register membership routes.
 	 */
 	public function register_routes() {
+		// Profile image upload — current logged-in member uploads/replaces
+		// their own photo. Lands in the WP media library, attachment id
+		// stored in user_meta. Pulled by the account dashboard avatar +
+		// the public verify page.
+		register_rest_route(
+			$this->namespace,
+			'/profile/image',
+			array(
+				array(
+					'methods'             => \WP_REST_Server::CREATABLE,
+					'callback'            => array( $this, 'upload_profile_image' ),
+					'permission_callback' => 'is_user_logged_in',
+				),
+				array(
+					'methods'             => \WP_REST_Server::DELETABLE,
+					'callback'            => array( $this, 'delete_profile_image' ),
+					'permission_callback' => 'is_user_logged_in',
+				),
+			)
+		);
+
 		register_rest_route(
 			$this->namespace,
 			'/memberships',
@@ -1014,6 +1035,50 @@ final class Memberships_Controller extends REST_Controller {
 
 		\WordPressistic\Memberistic\Database\Memberships_Repository::delete( $id );
 		return rest_ensure_response( array( 'deleted' => true ) );
+	}
+
+	public function upload_profile_image( $request ) {
+		$user_id = get_current_user_id();
+		if ( ! $user_id ) {
+			return new \WP_Error( 'memberistic_not_logged_in', __( 'Please log in to update your profile photo.', 'memberistic' ), array( 'status' => 401 ) );
+		}
+		if ( empty( $_FILES['file'] ) ) {
+			return new \WP_Error( 'memberistic_no_file', __( 'No file uploaded.', 'memberistic' ), array( 'status' => 400 ) );
+		}
+		// Restrict to image MIME types.
+		$file = $_FILES['file'];
+		$check = wp_check_filetype_and_ext( $file['tmp_name'], $file['name'] );
+		if ( empty( $check['type'] ) || 0 !== strpos( $check['type'], 'image/' ) ) {
+			return new \WP_Error( 'memberistic_invalid_image', __( 'Please upload a JPG, PNG, GIF, or WebP image.', 'memberistic' ), array( 'status' => 400 ) );
+		}
+		if ( ! function_exists( 'wp_handle_upload' ) ) {
+			require_once ABSPATH . 'wp-admin/includes/file.php';
+		}
+		if ( ! function_exists( 'wp_generate_attachment_metadata' ) ) {
+			require_once ABSPATH . 'wp-admin/includes/image.php';
+		}
+		if ( ! function_exists( 'media_handle_upload' ) ) {
+			require_once ABSPATH . 'wp-admin/includes/media.php';
+		}
+		$attachment_id = media_handle_upload( 'file', 0 );
+		if ( is_wp_error( $attachment_id ) ) {
+			return $attachment_id;
+		}
+		\WordPressistic\Memberistic\Utilities\Verification::set_profile_image_id( $user_id, $attachment_id );
+		return rest_ensure_response( array(
+			'success'       => true,
+			'attachment_id' => (int) $attachment_id,
+			'url'           => wp_get_attachment_image_url( $attachment_id, 'medium' ),
+		) );
+	}
+
+	public function delete_profile_image( $request ) {
+		$user_id = get_current_user_id();
+		if ( ! $user_id ) {
+			return new \WP_Error( 'memberistic_not_logged_in', '', array( 'status' => 401 ) );
+		}
+		\WordPressistic\Memberistic\Utilities\Verification::set_profile_image_id( $user_id, 0 );
+		return rest_ensure_response( array( 'success' => true ) );
 	}
 
 	public function get_people( $request ) {
