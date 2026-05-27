@@ -601,6 +601,24 @@ final class G2AB_REST_Bookings_Controller {
 	public function create_booking( WP_REST_Request $request ) {
 		global $wpdb;
 
+		// Idempotency: the caller may supply an Idempotency-Key header
+		// (or X-Idempotency-Key). If the same key has succeeded in the
+		// last 5 minutes we return the original response instead of
+		// creating a second booking. Protects against:
+		//   - user double-clicking the submit button before the JS
+		//     spinner kicks in,
+		//   - a flaky 502 mid-request triggering a client retry,
+		//   - rapid network hiccup that resends the same POST.
+		$idem_key = sanitize_text_field( (string) ( $request->get_header( 'idempotency-key' ) ?: $request->get_header( 'x-idempotency-key' ) ?: '' ) );
+		if ( '' !== $idem_key && strlen( $idem_key ) <= 128 ) {
+			$idem_cache_key = 'g2ab_idem_' . md5( $idem_key );
+			$cached         = get_transient( $idem_cache_key );
+			if ( is_array( $cached ) && isset( $cached['booking_id'], $cached['response'] ) ) {
+				// Return the original successful response verbatim.
+				return rest_ensure_response( $cached['response'] );
+			}
+		}
+
 		$booking_type_id = (int) $request->get_param( 'booking_type_id' );
 		$resource_id     = (int) $request->get_param( 'resource_id' );
 		$form_id         = absint( $request->get_param( 'form_id' ) );
@@ -971,6 +989,20 @@ final class G2AB_REST_Bookings_Controller {
 			&& G2AB_Addon_Manager::instance()->is_active( 'email_automation' );
 		if ( ! $email_automation_active && 1 === (int) get_option( 'g2ab_send_confirmation_email', 1 ) ) {
 			$this->send_confirmation_email( $customer_email, $customer_name, $resource->name, $start_sql, $uuid );
+		}
+
+		// Cache the response under the caller's idempotency key so a
+		// retry within 5 minutes returns the same response and does
+		// NOT create another booking row.
+		if ( ! empty( $idem_key ) && strlen( $idem_key ) <= 128 ) {
+			set_transient(
+				'g2ab_idem_' . md5( $idem_key ),
+				array(
+					'booking_id' => (int) $booking_id,
+					'response'   => array( 'success' => true, 'data' => $response ),
+				),
+				5 * MINUTE_IN_SECONDS
+			);
 		}
 
 		return rest_ensure_response( array( 'success' => true, 'data' => $response ) );
