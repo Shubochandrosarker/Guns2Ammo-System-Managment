@@ -142,6 +142,7 @@ function memberistic_get_page_url( $setting_key, $fallback_slug = '', $fallback_
  */
 function memberistic_legacy_page_slugs() {
 	return array(
+		// Pre-Memberistic plugin pages
 		'memberships',
 		'memberships-2',
 		'membership-checkout',
@@ -156,6 +157,26 @@ function memberistic_legacy_page_slugs() {
 		'membership-thank-you-2',
 		'membership-payment-failed',
 		'membership-payment-failed-2',
+		// Memberistic-namespaced auto-created pages from older installs.
+		// Treat as legacy so the page-URL helper prefers the modern
+		// branded slugs (account, book-a-lane, etc.) and customers
+		// never get redirected to URLs containing "memberistic-".
+		'memberistic-account',
+		'memberistic-account-2',
+		'memberistic-memberships',
+		'memberistic-memberships-2',
+		'memberistic-checkout',
+		'memberistic-checkout-2',
+		'memberistic-renewal',
+		'memberistic-renewal-2',
+		'memberistic-login',
+		'memberistic-login-2',
+		'memberistic-thank-you',
+		'memberistic-thank-you-2',
+		'memberistic-payment-failed',
+		'memberistic-payment-failed-2',
+		'memberistic-staff-dashboard',
+		'memberistic-staff-dashboard-2',
 	);
 }
 

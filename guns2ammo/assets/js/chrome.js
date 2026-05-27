@@ -13,18 +13,32 @@
 (function () {
   'use strict';
 
-  /* ===== PRELOADER ===== */
+  /* ===== PRELOADER =====
+   * Dismiss as soon as the DOM is parsed — NOT on full window
+   * load. Waiting for `load` waits for every image, font, and
+   * 3rd-party script (chat widget, analytics, fonts.googleapis,
+   * etc.) which can stretch to 5–10s on slow connections, leaving
+   * the brand preloader on screen far longer than the user-perceived
+   * "site is ready" moment. DOMContentLoaded fires once the HTML +
+   * CSS are parsed and the page is meaningfully laid out.
+   */
   function dismissPreloader() {
     var pl = document.getElementById('g2a-preloader');
     if (!pl) { document.documentElement.classList.remove('g2a-loading'); return; }
     document.documentElement.classList.remove('g2a-loading');
     pl.classList.add('done');
-    setTimeout(function () { pl.remove(); }, 500);
+    setTimeout(function () { if (pl.parentNode) pl.parentNode.removeChild(pl); }, 240);
   }
-  if (document.readyState === 'complete') dismissPreloader();
-  else window.addEventListener('load', function () { setTimeout(dismissPreloader, 200); });
-  // Safety net: never hold the page longer than 4s
-  setTimeout(dismissPreloader, 4000);
+  if (document.readyState !== 'loading') {
+    // DOM already parsed before this script ran — hand off immediately.
+    dismissPreloader();
+  } else {
+    document.addEventListener('DOMContentLoaded', dismissPreloader, { once: true });
+  }
+  // Safety net: was 4s and visibly stalled the page in incognito on
+  // cold caches. 1.2s is plenty for the preloader to register
+  // visually without ever blocking the real site for noticeable time.
+  setTimeout(dismissPreloader, 1200);
 
   document.addEventListener('DOMContentLoaded', function () {
 

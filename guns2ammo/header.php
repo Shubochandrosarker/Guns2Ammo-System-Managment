@@ -31,6 +31,30 @@ if ( ! defined( 'ABSPATH' ) ) exit;
 		<div class="pl-meta">Loading the range...</div>
 	</div>
 </div>
+<script>
+/* Inline preloader dismissal — fires as soon as the browser parses
+   <body>, BEFORE the footer chrome.js loads. Prevents the preloader
+   from sticking on cold-cache (incognito) loads while images, fonts,
+   3rd-party widgets, etc. are still streaming in. chrome.js still
+   owns the canonical dismiss path; this is a parallel fast lane. */
+(function(){
+  function done(){
+    var pl = document.getElementById('g2a-preloader');
+    if(!pl) return;
+    document.documentElement.classList.remove('g2a-loading');
+    pl.classList.add('done');
+    setTimeout(function(){ if(pl.parentNode) pl.parentNode.removeChild(pl); }, 240);
+  }
+  if (document.readyState !== 'loading') {
+    // DOM already parsed
+    done();
+  } else {
+    document.addEventListener('DOMContentLoaded', done, { once: true });
+  }
+  // Hard ceiling: dismiss after 900ms no matter what.
+  setTimeout(done, 900);
+})();
+</script>
 
 <?php get_template_part( 'template-parts/nav' ); ?>
 <?php get_template_part( 'template-parts/mobile-drawer' ); ?>

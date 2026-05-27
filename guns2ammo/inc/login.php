@@ -94,6 +94,29 @@ add_filter( 'register_url', function ( $register_url ) {
 } );
 
 /* ============================================================
+ * 2b. Post-login redirect.
+ *
+ * Members → /account/ (branded dashboard). Editors/admins keep
+ * the WP default (admin dashboard) so they can do their job.
+ *
+ * Runs at priority 999 so we win against any plugin (Memberistic,
+ * WC, etc.) that might point members at /memberistic-account/ or
+ * /my-account/ via its own login_redirect filter.
+ * ============================================================ */
+add_filter( 'login_redirect', 'g2a_login_redirect_filter', 999, 3 );
+function g2a_login_redirect_filter( $redirect_to, $requested_redirect_to, $user ) {
+	if ( is_wp_error( $user ) || ! ( $user instanceof WP_User ) ) {
+		return $redirect_to;
+	}
+	// Staff: keep the standard wp-admin flow.
+	if ( user_can( $user, 'edit_posts' ) ) {
+		return $redirect_to;
+	}
+	// Members + everyone else: branded dashboard.
+	return home_url( '/account/' );
+}
+
+/* ============================================================
  * 3. /g2a-admin-login/  →  wp-login.php
  *    Registers a rewrite rule that internally routes to the
  *    real wp-login.php so admins still get the WP login form.
