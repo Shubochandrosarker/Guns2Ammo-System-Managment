@@ -31,7 +31,10 @@ final class Installer {
 			add_option(
 				'memberistic_settings',
 				array(
-					'brand_label'              => 'Memberistic',
+					// Default to the WP site name so the member dashboard
+					// and digital card show the customer's brand (e.g.
+					// "GUNS 2 AMMO"), never the plugin's own name.
+					'brand_label'              => (string) get_bloginfo( 'name' ),
 					'business_name'            => '',
 					'business_phone'           => '',
 					'business_address'         => '',
@@ -42,6 +45,20 @@ final class Installer {
 				'',
 				false
 			);
+		}
+
+		// One-shot migration: older installs hard-coded the brand label
+		// to 'Memberistic'. If we see that literal value AND the site
+		// name is different, treat it as an un-customized default and
+		// switch it to the site name. The admin can still override via
+		// Memberistic → Settings.
+		$settings = get_option( 'memberistic_settings', array() );
+		if ( is_array( $settings ) && 'Memberistic' === ( $settings['brand_label'] ?? '' ) ) {
+			$site_name = (string) get_bloginfo( 'name' );
+			if ( $site_name && 'Memberistic' !== $site_name ) {
+				$settings['brand_label'] = $site_name;
+				update_option( 'memberistic_settings', $settings, false );
+			}
 		}
 
 		if ( $is_first_install ) {

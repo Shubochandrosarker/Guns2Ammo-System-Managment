@@ -334,12 +334,40 @@ $lane_url    = home_url( '/book-a-lane/' );
 								<span class="memberistic-acct-mini"><?php esc_html_e( 'Renews', 'memberistic' ); ?></span>
 								<strong><?php echo esc_html( $renew ); ?></strong>
 							</div>
-							<div class="memberistic-acct-pass__qr" role="img" aria-label="<?php esc_attr_e( 'Member verification QR code', 'memberistic' ); ?>"><?php
-								// SVG built in-process; encodes the SHORT verify URL.
-								// Scan it to load /?memberistic_verify=<token> which
-								// renders the member's CURRENT status server-side.
-								echo $qr_svg; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- generated SVG with hard-coded markup
-							?></div>
+							<div class="memberistic-acct-pass__qr" role="img" aria-label="<?php esc_attr_e( 'Member verification QR code', 'memberistic' ); ?>">
+								<?php
+								// Primary: a fetched PNG from a well-tested QR
+								// generator (api.qrserver.com). The payload here
+								// is ONLY the verify URL — a random 32-char
+								// token, no PII — so handing it to a 3rd-party
+								// generator is safe.
+								//
+								// We also render the in-process SVG underneath
+								// as a backup that browsers fall back to via the
+								// <img> onerror handler, so the card still scans
+								// even if the external service is blocked.
+								if ( $verify_url ) :
+									$qr_remote = add_query_arg(
+										array(
+											'size'   => '320x320',
+											'data'   => rawurlencode( $verify_url ),
+											'margin' => '0',
+											'ecc'    => 'M',
+										),
+										'https://api.qrserver.com/v1/create-qr-code/'
+									);
+									?>
+									<img class="memberistic-acct-pass__qr-img"
+									     src="<?php echo esc_url( $qr_remote ); ?>"
+									     alt=""
+									     width="320" height="320"
+									     style="width:100%;height:100%;display:block;"
+									     onerror="this.style.display='none';var n=this.nextElementSibling;if(n)n.style.display='block';">
+									<span class="memberistic-acct-pass__qr-svg" style="display:none;width:100%;height:100%;"><?php
+										echo $qr_svg; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- generated SVG with hard-coded markup
+									?></span>
+								<?php endif; ?>
+							</div>
 						</div>
 					</div>
 					<p class="memberistic-acct-mini memberistic-acct-passnote"><?php esc_html_e( 'Show at the range desk · or scan the QR', 'memberistic' ); ?></p>
@@ -491,9 +519,24 @@ $lane_url    = home_url( '/book-a-lane/' );
 .memberistic-acct-empty p{color:var(--ma-silver)!important;margin:0 0 20px;}
 
 @media print{
+	/* Hide EVERYTHING outside the digital card so the printed page is
+	   ONLY the branded member card — no nav, no admin bar, no header,
+	   no footer. */
+	body > *:not(.memberistic-acct){display:none!important;}
+	#wpadminbar,header,footer,nav,.g2a-news,.g2a-foot,
 	.memberistic-acct-side,.memberistic-acct-statusbar,.memberistic-acct-passnote,
-	.memberistic-acct-ctas,.memberistic-acct-view:not([data-panel="card"]){display:none!important;}
-	.memberistic-acct-shell{display:block;}
+	.memberistic-acct-ctas,.memberistic-acct-block > h2,
+	.memberistic-acct-view:not([data-panel="card"]){display:none!important;}
+	.memberistic-acct,.memberistic-acct-shell,.memberistic-acct-main,
+	.memberistic-acct-view[data-panel="card"]{display:block!important;background:#fff!important;padding:0!important;margin:0!important;}
+	.memberistic-acct-block{padding:0!important;background:#fff!important;border:0!important;}
+	/* Re-anchor the card so it prints centered without surrounding chrome. */
+	.memberistic-acct-pass{margin:24px auto!important;box-shadow:none!important;
+		background:linear-gradient(135deg,#1A191E,#2A2934)!important;
+		color:#fff!important;-webkit-print-color-adjust:exact!important;
+		print-color-adjust:exact!important;}
+	.memberistic-acct-pass *{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important;}
+	@page{margin:12mm;}
 }
 /* Profile photo: avatar slot, digital-card hero photo, upload controls */
 .memberistic-acct-avatar img{width:100%;height:100%;object-fit:cover;border-radius:50%;}
