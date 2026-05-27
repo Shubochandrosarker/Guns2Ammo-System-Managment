@@ -1,0 +1,193 @@
+<?php
+/**
+ * FAQs page wiring.
+ *
+ * Auto-creates a `/faqs/` page on theme activation and assigns the
+ * dedicated FAQ template. The template renders a smooth-dropdown
+ * Q&A list grouped by topic AND emits FAQPage JSON-LD for rich
+ * results / AI answer engines.
+ *
+ * @package guns2ammo
+ */
+if ( ! defined( 'ABSPATH' ) ) {
+	exit;
+}
+
+add_action( 'after_switch_theme', 'g2a_faqs_ensure_page' );
+function g2a_faqs_ensure_page() {
+	if ( get_page_by_path( 'faqs' ) ) {
+		return;
+	}
+	$id = wp_insert_post( array(
+		'post_type'    => 'page',
+		'post_status'  => 'publish',
+		'post_title'   => 'FAQs — Guns 2 Ammo',
+		'post_name'    => 'faqs',
+		'post_content' => '',
+	) );
+	if ( $id && ! is_wp_error( $id ) ) {
+		update_post_meta( $id, '_wp_page_template', 'page-templates/template-faqs.php' );
+	}
+}
+
+/**
+ * The canonical FAQ data. Themed page template + JSON-LD both read
+ * from this single source so the rendered HTML and the structured
+ * data can never drift apart. Edit here to add / change questions.
+ *
+ * @return array<int, array{ topic:string, items:array<int, array{q:string,a:string}> }>
+ */
+function g2a_faqs_data() {
+	$faqs = array(
+		array(
+			'topic' => 'Visiting the Range',
+			'items' => array(
+				array(
+					'q' => 'Do I need an appointment to shoot?',
+					'a' => 'No — walk-ins are welcome during open hours. Online lane reservations are available 24/7 for guaranteed availability, especially on weekends.',
+				),
+				array(
+					'q' => 'What are your hours?',
+					'a' => 'Mon–Thu 10am–6pm, Fri 10am–7pm, Sat 10am–7pm, Sun 12pm–6pm (all times Arizona / MST — Arizona does not observe Daylight Saving Time).',
+				),
+				array(
+					'q' => 'How old do you have to be to shoot?',
+					'a' => 'You must be 18+ to rent a handgun and 21+ to purchase one. Shooters under 18 may use the range with a parent or legal guardian present.',
+				),
+				array(
+					'q' => 'Do you have parking?',
+					'a' => 'Yes — free parking on-site at 6030 E Main St, Suite 103, Mesa, AZ 85205. The lot is large and accessible.',
+				),
+				array(
+					'q' => 'Is the range ADA accessible?',
+					'a' => 'Yes. Lanes 1 and 2 are ADA-accessible with wider lane widths and accessible benches. Let staff know in advance if you need additional support.',
+				),
+			),
+		),
+		array(
+			'topic' => 'Pricing & Membership',
+			'items' => array(
+				array(
+					'q' => 'How much does it cost to shoot?',
+					'a' => 'Walk-in lane rental is $20 per shooter per hour. Members get included lane time: Defender (1 person) $29.99/month, Patriot (2 people) $39.99/month, Guardian (4 people) $59.99/month. Annual billing saves up to $69.89/year.',
+				),
+				array(
+					'q' => 'Can my members bring guests?',
+					'a' => 'Yes. Defender members pay $15 per extra shooter per hour. Patriot and Guardian members pay $10 per extra shooter per hour. Each member household covers the primary + linked profiles included in the plan.',
+				),
+				array(
+					'q' => 'Can I cancel my membership anytime?',
+					'a' => 'Yes. Cancel from your account dashboard or email us — no fees, no contracts. Access remains active until the end of your current billing period.',
+				),
+				array(
+					'q' => 'Do you offer military, veteran, or law enforcement discounts?',
+					'a' => 'Yes — 15% off any membership plan with valid LEO, active military, or veteran ID, stackable with annual savings.',
+				),
+				array(
+					'q' => 'Do members get range gear discounts?',
+					'a' => 'Yes. Members save 25% on rental firearms, get eye + ear protection included, and 10% off range ammunition. See the full member benefits list on the Memberships page.',
+				),
+			),
+		),
+		array(
+			'topic' => 'Firearms — Buying, Renting, Transfers',
+			'items' => array(
+				array(
+					'q' => 'Do you sell new and used firearms?',
+					'a' => 'Yes. We are a federally licensed firearm dealer (FFL) carrying a curated selection of new and pre-owned handguns, rifles, and shotguns. Browse our shop online or visit the storefront.',
+				),
+				array(
+					'q' => 'Can I bring a firearm in for transfer?',
+					'a' => 'Yes. We accept private-party transfers and FFL-to-FFL transfers. See the Transfers page for current transfer fees, required documents, and processing time.',
+				),
+				array(
+					'q' => 'Do you buy used firearms?',
+					'a' => 'Yes — we buy quality used firearms. Bring yours in for a free evaluation; cash or store-credit offers, no obligation.',
+				),
+				array(
+					'q' => 'Do you rent firearms?',
+					'a' => 'Yes. Handgun rentals are $15 ($11.25 for members) and long-gun rentals are $25 ($18.75 for members). Range ammunition is required for rental use (no reloads or steel-core).',
+				),
+				array(
+					'q' => 'What ammunition do you allow on the range?',
+					'a' => 'Factory new ammunition only — no reloads, no steel core, no incendiary. We sell on-site if you forget yours.',
+				),
+			),
+		),
+		array(
+			'topic' => 'Training & CCW',
+			'items' => array(
+				array(
+					'q' => 'Do you offer concealed-carry permit training?',
+					'a' => 'Yes. We are an NRA-certified training facility offering Arizona CCW classes and California CCW live-fire qualifications. Class schedules are on the Training page.',
+				),
+				array(
+					'q' => 'I have never shot before — can I still train with you?',
+					'a' => 'Absolutely. We run regular New Shooter classes for first-timers. Our instructors will walk you through safety, fundamentals, and your first range session in a no-pressure setting.',
+				),
+				array(
+					'q' => 'Do you have a Ladies-only shooting day?',
+					'a' => 'Yes — every Tuesday, female shooters get one hour of free lane time (solo or with a guest), eye and ear protection included, plus 25% off any rental. Walk in or reserve online.',
+				),
+			),
+		),
+		array(
+			'topic' => 'Safety & Range Rules',
+			'items' => array(
+				array(
+					'q' => 'Is the range safe for first-time shooters?',
+					'a' => 'Yes. Every lane has a certified range safety officer on duty during open hours. We also offer free first-time-shooter orientation — just ask at the front desk.',
+				),
+				array(
+					'q' => 'What range rules do I need to know?',
+					'a' => 'Treat every firearm as loaded, point in a safe direction, keep your finger off the trigger until ready to shoot, and follow the RSO\'s instructions. Full range rules are posted on the Range Safety page and reviewed at check-in.',
+				),
+				array(
+					'q' => 'Can I bring a guest who isn\'t shooting?',
+					'a' => 'Yes. Non-shooting guests are welcome in the observation area at no charge. Eye + ear protection is provided.',
+				),
+			),
+		),
+		array(
+			'topic' => 'Online Orders & Returns',
+			'items' => array(
+				array(
+					'q' => 'How do online firearm orders work?',
+					'a' => 'Order online, then we coordinate transfer with your local FFL dealer (or pick up in store). All federal background-check requirements apply at the receiving FFL.',
+				),
+				array(
+					'q' => 'Do you ship ammunition?',
+					'a' => 'Yes — to most US states, subject to state and federal law. Restrictions for certain calibers and quantities may apply.',
+				),
+				array(
+					'q' => 'What is your refund policy?',
+					'a' => 'See our Refund and Returns Policy for full details. Most accessories are returnable within 30 days; firearms and ammunition follow stricter federal rules.',
+				),
+			),
+		),
+	);
+
+	return apply_filters( 'g2a_faqs_data', $faqs );
+}
+
+/**
+ * Emit FAQPage JSON-LD only on the dedicated FAQs page so we don't
+ * confuse search engines with multiple FAQPage entities on other
+ * pages that already carry their own contextual schema.
+ */
+add_action( 'wp_head', 'g2a_faqs_emit_schema', 12 );
+function g2a_faqs_emit_schema() {
+	if ( ! is_page_template( 'page-templates/template-faqs.php' ) && ! ( is_page() && 'faqs' === get_post_field( 'post_name', get_queried_object_id() ) ) ) {
+		return;
+	}
+	if ( ! function_exists( 'g2a_faq_schema' ) ) {
+		return; // requires inc/seo.php
+	}
+	$flat = array();
+	foreach ( g2a_faqs_data() as $group ) {
+		foreach ( $group['items'] as $it ) {
+			$flat[] = array( 'q' => $it['q'], 'a' => $it['a'] );
+		}
+	}
+	g2a_emit_jsonld( g2a_faq_schema( $flat ) );
+}

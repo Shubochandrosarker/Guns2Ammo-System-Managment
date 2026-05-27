@@ -399,11 +399,55 @@ get_header();
           <p>Weekly guides, range updates, and exclusive member deals  straight from our instructors. No fluff.</p>
         </div>
         <div>
-          <form onsubmit="event.preventDefault(); this.querySelector('input').value=''; this.querySelector('button').textContent=' Subscribed'; this.querySelector('button').classList.remove('btn-ember');">
-            <input type="email" placeholder="your@email.com" required />
+          <form class="g2a-newsletter-form"
+                data-endpoint="<?php echo esc_url( admin_url( 'admin-ajax.php' ) ); ?>"
+                data-action="wpcf_newsletter_subscribe"
+                data-nonce="<?php echo esc_attr( wp_create_nonce( 'wpcf_newsletter' ) ); ?>"
+                data-source="blog">
+            <input type="email" name="email" placeholder="your@email.com" required />
             <button type="submit" class="btn btn-ember">Subscribe</button>
+            <span class="g2a-newsletter-status" role="status" aria-live="polite" style="display:block; margin-top:8px; font-size:13px;"></span>
           </form>
-          <div class="fine"> No spam. Unsubscribe anytime.</div>
+          <script>
+          (function(){
+            var f = document.currentScript.previousElementSibling;
+            if (!f || f.tagName !== 'FORM') return;
+            f.addEventListener('submit', function (e) {
+              e.preventDefault();
+              var btn = f.querySelector('button');
+              var status = f.querySelector('.g2a-newsletter-status');
+              var input = f.querySelector('input[type=email]');
+              var original = btn.innerHTML;
+              btn.disabled = true; btn.textContent = '…'; status.textContent = '';
+              var fd = new FormData();
+              fd.append('action', f.dataset.action);
+              fd.append('_wpnonce', f.dataset.nonce);
+              fd.append('email', input.value.trim());
+              fd.append('source', f.dataset.source || 'blog');
+              fetch(f.dataset.endpoint, { method: 'POST', credentials: 'same-origin', body: fd })
+                .then(function (r) { return r.json().catch(function(){ return null; }); })
+                .then(function (j) {
+                  if (j && j.success) {
+                    btn.textContent = '✓ Subscribed';
+                    btn.classList.remove('btn-ember');
+                    status.style.color = '#9DE05B';
+                    status.textContent = (j.data && j.data.message) || 'Subscribed.';
+                    input.value = '';
+                  } else {
+                    btn.disabled = false; btn.innerHTML = original;
+                    status.style.color = '#E8802F';
+                    status.textContent = (j && j.data && j.data.message) || 'Something went wrong.';
+                  }
+                })
+                .catch(function () {
+                  btn.disabled = false; btn.innerHTML = original;
+                  status.style.color = '#E8802F';
+                  status.textContent = 'Network error. Please try again.';
+                });
+            });
+          })();
+          </script>
+          <div class="fine">No spam. Unsubscribe anytime.</div>
         </div>
       </div>
     </section>

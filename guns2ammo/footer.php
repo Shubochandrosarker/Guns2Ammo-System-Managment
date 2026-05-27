@@ -19,10 +19,68 @@ $reviews = get_theme_mod( 'g2a_review_count', '449+' );
 			<h3>GET RANGE UPDATES</h3>
 			<p>New inventory, training schedules, and exclusive member pricing  straight to your inbox.</p>
 		</div>
-		<form onsubmit="event.preventDefault(); this.querySelector('button').textContent='JOINED';" aria-label="Newsletter signup">
-			<input type="email" placeholder="your@email.com" required aria-label="Email">
+		<?php
+		// Real newsletter wiring — posts to WPistic Contact Form's
+		// /wp-admin/admin-ajax.php endpoint and reports the result in
+		// the inline status span. Falls back to a mailto: link if the
+		// plugin isn't active (so the form never silently no-ops).
+		$nl_endpoint = admin_url( 'admin-ajax.php' );
+		$nl_action   = 'wpcf_newsletter_subscribe';
+		$nl_nonce    = wp_create_nonce( 'wpcf_newsletter' );
+		?>
+		<form class="g2a-newsletter-form"
+		      data-endpoint="<?php echo esc_url( $nl_endpoint ); ?>"
+		      data-action="<?php echo esc_attr( $nl_action ); ?>"
+		      data-nonce="<?php echo esc_attr( $nl_nonce ); ?>"
+		      data-source="footer"
+		      aria-label="Newsletter signup">
+			<input type="email" name="email" placeholder="your@email.com" required aria-label="Email">
 			<button type="submit">JOIN <span style="font-size:14px;">-></span></button>
+			<span class="g2a-newsletter-status" role="status" aria-live="polite" style="display:block; margin-top:8px; font-size:13px; color: var(--color-fog);"></span>
 		</form>
+		<script>
+		(function(){
+		  var f = document.currentScript.previousElementSibling;
+		  if (!f || f.tagName !== 'FORM') return;
+		  f.addEventListener('submit', function (e) {
+		    e.preventDefault();
+		    var btn = f.querySelector('button');
+		    var status = f.querySelector('.g2a-newsletter-status');
+		    var email = f.querySelector('input[type=email]').value.trim();
+		    if (!email) return;
+		    var original = btn.innerHTML;
+		    btn.disabled = true;
+		    btn.textContent = '...';
+		    status.textContent = '';
+		    var fd = new FormData();
+		    fd.append('action', f.dataset.action);
+		    fd.append('_wpnonce', f.dataset.nonce);
+		    fd.append('email', email);
+		    fd.append('source', f.dataset.source || 'footer');
+		    fetch(f.dataset.endpoint, { method: 'POST', credentials: 'same-origin', body: fd })
+		      .then(function (r) { return r.json().catch(function(){ return null; }); })
+		      .then(function (j) {
+		        if (j && j.success) {
+		          btn.textContent = 'JOINED';
+		          status.style.color = '#9DE05B';
+		          status.textContent = (j.data && j.data.message) || 'Subscribed.';
+		          f.querySelector('input[type=email]').value = '';
+		        } else {
+		          btn.disabled = false;
+		          btn.innerHTML = original;
+		          status.style.color = '#E8802F';
+		          status.textContent = (j && j.data && j.data.message) || 'Something went wrong. Please try again.';
+		        }
+		      })
+		      .catch(function () {
+		        btn.disabled = false;
+		        btn.innerHTML = original;
+		        status.style.color = '#E8802F';
+		        status.textContent = 'Network error. Please try again.';
+		      });
+		  });
+		})();
+		</script>
 	</div>
 </section>
 

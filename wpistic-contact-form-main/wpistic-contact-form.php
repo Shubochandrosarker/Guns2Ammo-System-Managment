@@ -30,8 +30,8 @@ if ( ! defined( 'ABSPATH' ) ) {
  * WPISTIC_CF_URL        — URL to plugin directory (trailing slash).
  * WPISTIC_CF_BASENAME   — Plugin basename (folder/file.php) for hooks.
  */
-define( 'WPISTIC_CF_VERSION', '1.4.0' );
-define( 'WPISTIC_CF_DB_VERSION', '1.1.0' );
+define( 'WPISTIC_CF_VERSION', '1.5.0' );
+define( 'WPISTIC_CF_DB_VERSION', '1.2.0' );
 define( 'WPISTIC_CF_FILE', __FILE__ );
 define( 'WPISTIC_CF_PATH', plugin_dir_path( __FILE__ ) );
 define( 'WPISTIC_CF_URL', plugin_dir_url( __FILE__ ) );
@@ -53,12 +53,14 @@ require_once WPISTIC_CF_PATH . 'includes/class-wpcf-analytics.php';
 require_once WPISTIC_CF_PATH . 'includes/class-wpcf-settings.php';
 require_once WPISTIC_CF_PATH . 'includes/class-wpistic-cf-ai.php';
 require_once WPISTIC_CF_PATH . 'includes/class-wpcf-admin.php';
+require_once WPISTIC_CF_PATH . 'includes/class-wpcf-newsletter.php';
 require_once WPISTIC_CF_PATH . 'includes/class-wpcf-ajax.php';
 require_once WPISTIC_CF_PATH . 'includes/class-wpcf-plugin.php';
 
 /* Activation — create database tables + schedule daily cleanup cron. */
 register_activation_hook( __FILE__, function () {
 	WPISTIC_CF_Database::install();
+	WPISTIC_CF_Newsletter::install();
 	WPISTIC_CF_Gdpr::maybe_schedule();
 } );
 

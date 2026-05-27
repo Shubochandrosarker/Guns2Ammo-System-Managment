@@ -8,10 +8,10 @@ All zips are at the repo root and can be uploaded directly via **WP Admin → Pl
 
 | Artifact | Filename | Current version |
 |---|---|---|
-| Theme | `WPistic-Theme-For-G2A-Version-1.8.9.zip` *(also in `releases/`)* | **1.13.0** |
+| Theme | `WPistic-Theme-For-G2A-Version-1.8.9.zip` *(also in `releases/`)* | **1.14.0** |
 | Booking Engine plugin | `g2a-booking-engine.zip` | **1.9.0** (DB schema 1.5.0) |
 | Memberistic Membership Solutions plugin | `memberistic-membership-solutions.zip` | **1.15.0** |
-| WPistic Contact Form plugin | `wpistic-contact-form-main.zip` | **1.4.0** |
+| WPistic Contact Form plugin | `wpistic-contact-form-main.zip` | **1.5.0** (DB schema 1.2.0) |
 | G2A Theme Control plugin | `g2a-theme-control.zip` | **1.0.0** |
 
 > The root `WPistic-Theme-For-G2A-Version-1.8.9.zip` filename is preserved so the WP "Replace existing theme" flow recognises the upgrade. The `style.css` header inside reads `Version: 1.13.0` so WP treats it as an update, not a downgrade.
@@ -105,15 +105,48 @@ Plan prices are seeded by Memberistic at activation:
 
 ### 6. Per-tier guest pricing (Defender $15 / Patriot $10 / Guardian $10 per extra shooter)
 
-**Status: SPEC FINALIZED — not yet surfaced on the public site (per client request "Coming Soon / invisible for now").**
+**Status: NOW LIVE on the pricing + memberships pages.**
 
-The plan in the data model: $20 baseline lane fee for non-members; Defender plan = free 1hr lane + $15/extra shooter; Patriot and Guardian = primary gets free 1hr + $10/extra shooter. Once the client gives go-ahead, this will surface on the pricing page and the booking flow will auto-apply the per-tier discount.
+A "How lane pricing works" matrix sits below each plan card showing:
+| Plan | Primary Member | Per Extra Shooter | Example: 3 people, 1 hr |
+|---|---|---|---|
+| Walk-in | $20/hr | $20/hr each | $60 |
+| Defender | 1 hr FREE | $15/hr each | $30 |
+| Patriot | 1 hr FREE | $10/hr each | $20 |
+| Guardian | 1 hr FREE | $10/hr each | $20 |
+
+Each plan card lists "Bring friends: $X / extra shooter / hour" inline so the value prop is obvious before the customer clicks Select. After the first free hour, additional hours bill at standard rates. Linked profiles on Patriot/Guardian count as primary members, not guests.
+
+> The booking-flow auto-application (so a logged-in member sees their per-tier rate at checkout) is the next phase. For now, staff applies the discount at check-in based on the member's plan.
 
 ### 7. Training Room / Members Lounge / Instructor Membership
 
 **Status: NOT YET BUILT — intentionally invisible.** These three resources need final pricing, capacity, and benefit specs from the client. Once confirmed, they'll be added as bookable resources (Training Room, Lounge) and as a Memberistic plan ($49.99/mo Instructor tier with $15/lane/hr perk).
 
-### 8. Footer, newsletter, social links
+### 8. Newsletter signup + subscriber list (NEW in v1.5.0)
+
+The footer "GET RANGE UPDATES" form and the blog page's "Range Brief" form are now live — they post to **WPistic Contact Form** and write to a dedicated subscribers table.
+
+**Where to manage subscribers:**
+- WP Admin → **WPistic Contact → Newsletter**
+- See full list with email, source (`footer` / `blog` / `contact-form:<form-name>`), source URL, IP, subscribed date.
+- Filter by **Active** / **Unsubscribed** and search by email or source.
+- **"Export CSV"** button — downloads the filtered list as `newsletter-subscribers-active-YYYY-MM-DD.csv`.
+- Click **Unsubscribe** on any row to manually opt the email out.
+
+**How visitors subscribe:**
+1. Footer form on every page → POST `admin-ajax.php?action=wpcf_newsletter_subscribe`.
+2. Blog page "Range Brief" form → same endpoint, `source=blog`.
+3. Contact form has a "Subscribe to monthly range update newsletter" checkbox — if checked, the contact submission **also** subscribes the sender's email automatically (`source=contact-form:<form-name>`).
+4. REST mirror: `POST /wp-json/wpcf/v1/newsletter` with `{ email, source }`.
+5. Shortcode: `[wpcf_newsletter source="custom-page"]` for in-content placement.
+
+**Built-in protections:**
+- 60-second per-IP throttle prevents spam floods.
+- Resubscribe handling — if a previously unsubscribed email subscribes again, the row is re-activated (no duplicate).
+- WP nonce on every form.
+
+### 9. Footer, social links
 
 **Appearance → Customize → Footer / Social** for social URLs.
 
@@ -155,6 +188,11 @@ define( 'WPCF_EMAIL_DISABLED',          true );
 
 ## What's in this build
 
+### Theme (1.14.0)
+- **Newsletter signup forms (footer + blog) now work** — POST to WPistic Contact Form's `wpcf_newsletter_subscribe` endpoint with inline success/error status.
+- **Pricing + Memberships pages updated** with per-tier guest pricing baked into every plan card + a full "How lane pricing works" matrix.
+- Previous 1.13.0 work below.
+
 ### Theme (1.13.0)
 - Hours pivot consistent across SEO schema, llms.txt, JS live-status pill.
 - `g2a_ffl_license` customizer field (block hides when empty).
@@ -180,7 +218,8 @@ define( 'WPCF_EMAIL_DISABLED',          true );
 - **Dynamic verify QR: card QR encodes `/?memberistic_verify=TOKEN` resolving to a live, no-PII verification card with live plan/status/photo.**
 - **`memberistic_get_brand_label()` defaults to the site name (no hardcoded "GUNS 2 AMMO").**
 
-### Contact Form (1.4.0)
+### Contact Form (1.5.0, DB 1.2.0)
+- **NEW Newsletter system**: subscribers table, public AJAX + REST + shortcode capture, admin "Newsletter" tab under WPistic Contact with search/filter/unsubscribe + CSV export. Contact-form opt-in checkbox auto-subscribes on submit. 60-second per-IP throttle.
 - Email kill-switch (`WPCF_EMAIL_DISABLED`).
 - Per-target-email throttle on auto-responder (1 hour transient).
 

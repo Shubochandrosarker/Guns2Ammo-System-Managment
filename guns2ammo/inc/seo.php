@@ -18,9 +18,52 @@ function g2a_seo_plugin_active() {
 		|| class_exists( 'WPSEO_Frontend' );
 }
 
-/* ---------- Basic meta (only if no SEO plugin) ---------- */
+/* ============================================================
+ * RankMath coexistence: this theme is the single source of truth
+ * for Schema.org JSON-LD, Open Graph tags, Twitter cards, and the
+ * canonical link. RankMath stays responsible ONLY for:
+ *   - <title>
+ *   - <meta name="description">
+ *   - <meta name="keywords">  (if enabled in RM settings)
+ *   - <meta name="robots">    (noindex/nofollow per-post toggles)
+ *   - Its own backend tools (404 monitor, redirections module, etc.)
+ *
+ * We turn off every RankMath surface that overlaps with our output
+ * so there are no duplicate canonicals, no double OG, no two
+ * LocalBusiness JSON-LDs fighting in <head>. If RankMath isn't
+ * active these filters/options simply no-op.
+ * ============================================================ */
+add_action( 'init', 'g2a_seo_disable_rankmath_overlap', 20 );
+function g2a_seo_disable_rankmath_overlap() {
+	if ( ! defined( 'RANK_MATH_VERSION' ) && ! class_exists( 'RankMath' ) ) {
+		return;
+	}
+	// Schema (RankMath emits its own JSON-LD — silence it).
+	add_filter( 'rank_math/json_ld',                  '__return_empty_array', 99 );
+	add_filter( 'rank_math/schema/output',            '__return_empty_array', 99 );
+	add_filter( 'rank_math/snippet/rich_snippet_default', '__return_false', 99 );
+	add_filter( 'rank_math/sitemap/enable',           '__return_false', 99 );
+
+	// Open Graph + Twitter — theme handles these in the basic-meta block below.
+	add_filter( 'rank_math/opengraph/facebook/enable_og_tags', '__return_false', 99 );
+	add_filter( 'rank_math/opengraph/twitter/enable',          '__return_false', 99 );
+
+	// Canonical (theme emits its own).
+	add_filter( 'rank_math/frontend/canonical', '__return_false', 99 );
+	remove_filter( 'wp_head', 'rel_canonical' ); // belt-and-suspenders against WP core too
+
+	// Breadcrumb output — theme drives Breadcrumb JSON-LD itself.
+	add_filter( 'rank_math/frontend/breadcrumb/enable', '__return_false', 99 );
+}
+
+/* ---------- Basic meta + OG + canonical ----------
+ * Always run our own basic meta block. Title / description /
+ * keywords still come from RankMath via the title-tag + the
+ * wp_get_document_title filter, so RankMath's per-post overrides
+ * keep working. We just append OG, canonical, and JSON-LD.
+ * Was previously gated behind "no SEO plugin active" — flipped so
+ * the theme always owns canonical + OG. */
 add_action( 'wp_head', function () {
-	if ( g2a_seo_plugin_active() ) return;
 
 	$title = wp_get_document_title();
 	$desc  = g2a_seo_description();

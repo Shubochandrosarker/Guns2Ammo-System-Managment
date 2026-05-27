@@ -160,6 +160,13 @@ class WPISTIC_CF_Database {
 		dbDelta( $sql_impressions );
 		dbDelta( $sql_ai_meta );
 
+		// Newsletter subscribers table — owned by WPISTIC_CF_Newsletter
+		// but installed in the same dbDelta pass so the schema upgrade
+		// stays atomic from the admin's point of view.
+		if ( class_exists( 'WPISTIC_CF_Newsletter' ) ) {
+			WPISTIC_CF_Newsletter::install();
+		}
+
 		update_option( 'WPISTIC_CF_db_version', WPISTIC_CF_DB_VERSION );
 	}
 

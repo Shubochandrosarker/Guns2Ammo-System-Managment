@@ -332,7 +332,21 @@ h1, h2, h3 { color: var(--color-white); margin: 0; }
 .g2a-profile .profile-menu .pm-cta-primary:hover { background: var(--color-brass-bright); color: #111; border-left-color: transparent; }
 .g2a-profile .profile-menu .pm-cta-secondary { text-align: center; margin: 0 14px 6px; padding: 11px 18px; border: 1px solid var(--color-brass-dim); border-radius: 2px; color: var(--color-brass-bright); font-family: var(--font-condensed); font-weight: 600; letter-spacing: 0.12em; text-transform: uppercase; font-size: 12px; }
 .g2a-profile .profile-menu .pm-cta-secondary:hover { border-color: var(--color-brass); color: var(--color-white); background: transparent; border-left-color: var(--color-brass); }
-@media (max-width:1100px) { .g2a-profile { display: none; } }
+/* Keep the profile icon visible on mobile so members + visitors
+   can always reach the login / dashboard. Position it next to the
+   hamburger and size down a touch so the nav doesn't crowd. The
+   dropdown menu still opens correctly because the existing JS
+   doesn't gate on viewport width. */
+@media (max-width:1100px) {
+  .g2a-profile { display: inline-flex; margin-right: 6px; }
+  .g2a-profile .profile-btn { padding: 4px 8px 4px 4px; }
+  .g2a-profile .profile-btn .av { width: 30px; height: 30px; }
+  /* Anchor the dropdown to the right so it doesn't overflow the viewport */
+  .g2a-profile .profile-menu { right: 0; left: auto; min-width: 240px; max-width: calc(100vw - 24px); }
+}
+@media (max-width:480px) {
+  .g2a-profile .profile-btn .label { display: none; }
+}
 
 /* Mobile menu */
 .g2a-mobile { position:fixed; inset:0; z-index:200; background:#171620; padding:32px; display:none; flex-direction:column; gap:8px; overflow-y:auto; }
@@ -1019,8 +1033,12 @@ h1, h2, h3 { color: var(--color-white); margin: 0; }
 .auth-card .logo .mark::after { content:""; width:6px; height:6px; background: var(--color-brass); }
 
 /* ============ FORM HELPERS ============ */
-.form-row { display:grid; grid-template-columns:1fr 1fr; gap: 14px; }
-@media (max-width:540px) { .form-row { grid-template-columns:1fr; } }
+/* Scoped to .g2a-form so this 2-column grid doesn't accidentally
+   collide with WooCommerce's .form-row (which wraps a single field
+   with label + input). WC checkout uses the same class name and
+   was rendering with labels left of inputs because of this. */
+.g2a-form .form-row { display:grid; grid-template-columns:1fr 1fr; gap: 14px; }
+@media (max-width:540px) { .g2a-form .form-row { grid-template-columns:1fr; } }
 .form-label { display:block; font-family: var(--font-mono); font-size:10px; letter-spacing:0.24em; color: var(--color-silver); text-transform: uppercase; margin: 14px 0 6px; }
 .form-help { font-family: var(--font-mono); font-size:10px; letter-spacing:0.18em; color: var(--color-silver); text-transform: uppercase; margin-top:6px; }
 .field-wrap { position:relative; }

@@ -192,7 +192,7 @@ final class Shortcodes {
 		if ( $days_left > 30 || $days_left < 0 ) {
 			return '';
 		}
-		$account_url = \WordPressistic\Memberistic\memberistic_get_page_url( 'account_page_id', 'memberistic-account', home_url( '/' ) );
+		$account_url = \WordPressistic\Memberistic\memberistic_get_page_url( 'account_page_id', 'account', home_url( '/account/' ) );
 		ob_start();
 		?>
 		<div class="memberistic-frontend memberistic-expiring-notice">
@@ -214,7 +214,16 @@ final class Shortcodes {
 	public static function login_placeholder() {
 		$plans_url = \WordPressistic\Memberistic\memberistic_get_page_url( 'plans_page_id', 'memberistic-plans', home_url( '/' ) );
 		$lost_url  = wp_lostpassword_url();
-		$redirect  = \WordPressistic\Memberistic\memberistic_get_page_url( 'account_page_id', 'memberistic-account', home_url( '/' ) );
+		$redirect  = \WordPressistic\Memberistic\memberistic_get_page_url( 'account_page_id', 'account', home_url( '/account/' ) );
+
+		// CRITICAL: the form must POST to wp-login.php (the canonical
+		// WP auth endpoint), NOT to wp_login_url() — themes that filter
+		// `login_url` (the Guns 2 Ammo theme does, to surface /login/
+		// in customer emails) would otherwise rewrite the action to
+		// /login/ and the credential POST would land on the page that
+		// renders the form, never reaching the auth handler. Use the
+		// `login_post` scheme so site_url skips the login_url filter.
+		$login_action = site_url( 'wp-login.php', 'login_post' );
 
 		ob_start();
 		?>
@@ -224,7 +233,7 @@ final class Shortcodes {
 				<h2 class="memberistic-auth-title"><?php esc_html_e( 'MEMBER LOGIN', 'memberistic' ); ?></h2>
 				<p class="memberistic-auth-sub"><?php esc_html_e( 'Welcome back. Access your range account.', 'memberistic' ); ?></p>
 
-				<form class="memberistic-auth-form" method="post" action="<?php echo esc_url( wp_login_url() ); ?>">
+				<form class="memberistic-auth-form" method="post" action="<?php echo esc_url( $login_action ); ?>">
 					<input type="hidden" name="redirect_to" value="<?php echo esc_attr( $redirect ); ?>">
 
 					<label class="memberistic-auth-label" for="memberistic_user_login"><?php esc_html_e( 'Email Address', 'memberistic' ); ?></label>
@@ -268,7 +277,7 @@ final class Shortcodes {
 
 	private static function result_page( $type, $title, $message ) {
 		$checkout_url = \WordPressistic\Memberistic\memberistic_get_page_url( 'checkout_page_id', 'memberistic-checkout', home_url( '/' ) );
-		$account_url  = \WordPressistic\Memberistic\memberistic_get_page_url( 'account_page_id', 'memberistic-account', home_url( '/' ) );
+		$account_url  = \WordPressistic\Memberistic\memberistic_get_page_url( 'account_page_id', 'account', home_url( '/account/' ) );
 
 		ob_start();
 		?>

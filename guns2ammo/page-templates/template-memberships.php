@@ -92,13 +92,15 @@ get_header();
     <div class="name">DEFENDER</div>
     <div class="tag">Individual  1 Person</div>
     <div class="price"><span class="num" data-monthly="29.99" data-annual="299.99">$29.99</span><span class="per">/month</span></div>
-    <div class="pays">Individual membership foundation for Guns 2 Ammo</div>
+    <div class="pays">For the solo shooter who wants the best lane price in Mesa</div>
     <ul class="feats">
-      <li>Includes 1 total person</li>
-      <li>Individual membership access</li>
-      <li>Member profile and waiver tracking</li>
-      <li>Unlimited range time</li>
+      <li><strong>1 free hour of lane time</strong> per visit</li>
+      <li>Bring friends: <strong>$15 / extra shooter / hour</strong></li>
+      <li>Unlimited range time during open hours</li>
       <li>Online lane reservations</li>
+      <li>Member profile + digital membership card</li>
+      <li>Per-person waiver + check-in tracking</li>
+      <li>Walk-in lane fee for non-members: <strong>$20/hr</strong></li>
     </ul>
     <a class="btn btn-brass" href="<?php echo esc_url( home_url( '/checkout/' ) ); ?>?plan=defender">Select Monthly Plan</a>
   </article>
@@ -108,13 +110,15 @@ get_header();
     <div class="name">PATRIOT</div>
     <div class="tag">Two-Person  2 People</div>
     <div class="price"><span class="num" data-monthly="39.99" data-annual="449.99">$39.99</span><span class="per">/month</span></div>
-    <div class="pays">Two-person membership with linked member profiles</div>
+    <div class="pays">For couples, range buddies, and two-person teams</div>
     <ul class="feats">
-      <li>Includes 2 total people</li>
-      <li>Primary member plus one linked profile</li>
-      <li>Per-person waiver and check-in tracking</li>
-      <li>Unlimited range time</li>
+      <li>Covers 2 people  primary + 1 linked profile</li>
+      <li><strong>1 free hour of lane time</strong> for the primary member</li>
+      <li>Bring friends: <strong>$10 / extra shooter / hour</strong></li>
+      <li>Unlimited range time during open hours</li>
       <li>Online lane reservations</li>
+      <li>Per-person waiver + check-in tracking</li>
+      <li>Each member gets their own digital card</li>
     </ul>
     <a class="btn btn-ember" href="<?php echo esc_url( home_url( '/checkout/' ) ); ?>?plan=patriot">Select Monthly Plan</a>
   </article>
@@ -123,17 +127,64 @@ get_header();
     <div class="name">GUARDIAN</div>
     <div class="tag">Family / Group  4 People</div>
     <div class="price"><span class="num" data-monthly="59.99" data-annual="649.99">$59.99</span><span class="per">/month</span></div>
-    <div class="pays">Four-person membership for families or groups</div>
+    <div class="pays">For families and groups of up to 4 shooters</div>
     <ul class="feats">
-      <li>Includes 4 total people</li>
-      <li>Primary member plus three linked profiles</li>
-      <li>Operational readiness for check-ins and waivers</li>
-      <li>Unlimited range time</li>
+      <li>Covers 4 people  primary + 3 linked profiles</li>
+      <li><strong>1 free hour of lane time</strong> for the primary member</li>
+      <li>Bring friends: <strong>$10 / extra shooter / hour</strong></li>
+      <li>Unlimited range time during open hours</li>
       <li>Online lane reservations</li>
+      <li>Per-person waiver + check-in tracking</li>
+      <li>Each member gets their own digital card</li>
     </ul>
     <a class="btn btn-brass" href="<?php echo esc_url( home_url( '/checkout/' ) ); ?>?plan=guardian">Select Monthly Plan</a>
   </article>
 </div>
+
+<!-- Per-tier guest pricing matrix — so customers see exactly what they pay for guests at each tier. -->
+<section class="lane-matrix" style="max-width:1100px; margin: 56px auto 0; padding: 0 32px;">
+  <div class="eyebrow" style="text-align:center; margin-bottom:14px;">Lane Pricing  Member vs. Guest</div>
+  <h2 class="sec" style="text-align:center; margin-bottom: 28px;">How lane pricing works</h2>
+  <div style="overflow-x:auto;">
+    <table style="width:100%; border-collapse: collapse; font-size: 15px; background:#1A1F26; border:1px solid var(--color-hairline);">
+      <thead>
+        <tr style="background:#11161D; color: var(--color-white); text-transform: uppercase; font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.18em;">
+          <th style="padding:14px 16px; text-align:left; border-bottom:1px solid var(--color-hairline);">Plan</th>
+          <th style="padding:14px 16px; text-align:left; border-bottom:1px solid var(--color-hairline);">Primary Member</th>
+          <th style="padding:14px 16px; text-align:left; border-bottom:1px solid var(--color-hairline);">Per Extra Shooter</th>
+          <th style="padding:14px 16px; text-align:left; border-bottom:1px solid var(--color-hairline);">Example: 3 people, 1 hr</th>
+        </tr>
+      </thead>
+      <tbody style="color: var(--color-fog);">
+        <tr>
+          <td style="padding:14px 16px; border-bottom:1px solid var(--color-hairline);"><strong style="color:var(--color-white);">Walk-in</strong> (no membership)</td>
+          <td style="padding:14px 16px; border-bottom:1px solid var(--color-hairline);">$20/hr</td>
+          <td style="padding:14px 16px; border-bottom:1px solid var(--color-hairline);">$20/hr each</td>
+          <td style="padding:14px 16px; border-bottom:1px solid var(--color-hairline);">$60</td>
+        </tr>
+        <tr>
+          <td style="padding:14px 16px; border-bottom:1px solid var(--color-hairline);"><strong style="color:var(--color-white);">Defender</strong></td>
+          <td style="padding:14px 16px; border-bottom:1px solid var(--color-hairline); color:#9DE05B;">1 hr FREE</td>
+          <td style="padding:14px 16px; border-bottom:1px solid var(--color-hairline);">$15/hr each</td>
+          <td style="padding:14px 16px; border-bottom:1px solid var(--color-hairline);"><strong style="color:#9DE05B;">$30</strong> (you free + 2  $15)</td>
+        </tr>
+        <tr>
+          <td style="padding:14px 16px; border-bottom:1px solid var(--color-hairline);"><strong style="color:var(--color-white);">Patriot</strong></td>
+          <td style="padding:14px 16px; border-bottom:1px solid var(--color-hairline); color:#9DE05B;">1 hr FREE</td>
+          <td style="padding:14px 16px; border-bottom:1px solid var(--color-hairline);">$10/hr each</td>
+          <td style="padding:14px 16px; border-bottom:1px solid var(--color-hairline);"><strong style="color:#9DE05B;">$20</strong> (you free + 2  $10)</td>
+        </tr>
+        <tr>
+          <td style="padding:14px 16px;"><strong style="color:var(--color-white);">Guardian</strong></td>
+          <td style="padding:14px 16px; color:#9DE05B;">1 hr FREE</td>
+          <td style="padding:14px 16px;">$10/hr each</td>
+          <td style="padding:14px 16px;"><strong style="color:#9DE05B;">$20</strong> (you free + 2  $10)</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+  <p style="text-align:center; color: var(--color-silver); font-size: 13px; margin-top: 14px; font-family: var(--font-mono); letter-spacing: 0.04em;">After the first free hour, additional hours bill at standard rates. Linked profiles on Patriot &amp; Guardian count as primary members  not guests.</p>
+</section>
 <?php endif; ?>
 
 <div class="trust-strip">

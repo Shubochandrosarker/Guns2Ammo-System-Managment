@@ -13,18 +13,32 @@
 (function () {
   'use strict';
 
-  /* ===== PRELOADER ===== */
+  /* ===== PRELOADER =====
+   * Dismiss as soon as the DOM is parsed — NOT on full window
+   * load. Waiting for `load` waits for every image, font, and
+   * 3rd-party script (chat widget, analytics, fonts.googleapis,
+   * etc.) which can stretch to 5–10s on slow connections, leaving
+   * the brand preloader on screen far longer than the user-perceived
+   * "site is ready" moment. DOMContentLoaded fires once the HTML +
+   * CSS are parsed and the page is meaningfully laid out.
+   */
   function dismissPreloader() {
     var pl = document.getElementById('g2a-preloader');
     if (!pl) { document.documentElement.classList.remove('g2a-loading'); return; }
     document.documentElement.classList.remove('g2a-loading');
     pl.classList.add('done');
-    setTimeout(function () { pl.remove(); }, 500);
+    setTimeout(function () { if (pl.parentNode) pl.parentNode.removeChild(pl); }, 240);
   }
-  if (document.readyState === 'complete') dismissPreloader();
-  else window.addEventListener('load', function () { setTimeout(dismissPreloader, 200); });
-  // Safety net: never hold the page longer than 4s
-  setTimeout(dismissPreloader, 4000);
+  if (document.readyState !== 'loading') {
+    // DOM already parsed before this script ran — hand off immediately.
+    dismissPreloader();
+  } else {
+    document.addEventListener('DOMContentLoaded', dismissPreloader, { once: true });
+  }
+  // Safety net: was 4s and visibly stalled the page in incognito on
+  // cold caches. 1.2s is plenty for the preloader to register
+  // visually without ever blocking the real site for noticeable time.
+  setTimeout(dismissPreloader, 1200);
 
   document.addEventListener('DOMContentLoaded', function () {
 
@@ -130,24 +144,64 @@
       // localStorage-driven UI fake.
     });
 
-    /* ===== Live Open/Closed pill ===== */
+    /* ===== Live Open/Closed pill =====
+     * Uses Mesa, AZ local time (America/Phoenix — no DST) so a
+     * visitor in any timezone sees the range's real status. The old
+     * implementation used `new Date()` directly which is the user's
+     * local time, so a Mesa customer in Phoenix saw correct hours
+     * but anyone outside Arizona saw the wrong status.
+     */
     var liveEl = document.getElementById('g2a-live-status');
     if (liveEl) {
       var fmt = function (m) { var h = Math.floor(m / 60); var am = h < 12; var h12 = h % 12 || 12; return h12 + (am ? 'am' : 'pm'); };
-      // Hours (minutes from midnight). Sun(0): 12-6 / Mon-Thu(1-4): 10-6 / Fri(5): 10-7 / Sat(6): 10-7.
+      // Mesa hours (minutes from midnight). Sun(0): 12-6 / Mon-Thu(1-4): 10-6 / Fri(5): 10-7 / Sat(6): 10-7.
       var ranges = { 0: [720, 1080], 1: [600, 1080], 2: [600, 1080], 3: [600, 1080], 4: [600, 1080], 5: [600, 1140], 6: [600, 1140] };
+      function mesaNow() {
+        // Robust Mesa-time read. Earlier version used
+        // hourCycle: 'h23', which Safari + some Firefox builds
+        // ignore — formatToParts then returns a 12-hour-clock hour
+        // without an AM/PM marker, so 12:55pm parsed as "12" with
+        // min 55 and the comparator was fine BUT 1pm parsed as "1"
+        // and worked, while edge cases (midnight, single-digit
+        // hours) ended up as NaN → comparator always false → pill
+        // stuck on "Closed". Using `hour12: false` is universally
+        // honored and the source string is HH:MM which we parse
+        // with a regex.
+        try {
+          var d = new Date();
+          var time = d.toLocaleString('en-US', {
+            timeZone: 'America/Phoenix',
+            hour: '2-digit', minute: '2-digit', hour12: false
+          });
+          // time is "HH:MM" or "HH:MM:SS" or "24:00" — match HH:MM only.
+          var m = time.match(/(\d{1,2}):(\d{2})/);
+          var hr  = m ? parseInt(m[1], 10) : 0;
+          var min = m ? parseInt(m[2], 10) : 0;
+          if (hr === 24) hr = 0; // some engines report 24:00 for midnight
+          // Weekday separately — short en-US ("Mon", "Tue", …)
+          var wd = d.toLocaleString('en-US', {
+            timeZone: 'America/Phoenix',
+            weekday: 'short'
+          });
+          var wdMap = { Sun: 0, Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6 };
+          var day = wdMap[wd] != null ? wdMap[wd] : d.getDay();
+          return { day: day, mins: hr * 60 + min };
+        } catch (e) {
+          // Last-resort fallback — visitor's local time
+          var now = new Date();
+          return { day: now.getDay(), mins: now.getHours() * 60 + now.getMinutes() };
+        }
+      }
       var update = function () {
-        var now = new Date();
-        var day = now.getDay();
-        var cur = now.getHours() * 60 + now.getMinutes();
-        var r = ranges[day];
-        var open = r && cur >= r[0] && cur < r[1];
+        var m = mesaNow();
+        var r = ranges[m.day];
+        var open = r && m.mins >= r[0] && m.mins < r[1];
         liveEl.classList.toggle('open', !!open);
         liveEl.classList.toggle('closed', !open);
         var lbl = document.getElementById('g2a-live-label');
         var tm  = document.getElementById('g2a-live-time');
         if (lbl) lbl.textContent = open ? 'Open Now' : 'Closed';
-        if (tm)  tm.textContent  = open ? ' Until ' + fmt(r[1]) : (r ? ' Today ' + fmt(r[0]) + '-' + fmt(r[1]) : 'Closed');
+        if (tm)  tm.textContent  = open ? ' Until ' + fmt(r[1]) + ' MST' : (r ? ' Today ' + fmt(r[0]) + '-' + fmt(r[1]) + ' MST' : 'Closed');
       };
       update();
       setInterval(update, 60000);

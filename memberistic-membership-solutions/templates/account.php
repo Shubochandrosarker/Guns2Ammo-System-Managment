@@ -18,7 +18,8 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 
 $renewal_url = memberistic_get_page_url( 'renewal_page_id', 'memberistic-renewal', home_url( '/' ) );
-$plans_url   = memberistic_get_page_url( 'plans_page_id', 'memberistic-memberships', home_url( '/' ) );
+$plans_url   = memberistic_get_page_url( 'plans_page_id', 'memberships', '' );
+if ( ! $plans_url ) { $plans_url = memberistic_get_page_url( 'plans_page_id', 'memberistic-memberships', home_url( '/memberships/' ) ); }
 $support_url = home_url( '/get-support/' );
 $lane_url    = home_url( '/book-a-lane/' );
 ?>
@@ -117,10 +118,11 @@ $lane_url    = home_url( '/book-a-lane/' );
 			<div class="memberistic-acct-planpill"><?php echo esc_html( $current['plan_name'] ); ?> <?php esc_html_e( 'Plan', 'memberistic' ); ?></div>
 			<nav class="memberistic-acct-nav">
 				<a href="#dashboard" data-tab="dashboard" class="is-active"><span class="memberistic-acct-ic">▦</span><?php esc_html_e( 'Dashboard', 'memberistic' ); ?></a>
+				<a href="#book"      data-tab="book"><span class="memberistic-acct-ic">◷</span><?php esc_html_e( 'Book A Lane', 'memberistic' ); ?></a>
 				<a href="#details"   data-tab="details"><span class="memberistic-acct-ic">◇</span><?php esc_html_e( 'Membership Details', 'memberistic' ); ?></a>
 				<a href="#billing"   data-tab="billing"><span class="memberistic-acct-ic">▭</span><?php esc_html_e( 'Billing &amp; Payments', 'memberistic' ); ?></a>
 				<a href="#members"   data-tab="members"><span class="memberistic-acct-ic">⚇</span><?php esc_html_e( 'Additional Members', 'memberistic' ); ?></a>
-				<a href="#bookings"  data-tab="bookings"><span class="memberistic-acct-ic">◷</span><?php esc_html_e( 'Booking History', 'memberistic' ); ?></a>
+				<a href="#bookings"  data-tab="bookings"><span class="memberistic-acct-ic">▥</span><?php esc_html_e( 'Booking History', 'memberistic' ); ?></a>
 				<a href="#card"      data-tab="card"><span class="memberistic-acct-ic">▤</span><?php esc_html_e( 'Digital Member Card', 'memberistic' ); ?></a>
 				<span class="memberistic-acct-navsep"></span>
 				<a href="<?php echo esc_url( wp_logout_url( home_url( '/' ) ) ); ?>" class="memberistic-acct-signout"><span class="memberistic-acct-ic">⤶</span><?php esc_html_e( 'Sign Out', 'memberistic' ); ?></a>
@@ -142,7 +144,7 @@ $lane_url    = home_url( '/book-a-lane/' );
 					<div class="memberistic-acct-stat"><span><?php esc_html_e( 'Member Since', 'memberistic' ); ?></span><strong><?php echo esc_html( $since ); ?></strong></div>
 				</div>
 				<div class="memberistic-acct-actions">
-					<a class="memberistic-acct-action" href="<?php echo esc_url( $lane_url ); ?>">
+					<a class="memberistic-acct-action" href="#" data-open-booking>
 						<span class="memberistic-acct-ic">◷</span>
 						<span><strong><?php esc_html_e( 'Book A Lane', 'memberistic' ); ?></strong><small><?php esc_html_e( 'Reserve online 24/7', 'memberistic' ); ?></small></span>
 					</a>
@@ -158,6 +160,25 @@ $lane_url    = home_url( '/book-a-lane/' );
 						<span class="memberistic-acct-ic">▭</span>
 						<span><strong><?php esc_html_e( 'Update Payment', 'memberistic' ); ?></strong><small><?php echo esc_html( $pay_method ); ?></small></span>
 					</a>
+				</div>
+			</section>
+
+			<!-- BOOK A LANE — the tab acts as a "Reserve your lane" hero;
+			     the actual booking form lives in a full-screen modal so
+			     it has room to render its two-column date/lane layout
+			     properly. Clicking the CTA (or the dashboard tile, or
+			     this sidebar link) opens that modal. -->
+			<section class="memberistic-acct-view" data-panel="book">
+				<div class="memberistic-acct-block memberistic-acct-block--center">
+					<h2><?php esc_html_e( 'Reserve Your Lane', 'memberistic' ); ?></h2>
+					<p class="memberistic-acct-muted" style="margin:8px 0 22px;max-width:48ch;">
+						<?php esc_html_e( 'Pick any open slot — your contact details on file are pre-filled, so it only takes a few taps.', 'memberistic' ); ?>
+					</p>
+					<div class="memberistic-acct-ctas memberistic-acct-ctas--center">
+						<button type="button" class="memberistic-acct-cta memberistic-acct-cta--primary" data-open-booking>
+							<?php esc_html_e( 'Open Booking Form', 'memberistic' ); ?>
+						</button>
+					</div>
 				</div>
 			</section>
 
@@ -314,9 +335,27 @@ $lane_url    = home_url( '/book-a-lane/' );
 			<section class="memberistic-acct-view" data-panel="card">
 				<div class="memberistic-acct-block memberistic-acct-block--center">
 					<h2><?php esc_html_e( 'Your Digital Member Card', 'memberistic' ); ?></h2>
+					<?php
+					// Pull the site's brand logo for the card. Order of
+					// preference: theme's custom-logo (Appearance →
+					// Customize → Site Identity), then Memberistic's
+					// own logo_url setting, then nothing (fall back to
+					// the brand-label text).
+					$card_logo_id  = function_exists( 'get_theme_mod' ) ? (int) get_theme_mod( 'custom_logo' ) : 0;
+					$card_logo_url = $card_logo_id ? wp_get_attachment_image_url( $card_logo_id, 'medium' ) : '';
+					if ( ! $card_logo_url ) {
+						$card_logo_url = (string) memberistic_get_setting( 'logo_url', '' );
+					}
+					?>
 					<div class="memberistic-acct-pass" id="memberistic-acct-pass">
 						<div class="memberistic-acct-pass__top">
-							<span class="memberistic-acct-pass__brand"><?php echo esc_html( strtoupper( memberistic_get_brand_label() ) ); ?></span>
+							<span class="memberistic-acct-pass__brand">
+								<?php if ( $card_logo_url ) : ?>
+									<img class="memberistic-acct-pass__logo" src="<?php echo esc_url( $card_logo_url ); ?>" alt="<?php echo esc_attr( memberistic_get_brand_label() ); ?>">
+								<?php else : ?>
+									<?php echo esc_html( strtoupper( memberistic_get_brand_label() ) ); ?>
+								<?php endif; ?>
+							</span>
 							<span class="memberistic-acct-pass__plan"><?php echo esc_html( strtoupper( $current['plan_name'] ) ); ?></span>
 						</div>
 						<?php if ( $photo_url ) : ?>
@@ -334,12 +373,40 @@ $lane_url    = home_url( '/book-a-lane/' );
 								<span class="memberistic-acct-mini"><?php esc_html_e( 'Renews', 'memberistic' ); ?></span>
 								<strong><?php echo esc_html( $renew ); ?></strong>
 							</div>
-							<div class="memberistic-acct-pass__qr" role="img" aria-label="<?php esc_attr_e( 'Member verification QR code', 'memberistic' ); ?>"><?php
-								// SVG built in-process; encodes the SHORT verify URL.
-								// Scan it to load /?memberistic_verify=<token> which
-								// renders the member's CURRENT status server-side.
-								echo $qr_svg; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- generated SVG with hard-coded markup
-							?></div>
+							<div class="memberistic-acct-pass__qr" role="img" aria-label="<?php esc_attr_e( 'Member verification QR code', 'memberistic' ); ?>">
+								<?php
+								// Primary: a fetched PNG from a well-tested QR
+								// generator (api.qrserver.com). The payload here
+								// is ONLY the verify URL — a random 32-char
+								// token, no PII — so handing it to a 3rd-party
+								// generator is safe.
+								//
+								// We also render the in-process SVG underneath
+								// as a backup that browsers fall back to via the
+								// <img> onerror handler, so the card still scans
+								// even if the external service is blocked.
+								if ( $verify_url ) :
+									$qr_remote = add_query_arg(
+										array(
+											'size'   => '320x320',
+											'data'   => rawurlencode( $verify_url ),
+											'margin' => '0',
+											'ecc'    => 'M',
+										),
+										'https://api.qrserver.com/v1/create-qr-code/'
+									);
+									?>
+									<img class="memberistic-acct-pass__qr-img"
+									     src="<?php echo esc_url( $qr_remote ); ?>"
+									     alt=""
+									     width="320" height="320"
+									     style="width:100%;height:100%;display:block;"
+									     onerror="this.style.display='none';var n=this.nextElementSibling;if(n)n.style.display='block';">
+									<span class="memberistic-acct-pass__qr-svg" style="display:none;width:100%;height:100%;"><?php
+										echo $qr_svg; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- generated SVG with hard-coded markup
+									?></span>
+								<?php endif; ?>
+							</div>
 						</div>
 					</div>
 					<p class="memberistic-acct-mini memberistic-acct-passnote"><?php esc_html_e( 'Show at the range desk · or scan the QR', 'memberistic' ); ?></p>
@@ -349,6 +416,46 @@ $lane_url    = home_url( '/book-a-lane/' );
 				</div>
 			</section>
 
+		</div>
+	</div>
+
+	<?php
+	// Booking modal — rendered once at the bottom of the shell.
+	// Stays hidden until [data-open-booking] is clicked. Contains
+	// the live booking-engine shortcode + a wrapper carrying the
+	// logged-in member's contact details for the auto-fill JS to
+	// drop into the form's name/email/phone inputs.
+	$member_email_modal = (string) ( $user->user_email ?? '' );
+	$member_phone_modal = (string) get_user_meta( $user->ID, 'billing_phone', true );
+	if ( ! $member_phone_modal ) {
+		$member_phone_modal = (string) get_user_meta( $user->ID, 'memberistic_phone', true );
+	}
+	?>
+	<div class="memberistic-acct-modal" id="memberistic-acct-modal" role="dialog" aria-modal="true" aria-labelledby="memberistic-acct-modal-title" hidden>
+		<div class="memberistic-acct-modal__card">
+			<div class="memberistic-acct-modal__head">
+				<h2 class="memberistic-acct-modal__title" id="memberistic-acct-modal-title"><?php esc_html_e( 'Book A Lane', 'memberistic' ); ?></h2>
+				<button type="button" class="memberistic-acct-modal__close" data-close-booking aria-label="<?php esc_attr_e( 'Close', 'memberistic' ); ?>">×</button>
+			</div>
+			<div class="memberistic-acct-modal__body">
+				<div class="memberistic-acct-booking"
+				     data-member-name="<?php echo esc_attr( $display ); ?>"
+				     data-member-email="<?php echo esc_attr( $member_email_modal ); ?>"
+				     data-member-phone="<?php echo esc_attr( $member_phone_modal ); ?>"
+				     data-member-plan="<?php echo esc_attr( $current['plan_name'] ); ?>">
+					<?php
+					if ( shortcode_exists( 'g2a_lane_booking' ) ) {
+						echo do_shortcode( '[g2a_lane_booking]' );
+					} else {
+						echo '<p class="memberistic-acct-muted">' . sprintf(
+							/* translators: %s: anchor to the standalone booking page */
+							esc_html__( 'The booking module is not active. %s.', 'memberistic' ),
+							'<a href="' . esc_url( $lane_url ) . '">' . esc_html__( 'Open the standalone booking page', 'memberistic' ) . '</a>'
+						) . '</p>';
+					}
+					?>
+				</div>
+			</div>
 		</div>
 	</div>
 <?php endif; ?>
@@ -491,12 +598,28 @@ $lane_url    = home_url( '/book-a-lane/' );
 .memberistic-acct-empty p{color:var(--ma-silver)!important;margin:0 0 20px;}
 
 @media print{
+	/* Hide EVERYTHING outside the digital card so the printed page is
+	   ONLY the branded member card — no nav, no admin bar, no header,
+	   no footer. */
+	body > *:not(.memberistic-acct){display:none!important;}
+	#wpadminbar,header,footer,nav,.g2a-news,.g2a-foot,
 	.memberistic-acct-side,.memberistic-acct-statusbar,.memberistic-acct-passnote,
-	.memberistic-acct-ctas,.memberistic-acct-view:not([data-panel="card"]){display:none!important;}
-	.memberistic-acct-shell{display:block;}
+	.memberistic-acct-ctas,.memberistic-acct-block > h2,
+	.memberistic-acct-view:not([data-panel="card"]){display:none!important;}
+	.memberistic-acct,.memberistic-acct-shell,.memberistic-acct-main,
+	.memberistic-acct-view[data-panel="card"]{display:block!important;background:#fff!important;padding:0!important;margin:0!important;}
+	.memberistic-acct-block{padding:0!important;background:#fff!important;border:0!important;}
+	/* Re-anchor the card so it prints centered without surrounding chrome. */
+	.memberistic-acct-pass{margin:24px auto!important;box-shadow:none!important;
+		background:linear-gradient(135deg,#1A191E,#2A2934)!important;
+		color:#fff!important;-webkit-print-color-adjust:exact!important;
+		print-color-adjust:exact!important;}
+	.memberistic-acct-pass *{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important;}
+	@page{margin:12mm;}
 }
 /* Profile photo: avatar slot, digital-card hero photo, upload controls */
 .memberistic-acct-avatar img{width:100%;height:100%;object-fit:cover;border-radius:50%;}
+.memberistic-acct-pass__logo{display:block;max-height:32px;width:auto;max-width:180px;object-fit:contain;}
 .memberistic-acct-pass__photo{width:84px;height:84px;border-radius:50%;overflow:hidden;margin:14px auto 6px;border:3px solid rgba(255,255,255,.18);background:rgba(255,255,255,.06);}
 .memberistic-acct-pass__photo img{width:100%;height:100%;object-fit:cover;display:block;}
 .memberistic-acct-photo-actions{display:flex;gap:8px;flex-wrap:wrap;}
@@ -506,6 +629,118 @@ $lane_url    = home_url( '/book-a-lane/' );
 .memberistic-acct-photo-msg.is-err{color:#E8802F;display:block;}
 .memberistic-acct-photo-msg.is-ok{color:#9DE05B;display:block;}
 @media print{ .memberistic-acct-photo-actions{display:none!important;} }
+
+/* ============================================================
+ * MOBILE RESPONSIVE — dashboard, tabs, embedded booking, card.
+ * Most members use a phone, so every panel needs to be usable
+ * under 480px without horizontal scroll.
+ * ============================================================ */
+/* Booking form inside the dashboard panel — DO NOT force a single
+   column layout (the booking engine's two-column "info + date
+   picker" design needs room to breathe). Just sandbox it so its
+   long descriptive copy doesn't break the dashboard width. */
+.memberistic-acct-booking{ width:100%; overflow:visible; }
+.memberistic-acct-booking input,
+.memberistic-acct-booking select,
+.memberistic-acct-booking textarea{
+  font-size:16px !important; /* prevents iOS focus zoom */
+}
+.memberistic-acct-booking button{ min-height:44px; }
+
+/* Modal overlay that hosts the same shortcode at full width. Used
+   when the user clicks Book A Lane from the dashboard tile or the
+   sidebar — gives the booking form a wide 1100px canvas to render
+   in instead of being crammed inside the dashboard's main column. */
+.memberistic-acct-modal{
+  position:fixed; inset:0; z-index:99999; display:none;
+  background:rgba(15,17,21,.92); backdrop-filter:blur(4px);
+  padding:24px; overflow-y:auto;
+  -webkit-overflow-scrolling:touch;
+}
+.memberistic-acct-modal.is-open{ display:block; }
+.memberistic-acct-modal__card{
+  max-width:1100px; margin:0 auto; background:#1A1F26;
+  border:1px solid #2A323D; border-radius:8px;
+  box-shadow:0 24px 80px rgba(0,0,0,.6);
+  position:relative; padding:28px;
+}
+.memberistic-acct-modal__head{
+  display:flex; justify-content:space-between; align-items:center;
+  margin-bottom:18px; padding-bottom:14px;
+  border-bottom:1px solid #2A323D;
+}
+.memberistic-acct-modal__title{
+  font-family:var(--font-display,"Bebas Neue",sans-serif);
+  font-size:28px; color:#fff; margin:0; letter-spacing:.04em;
+}
+.memberistic-acct-modal__close{
+  background:transparent; border:1px solid rgba(255,255,255,.2);
+  color:#fff; width:38px; height:38px; border-radius:50%;
+  cursor:pointer; font-size:18px; line-height:1;
+  display:grid; place-items:center;
+}
+.memberistic-acct-modal__close:hover{ background:rgba(255,255,255,.08); border-color:#C9A84C; color:#C9A84C; }
+.memberistic-acct-modal__body{ min-height:300px; }
+body.memberistic-modal-open{ overflow:hidden; }
+
+/* Stack the booking engine's shell when it's mounted inside the
+   modal — info card on TOP (full width), date/time/lane picker
+   BELOW (full width). The engine ships with a `g2ab-layout-stacked`
+   variant that does exactly this; we force it here regardless of
+   the global g2ab_form_layout option so the modal layout is
+   consistent. Also stretches the aside card to use the full row
+   instead of staying narrow. */
+.memberistic-acct-modal .g2ab-shell{
+  display:grid !important;
+  grid-template-columns:1fr !important;
+  gap:18px !important;
+}
+.memberistic-acct-modal .g2ab-aside,
+.memberistic-acct-modal .g2ab-stage{ width:100%; min-width:0; }
+.memberistic-acct-modal .g2ab-aside__card{ height:auto; }
+/* On wider screens, the description card doesn't need to be as
+   tall as the date picker — cap it at content height so it reads
+   as a compact intro block above the form. */
+.memberistic-acct-modal .g2ab-aside__features{ display:flex; flex-wrap:wrap; gap:14px 22px; margin-top:10px; }
+.memberistic-acct-modal .g2ab-aside__features li{ flex:0 0 auto; }
+/* Date picker calendar gets the full row width — fixes the
+   "last column cut off" issue from the screenshot. */
+.memberistic-acct-modal .g2ab-stage__panel{ min-width:0; }
+.memberistic-acct-modal .g2ab-stage table,
+.memberistic-acct-modal .g2ab-stage [class*="calendar"],
+.memberistic-acct-modal .g2ab-stage [class*="cal-"]{ width:100% !important; max-width:100% !important; }
+
+@media (max-width:760px){
+  .memberistic-acct-modal{ padding:0; }
+  .memberistic-acct-modal__card{ border-radius:0; min-height:100vh; padding:18px; }
+  .memberistic-acct-modal__title{ font-size:22px; }
+}
+
+@media (max-width:680px){
+  .memberistic-acct{ padding:12px !important; }
+  .memberistic-acct-shell{ gap:14px !important; }
+  .memberistic-acct-side{ padding:16px !important; }
+  .memberistic-acct-main{ padding:16px !important; }
+  .memberistic-acct-block{ padding:16px !important; }
+  .memberistic-acct-welcome h2{ font-size:26px !important; line-height:1.1 !important; }
+  .memberistic-acct-nav{ display:grid; grid-template-columns:1fr 1fr; gap:6px; }
+  .memberistic-acct-nav a{ padding:10px 8px !important; font-size:12px !important; }
+  .memberistic-acct-nav .memberistic-acct-navsep{ display:none; }
+  .memberistic-acct-stats{ gap:8px !important; }
+  .memberistic-acct-stat{ padding:14px !important; }
+  .memberistic-acct-stat strong{ font-size:18px !important; }
+  /* Member card scales down so it fits 320–480px phones */
+  .memberistic-acct-pass{ max-width:100% !important; padding:18px !important; }
+  .memberistic-acct-pass__name{ font-size:22px !important; }
+  .memberistic-acct-pass__body{ flex-direction:column !important; gap:18px !important; align-items:center !important; }
+  .memberistic-acct-pass__qr{ width:140px !important; height:140px !important; }
+  .memberistic-acct-pass__photo{ width:72px !important; height:72px !important; }
+}
+@media (max-width:420px){
+  .memberistic-acct-nav{ grid-template-columns:1fr; }
+  .memberistic-acct-stats{ grid-template-columns:1fr !important; }
+  .memberistic-acct-id{ flex-direction:column !important; text-align:center !important; }
+}
 </style>
 <script>
 (function(){
@@ -532,8 +767,187 @@ $lane_url    = home_url( '/book-a-lane/' );
 	});
 	var initial=(location.hash||'').replace('#','');
 	show(initial||'dashboard');
-	var printBtn=root.querySelector('[data-print-card]');
-	if(printBtn){printBtn.addEventListener('click',function(){window.print();});}
+	/* ──────────────────────────────────────────────────────────
+	 * Digital card download
+	 * Builds a SELF-CONTAINED popup window with print-optimized
+	 * light theme + brand strip — every style is inlined, so the
+	 * download works regardless of:
+	 *   • whether the user enables "Background graphics" in print
+	 *   • CORS-restricted QR images (we re-fetch the same URL)
+	 *   • the parent page's CSS being broken / cached badly
+	 *
+	 * Previously the button called window.print() on the dashboard
+	 * itself, which relied on @media print to hide chrome and on
+	 * background-graphics print to keep the dark card readable.
+	 * That produced a blank/black PDF whenever the browser stripped
+	 * backgrounds, which most do by default.
+	 * ────────────────────────────────────────────────────────── */
+	var printBtn = root.querySelector('[data-print-card]');
+	if (printBtn) {
+		printBtn.addEventListener('click', function (e) {
+			e.preventDefault();
+			var pass = document.getElementById('memberistic-acct-pass');
+			if (!pass) return;
+			// Pull the card's data so the popup can rebuild it with
+			// clean inlined CSS instead of cloning live DOM (which
+			// would drag dashboard CSS along and re-create the bug).
+			var brandEl = pass.querySelector('.memberistic-acct-pass__brand');
+			var logoImg = pass.querySelector('.memberistic-acct-pass__logo');
+			var planEl  = pass.querySelector('.memberistic-acct-pass__plan');
+			var photoImg = pass.querySelector('.memberistic-acct-pass__photo img');
+			var nameEl  = pass.querySelector('.memberistic-acct-pass__name');
+			var qrImg   = pass.querySelector('.memberistic-acct-pass__qr-img');
+			var qrSvgEl = pass.querySelector('.memberistic-acct-pass__qr-svg');
+			var metaText = '';
+			pass.querySelectorAll('.memberistic-acct-pass__meta > *').forEach(function (el) {
+				metaText += '<div style="margin-bottom:8px;">' + el.outerHTML.replace(/class="[^"]*"/g, '') + '</div>';
+			});
+			var logoHtml = '';
+			if (logoImg) {
+				logoHtml = '<img src="' + logoImg.src + '" alt="" style="max-height:44px;width:auto;max-width:240px;display:block;">';
+			} else if (brandEl) {
+				logoHtml = '<div style="font-family:Impact,\'Bebas Neue\',Arial Black,sans-serif;font-size:24px;letter-spacing:.04em;color:#C9A84C;">' + (brandEl.textContent || '').trim() + '</div>';
+			}
+			var photoHtml = '';
+			if (photoImg) {
+				photoHtml = '<img src="' + photoImg.src + '" alt="" style="width:130px;height:130px;border-radius:50%;object-fit:cover;border:4px solid #C9A84C;display:block;margin:0 auto 16px;">';
+			}
+			var qrHtml = '';
+			if (qrImg) {
+				qrHtml = '<img src="' + qrImg.src + '" alt="QR" style="width:180px;height:180px;display:block;margin:0 auto;background:#fff;padding:8px;border:1px solid #ddd;">';
+			} else if (qrSvgEl) {
+				qrHtml = '<div style="width:180px;height:180px;margin:0 auto;background:#fff;padding:8px;border:1px solid #ddd;">' + qrSvgEl.innerHTML + '</div>';
+			}
+			var plan = (planEl && planEl.textContent || '').trim();
+			var name = (nameEl && nameEl.textContent || '').trim();
+
+			// Build the popup. Light cream background + brass header
+			// strip so it prints beautifully on ANY printer without
+			// needing "background graphics" enabled.
+			var html =
+				'<!doctype html><html><head><meta charset="utf-8">' +
+				'<title>' + (name || 'Member') + ' — Digital Card</title>' +
+				'<style>' +
+				'@page{size:auto;margin:14mm;}' +
+				'*{box-sizing:border-box;}' +
+				'body{margin:0;padding:32px;background:#F4EFE4;color:#1A1A1A;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif;}' +
+				'.card{max-width:520px;margin:0 auto;background:#fff;border:1px solid #C9A84C;border-radius:8px;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,.08);}' +
+				'.card__head{background:#0F1115;padding:20px 24px;display:flex;justify-content:space-between;align-items:center;border-bottom:3px solid #C9A84C;-webkit-print-color-adjust:exact;print-color-adjust:exact;}' +
+				'.card__head .plan{font-family:Consolas,"Courier New",monospace;font-size:11px;letter-spacing:.22em;color:#C9A84C;text-transform:uppercase;}' +
+				'.card__body{padding:28px 24px;text-align:center;}' +
+				'.card__name{font-family:Impact,"Bebas Neue",Arial Black,sans-serif;font-size:28px;letter-spacing:.04em;color:#0F1115;margin:0 0 4px;text-transform:uppercase;}' +
+				'.card__planlabel{font-family:Consolas,"Courier New",monospace;font-size:11px;letter-spacing:.22em;color:#7C7C82;text-transform:uppercase;margin:0 0 22px;}' +
+				'.card__meta{text-align:left;border-top:1px solid #E6E0CF;padding:18px 24px;background:#FAF6EB;-webkit-print-color-adjust:exact;print-color-adjust:exact;font-size:13px;}' +
+				'.card__meta .memberistic-acct-mini{font-family:Consolas,"Courier New",monospace;font-size:10px;letter-spacing:.18em;text-transform:uppercase;color:#7C7C82;display:block;}' +
+				'.card__meta strong{color:#1A1A1A;font-size:14px;display:block;margin:2px 0 6px;}' +
+				'.card__qrwrap{padding:18px 24px 24px;text-align:center;background:#fff;}' +
+				'.card__note{text-align:center;font-family:Consolas,"Courier New",monospace;font-size:10px;letter-spacing:.22em;text-transform:uppercase;color:#7C7C82;padding:12px 24px 24px;}' +
+				'@media print{body{background:#fff;padding:0;}.card{box-shadow:none;}}' +
+				'</style></head><body>' +
+				'<div class="card">' +
+				'  <div class="card__head"><div>' + logoHtml + '</div><div class="plan">' + plan + '</div></div>' +
+				'  <div class="card__body">' +
+				     photoHtml +
+				'    <h1 class="card__name">' + name + '</h1>' +
+				'    <p class="card__planlabel">' + plan + ' MEMBER</p>' +
+				'  </div>' +
+				'  <div class="card__qrwrap">' + qrHtml + '</div>' +
+				'  <div class="card__meta">' + metaText + '</div>' +
+				'  <div class="card__note">Show at the range desk · or scan the QR</div>' +
+				'</div>' +
+				'<script>window.addEventListener("load",function(){setTimeout(function(){window.focus();window.print();},300);});<\/script>' +
+				'</body></html>';
+
+			var w = window.open('', 'memberistic-card-print', 'width=620,height=820');
+			if (!w) {
+				// Popup blocked — fall back to inline print so the
+				// button is never dead.
+				window.print();
+				return;
+			}
+			w.document.open();
+			w.document.write(html);
+			w.document.close();
+		});
+	}
+
+	/* ──────────────────────────────────────────────────────────
+	 * Booking modal + auto-fill
+	 *
+	 * The dashboard "Book A Lane" tile, the sidebar's "Book A
+	 * Lane" tab, and the "Open Booking Form" CTA inside that tab
+	 * all share one [data-open-booking] hook — clicking any of
+	 * them opens the modal. The modal hosts the live booking-
+	 * engine shortcode at full width (max 1100px), so the form's
+	 * two-column "info + date picker" layout renders properly
+	 * instead of being squeezed into the dashboard's narrow main
+	 * column.
+	 *
+	 * Auto-fill is idempotent — only populates empty fields, so a
+	 * member who tweaks the email never sees it bounced back.
+	 * ────────────────────────────────────────────────────────── */
+	var modal = document.getElementById('memberistic-acct-modal');
+	function prefillBooking(){
+		if(!modal) return;
+		var wrap = modal.querySelector('.memberistic-acct-booking');
+		if(!wrap) return;
+		var name = wrap.getAttribute('data-member-name')  || '';
+		var mail = wrap.getAttribute('data-member-email') || '';
+		var tel  = wrap.getAttribute('data-member-phone') || '';
+		// Match by name first (g2a-booking uses customer_name /
+		// customer_email / customer_phone), then id/type so future
+		// form variants keep working without code changes.
+		[
+			{val:name, sel:[
+				'input[name="customer_name"]','input[name="full_name"]','input[name="name"]',
+				'#g2ab-customer-name','input[autocomplete="name"]'
+			]},
+			{val:mail, sel:[
+				'input[name="customer_email"]','input[name="email"]',
+				'#g2ab-customer-email','input[type="email"]'
+			]},
+			{val:tel,  sel:[
+				'input[name="customer_phone"]','input[name="phone"]',
+				'#g2ab-customer-phone','input[type="tel"]','input[autocomplete="tel"]'
+			]}
+		].forEach(function(group){
+			if(!group.val) return;
+			group.sel.some(function(sel){
+				var el = wrap.querySelector(sel);
+				if(el && !el.value){ el.value = group.val; el.dispatchEvent(new Event('change',{bubbles:true})); return true; }
+				return false;
+			});
+		});
+	}
+	function openBooking(){
+		if(!modal) return;
+		modal.removeAttribute('hidden');
+		modal.classList.add('is-open');
+		document.body.classList.add('memberistic-modal-open');
+		// The booking engine may hydrate its inputs after first
+		// render — re-run prefill twice to catch lazy mounts.
+		setTimeout(prefillBooking, 50);
+		setTimeout(prefillBooking, 400);
+	}
+	function closeBooking(){
+		if(!modal) return;
+		modal.classList.remove('is-open');
+		modal.setAttribute('hidden','');
+		document.body.classList.remove('memberistic-modal-open');
+	}
+	document.querySelectorAll('[data-open-booking]').forEach(function(btn){
+		btn.addEventListener('click', function(e){ e.preventDefault(); openBooking(); });
+	});
+	if(modal){
+		modal.addEventListener('click', function(e){
+			if(e.target === modal) closeBooking(); // click backdrop to close
+		});
+		var closeBtn = modal.querySelector('[data-close-booking]');
+		if(closeBtn) closeBtn.addEventListener('click', closeBooking);
+		document.addEventListener('keydown', function(e){
+			if(e.key === 'Escape' && modal.classList.contains('is-open')) closeBooking();
+		});
+	}
 
 	/* ──────────────────────────────────────────────────────────
 	 * Profile photo upload
