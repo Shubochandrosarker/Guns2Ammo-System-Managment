@@ -144,7 +144,7 @@ $lane_url    = home_url( '/book-a-lane/' );
 					<div class="memberistic-acct-stat"><span><?php esc_html_e( 'Member Since', 'memberistic' ); ?></span><strong><?php echo esc_html( $since ); ?></strong></div>
 				</div>
 				<div class="memberistic-acct-actions">
-					<a class="memberistic-acct-action" href="#book" data-tab="book">
+					<a class="memberistic-acct-action" href="#" data-open-booking>
 						<span class="memberistic-acct-ic">◷</span>
 						<span><strong><?php esc_html_e( 'Book A Lane', 'memberistic' ); ?></strong><small><?php esc_html_e( 'Reserve online 24/7', 'memberistic' ); ?></small></span>
 					</a>
@@ -163,40 +163,21 @@ $lane_url    = home_url( '/book-a-lane/' );
 				</div>
 			</section>
 
-			<!-- BOOK A LANE — embeds the booking-engine shortcode so the
-			     member can reserve from inside the dashboard without
-			     leaving. The wrapper carries `data-member-*` attrs that
-			     the booking form's JS uses to auto-fill name + email +
-			     phone so returning members don't retype their info. -->
+			<!-- BOOK A LANE — the tab acts as a "Reserve your lane" hero;
+			     the actual booking form lives in a full-screen modal so
+			     it has room to render its two-column date/lane layout
+			     properly. Clicking the CTA (or the dashboard tile, or
+			     this sidebar link) opens that modal. -->
 			<section class="memberistic-acct-view" data-panel="book">
-				<div class="memberistic-acct-block">
-					<h2><?php esc_html_e( 'Book A Lane', 'memberistic' ); ?></h2>
-					<p class="memberistic-acct-muted" style="margin-bottom:18px;">
-						<?php esc_html_e( 'Pick a date and time below. Your contact details on file are pre-filled — change them only if needed.', 'memberistic' ); ?>
+				<div class="memberistic-acct-block memberistic-acct-block--center">
+					<h2><?php esc_html_e( 'Reserve Your Lane', 'memberistic' ); ?></h2>
+					<p class="memberistic-acct-muted" style="margin:8px 0 22px;max-width:48ch;">
+						<?php esc_html_e( 'Pick any open slot — your contact details on file are pre-filled, so it only takes a few taps.', 'memberistic' ); ?>
 					</p>
-					<?php
-					$member_email = (string) ( $user->user_email ?? '' );
-					$member_phone = (string) get_user_meta( $user->ID, 'billing_phone', true );
-					if ( ! $member_phone ) {
-						$member_phone = (string) get_user_meta( $user->ID, 'memberistic_phone', true );
-					}
-					?>
-					<div class="memberistic-acct-booking"
-					     data-member-name="<?php echo esc_attr( $display ); ?>"
-					     data-member-email="<?php echo esc_attr( $member_email ); ?>"
-					     data-member-phone="<?php echo esc_attr( $member_phone ); ?>"
-					     data-member-plan="<?php echo esc_attr( $current['plan_name'] ); ?>">
-						<?php
-						if ( shortcode_exists( 'g2a_lane_booking' ) ) {
-							echo do_shortcode( '[g2a_lane_booking]' );
-						} else {
-							echo '<p class="memberistic-acct-muted">' . sprintf(
-								/* translators: %s: anchor to the standalone booking page */
-								esc_html__( 'The booking module is loading. If you do not see the form, %s.', 'memberistic' ),
-								'<a href="' . esc_url( $lane_url ) . '">' . esc_html__( 'open the standalone booking page', 'memberistic' ) . '</a>'
-							) . '</p>';
-						}
-						?>
+					<div class="memberistic-acct-ctas memberistic-acct-ctas--center">
+						<button type="button" class="memberistic-acct-cta memberistic-acct-cta--primary" data-open-booking>
+							<?php esc_html_e( 'Open Booking Form', 'memberistic' ); ?>
+						</button>
 					</div>
 				</div>
 			</section>
@@ -437,6 +418,46 @@ $lane_url    = home_url( '/book-a-lane/' );
 
 		</div>
 	</div>
+
+	<?php
+	// Booking modal — rendered once at the bottom of the shell.
+	// Stays hidden until [data-open-booking] is clicked. Contains
+	// the live booking-engine shortcode + a wrapper carrying the
+	// logged-in member's contact details for the auto-fill JS to
+	// drop into the form's name/email/phone inputs.
+	$member_email_modal = (string) ( $user->user_email ?? '' );
+	$member_phone_modal = (string) get_user_meta( $user->ID, 'billing_phone', true );
+	if ( ! $member_phone_modal ) {
+		$member_phone_modal = (string) get_user_meta( $user->ID, 'memberistic_phone', true );
+	}
+	?>
+	<div class="memberistic-acct-modal" id="memberistic-acct-modal" role="dialog" aria-modal="true" aria-labelledby="memberistic-acct-modal-title" hidden>
+		<div class="memberistic-acct-modal__card">
+			<div class="memberistic-acct-modal__head">
+				<h2 class="memberistic-acct-modal__title" id="memberistic-acct-modal-title"><?php esc_html_e( 'Book A Lane', 'memberistic' ); ?></h2>
+				<button type="button" class="memberistic-acct-modal__close" data-close-booking aria-label="<?php esc_attr_e( 'Close', 'memberistic' ); ?>">×</button>
+			</div>
+			<div class="memberistic-acct-modal__body">
+				<div class="memberistic-acct-booking"
+				     data-member-name="<?php echo esc_attr( $display ); ?>"
+				     data-member-email="<?php echo esc_attr( $member_email_modal ); ?>"
+				     data-member-phone="<?php echo esc_attr( $member_phone_modal ); ?>"
+				     data-member-plan="<?php echo esc_attr( $current['plan_name'] ); ?>">
+					<?php
+					if ( shortcode_exists( 'g2a_lane_booking' ) ) {
+						echo do_shortcode( '[g2a_lane_booking]' );
+					} else {
+						echo '<p class="memberistic-acct-muted">' . sprintf(
+							/* translators: %s: anchor to the standalone booking page */
+							esc_html__( 'The booking module is not active. %s.', 'memberistic' ),
+							'<a href="' . esc_url( $lane_url ) . '">' . esc_html__( 'Open the standalone booking page', 'memberistic' ) . '</a>'
+						) . '</p>';
+					}
+					?>
+				</div>
+			</div>
+		</div>
+	</div>
 <?php endif; ?>
 </div>
 
@@ -614,26 +635,58 @@ $lane_url    = home_url( '/book-a-lane/' );
  * Most members use a phone, so every panel needs to be usable
  * under 480px without horizontal scroll.
  * ============================================================ */
-.memberistic-acct-booking{ width:100%; overflow-x:hidden; }
-.memberistic-acct-booking *{ max-width:100%; box-sizing:border-box; }
-/* Booking-engine grids/calendars stretch correctly on phones */
-.memberistic-acct-booking .g2ab-grid,
-.memberistic-acct-booking .g2ab-row,
-.memberistic-acct-booking .g2ab-cols,
-.memberistic-acct-booking [class*="grid"],
-.memberistic-acct-booking [class*="cols"]{
-  display:grid !important; grid-template-columns:1fr !important; gap:14px !important;
-}
+/* Booking form inside the dashboard panel — DO NOT force a single
+   column layout (the booking engine's two-column "info + date
+   picker" design needs room to breathe). Just sandbox it so its
+   long descriptive copy doesn't break the dashboard width. */
+.memberistic-acct-booking{ width:100%; overflow:visible; }
 .memberistic-acct-booking input,
 .memberistic-acct-booking select,
 .memberistic-acct-booking textarea{
-  width:100% !important; min-height:44px; font-size:16px !important;
+  font-size:16px !important; /* prevents iOS focus zoom */
 }
 .memberistic-acct-booking button{ min-height:44px; }
-.memberistic-acct-booking iframe{ width:100% !important; min-height:560px; border:0; }
-@media (min-width:760px){
-  .memberistic-acct-booking [class*="grid"],
-  .memberistic-acct-booking [class*="cols"]{ grid-template-columns:1fr 1fr !important; }
+
+/* Modal overlay that hosts the same shortcode at full width. Used
+   when the user clicks Book A Lane from the dashboard tile or the
+   sidebar — gives the booking form a wide 1100px canvas to render
+   in instead of being crammed inside the dashboard's main column. */
+.memberistic-acct-modal{
+  position:fixed; inset:0; z-index:99999; display:none;
+  background:rgba(15,17,21,.92); backdrop-filter:blur(4px);
+  padding:24px; overflow-y:auto;
+  -webkit-overflow-scrolling:touch;
+}
+.memberistic-acct-modal.is-open{ display:block; }
+.memberistic-acct-modal__card{
+  max-width:1100px; margin:0 auto; background:#1A1F26;
+  border:1px solid #2A323D; border-radius:8px;
+  box-shadow:0 24px 80px rgba(0,0,0,.6);
+  position:relative; padding:28px;
+}
+.memberistic-acct-modal__head{
+  display:flex; justify-content:space-between; align-items:center;
+  margin-bottom:18px; padding-bottom:14px;
+  border-bottom:1px solid #2A323D;
+}
+.memberistic-acct-modal__title{
+  font-family:var(--font-display,"Bebas Neue",sans-serif);
+  font-size:28px; color:#fff; margin:0; letter-spacing:.04em;
+}
+.memberistic-acct-modal__close{
+  background:transparent; border:1px solid rgba(255,255,255,.2);
+  color:#fff; width:38px; height:38px; border-radius:50%;
+  cursor:pointer; font-size:18px; line-height:1;
+  display:grid; place-items:center;
+}
+.memberistic-acct-modal__close:hover{ background:rgba(255,255,255,.08); border-color:#C9A84C; color:#C9A84C; }
+.memberistic-acct-modal__body{ min-height:300px; }
+body.memberistic-modal-open{ overflow:hidden; }
+
+@media (max-width:760px){
+  .memberistic-acct-modal{ padding:0; }
+  .memberistic-acct-modal__card{ border-radius:0; min-height:100vh; padding:18px; }
+  .memberistic-acct-modal__title{ font-size:22px; }
 }
 
 @media (max-width:680px){
@@ -792,24 +845,31 @@ $lane_url    = home_url( '/book-a-lane/' );
 	}
 
 	/* ──────────────────────────────────────────────────────────
-	 * Lane booking auto-fill
-	 * When the user opens the "Book A Lane" tab, populate the
-	 * embedded booking form's contact fields with their on-file
-	 * info so they don't have to retype it every visit. Idempotent
-	 * — only fills empty fields, never overwrites what the user
-	 * just typed. Re-runs on every tab switch in case the booking
-	 * form is mounted lazily.
+	 * Booking modal + auto-fill
+	 *
+	 * The dashboard "Book A Lane" tile, the sidebar's "Book A
+	 * Lane" tab, and the "Open Booking Form" CTA inside that tab
+	 * all share one [data-open-booking] hook — clicking any of
+	 * them opens the modal. The modal hosts the live booking-
+	 * engine shortcode at full width (max 1100px), so the form's
+	 * two-column "info + date picker" layout renders properly
+	 * instead of being squeezed into the dashboard's narrow main
+	 * column.
+	 *
+	 * Auto-fill is idempotent — only populates empty fields, so a
+	 * member who tweaks the email never sees it bounced back.
 	 * ────────────────────────────────────────────────────────── */
+	var modal = document.getElementById('memberistic-acct-modal');
 	function prefillBooking(){
-		var wrap = root.querySelector('.memberistic-acct-booking');
+		if(!modal) return;
+		var wrap = modal.querySelector('.memberistic-acct-booking');
 		if(!wrap) return;
 		var name = wrap.getAttribute('data-member-name')  || '';
 		var mail = wrap.getAttribute('data-member-email') || '';
 		var tel  = wrap.getAttribute('data-member-phone') || '';
-		// Common field selectors used by g2a-booking-engine + any
-		// generic booking form. We match by NAME first (the booking
-		// engine uses customer_name/email/phone) then by id/type so
-		// future forms keep working without code changes.
+		// Match by name first (g2a-booking uses customer_name /
+		// customer_email / customer_phone), then id/type so future
+		// form variants keep working without code changes.
 		[
 			{val:name, sel:[
 				'input[name="customer_name"]','input[name="full_name"]','input[name="name"]',
@@ -832,19 +892,35 @@ $lane_url    = home_url( '/book-a-lane/' );
 			});
 		});
 	}
-	// Run once on load (in case Book A Lane is the active tab) and
-	// every time the user switches tabs.
-	prefillBooking();
-	tabs.forEach(function(t){
-		t.addEventListener('click', function(){
-			if(t.getAttribute('data-tab')==='book'){
-				// Booking engine markup may hydrate after click;
-				// give it a beat then run again.
-				setTimeout(prefillBooking, 50);
-				setTimeout(prefillBooking, 400);
-			}
-		});
+	function openBooking(){
+		if(!modal) return;
+		modal.removeAttribute('hidden');
+		modal.classList.add('is-open');
+		document.body.classList.add('memberistic-modal-open');
+		// The booking engine may hydrate its inputs after first
+		// render — re-run prefill twice to catch lazy mounts.
+		setTimeout(prefillBooking, 50);
+		setTimeout(prefillBooking, 400);
+	}
+	function closeBooking(){
+		if(!modal) return;
+		modal.classList.remove('is-open');
+		modal.setAttribute('hidden','');
+		document.body.classList.remove('memberistic-modal-open');
+	}
+	document.querySelectorAll('[data-open-booking]').forEach(function(btn){
+		btn.addEventListener('click', function(e){ e.preventDefault(); openBooking(); });
 	});
+	if(modal){
+		modal.addEventListener('click', function(e){
+			if(e.target === modal) closeBooking(); // click backdrop to close
+		});
+		var closeBtn = modal.querySelector('[data-close-booking]');
+		if(closeBtn) closeBtn.addEventListener('click', closeBooking);
+		document.addEventListener('keydown', function(e){
+			if(e.key === 'Escape' && modal.classList.contains('is-open')) closeBooking();
+		});
+	}
 
 	/* ──────────────────────────────────────────────────────────
 	 * Profile photo upload
