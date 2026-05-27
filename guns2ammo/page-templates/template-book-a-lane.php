@@ -29,7 +29,7 @@ $g2a_lane_membership_pitch   = get_post_meta( $g2a_page_id, 'lane_membership_pit
 
 <?php
 /* Membership promo  shown to non-members (logged-out visitors and
- * any logged-in user without an active Memberistic membership). */
+ * any logged-in user without an active Members Hub membership). */
 $g2a_is_member = false;
 if ( is_user_logged_in() ) {
 	if ( function_exists( 'memberistic_user_has_active_membership' ) ) {

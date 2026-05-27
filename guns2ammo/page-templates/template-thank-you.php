@@ -2,7 +2,7 @@
 /**
  * Template Name: Thank You
  *
- * Hosts the Memberistic post-checkout confirmation inside the branded shell.
+ * Hosts the Members Hub post-checkout confirmation inside the branded shell.
  * Assign to a Page with slug: thank-you
  *
  * @package guns2ammo

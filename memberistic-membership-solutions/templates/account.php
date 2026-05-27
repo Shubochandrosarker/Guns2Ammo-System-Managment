@@ -60,7 +60,10 @@ $lane_url    = home_url( '/book-a-lane/' );
 		'Status: ' . ucfirst( $status ),
 		'Renews: ' . $renew,
 	) );
-	$qr_data     = rawurlencode( $qr_payload );
+	// Locally-generated SVG QR — no PII sent to any third-party service.
+	$qr_svg      = class_exists( '\WordPressistic\Memberistic\Utilities\QR' )
+		? \WordPressistic\Memberistic\Utilities\QR::svg( $qr_payload, 260, '#ffffff', '#0f2044' )
+		: '';
 	?>
 	<div class="memberistic-acct-statusbar">
 		<span class="memberistic-acct-statuspill <?php echo $status_ok ? 'is-ok' : 'is-warn'; ?>">
@@ -303,8 +306,11 @@ $lane_url    = home_url( '/book-a-lane/' );
 								<span class="memberistic-acct-mini"><?php esc_html_e( 'Renews', 'memberistic' ); ?></span>
 								<strong><?php echo esc_html( $renew ); ?></strong>
 							</div>
-							<img class="memberistic-acct-pass__qr" alt="<?php esc_attr_e( 'Member verification QR code', 'memberistic' ); ?>"
-								src="https://api.qrserver.com/v1/create-qr-code/?size=260x260&amp;margin=0&amp;ecc=M&amp;bgcolor=ffffff&amp;data=<?php echo esc_attr( $qr_data ); ?>" />
+							<div class="memberistic-acct-pass__qr" role="img" aria-label="<?php esc_attr_e( 'Member verification QR code', 'memberistic' ); ?>"><?php
+								// SVG is built in-process from a deterministic local
+								// generator; no PII is sent to any third party.
+								echo $qr_svg; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- generated SVG with hard-coded markup
+							?></div>
 						</div>
 					</div>
 					<p class="memberistic-acct-mini memberistic-acct-passnote"><?php esc_html_e( 'Show at the range desk · or scan the QR', 'memberistic' ); ?></p>

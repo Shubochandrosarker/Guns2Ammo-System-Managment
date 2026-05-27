@@ -2,7 +2,7 @@
 /**
  * Template Name: Payment Failed
  *
- * Hosts the Memberistic failed-payment recovery flow inside the branded shell.
+ * Hosts the Members Hub failed-payment recovery flow inside the branded shell.
  * Assign to a Page with slug: payment-failed
  *
  * @package guns2ammo

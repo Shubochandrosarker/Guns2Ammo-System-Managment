@@ -2,7 +2,7 @@
 /**
  * Template Name: Checkout
  *
- * Hosts the Memberistic checkout flow inside the branded theme shell.
+ * Hosts the Members Hub checkout flow inside the branded theme shell.
  * Assign to a Page with slug: checkout
  *
  * @package guns2ammo

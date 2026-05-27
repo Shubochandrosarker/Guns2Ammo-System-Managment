@@ -31,6 +31,7 @@ final class Plugin {
 			'includes/utilities/helpers.php',
 			'includes/utilities/global-functions.php',
 			'includes/utilities/formatting.php',
+			'includes/utilities/class-qr.php',
 			'includes/class-capabilities.php',
 			'includes/class-roles.php',
 			'includes/class-content-restrictions.php',

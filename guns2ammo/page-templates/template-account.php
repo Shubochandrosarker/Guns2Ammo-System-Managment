@@ -2,7 +2,7 @@
 /**
  * Template Name: Account
  *
- * Hosts the Memberistic member dashboard inside the branded theme shell.
+ * Hosts the Members Hub member dashboard inside the branded theme shell.
  * Assign to a Page with slug: account
  *
  * @package guns2ammo

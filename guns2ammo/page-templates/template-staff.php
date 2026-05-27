@@ -2,7 +2,7 @@
 /**
  * Template Name: Staff
  *
- * Hosts the Memberistic staff dashboard inside the branded theme shell.
+ * Hosts the Members Hub staff dashboard inside the branded theme shell.
  * Assign to a Page with slug: staff
  *
  * @package guns2ammo

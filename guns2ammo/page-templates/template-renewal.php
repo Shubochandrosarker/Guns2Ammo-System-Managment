@@ -2,7 +2,7 @@
 /**
  * Template Name: Renewal
  *
- * Hosts the Memberistic renewal flow inside the branded theme shell.
+ * Hosts the Members Hub renewal flow inside the branded theme shell.
  * Assign to a Page with slug: renewal
  *
  * @package guns2ammo
