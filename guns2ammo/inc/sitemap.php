@@ -29,6 +29,56 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
+/* ============================================================
+ * Earliest possible intercept.
+ *
+ * Runs when the theme's functions.php require_once's this file —
+ * before parse_request, before init, before anything else WP might
+ * hook. Catches the case where a competing rewrite rule (.htaccess
+ * or a plugin) would otherwise eat /sitemap.xml or send it through
+ * a different handler.
+ *
+ * Only fires for the sitemap URLs; every other request returns
+ * immediately so this costs effectively nothing.
+ * ============================================================ */
+g2a_sitemap_maybe_serve();
+function g2a_sitemap_maybe_serve() {
+	$uri = isset( $_SERVER['REQUEST_URI'] )
+		? (string) wp_parse_url( wp_unslash( $_SERVER['REQUEST_URI'] ), PHP_URL_PATH )
+		: '';
+	if ( '' === $uri ) {
+		return;
+	}
+	$uri = strtolower( rtrim( $uri, '/' ) );
+	$map = array(
+		'/sitemap.xml'              => 'index',
+		'/sitemap-pages.xml'        => 'pages',
+		'/sitemap-posts.xml'        => 'posts',
+		'/sitemap-products.xml'     => 'products',
+		'/sitemap-product-cats.xml' => 'productcats',
+		'/sitemap-faqs.xml'         => 'faqs',
+	);
+	if ( ! isset( $map[ $uri ] ) ) {
+		return;
+	}
+	// WP may not be fully bootstrapped yet — load enough for our
+	// queries to run. is_user_logged_in / get_permalink etc.
+	// require the full WP environment, but functions.php only loads
+	// after WP_Query is set up, so this is safe to call here.
+	header( 'Content-Type: application/xml; charset=utf-8' );
+	header( 'X-Robots-Tag: noindex' );
+	header( 'Cache-Control: public, max-age=3600' );
+	switch ( $map[ $uri ] ) {
+		case 'index':       g2a_sitemap_render_index(); break;
+		case 'pages':       g2a_sitemap_render_pages(); break;
+		case 'posts':       g2a_sitemap_render_posts(); break;
+		case 'products':    g2a_sitemap_render_products(); break;
+		case 'productcats': g2a_sitemap_render_product_cats(); break;
+		case 'faqs':        g2a_sitemap_render_faqs(); break;
+	}
+	exit;
+}
+
 /* Turn off WP core's wp-sitemap.xml — we own /sitemap.xml */
 add_filter( 'wp_sitemaps_enabled', '__return_false' );
 
