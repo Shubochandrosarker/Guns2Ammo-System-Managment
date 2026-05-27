@@ -193,15 +193,19 @@ final class Settings_Page {
 	 * @return array<string, array<string, string>>
 	 */
 	private static function get_required_pages() {
+		// Branded titles + slugs — no "memberistic-*" namespace leaks
+		// out to public URLs. Settings page admin still says
+		// "Memberships / Account / etc." which is what the customer
+		// expects to see in their site nav.
 		$pages = array(
-			'plans_page_id'          => array( 'title' => 'Memberistic Memberships', 'slug' => 'memberistic-memberships', 'content' => '[memberistic_plans]' ),
-			'checkout_page_id'       => array( 'title' => 'Memberistic Checkout', 'slug' => 'memberistic-checkout', 'content' => '[memberistic_checkout]' ),
-			'account_page_id'        => array( 'title' => 'Memberistic Account', 'slug' => 'memberistic-account', 'content' => '[memberistic_account]' ),
-			'renewal_page_id'        => array( 'title' => 'Memberistic Renewal', 'slug' => 'memberistic-renewal', 'content' => '[memberistic_renewal]' ),
-			'login_page_id'          => array( 'title' => 'Memberistic Login', 'slug' => 'memberistic-login', 'content' => '[memberistic_login]' ),
-			'thank_you_page_id'      => array( 'title' => 'Memberistic Thank You', 'slug' => 'memberistic-thank-you', 'content' => '[memberistic_thank_you]' ),
-			'failed_payment_page_id' => array( 'title' => 'Memberistic Payment Failed', 'slug' => 'memberistic-payment-failed', 'content' => '[memberistic_payment_failed]' ),
-			'staff_dashboard_page_id'=> array( 'title' => 'Memberistic Staff Dashboard', 'slug' => 'memberistic-staff-dashboard', 'content' => '[memberistic_staff_dashboard]' ),
+			'plans_page_id'          => array( 'title' => 'Memberships',     'slug' => 'memberships',     'content' => '[memberistic_plans]' ),
+			'checkout_page_id'       => array( 'title' => 'Checkout',        'slug' => 'membership-checkout-page', 'content' => '[memberistic_checkout]' ),
+			'account_page_id'        => array( 'title' => 'My Account',      'slug' => 'account',         'content' => '[memberistic_account]' ),
+			'renewal_page_id'        => array( 'title' => 'Renew Membership','slug' => 'renew-membership','content' => '[memberistic_renewal]' ),
+			'login_page_id'          => array( 'title' => 'Sign In',         'slug' => 'login',           'content' => '[memberistic_login]' ),
+			'thank_you_page_id'      => array( 'title' => 'Thank You',       'slug' => 'membership-thank-you', 'content' => '[memberistic_thank_you]' ),
+			'failed_payment_page_id' => array( 'title' => 'Payment Failed',  'slug' => 'payment-failed',  'content' => '[memberistic_payment_failed]' ),
+			'staff_dashboard_page_id'=> array( 'title' => 'Staff Dashboard', 'slug' => 'staff-dashboard', 'content' => '[memberistic_staff_dashboard]' ),
 		);
 
 		return apply_filters( 'memberistic_required_pages', $pages );

@@ -18,7 +18,8 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 
 $renewal_url = memberistic_get_page_url( 'renewal_page_id', 'memberistic-renewal', home_url( '/' ) );
-$plans_url   = memberistic_get_page_url( 'plans_page_id', 'memberistic-memberships', home_url( '/' ) );
+$plans_url   = memberistic_get_page_url( 'plans_page_id', 'memberships', '' );
+if ( ! $plans_url ) { $plans_url = memberistic_get_page_url( 'plans_page_id', 'memberistic-memberships', home_url( '/memberships/' ) ); }
 $support_url = home_url( '/get-support/' );
 $lane_url    = home_url( '/book-a-lane/' );
 ?>
@@ -117,10 +118,11 @@ $lane_url    = home_url( '/book-a-lane/' );
 			<div class="memberistic-acct-planpill"><?php echo esc_html( $current['plan_name'] ); ?> <?php esc_html_e( 'Plan', 'memberistic' ); ?></div>
 			<nav class="memberistic-acct-nav">
 				<a href="#dashboard" data-tab="dashboard" class="is-active"><span class="memberistic-acct-ic">▦</span><?php esc_html_e( 'Dashboard', 'memberistic' ); ?></a>
+				<a href="#book"      data-tab="book"><span class="memberistic-acct-ic">◷</span><?php esc_html_e( 'Book A Lane', 'memberistic' ); ?></a>
 				<a href="#details"   data-tab="details"><span class="memberistic-acct-ic">◇</span><?php esc_html_e( 'Membership Details', 'memberistic' ); ?></a>
 				<a href="#billing"   data-tab="billing"><span class="memberistic-acct-ic">▭</span><?php esc_html_e( 'Billing &amp; Payments', 'memberistic' ); ?></a>
 				<a href="#members"   data-tab="members"><span class="memberistic-acct-ic">⚇</span><?php esc_html_e( 'Additional Members', 'memberistic' ); ?></a>
-				<a href="#bookings"  data-tab="bookings"><span class="memberistic-acct-ic">◷</span><?php esc_html_e( 'Booking History', 'memberistic' ); ?></a>
+				<a href="#bookings"  data-tab="bookings"><span class="memberistic-acct-ic">▥</span><?php esc_html_e( 'Booking History', 'memberistic' ); ?></a>
 				<a href="#card"      data-tab="card"><span class="memberistic-acct-ic">▤</span><?php esc_html_e( 'Digital Member Card', 'memberistic' ); ?></a>
 				<span class="memberistic-acct-navsep"></span>
 				<a href="<?php echo esc_url( wp_logout_url( home_url( '/' ) ) ); ?>" class="memberistic-acct-signout"><span class="memberistic-acct-ic">⤶</span><?php esc_html_e( 'Sign Out', 'memberistic' ); ?></a>
@@ -158,6 +160,44 @@ $lane_url    = home_url( '/book-a-lane/' );
 						<span class="memberistic-acct-ic">▭</span>
 						<span><strong><?php esc_html_e( 'Update Payment', 'memberistic' ); ?></strong><small><?php echo esc_html( $pay_method ); ?></small></span>
 					</a>
+				</div>
+			</section>
+
+			<!-- BOOK A LANE — embeds the booking-engine shortcode so the
+			     member can reserve from inside the dashboard without
+			     leaving. The wrapper carries `data-member-*` attrs that
+			     the booking form's JS uses to auto-fill name + email +
+			     phone so returning members don't retype their info. -->
+			<section class="memberistic-acct-view" data-panel="book">
+				<div class="memberistic-acct-block">
+					<h2><?php esc_html_e( 'Book A Lane', 'memberistic' ); ?></h2>
+					<p class="memberistic-acct-muted" style="margin-bottom:18px;">
+						<?php esc_html_e( 'Pick a date and time below. Your contact details on file are pre-filled — change them only if needed.', 'memberistic' ); ?>
+					</p>
+					<?php
+					$member_email = (string) ( $user->user_email ?? '' );
+					$member_phone = (string) get_user_meta( $user->ID, 'billing_phone', true );
+					if ( ! $member_phone ) {
+						$member_phone = (string) get_user_meta( $user->ID, 'memberistic_phone', true );
+					}
+					?>
+					<div class="memberistic-acct-booking"
+					     data-member-name="<?php echo esc_attr( $display ); ?>"
+					     data-member-email="<?php echo esc_attr( $member_email ); ?>"
+					     data-member-phone="<?php echo esc_attr( $member_phone ); ?>"
+					     data-member-plan="<?php echo esc_attr( $current['plan_name'] ); ?>">
+						<?php
+						if ( shortcode_exists( 'g2a_lane_booking' ) ) {
+							echo do_shortcode( '[g2a_lane_booking]' );
+						} else {
+							echo '<p class="memberistic-acct-muted">' . sprintf(
+								/* translators: %s: anchor to the standalone booking page */
+								esc_html__( 'The booking module is loading. If you do not see the form, %s.', 'memberistic' ),
+								'<a href="' . esc_url( $lane_url ) . '">' . esc_html__( 'open the standalone booking page', 'memberistic' ) . '</a>'
+							) . '</p>';
+						}
+						?>
+					</div>
 				</div>
 			</section>
 
@@ -314,9 +354,27 @@ $lane_url    = home_url( '/book-a-lane/' );
 			<section class="memberistic-acct-view" data-panel="card">
 				<div class="memberistic-acct-block memberistic-acct-block--center">
 					<h2><?php esc_html_e( 'Your Digital Member Card', 'memberistic' ); ?></h2>
+					<?php
+					// Pull the site's brand logo for the card. Order of
+					// preference: theme's custom-logo (Appearance →
+					// Customize → Site Identity), then Memberistic's
+					// own logo_url setting, then nothing (fall back to
+					// the brand-label text).
+					$card_logo_id  = function_exists( 'get_theme_mod' ) ? (int) get_theme_mod( 'custom_logo' ) : 0;
+					$card_logo_url = $card_logo_id ? wp_get_attachment_image_url( $card_logo_id, 'medium' ) : '';
+					if ( ! $card_logo_url ) {
+						$card_logo_url = (string) memberistic_get_setting( 'logo_url', '' );
+					}
+					?>
 					<div class="memberistic-acct-pass" id="memberistic-acct-pass">
 						<div class="memberistic-acct-pass__top">
-							<span class="memberistic-acct-pass__brand"><?php echo esc_html( strtoupper( memberistic_get_brand_label() ) ); ?></span>
+							<span class="memberistic-acct-pass__brand">
+								<?php if ( $card_logo_url ) : ?>
+									<img class="memberistic-acct-pass__logo" src="<?php echo esc_url( $card_logo_url ); ?>" alt="<?php echo esc_attr( memberistic_get_brand_label() ); ?>">
+								<?php else : ?>
+									<?php echo esc_html( strtoupper( memberistic_get_brand_label() ) ); ?>
+								<?php endif; ?>
+							</span>
 							<span class="memberistic-acct-pass__plan"><?php echo esc_html( strtoupper( $current['plan_name'] ) ); ?></span>
 						</div>
 						<?php if ( $photo_url ) : ?>
@@ -540,6 +598,7 @@ $lane_url    = home_url( '/book-a-lane/' );
 }
 /* Profile photo: avatar slot, digital-card hero photo, upload controls */
 .memberistic-acct-avatar img{width:100%;height:100%;object-fit:cover;border-radius:50%;}
+.memberistic-acct-pass__logo{display:block;max-height:32px;width:auto;max-width:180px;object-fit:contain;}
 .memberistic-acct-pass__photo{width:84px;height:84px;border-radius:50%;overflow:hidden;margin:14px auto 6px;border:3px solid rgba(255,255,255,.18);background:rgba(255,255,255,.06);}
 .memberistic-acct-pass__photo img{width:100%;height:100%;object-fit:cover;display:block;}
 .memberistic-acct-photo-actions{display:flex;gap:8px;flex-wrap:wrap;}
@@ -577,6 +636,61 @@ $lane_url    = home_url( '/book-a-lane/' );
 	show(initial||'dashboard');
 	var printBtn=root.querySelector('[data-print-card]');
 	if(printBtn){printBtn.addEventListener('click',function(){window.print();});}
+
+	/* ──────────────────────────────────────────────────────────
+	 * Lane booking auto-fill
+	 * When the user opens the "Book A Lane" tab, populate the
+	 * embedded booking form's contact fields with their on-file
+	 * info so they don't have to retype it every visit. Idempotent
+	 * — only fills empty fields, never overwrites what the user
+	 * just typed. Re-runs on every tab switch in case the booking
+	 * form is mounted lazily.
+	 * ────────────────────────────────────────────────────────── */
+	function prefillBooking(){
+		var wrap = root.querySelector('.memberistic-acct-booking');
+		if(!wrap) return;
+		var name = wrap.getAttribute('data-member-name')  || '';
+		var mail = wrap.getAttribute('data-member-email') || '';
+		var tel  = wrap.getAttribute('data-member-phone') || '';
+		// Common field selectors used by g2a-booking-engine + any
+		// generic booking form. We match by NAME first (the booking
+		// engine uses customer_name/email/phone) then by id/type so
+		// future forms keep working without code changes.
+		[
+			{val:name, sel:[
+				'input[name="customer_name"]','input[name="full_name"]','input[name="name"]',
+				'#g2ab-customer-name','input[autocomplete="name"]'
+			]},
+			{val:mail, sel:[
+				'input[name="customer_email"]','input[name="email"]',
+				'#g2ab-customer-email','input[type="email"]'
+			]},
+			{val:tel,  sel:[
+				'input[name="customer_phone"]','input[name="phone"]',
+				'#g2ab-customer-phone','input[type="tel"]','input[autocomplete="tel"]'
+			]}
+		].forEach(function(group){
+			if(!group.val) return;
+			group.sel.some(function(sel){
+				var el = wrap.querySelector(sel);
+				if(el && !el.value){ el.value = group.val; el.dispatchEvent(new Event('change',{bubbles:true})); return true; }
+				return false;
+			});
+		});
+	}
+	// Run once on load (in case Book A Lane is the active tab) and
+	// every time the user switches tabs.
+	prefillBooking();
+	tabs.forEach(function(t){
+		t.addEventListener('click', function(){
+			if(t.getAttribute('data-tab')==='book'){
+				// Booking engine markup may hydrate after click;
+				// give it a beat then run again.
+				setTimeout(prefillBooking, 50);
+				setTimeout(prefillBooking, 400);
+			}
+		});
+	});
 
 	/* ──────────────────────────────────────────────────────────
 	 * Profile photo upload

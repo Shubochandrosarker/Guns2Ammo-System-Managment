@@ -155,7 +155,7 @@ final class Content_Restrictions {
 			return;
 		}
 		$plans = self::plan_names( array_filter( array_map( 'absint', (array) get_post_meta( self::$locked_post, '_memberistic_required_plans', true ) ) ) );
-		$url   = memberistic_get_page_url( 'plans_page_id', 'memberistic-memberships', home_url( '/' ) );
+		$url   = memberistic_get_page_url( 'plans_page_id', 'memberships', home_url( '/memberships/' ) );
 		?>
 		<style>
 			body.memberistic-content-locked > *:not(.memberistic-restriction-overlay){filter:blur(4px);pointer-events:none;user-select:none;}
@@ -201,7 +201,7 @@ final class Content_Restrictions {
 		// useful as a visual hint), but replace the body so the source
 		// view does not contain the gated text.
 		self::$locked_post = $post_id;
-		$url = memberistic_get_page_url( 'plans_page_id', 'memberistic-memberships', home_url( '/' ) );
+		$url = memberistic_get_page_url( 'plans_page_id', 'memberships', home_url( '/memberships/' ) );
 		$names = self::plan_names( $plans );
 		$detail = $names
 			? sprintf( __( 'This content is available for: %s.', 'memberistic' ), implode( ', ', $names ) )

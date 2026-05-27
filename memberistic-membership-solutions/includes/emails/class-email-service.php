@@ -214,9 +214,22 @@ final class Email_Service {
 	 */
 	private static function build_context( $membership, $person, $extra_context = array() ) {
 		$brand        = memberistic_get_brand_label();
-		$account_url  = memberistic_get_page_url( 'account_page_id', 'memberistic-account', home_url( '/' ) );
-		$renewal_url  = memberistic_get_page_url( 'renewal_page_id', 'memberistic-renewal', $account_url );
-		$booking_url  = memberistic_get_page_url( 'plans_page_id', 'memberistic-memberships', home_url( '/' ) );
+		// Account URL: prefer the customer's branded /account/ slug,
+		// then the historic /memberistic-account/ slug, then home as a
+		// final fallback. This means emails never leak the plugin's
+		// internal namespace even on installs that didn't wire the
+		// page in Memberistic → Settings.
+		$account_url  = memberistic_get_page_url( 'account_page_id', 'account', '' );
+		if ( ! $account_url ) {
+			$account_url = memberistic_get_page_url( 'account_page_id', 'memberistic-account', home_url( '/account/' ) );
+		}
+		$renewal_url  = memberistic_get_page_url( 'renewal_page_id', 'renew-membership', $account_url );
+		// Booking URL: prefer a real Book-a-Lane page, then the
+		// legacy memberistic-memberships slug, then home.
+		$booking_url  = memberistic_get_page_url( 'booking_page_id', 'book-a-lane', '' );
+		if ( ! $booking_url ) {
+			$booking_url = memberistic_get_page_url( 'plans_page_id', 'memberistic-memberships', home_url( '/book-a-lane/' ) );
+		}
 		$current_user = wp_get_current_user();
 		$staff_name   = $current_user && $current_user->exists() ? $current_user->display_name : '';
 
@@ -282,8 +295,8 @@ final class Email_Service {
 				'body'    => __( "Hi {member_name},\n\nYour {plan_name} membership ({membership_id}) was created. Once payment is confirmed, your membership becomes active automatically.\n\nView your account: {account_url}\n\n{brand_label}\n{business_phone}", 'memberistic' ),
 			),
 			'membership_activated' => array(
-				'subject' => __( 'Your {brand_label} membership is active', 'memberistic' ),
-				'body'    => __( "Hi {member_name},\n\nWelcome to {brand_label}! Your {plan_name} membership ({membership_id}) is now active.\nBilling cycle: {billing_cycle}\nNext renewal: {renewal_date}\n\nLog in to your account:\n{login_url}\n\nForgot your password? Reset it here:\n{lostpassword_url}\n\nManage your membership: {account_url}\nBook a lane: {booking_url}\n\n{business_name}\n{business_phone}", 'memberistic' ),
+				'subject' => __( 'Welcome to {brand_label} — your membership is active', 'memberistic' ),
+				'body'    => __( "Hi {member_name},\n\nWelcome to {brand_label}! Your {plan_name} membership is now active.\n\nMembership ID: {membership_id}\nBilling cycle: {billing_cycle}\nNext renewal: {renewal_date}\n\nSign in to your account:\n{login_url}\n\nForgot your password? Reset it here:\n{lostpassword_url}\n\nManage your membership and download your digital card:\n{account_url}\n\nBook a lane:\n{booking_url}\n\nSee you at the range.\n\n{brand_label}\n{business_phone}", 'memberistic' ),
 			),
 			'membership_renewed'   => array(
 				'subject' => __( 'Your {brand_label} membership was renewed', 'memberistic' ),
