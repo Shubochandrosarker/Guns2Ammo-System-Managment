@@ -172,7 +172,10 @@ class G2AB_AutoReply_Engine {
 		$patterns = array(
 			'/sk-[a-zA-Z0-9_-]{16,}/',          // OpenAI-style key
 			'/sk-or-v\d-[a-zA-Z0-9_-]{16,}/',   // OpenRouter
-			'/eyJ[A-Za-z0-9_-]{20,}\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+/', // JWT
+			// JWT: three base64url segments separated by dots, header
+			// always starts with "eyJ" (decodes to '{"'). Standard JWT
+			// headers are ~20 chars total; allow short ones too.
+			'/eyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+/',
 		);
 		foreach ( $patterns as $re ) {
 			$text = preg_replace( $re, '[REDACTED]', $text );
