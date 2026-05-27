@@ -84,6 +84,20 @@ add_action( 'wp_enqueue_scripts', function () {
 		wp_enqueue_style( 'g2a-front-page', G2A_URI . '/assets/css/front-page.css', [ 'g2a-app' ], G2A_VERSION );
 	}
 
+	// Per-template page CSS — same pattern as the front-page hero. Each
+	// CSS file is the verbatim <style> block previously inlined in its
+	// template (machine-gun.php / ccw.php / book-a-lane.php), now
+	// cacheable and only loaded on the matching page template.
+	if ( is_page_template( 'page-templates/template-machine-gun.php' ) ) {
+		wp_enqueue_style( 'g2a-machine-gun', G2A_URI . '/assets/css/machine-gun.css', [ 'g2a-app' ], G2A_VERSION );
+	}
+	if ( is_page_template( 'page-templates/template-ccw.php' ) ) {
+		wp_enqueue_style( 'g2a-ccw', G2A_URI . '/assets/css/ccw.css', [ 'g2a-app' ], G2A_VERSION );
+	}
+	if ( is_page_template( 'page-templates/template-book-a-lane.php' ) ) {
+		wp_enqueue_style( 'g2a-book-a-lane', G2A_URI . '/assets/css/book-a-lane.css', [ 'g2a-app' ], G2A_VERSION );
+	}
+
 	wp_enqueue_script( 'g2a-chrome', G2A_URI . '/assets/js/chrome.js', [], G2A_VERSION, true );
 }, 20 );
 

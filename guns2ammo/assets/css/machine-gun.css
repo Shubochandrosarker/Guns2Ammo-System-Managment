@@ -1,0 +1,44 @@
+/* G2A theme - machine-gun page CSS, extracted from page-templates/template-machine-gun.php */
+.mg-hero { min-height: 100vh; padding: 140px 32px 64px; display:flex; align-items:center; position:relative; overflow:hidden; background: radial-gradient(ellipse at 70% 50%, rgba(232,128,47,0.18), transparent 55%), linear-gradient(180deg, #2A2020, var(--color-void)); }
+.mg-hero::after { content:""; position:absolute; right:-200px; top:50%; transform:translateY(-50%); width:800px; height:800px; background: radial-gradient(circle, rgba(232,128,47,0.15), transparent 60%); }
+.mg-hero .c { max-width:1280px; margin:0 auto; width:100%; position:relative; z-index:2; }
+.mg-hero h1 { font-family: var(--font-display); line-height:0.86; font-size: clamp(64px, 12vw, 168px); letter-spacing:0.005em; }
+.mg-hero h1 .thin { font-family: var(--font-condensed); font-weight:500; color: var(--color-silver); display:block; font-size: clamp(28px, 4vw, 56px); letter-spacing:0.18em; margin-bottom: 12px; }
+.mg-hero h1 .ember { color: var(--color-ember); }
+.mg-hero p { color: var(--color-fog); font-size:18px; max-width:520px; margin: 32px 0 36px; }
+.crosshair { position:absolute; right:60px; top:50%; transform:translateY(-50%); width:280px; height:280px; opacity:0.25; animation: spin 20s linear infinite; }
+@keyframes spin { to { transform: translateY(-50%) rotate(360deg); } }
+@media (max-width:980px){ .crosshair { display:none; } }
+
+.weapons { padding: 100px 32px; background: var(--color-void); border-top:1px solid var(--color-hairline); }
+.weapons-head { max-width:1280px; margin:0 auto 48px; display:flex; justify-content:space-between; align-items:end; gap:32px; flex-wrap:wrap; }
+.weapons-head h2 { font-family: var(--font-display); font-size: clamp(40px, 6vw, 80px); line-height:0.95; }
+.weapons-grid { max-width:1280px; margin:0 auto; display:grid; grid-template-columns: repeat(3, 1fr); gap:16px; }
+@media (max-width:900px){ .weapons-grid { grid-template-columns:1fr; } }
+.weapon { padding: 32px; background: var(--color-gunmetal); border:1px solid var(--color-hairline); position:relative; overflow:hidden; min-height: 320px; display:flex; flex-direction:column; justify-content:space-between; }
+.weapon::before { content:""; position:absolute; right:-40px; top:-40px; width:240px; height:240px; background-image: repeating-linear-gradient(45deg, rgba(201,168,76,0.04) 0 2px, transparent 2px 14px); transform: rotate(-15deg); }
+.weapon .tag { font-family: var(--font-mono); font-size:11px; letter-spacing:0.24em; color: var(--color-brass-bright); text-transform: uppercase; }
+.weapon h3 { font-family: var(--font-display); font-size:64px; color: var(--color-white); line-height:1; margin: 14px 0 8px; }
+.weapon .cal { font-family: var(--font-mono); font-size:12px; color: var(--color-silver); letter-spacing:0.18em; }
+.weapon .specs { display:grid; grid-template-columns:1fr 1fr; gap:14px; margin: 24px 0; padding: 16px 0; border-top:1px solid var(--color-hairline); border-bottom:1px solid var(--color-hairline); position:relative; z-index:2; }
+.weapon .specs .v { font-family: var(--font-display); font-size:24px; color: var(--color-brass-bright); line-height:1; }
+.weapon .specs .l { font-family: var(--font-mono); font-size:9px; letter-spacing:0.22em; color: var(--color-silver); text-transform: uppercase; margin-top:4px; }
+.weapon .add { font-family: var(--font-condensed); font-weight:600; letter-spacing:0.12em; text-transform: uppercase; color: var(--color-brass-bright); display:inline-flex; align-items:center; gap:8px; text-decoration:none; }
+
+.tiers { padding: 100px 32px; background: var(--color-gunmetal); }
+.tiers-grid { max-width:1280px; margin:0 auto; display:grid; grid-template-columns: repeat(3, 1fr); gap:16px; }
+@media (max-width:900px){ .tiers-grid { grid-template-columns:1fr; } }
+.tier { padding: 36px 28px; background: var(--color-void); border:1px solid var(--color-hairline); position:relative; }
+.tier.popular { border-color: var(--color-brass); transform: translateY(-12px); }
+.tier .pop { position:absolute; top:-14px; left:50%; transform:translateX(-50%); padding: 5px 14px; background: var(--color-brass); color:#111; font-family: var(--font-mono); font-size:10px; letter-spacing:0.24em; text-transform: uppercase; }
+.tier h3 { font-family: var(--font-display); font-size:36px; color: var(--color-white); }
+.tier .price { font-family: var(--font-display); font-size:64px; color: var(--color-brass-bright); line-height:1; margin: 8px 0 4px; }
+.tier .pn { font-family: var(--font-mono); font-size:11px; letter-spacing:0.22em; color: var(--color-silver); text-transform: uppercase; }
+.tier ul { list-style:none; padding: 24px 0; margin:0; border-top:1px solid var(--color-hairline); margin-top:24px; }
+.tier ul li { padding: 8px 0; font-size:14px; color: var(--color-fog); display:flex; gap:12px; }
+.tier ul li::before { content:""; color: var(--color-brass-bright); font-family: var(--font-mono); }
+
+.bonus { padding:24px 32px; background: var(--color-brass); color: #111; }
+.bonus .c { max-width:1280px; margin:0 auto; display:flex; justify-content:space-between; align-items:center; gap:20px; flex-wrap:wrap; }
+.bonus h4 { font-family: var(--font-display); font-size:28px; letter-spacing:0.02em; }
+.bonus p { margin:0; font-family: var(--font-condensed); font-weight:600; letter-spacing:0.06em; text-transform: uppercase; font-size:14px; }
