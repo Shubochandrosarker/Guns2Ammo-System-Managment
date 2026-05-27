@@ -406,7 +406,14 @@ final class Stripe_Service {
 
 		$membership_id = (int) $membership['id'];
 		$billing_cycle = $membership['billing_cycle'];
-		$renewal_date  = gmdate( 'Y-m-d H:i:s', strtotime( 'annual' === $billing_cycle ? '+1 year' : '+1 month', time() ) );
+		// Anchor the new renewal off the EXISTING renewal_date if the
+		// member is being renewed before their current term ends — so
+		// they keep the paid time. Falls back to "now" for first-time
+		// invoices or expired memberships. Site-local time throughout.
+		$now_local     = current_time( 'mysql' );
+		$current_rd    = ! empty( $membership['renewal_date'] ) ? $membership['renewal_date'] : '';
+		$anchor        = ( $current_rd && $current_rd > $now_local ) ? $current_rd : $now_local;
+		$renewal_date  = \WordPressistic\Memberistic\Integrations\WooCommerce_Bridge::compute_next_renewal( $billing_cycle, $anchor );
 
 		// Skip the very first invoice that fires on checkout completion — that path is
 		// already handled by checkout.session.completed and creates the start_date row.
@@ -472,7 +479,9 @@ final class Stripe_Service {
 
 		$billing_cycle = $membership['billing_cycle'];
 		$start_date    = current_time( 'mysql' );
-		$renewal_date  = gmdate( 'Y-m-d H:i:s', strtotime( 'annual' === $billing_cycle ? '+1 year' : '+1 month', time() ) );
+		// Site-local renewal compute (was UTC-via-gmdate which mis-drifted
+		// on non-UTC sites like Mesa AZ).
+		$renewal_date  = \WordPressistic\Memberistic\Integrations\WooCommerce_Bridge::compute_next_renewal( $billing_cycle, $start_date );
 
 		Memberships_Repository::update(
 			$membership_id,

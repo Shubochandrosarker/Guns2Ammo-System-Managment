@@ -1099,11 +1099,25 @@ final class Memberships_Controller extends REST_Controller {
 			return new \WP_Error( 'memberistic_membership_not_found', __( 'Membership not found.', 'memberistic' ), array( 'status' => 404 ) );
 		}
 
-		$renewal_date = gmdate( 'Y-m-d H:i:s', strtotime( 'annual' === $membership['billing_cycle'] ? '+1 year' : '+1 month', time() ) );
+		// Audit B19: previous code computed the new renewal date from
+		// time() rather than from the EXISTING renewal_date. Members
+		// who renewed early lost paid time; members who renewed late
+		// silently got an extra free window. Now we anchor the new
+		// renewal off max(current renewal_date, now) so:
+		//   - Early renewal:  new = current_renewal + 1 cycle
+		//                     (member keeps the time they paid for)
+		//   - Late renewal:   new = now + 1 cycle
+		//                     (no retroactive window, no "free month")
+		$now_local      = current_time( 'mysql' );
+		$current        = ! empty( $membership['renewal_date'] ) ? $membership['renewal_date'] : '';
+		$anchor         = ( $current && $current > $now_local ) ? $current : $now_local;
+		$billing_cycle  = ! empty( $membership['billing_cycle'] ) ? $membership['billing_cycle'] : 'monthly';
+		$renewal_date   = \WordPressistic\Memberistic\Integrations\WooCommerce_Bridge::compute_next_renewal( $billing_cycle, $anchor );
+
 		\WordPressistic\Memberistic\Database\Memberships_Repository::update( $id, array( 'status' => 'active', 'renewal_date' => $renewal_date ) );
 		do_action( 'memberistic_membership_activated', $id );
 		\WordPressistic\Memberistic\Database\Activity_Repository::log( array( 'membership_id' => $id, 'activity_type' => 'membership_renewed', 'title' => __( 'Membership renewed', 'memberistic' ), 'created_by' => get_current_user_id() ) );
-		\WordPressistic\Memberistic\Emails\Email_Service::send_membership_email( $id, 'renewal_reminder' );
+		\WordPressistic\Memberistic\Emails\Email_Service::send_membership_email( $id, 'membership_renewed' );
 
 		return rest_ensure_response( \WordPressistic\Memberistic\Database\Memberships_Repository::get_with_summary( $id ) );
 	}
