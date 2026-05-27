@@ -66,13 +66,12 @@ remove_action( 'wp_head', 'wp_oembed_add_discovery_links', 10 );
 
 /* ---------- Enqueue theme assets ---------- */
 add_action( 'wp_enqueue_scripts', function () {
-	// Self-hosted brand fonts  single optimized request, swap fallback.
-	wp_enqueue_style(
-		'g2a-fonts',
-		'https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Barlow+Condensed:wght@500;600;700&family=Barlow:wght@400;500;600&family=DM+Sans:wght@400;500;700&family=Space+Mono:wght@400;700&display=swap',
-		[],
-		null
-	);
+	// Self-hosted brand fonts (Bebas Neue, Barlow + Condensed, DM Sans,
+	// Space Mono — latin subset only). WOFF2 files live in
+	// assets/fonts/, regenerated via scripts/fetch-fonts.sh. Local
+	// hosting drops a third-party DNS hop from every page load AND
+	// keeps visitor IPs out of Google's logs.
+	wp_enqueue_style( 'g2a-fonts', G2A_URI . '/assets/css/fonts.css', [], G2A_VERSION );
 
 	wp_enqueue_style( 'g2a-tokens', G2A_URI . '/assets/css/tokens.css', [], G2A_VERSION );
 	wp_enqueue_style( 'g2a-app',    G2A_URI . '/assets/css/app.css',    [ 'g2a-tokens' ], G2A_VERSION );
@@ -88,11 +87,10 @@ add_action( 'wp_enqueue_scripts', function () {
 	wp_enqueue_script( 'g2a-chrome', G2A_URI . '/assets/js/chrome.js', [], G2A_VERSION, true );
 }, 20 );
 
-/* Preconnect for fonts.gstatic */
-add_action( 'wp_head', function () {
-	echo '<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>' . "\n";
-	echo '<link rel="dns-prefetch" href="https://fonts.googleapis.com">' . "\n";
-}, 1 );
+/* No third-party font hosts since assets/css/fonts.css is local. The
+ * preconnect/dns-prefetch hints we used to print for fonts.gstatic are
+ * intentionally removed — they would slow first paint with a useless
+ * DNS lookup and leak the visitor's IP to Google. */
 
 /* Add defer to non-essential scripts */
 add_filter( 'script_loader_tag', function ( $tag, $handle ) {
