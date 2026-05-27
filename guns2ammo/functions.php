@@ -204,6 +204,12 @@ function g2a_handle_reservation() {
 	}
 	wp_mail( $to, 'Website Request: ' . $subject, implode( "\n", $lines ), $headers );
 
+	// Also log the submission into the WPistic Contact Form dashboard so
+	// staff can review + reply from one place. Silent no-op if the plugin
+	// isn't active. Passes notify_admin=false because we already mailed
+	// the admin above and don't want a duplicate notification.
+	g2a_capture_to_wpcf( 'Reservation: ' . $subject, $fields );
+
 	$back = wp_get_referer() ?: home_url( '/' );
 	wp_safe_redirect( add_query_arg( 'g2a_sent', '1', remove_query_arg( 'g2a_sent', $back ) ) . '#reserve' );
 	exit;
@@ -227,6 +233,7 @@ function g2a_handle_request() {
 	$subject = sanitize_text_field( wp_unslash( $_POST['g2a_subject'] ?? 'Website Request' ) );
 	$lines   = [ 'New request from the Guns 2 Ammo website.', '', 'Request: ' . $subject, '' ];
 	$reply   = '';
+	$fields  = [];
 
 	foreach ( $_POST as $key => $value ) {
 		if ( 0 !== strpos( $key, 'g2a_f_' ) ) continue;
@@ -241,11 +248,15 @@ function g2a_handle_request() {
 		if ( '' === $clean ) continue;
 		if ( 'Email' === $label ) $reply = sanitize_email( $clean );
 		$lines[] = $label . ': ' . $clean;
+		$fields[ $label ] = $clean;
 	}
 
 	$to      = get_theme_mod( 'g2a_email', get_option( 'admin_email' ) );
 	$headers = $reply ? [ 'Reply-To: ' . $reply ] : [];
 	wp_mail( $to, 'Website Request: ' . $subject, implode( "\n", $lines ), $headers );
+
+	// Also log into the WPistic Contact Form dashboard for unified inbox.
+	g2a_capture_to_wpcf( $subject, $fields );
 
 	$back = wp_get_referer() ?: home_url( '/' );
 	wp_safe_redirect( add_query_arg( 'g2a_sent', '1', remove_query_arg( 'g2a_sent', $back ) ) . '#request' );
@@ -253,3 +264,32 @@ function g2a_handle_request() {
 }
 add_action( 'admin_post_g2a_request', 'g2a_handle_request' );
 add_action( 'admin_post_nopriv_g2a_request', 'g2a_handle_request' );
+
+/**
+ * Capture a theme form submission into the WPistic Contact Form dashboard.
+ *
+ * Single bridge so every Guns 2 Ammo theme form (reservation, sell-your-gun,
+ * transfer-request, get-support, contact, etc.) lands in WPCF's submissions
+ * list and can be replied to from one inbox. wp_mail to the admin already
+ * fires separately in the calling handler — passing notify_admin=false here
+ * prevents WPCF from sending its own duplicate notification.
+ *
+ * Silent no-op when WPistic Contact Form is not active.
+ *
+ * @param string $form_name Human-readable label shown in the WPCF list.
+ * @param array  $fields    Label => value pairs from the form.
+ */
+function g2a_capture_to_wpcf( $form_name, array $fields ) {
+	if ( ! class_exists( 'WPISTIC_CF_Capture' ) ) {
+		return 0;
+	}
+	try {
+		return ( new WPISTIC_CF_Capture() )->store( (string) $form_name, $fields, false );
+	} catch ( \Throwable $e ) {
+		// Never let a logging side-effect break the form post.
+		if ( function_exists( 'error_log' ) ) {
+			error_log( '[g2a_capture_to_wpcf] ' . $e->getMessage() );
+		}
+		return 0;
+	}
+}
