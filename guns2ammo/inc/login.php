@@ -140,6 +140,15 @@ function g2a_login_guard_wp_login() {
 	if ( defined( 'XMLRPC_REQUEST' ) || defined( 'WP_CLI' ) || wp_doing_ajax() || ( defined( 'REST_REQUEST' ) && REST_REQUEST ) ) {
 		return;
 	}
+	// CRITICAL: allow ALL POST requests through. The member login
+	// form on /login/ posts credentials to wp-login.php; bouncing
+	// those POSTs back to /login/ breaks every member sign-in.
+	// POSTs to wp-login.php are by design intentional auth attempts —
+	// either a real login or an attacker, and WP itself rate-limits
+	// + locks accounts on repeated failures, so we don't need to.
+	if ( 'POST' === strtoupper( (string) ( $_SERVER['REQUEST_METHOD'] ?? '' ) ) ) {
+		return;
+	}
 	// Allow the bypass query param (set by /g2a-admin-login/).
 	if ( ! empty( $_GET['g2a_admin_login'] ) ) {
 		// Drop a 24-hour bypass cookie so refreshes work.
@@ -152,11 +161,17 @@ function g2a_login_guard_wp_login() {
 	if ( ! empty( $_COOKIE['g2a_admin_login'] ) ) {
 		return;
 	}
-	// Allow logout actions (action=logout / loggedout) so wp_loginout()
-	// links from the admin bar continue to work cleanly even after the
-	// cookie expires.
+	// Allow the WP login-flow GET actions so failed-login redirects,
+	// password reset, and logout all land somewhere coherent instead
+	// of being silently bounced to /login/.
 	$action = isset( $_GET['action'] ) ? sanitize_key( wp_unslash( $_GET['action'] ) ) : '';
-	if ( in_array( $action, array( 'logout', 'loggedout' ), true ) ) {
+	if ( in_array( $action, array( 'logout', 'loggedout', 'lostpassword', 'rp', 'resetpass', 'postpass', 'confirm_action', 'confirmaction', 'register' ), true ) ) {
+		return;
+	}
+	// If WP signals a failed login via ?login=failed (or any value),
+	// stay on wp-login.php so the error message is shown. Without
+	// this the member would be silently kicked back to a fresh form.
+	if ( isset( $_GET['login'] ) ) {
 		return;
 	}
 	// Allow already-logged-in administrators / editors so they can
