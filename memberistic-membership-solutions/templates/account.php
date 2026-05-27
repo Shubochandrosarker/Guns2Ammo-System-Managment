@@ -683,6 +683,33 @@ $lane_url    = home_url( '/book-a-lane/' );
 .memberistic-acct-modal__body{ min-height:300px; }
 body.memberistic-modal-open{ overflow:hidden; }
 
+/* Stack the booking engine's shell when it's mounted inside the
+   modal — info card on TOP (full width), date/time/lane picker
+   BELOW (full width). The engine ships with a `g2ab-layout-stacked`
+   variant that does exactly this; we force it here regardless of
+   the global g2ab_form_layout option so the modal layout is
+   consistent. Also stretches the aside card to use the full row
+   instead of staying narrow. */
+.memberistic-acct-modal .g2ab-shell{
+  display:grid !important;
+  grid-template-columns:1fr !important;
+  gap:18px !important;
+}
+.memberistic-acct-modal .g2ab-aside,
+.memberistic-acct-modal .g2ab-stage{ width:100%; min-width:0; }
+.memberistic-acct-modal .g2ab-aside__card{ height:auto; }
+/* On wider screens, the description card doesn't need to be as
+   tall as the date picker — cap it at content height so it reads
+   as a compact intro block above the form. */
+.memberistic-acct-modal .g2ab-aside__features{ display:flex; flex-wrap:wrap; gap:14px 22px; margin-top:10px; }
+.memberistic-acct-modal .g2ab-aside__features li{ flex:0 0 auto; }
+/* Date picker calendar gets the full row width — fixes the
+   "last column cut off" issue from the screenshot. */
+.memberistic-acct-modal .g2ab-stage__panel{ min-width:0; }
+.memberistic-acct-modal .g2ab-stage table,
+.memberistic-acct-modal .g2ab-stage [class*="calendar"],
+.memberistic-acct-modal .g2ab-stage [class*="cal-"]{ width:100% !important; max-width:100% !important; }
+
 @media (max-width:760px){
   .memberistic-acct-modal{ padding:0; }
   .memberistic-acct-modal__card{ border-radius:0; min-height:100vh; padding:18px; }
