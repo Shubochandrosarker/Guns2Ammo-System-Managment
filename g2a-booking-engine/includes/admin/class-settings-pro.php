@@ -264,10 +264,40 @@ final class G2AB_Admin_Settings_Pro {
 		return false;
 	}
 
+	/**
+	 * Render a per-gateway "Some keys are locked by wp-config.php
+	 * constants" notice listing every locked option key from the
+	 * passed list. Renders nothing if none are locked.
+	 */
+	private function render_constant_lock_notice( array $option_keys ) {
+		$map    = self::secret_option_constants();
+		$locked = array();
+		foreach ( $option_keys as $opt ) {
+			if ( self::option_is_constant_locked( $opt ) ) {
+				$locked[ $opt ] = $map[ $opt ];
+			}
+		}
+		if ( empty( $locked ) ) {
+			return;
+		}
+		?>
+		<div class="g2ab-set__notice g2ab-set__notice--warn" style="margin:8px 0 14px;padding:10px 14px;border-left:4px solid #c9a84c;background:rgba(201,168,76,.08);color:#5a4a14;font-size:13px;">
+			<strong><?php esc_html_e( 'Some credentials are locked by wp-config.php constants.', 'g2a-booking' ); ?></strong>
+			<?php esc_html_e( 'The constant value always wins on read; any value you save below for these fields will be ignored.', 'g2a-booking' ); ?>
+			<ul style="margin:6px 0 0 18px;">
+				<?php foreach ( $locked as $opt => $const ) : ?>
+					<li><code><?php echo esc_html( $opt ); ?></code> ← <code><?php echo esc_html( $const ); ?></code></li>
+				<?php endforeach; ?>
+			</ul>
+		</div>
+		<?php
+	}
+
 	private function render_gateway_stripe() {
 		?>
 		<div class="g2ab-set__gw-card-detail">
 			<div class="g2ab-set__gw-detail-head"><span class="g2ab-set__gw-logo g2ab-set__gw-logo--xl" style="background:#635BFF;">S</span><div><h2>Stripe</h2><p>Get your API keys at <a href="https://dashboard.stripe.com/apikeys" target="_blank" rel="noopener">dashboard.stripe.com/apikeys</a></p></div></div>
+			<?php $this->render_constant_lock_notice( array( 'g2ab_stripe_secret_key', 'g2ab_stripe_publishable_key', 'g2ab_stripe_webhook_secret' ) ); ?>
 			<div class="g2ab-set__field"><label class="g2ab-set__check"><input type="checkbox" name="g2ab_stripe_enabled" value="1" <?php checked( 1, (int) get_option( 'g2ab_stripe_enabled', 0 ) ); ?> /> <?php esc_html_e( 'Enable Stripe', 'g2a-booking' ); ?></label></div>
 			<div class="g2ab-set__field"><label class="g2ab-set__check"><input type="checkbox" name="g2ab_stripe_test_mode" value="1" <?php checked( 1, (int) get_option( 'g2ab_stripe_test_mode', 1 ) ); ?> /> <?php esc_html_e( 'Test mode (use pk_test_/sk_test_ keys)', 'g2a-booking' ); ?></label></div>
 			<div class="g2ab-set__field"><label><?php esc_html_e( 'Publishable Key', 'g2a-booking' ); ?></label><input type="text" name="g2ab_stripe_publishable_key" value="<?php echo esc_attr( get_option( 'g2ab_stripe_publishable_key', '' ) ); ?>" placeholder="pk_live_..." /></div>
@@ -281,6 +311,7 @@ final class G2AB_Admin_Settings_Pro {
 		?>
 		<div class="g2ab-set__gw-card-detail">
 			<div class="g2ab-set__gw-detail-head"><span class="g2ab-set__gw-logo g2ab-set__gw-logo--xl" style="background:#003087;">P</span><div><h2>PayPal</h2><p>Get your REST API credentials at <a href="https://developer.paypal.com/dashboard/applications/" target="_blank" rel="noopener">developer.paypal.com</a></p></div></div>
+			<?php $this->render_constant_lock_notice( array( 'g2ab_paypal_client_id', 'g2ab_paypal_secret', 'g2ab_paypal_webhook_id' ) ); ?>
 			<div class="g2ab-set__field"><label class="g2ab-set__check"><input type="checkbox" name="g2ab_paypal_enabled" value="1" <?php checked( 1, (int) get_option( 'g2ab_paypal_enabled', 0 ) ); ?> /> <?php esc_html_e( 'Enable PayPal', 'g2a-booking' ); ?></label></div>
 			<div class="g2ab-set__field"><label class="g2ab-set__check"><input type="checkbox" name="g2ab_paypal_test_mode" value="1" <?php checked( 1, (int) get_option( 'g2ab_paypal_test_mode', 1 ) ); ?> /> <?php esc_html_e( 'Sandbox mode', 'g2a-booking' ); ?></label></div>
 			<div class="g2ab-set__field"><label><?php esc_html_e( 'Client ID', 'g2a-booking' ); ?></label><input type="text" name="g2ab_paypal_client_id" value="<?php echo esc_attr( get_option( 'g2ab_paypal_client_id', '' ) ); ?>" /></div>
@@ -294,6 +325,7 @@ final class G2AB_Admin_Settings_Pro {
 		?>
 		<div class="g2ab-set__gw-card-detail">
 			<div class="g2ab-set__gw-detail-head"><span class="g2ab-set__gw-logo g2ab-set__gw-logo--xl" style="background:#0F4C75;">F</span><div><h2>Fortis Pay</h2><p>Get credentials at <a href="https://docs.fortispay.com/" target="_blank" rel="noopener">docs.fortispay.com</a> · 3-header auth (user-id, user-api-key, developer-id)</p></div></div>
+			<?php $this->render_constant_lock_notice( array( 'g2ab_fortis_user_id', 'g2ab_fortis_user_api_key', 'g2ab_fortis_developer_id', 'g2ab_fortis_hmac_secret', 'g2ab_fortis_webhook_secret' ) ); ?>
 			<div class="g2ab-set__field"><label class="g2ab-set__check"><input type="checkbox" name="g2ab_fortis_enabled" value="1" <?php checked( 1, (int) get_option( 'g2ab_fortis_enabled', 0 ) ); ?> /> <?php esc_html_e( 'Enable Fortis Pay', 'g2a-booking' ); ?></label></div>
 			<div class="g2ab-set__field"><label class="g2ab-set__check"><input type="checkbox" name="g2ab_fortis_test_mode" value="1" <?php checked( 1, (int) get_option( 'g2ab_fortis_test_mode', 1 ) ); ?> /> <?php esc_html_e( 'Sandbox mode', 'g2a-booking' ); ?></label></div>
 			<div class="g2ab-set__field"><label><?php esc_html_e( 'User ID', 'g2a-booking' ); ?></label><input type="text" name="g2ab_fortis_user_id" value="<?php echo esc_attr( get_option( 'g2ab_fortis_user_id', '' ) ); ?>" /><small><?php esc_html_e( 'Your merchant user ID from Fortis.', 'g2a-booking' ); ?></small></div>
@@ -309,6 +341,7 @@ final class G2AB_Admin_Settings_Pro {
 		?>
 		<div class="g2ab-set__gw-card-detail">
 			<div class="g2ab-set__gw-detail-head"><span class="g2ab-set__gw-logo g2ab-set__gw-logo--xl" style="background:#1F3864;">A</span><div><h2>Authorize.net</h2><p>Get credentials at <a href="https://account.authorize.net/" target="_blank" rel="noopener">account.authorize.net</a></p></div></div>
+			<?php $this->render_constant_lock_notice( array( 'g2ab_authnet_login_id', 'g2ab_authnet_transaction_key', 'g2ab_authnet_signature_key' ) ); ?>
 			<div class="g2ab-set__field"><label class="g2ab-set__check"><input type="checkbox" name="g2ab_authnet_enabled" value="1" <?php checked( 1, (int) get_option( 'g2ab_authnet_enabled', 0 ) ); ?> /> <?php esc_html_e( 'Enable Authorize.net', 'g2a-booking' ); ?></label></div>
 			<div class="g2ab-set__field"><label class="g2ab-set__check"><input type="checkbox" name="g2ab_authnet_test_mode" value="1" <?php checked( 1, (int) get_option( 'g2ab_authnet_test_mode', 1 ) ); ?> /> <?php esc_html_e( 'Sandbox mode', 'g2a-booking' ); ?></label></div>
 			<div class="g2ab-set__field"><label><?php esc_html_e( 'API Login ID', 'g2a-booking' ); ?></label><input type="text" name="g2ab_authnet_login_id" value="<?php echo esc_attr( get_option( 'g2ab_authnet_login_id', '' ) ); ?>" /></div>
@@ -616,6 +649,47 @@ final class G2AB_Admin_Settings_Pro {
 	/* ============================================================ */
 	/*  SAVE HANDLER                                                */
 	/* ============================================================ */
+	/**
+	 * Map of gateway-secret option keys → the wp-config.php constant
+	 * name that overrides them. Used by the UI to show "Locked by
+	 * constant" indicators AND by handle_save() to refuse writing the
+	 * stored option when the constant is in force (otherwise the admin
+	 * thinks they saved a value but the constant always wins on read).
+	 *
+	 * Filterable so future gateways can register their own.
+	 */
+	public static function secret_option_constants() {
+		return apply_filters( 'g2ab_secret_option_constants', array(
+			'g2ab_stripe_secret_key'         => 'G2AB_STRIPE_SECRET',
+			'g2ab_stripe_publishable_key'    => 'G2AB_STRIPE_PUBLISHABLE',
+			'g2ab_stripe_webhook_secret'     => 'G2AB_STRIPE_WEBHOOK_SECRET',
+			'g2ab_paypal_client_id'          => 'G2AB_PAYPAL_CLIENT_ID',
+			'g2ab_paypal_secret'             => 'G2AB_PAYPAL_SECRET',
+			'g2ab_paypal_webhook_id'         => 'G2AB_PAYPAL_WEBHOOK_ID',
+			'g2ab_fortis_user_id'            => 'G2AB_FORTIS_USER_ID',
+			'g2ab_fortis_user_api_key'       => 'G2AB_FORTIS_USER_API_KEY',
+			'g2ab_fortis_developer_id'       => 'G2AB_FORTIS_DEVELOPER_ID',
+			'g2ab_fortis_hmac_secret'        => 'G2AB_FORTIS_HMAC_SECRET',
+			'g2ab_fortis_webhook_secret'     => 'G2AB_FORTIS_WEBHOOK_SECRET',
+			'g2ab_authnet_login_id'          => 'G2AB_AUTHNET_LOGIN',
+			'g2ab_authnet_transaction_key'   => 'G2AB_AUTHNET_KEY',
+			'g2ab_authnet_signature_key'     => 'G2AB_AUTHNET_SIGNATURE_KEY',
+		) );
+	}
+
+	/**
+	 * True when the matching wp-config.php constant for this option
+	 * key is defined to a non-empty value.
+	 */
+	public static function option_is_constant_locked( $option_key ) {
+		$map = self::secret_option_constants();
+		if ( ! isset( $map[ $option_key ] ) ) {
+			return false;
+		}
+		$const = $map[ $option_key ];
+		return defined( $const ) && '' !== (string) constant( $const );
+	}
+
 	public function handle_save() {
 		if ( ! current_user_can( 'manage_g2ab_settings' ) ) wp_die( 'No permission.' );
 		check_admin_referer( 'g2ab_save_settings_pro', '_g2ab_nonce' );
@@ -625,6 +699,12 @@ final class G2AB_Admin_Settings_Pro {
 		foreach ( $_POST as $k => $v ) {
 			if ( 0 !== strpos( $k, 'g2ab_' ) ) continue;
 			if ( in_array( $k, array( 'g2ab_save_settings_pro', '_g2ab_nonce' ), true ) ) continue;
+			// Refuse to overwrite a gateway secret when the wp-config.php
+			// constant is in force. The constant always wins on read,
+			// so persisting the option silently would mislead the admin.
+			if ( self::option_is_constant_locked( $k ) ) {
+				continue;
+			}
 
 			// Determine sanitization based on key prefix/type.
 			if ( in_array( $k, array( 'g2ab_admin_notification_email', 'g2ab_email_from_address' ), true ) ) {
