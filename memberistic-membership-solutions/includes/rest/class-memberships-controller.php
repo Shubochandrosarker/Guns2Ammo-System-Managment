@@ -946,11 +946,59 @@ final class Memberships_Controller extends REST_Controller {
 			return new \WP_Error( 'memberistic_membership_not_found', __( 'Membership not found.', 'memberistic' ), array( 'status' => 404 ) );
 		}
 
-		$data = array();
-		foreach ( array( 'plan_id', 'billing_cycle', 'status', 'start_date', 'renewal_date', 'end_date', 'cancelled_at', 'notes', 'primary_user_id', 'payment_source', 'stripe_customer_id', 'stripe_subscription_id', 'woo_customer_id', 'woo_subscription_id', 'pos_customer_id' ) as $field ) {
-			if ( array_key_exists( $field, $params ) ) {
-				$data[ $field ] = $params[ $field ];
+		// Audit C11: previously this loop accepted every field including
+		// stripe_customer_id, stripe_subscription_id, woo_subscription_id,
+		// pos_customer_id, primary_user_id — which let any caller with
+		// the manage_members capability (incl. memberistic_staff) rewrite
+		// a membership's Stripe linkage and hijack it.
+		//
+		// The fields below are the ONLY ones safe to update from a UI
+		// edit. Stripe / WooCommerce / POS identity fields are written
+		// only by their respective webhook handlers (which verify the
+		// request is genuinely from the upstream provider) and are
+		// removed from the allow-list here. primary_user_id is also
+		// removed — re-parenting a membership to a different WP user
+		// must go through the dedicated /memberships/{id}/people
+		// endpoints, which audit-trail the change properly.
+		$allowed_fields = array(
+			'plan_id',
+			'billing_cycle',
+			'status',
+			'start_date',
+			'renewal_date',
+			'end_date',
+			'cancelled_at',
+			'notes',
+			'payment_source',
+		);
+		$allowed_fields = apply_filters( 'memberistic_membership_updatable_fields', $allowed_fields );
+
+		$data            = array();
+		$rejected_fields = array();
+		foreach ( $params as $key => $value ) {
+			if ( in_array( $key, array( 'id', 'membership_id' ), true ) ) {
+				continue; // route param, ignore
 			}
+			if ( in_array( $key, $allowed_fields, true ) ) {
+				$data[ $key ] = $value;
+			} else {
+				$rejected_fields[] = $key;
+			}
+		}
+
+		// If the caller tried to write any locked field, refuse the
+		// whole request so they get a clear signal rather than silent
+		// partial success.
+		if ( ! empty( $rejected_fields ) ) {
+			return new \WP_Error(
+				'memberistic_membership_update_forbidden_field',
+				sprintf(
+					/* translators: %s = comma-separated field names */
+					__( 'These fields cannot be updated via this endpoint: %s.', 'memberistic' ),
+					implode( ', ', $rejected_fields )
+				),
+				array( 'status' => 400, 'forbidden_fields' => $rejected_fields )
+			);
 		}
 
 		\WordPressistic\Memberistic\Database\Memberships_Repository::update( $id, $data );
