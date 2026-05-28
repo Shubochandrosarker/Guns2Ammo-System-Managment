@@ -2,6 +2,23 @@
 
 All notable changes are tracked here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## 1.33.0 — Automatic Guest members for non-members
+
+Non-members are now remembered. Anyone who books a range lane or buys a product without a membership level is saved automatically as a **Guest member** — with their own WordPress login account, a Digital Card with dynamic QR, a waiver request, and their contact details on file — so the next visit the front desk can pull them up by QR scan and their information persists.
+
+### Added
+
+- **Auto Guest enrollment from WooCommerce purchases.** `Corporate_Guest_Service::maybe_enroll_from_wc_order()` hooks `woocommerce_payment_complete` + `woocommerce_order_status_completed/processing`. Any buyer whose billing email has no membership is enrolled on the hidden Guest Pass plan (login account + QR Digital Card + waiver email). Membership/group-invoice orders are skipped (they are not product sales), and orders without an email are skipped.
+- **Auto Guest enrollment from range bookings.** `Corporate_Guest_Service::maybe_enroll_from_booking()` hooks both `g2ab_booking_created` (passes a booking id) and `g2ab_booking_paid` (passes the booking row). The handler normalizes either payload, reads `customer_name` / `customer_email` / `customer_phone`, and enrolls the booker as a Guest member if they are not already a member.
+
+### Changed
+
+- **Idempotent by design.** A new `email_has_membership()` guard means existing members and existing guests are never re-enrolled and never re-emailed on repeat purchases or bookings. A booker/buyer with no name falls back to the email local-part so a card can always be issued.
+
+### Notes
+
+- No DB schema changes — guests reuse the existing membership, person, waiver, check-in, and QR verification infrastructure.
+
 ## 1.10.0 — Operations dashboard release
 
 A broad admin operations upgrade: pagination, KPI cards across every list page, a card-based Plans console, a permissive importer that never drops a row, and a React-rebuilt Email Directory.

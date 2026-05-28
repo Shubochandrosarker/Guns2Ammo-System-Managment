@@ -3,7 +3,7 @@
  * Plugin Name: Memberistic Membership Solutions
  * Plugin URI: https://www.wordpressistic.com
  * Description: A modern membership operations engine for service businesses. Co-developed by WordPressistic and launch partner Guns 2 Ammo (https://guns2ammo.com), a US-based indoor shooting range and firearms retail business.
- * Version: 1.22.0
+ * Version: 1.33.0
  * Author: WordPressistic, in partnership with Guns 2 Ammo
  * Author URI: https://www.wordpressistic.com
  * Text Domain: memberistic
@@ -17,7 +17,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-define( 'MEMBERISTIC_VERSION', '1.13.0' );
+define( 'MEMBERISTIC_VERSION', '1.33.0' );
 define( 'MEMBERISTIC_DB_VERSION', '1.2.0' );
 define( 'MEMBERISTIC_FILE', __FILE__ );
 define( 'MEMBERISTIC_PATH', plugin_dir_path( __FILE__ ) );

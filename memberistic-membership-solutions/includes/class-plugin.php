@@ -226,6 +226,7 @@ final class Plugin {
 				'window.memberisticMembersSettings = ' . wp_json_encode(
 					array(
 						'addNewUrl'         => admin_url( 'admin.php?page=memberistic-members&action=add' ),
+						'corporateNewUrl'   => admin_url( 'admin.php?page=memberistic-corporate-groups&view=new' ),
 						'canCreate'         => current_user_can( 'create_memberistic_members' ) || current_user_can( 'manage_options' ),
 						'initialAction'     => $action,
 						'initialSelectedId' => isset( $_GET['id'] ) ? absint( $_GET['id'] ) : 0, // phpcs:ignore WordPress.Security.NonceVerification.Recommended

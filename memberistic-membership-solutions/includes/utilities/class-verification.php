@@ -123,6 +123,10 @@ final class Verification {
 
 		$membership = \WordPressistic\Memberistic\Database\Memberships_Repository::get_by_user_id( $user_id );
 
+		// Let staff tools (e.g. the corporate check-in module) handle a
+		// POSTed check-in action before the card renders.
+		do_action( 'memberistic_verify_request', $user, $membership, $token );
+
 		self::render_card( $user, $membership );
 	}
 
@@ -197,6 +201,12 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-
 	</div>
 	<div class="footer"><?php echo esc_html( wp_date( 'Y-m-d H:i' ) ); ?> · <?php esc_html_e( 'Live verification', 'memberistic' ); ?></div>
 </div>
+<?php
+	// Staff-only check-in panel attaches here (corporate module).
+	// Public/no-PII viewers see nothing extra; logged-in staff with
+	// the check-in capability get member details + a Check In button.
+	do_action( 'memberistic_verify_card_after', $user, $membership );
+	?>
 </body>
 </html>
 <?php

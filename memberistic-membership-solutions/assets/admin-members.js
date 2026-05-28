@@ -1235,6 +1235,17 @@
 		function runBulk() {
 			if (!bulkAction || !selectedIds.length) return;
 
+			if (bulkAction === 'create_group') {
+				// Hand the selected memberships to the Corporate Groups
+				// "Create Group" screen, which pre-fills seats + attaches
+				// these existing members once the group is created.
+				const ids = selectedIds.join(',');
+				const url = (settings.corporateNewUrl || (window.location.origin + '/wp-admin/admin.php?page=memberistic-corporate-groups&view=new'))
+					+ '&from_members=' + encodeURIComponent(ids);
+				window.location.href = url;
+				return;
+			}
+
 			if (bulkAction === 'export') {
 				const map = {};
 				members.forEach(function (m) { map[m.id] = m; });
@@ -1436,6 +1447,7 @@
 						h('option', { value: 'renew' }, __('Renew memberships', 'memberistic')),
 						h('option', { value: 'cancel' }, __('Cancel memberships', 'memberistic')),
 						h('option', { value: 'waiver' }, __('Change waiver status…', 'memberistic')),
+						h('option', { value: 'create_group' }, __('Create corporate group from selected', 'memberistic')),
 						h('option', { value: 'export' }, __('Export to CSV', 'memberistic'))
 					),
 					bulkAction === 'waiver'

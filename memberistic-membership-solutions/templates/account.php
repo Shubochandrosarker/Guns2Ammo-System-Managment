@@ -163,6 +163,14 @@ $lane_url    = home_url( '/book-a-lane/' );
 				</div>
 			</section>
 
+			<?php
+			/**
+			 * Corporate Groups portal injection (Phase 6). Owner self-
+			 * service view is gated by a per-group admin toggle.
+			 */
+			do_action( 'memberistic_account_dashboard_end', $user );
+			?>
+
 			<!-- BOOK A LANE — the tab acts as a "Reserve your lane" hero;
 			     the actual booking form lives in a full-screen modal so
 			     it has room to render its two-column date/lane layout
