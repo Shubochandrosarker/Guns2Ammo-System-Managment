@@ -457,28 +457,105 @@ final class Corporate_Admin {
 	}
 
 	public static function assets( $hook ) {
-		if ( false === strpos( (string) $hook, self::PAGE ) ) {
+		// Covers both the Corporate Groups page AND the Corporate
+		// Reports page (both share the .g2a-corp-wrap shell).
+		if ( false === strpos( (string) $hook, 'corporate' ) ) {
 			return;
 		}
-		// Lean inline styling — tactical-luxury dark cards. No extra
-		// asset request for Phase 1.
-		$css = '
-		.g2a-corp-wrap{max-width:1100px;}
-		.g2a-corp-badge{display:inline-block;padding:3px 10px;border-radius:999px;font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;}
-		.g2a-corp-badge.active{background:rgba(157,224,91,.15);color:#5a8a2c;border:1px solid rgba(157,224,91,.5);}
-		.g2a-corp-badge.pending{background:rgba(232,128,47,.15);color:#b5611f;border:1px solid rgba(232,128,47,.5);}
-		.g2a-corp-badge.expired,.g2a-corp-badge.cancelled{background:rgba(150,150,150,.15);color:#777;border:1px solid #ccc;}
-		.g2a-corp-badge.paid{background:rgba(157,224,91,.15);color:#5a8a2c;border:1px solid rgba(157,224,91,.5);}
-		.g2a-corp-badge.unpaid{background:rgba(232,80,80,.12);color:#b53030;border:1px solid rgba(232,80,80,.4);}
-		.g2a-corp-badge.partial,.g2a-corp-badge.deposit{background:rgba(232,128,47,.15);color:#b5611f;border:1px solid rgba(232,128,47,.5);}
-		.g2a-corp-card{background:#fff;border:1px solid #dcdcde;border-radius:6px;padding:20px 24px;margin:16px 0;}
-		.g2a-corp-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px;}
-		.g2a-corp-field label{display:block;font-weight:600;margin:0 0 4px;}
-		.g2a-corp-field input,.g2a-corp-field select,.g2a-corp-field textarea{width:100%;}
-		';
+		$css = self::admin_css();
 		wp_register_style( 'memberistic-corp-inline', false );
 		wp_enqueue_style( 'memberistic-corp-inline' );
 		wp_add_inline_style( 'memberistic-corp-inline', $css );
+	}
+
+	/**
+	 * Premium tactical-luxury admin styling for the Corporate
+	 * console: animated tabs, lifting cards, clean fields + focus
+	 * rings, refined status badges, and a proper toggle for the
+	 * owner-portal checkbox (which previously stretched to 100%
+	 * width and rendered as a broken bar).
+	 */
+	private static function admin_css() {
+		return <<<CSS
+		/* ===== Palette + shell ===== */
+		.g2a-corp-wrap{--g2a-ink:#0F1115;--g2a-panel:#161A21;--g2a-line:#E2E1E4;--g2a-brass:#C9A84C;--g2a-brass-d:#A8862F;--g2a-ember:#E8802F;--g2a-ok:#5a8a2c;--g2a-okbg:rgba(157,224,91,.16);--g2a-warnbg:rgba(232,128,47,.14);--g2a-nobg:rgba(232,80,80,.12);--g2a-muted:#646970;max-width:1180px;}
+		.g2a-corp-wrap h1{font-size:26px;font-weight:700;letter-spacing:-.01em;color:var(--g2a-ink);display:flex;align-items:center;gap:12px;}
+		.g2a-corp-wrap .page-title-action{border-radius:6px!important;border:1px solid var(--g2a-brass)!important;background:var(--g2a-brass)!important;color:#1a1408!important;font-weight:600!important;transition:transform .15s ease,box-shadow .15s ease,background .15s ease;}
+		.g2a-corp-wrap .page-title-action:hover{background:var(--g2a-brass-d)!important;transform:translateY(-1px);box-shadow:0 6px 16px rgba(168,134,47,.3);}
+		.g2a-corp-wrap > p.description{color:var(--g2a-muted);font-size:13.5px;margin:6px 0 4px;}
+
+		/* ===== Animated nav tabs ===== */
+		.g2a-corp-wrap .nav-tab-wrapper{border-bottom:1px solid var(--g2a-line);display:flex;gap:2px;padding:0;margin:18px 0 0;}
+		.g2a-corp-wrap .nav-tab{position:relative;background:transparent;border:0;margin:0;padding:13px 20px;font-size:13.5px;font-weight:600;color:var(--g2a-muted);border-radius:8px 8px 0 0;transition:color .2s ease,background .2s ease;overflow:hidden;}
+		.g2a-corp-wrap .nav-tab:hover{color:var(--g2a-ink);background:rgba(201,168,76,.07);}
+		.g2a-corp-wrap .nav-tab::after{content:"";position:absolute;left:14px;right:14px;bottom:0;height:3px;border-radius:3px 3px 0 0;background:var(--g2a-brass);transform:scaleX(0);transform-origin:center;transition:transform .28s cubic-bezier(.4,0,.2,1);}
+		.g2a-corp-wrap .nav-tab-active,.g2a-corp-wrap .nav-tab-active:focus{color:var(--g2a-ink);background:#fff;box-shadow:none;}
+		.g2a-corp-wrap .nav-tab-active::after{transform:scaleX(1);}
+
+		/* ===== Cards (lift on hover) ===== */
+		.g2a-corp-card{background:#fff;border:1px solid var(--g2a-line);border-radius:12px;padding:22px 24px;margin:18px 0;box-shadow:0 1px 2px rgba(16,17,21,.04);transition:transform .2s cubic-bezier(.4,0,.2,1),box-shadow .2s ease,border-color .2s ease;}
+		.g2a-corp-card:hover{transform:translateY(-2px);box-shadow:0 12px 30px rgba(16,17,21,.08);border-color:#d3cdbb;}
+		.g2a-corp-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:16px;}
+		.g2a-corp-grid .g2a-corp-card{margin:0;animation:g2aCardIn .4s cubic-bezier(.4,0,.2,1) both;}
+		.g2a-corp-grid .g2a-corp-card:nth-child(2){animation-delay:.05s;}
+		.g2a-corp-grid .g2a-corp-card:nth-child(3){animation-delay:.1s;}
+		.g2a-corp-grid .g2a-corp-card:nth-child(4){animation-delay:.15s;}
+		.g2a-corp-grid .g2a-corp-card:nth-child(5){animation-delay:.2s;}
+		.g2a-corp-grid .g2a-corp-card:nth-child(6){animation-delay:.25s;}
+		@keyframes g2aCardIn{from{opacity:0;transform:translateY(10px);}to{opacity:1;transform:translateY(0);}}
+		/* Stat-card numbers (overview + reports) */
+		.g2a-corp-card .description{text-transform:uppercase;letter-spacing:.1em;font-size:10.5px!important;color:var(--g2a-muted)!important;font-weight:600;}
+		.g2a-corp-card > div[style*="font-size:24px"],.g2a-corp-card > div[style*="font-size:26px"]{color:var(--g2a-ink);}
+
+		/* ===== Forms ===== */
+		.g2a-corp-field{margin:0 0 4px;}
+		.g2a-corp-field label{display:block;font-weight:600;color:var(--g2a-ink);margin:0 0 6px;font-size:13px;}
+		.g2a-corp-field input:not([type=checkbox]):not([type=radio]),
+		.g2a-corp-field select,
+		.g2a-corp-field textarea{width:100%;border:1px solid var(--g2a-line);border-radius:8px;padding:9px 12px;font-size:14px;background:#fff;transition:border-color .15s ease,box-shadow .15s ease;box-shadow:none;}
+		.g2a-corp-field input:not([type=checkbox]):focus,
+		.g2a-corp-field select:focus,
+		.g2a-corp-field textarea:focus{border-color:var(--g2a-brass);box-shadow:0 0 0 3px rgba(201,168,76,.18);outline:none;}
+
+		/* ===== Owner-portal toggle (was a broken full-width red bar) ===== */
+		.g2a-corp-wrap input[type=checkbox]{appearance:none;-webkit-appearance:none;width:44px!important;height:24px;min-width:44px;border-radius:999px;background:#cfcfd4;border:0;position:relative;cursor:pointer;transition:background .2s ease;margin:0;flex:0 0 44px;box-shadow:none;}
+		.g2a-corp-wrap input[type=checkbox]::before{content:"";position:absolute;top:2px;left:2px;width:20px;height:20px;border-radius:50%;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.3);transition:transform .2s cubic-bezier(.4,0,.2,1);}
+		.g2a-corp-wrap input[type=checkbox]:checked{background:var(--g2a-brass);}
+		.g2a-corp-wrap input[type=checkbox]:checked::before{transform:translateX(20px);}
+		.g2a-corp-wrap input[type=checkbox]:focus{box-shadow:0 0 0 3px rgba(201,168,76,.25);}
+
+		/* ===== Status badges ===== */
+		.g2a-corp-badge{display:inline-block;padding:4px 11px;border-radius:999px;font-size:11px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;line-height:1.4;}
+		.g2a-corp-badge.active,.g2a-corp-badge.paid{background:var(--g2a-okbg);color:var(--g2a-ok);border:1px solid rgba(157,224,91,.55);}
+		.g2a-corp-badge.pending,.g2a-corp-badge.partial,.g2a-corp-badge.deposit{background:var(--g2a-warnbg);color:#b5611f;border:1px solid rgba(232,128,47,.5);}
+		.g2a-corp-badge.expired,.g2a-corp-badge.cancelled{background:rgba(120,120,120,.12);color:#777;border:1px solid #d0d0d3;}
+		.g2a-corp-badge.unpaid{background:var(--g2a-nobg);color:#b53030;border:1px solid rgba(232,80,80,.45);}
+
+		/* ===== Tables ===== */
+		.g2a-corp-wrap .wp-list-table{border:1px solid var(--g2a-line);border-radius:12px;overflow:hidden;box-shadow:0 1px 2px rgba(16,17,21,.04);}
+		.g2a-corp-wrap .wp-list-table thead th{background:#FAF7EF;color:var(--g2a-ink);font-size:11px;letter-spacing:.08em;text-transform:uppercase;border-bottom:1px solid var(--g2a-line);padding:13px 14px;}
+		.g2a-corp-wrap .wp-list-table tbody td{padding:13px 14px;border-bottom:1px solid #f0eff2;vertical-align:middle;}
+		.g2a-corp-wrap .wp-list-table tbody tr{transition:background .15s ease;}
+		.g2a-corp-wrap .wp-list-table tbody tr:hover{background:rgba(201,168,76,.05);}
+		.g2a-corp-wrap .wp-list-table tbody tr:last-child td{border-bottom:0;}
+		.g2a-corp-wrap .wp-list-table a{color:var(--g2a-brass-d);font-weight:600;text-decoration:none;}
+		.g2a-corp-wrap .wp-list-table a:hover{color:var(--g2a-ember);text-decoration:underline;}
+
+		/* ===== Buttons ===== */
+		.g2a-corp-wrap .button-primary{background:var(--g2a-brass)!important;border-color:var(--g2a-brass-d)!important;color:#1a1408!important;border-radius:8px!important;font-weight:600!important;box-shadow:none!important;transition:transform .15s ease,box-shadow .15s ease,background .15s ease;padding:4px 18px!important;height:auto!important;line-height:2!important;}
+		.g2a-corp-wrap .button-primary:hover{background:var(--g2a-brass-d)!important;transform:translateY(-1px);box-shadow:0 6px 16px rgba(168,134,47,.3);}
+		.g2a-corp-wrap .button-small{border-radius:6px!important;transition:border-color .15s ease,color .15s ease,background .15s ease;}
+		.g2a-corp-wrap .button-small:hover{border-color:var(--g2a-brass)!important;color:var(--g2a-brass-d)!important;}
+
+		/* ===== Headings + section spacing ===== */
+		.g2a-corp-wrap h2{font-size:17px;font-weight:700;color:var(--g2a-ink);margin:30px 0 10px;}
+		.g2a-corp-wrap h3{font-size:14px;font-weight:700;color:var(--g2a-ink);margin:0 0 10px;}
+		.g2a-corp-wrap > a[href*="page=memberistic-corporate"]{display:inline-block;margin:8px 0;color:var(--g2a-brass-d);font-weight:600;text-decoration:none;}
+
+		@media (prefers-reduced-motion: reduce){
+			.g2a-corp-wrap *{animation:none!important;transition:none!important;}
+		}
+CSS;
 	}
 
 	/**
