@@ -73,6 +73,7 @@ final class Plugin {
 			'includes/rest/class-records-controller.php',
 			'includes/rest/class-saved-views-controller.php',
 			'includes/rest/class-settings-controller.php',
+			'includes/corporate/class-corporate-module.php',
 		);
 
 		foreach ( $files as $file ) {
@@ -105,6 +106,9 @@ final class Plugin {
 		// Register Verification before `init` fires so its priority-5 init
 		// hook actually lands in the queue before WP processes priority 5.
 		Utilities\Verification::register();
+
+		// Corporate / Group Membership module (Phase 1).
+		Corporate\Corporate_Module::register();
 		add_action( 'rest_api_init', array( $this, 'register_rest_routes' ) );
 	}
 
