@@ -43,11 +43,19 @@ final class Corporate_Module {
 		add_action( 'admin_init', array( __CLASS__, 'maybe_install' ) );
 		// Capabilities onto admin/staff roles.
 		add_action( 'admin_init', array( Corporate_Capabilities::class, 'maybe_assign' ) );
+		// Phase 2 — branded email template + merge tags for group members.
+		add_filter( 'memberistic_email_template_subject', array( Corporate_Emails::class, 'subject' ), 10, 3 );
+		add_filter( 'memberistic_email_template_body',    array( Corporate_Emails::class, 'body' ),    10, 3 );
+		add_filter( 'memberistic_email_merge_tags',       array( Corporate_Emails::class, 'merge_tags' ), 10, 4 );
 		// Admin UI.
 		if ( is_admin() ) {
 			add_action( 'admin_menu', array( Corporate_Admin::class, 'menu' ), 30 );
 			add_action( 'admin_post_memberistic_corp_create', array( Corporate_Admin::class, 'handle_create' ) );
 			add_action( 'admin_post_memberistic_corp_update', array( Corporate_Admin::class, 'handle_update' ) );
+			add_action( 'admin_post_memberistic_corp_add_member',  array( Corporate_Admin::class, 'handle_add_member' ) );
+			add_action( 'admin_post_memberistic_corp_bulk_members', array( Corporate_Admin::class, 'handle_bulk_members' ) );
+			add_action( 'admin_post_memberistic_corp_remove_member', array( Corporate_Admin::class, 'handle_remove_member' ) );
+			add_action( 'admin_post_memberistic_corp_resend',       array( Corporate_Admin::class, 'handle_resend' ) );
 			add_action( 'admin_enqueue_scripts', array( Corporate_Admin::class, 'assets' ) );
 		}
 	}
@@ -498,7 +506,7 @@ final class Corporate_Admin {
 		<?php
 	}
 
-	private static function render_form( $group = null ) {
+	private static function render_form( $group = null, $wrap = true ) {
 		$is_edit = ( $group instanceof \stdClass );
 		$action  = $is_edit ? 'memberistic_corp_update' : 'memberistic_corp_create';
 		$nonce   = $is_edit ? 'memberistic_corp_update_' . (int) $group->id : 'memberistic_corp_create';
@@ -506,10 +514,13 @@ final class Corporate_Admin {
 		$val     = function ( $field, $default = '' ) use ( $group, $is_edit ) {
 			return $is_edit && isset( $group->$field ) ? $group->$field : $default;
 		};
-		?>
+		// $wrap=false when rendered inside the tabbed single-group view
+		// (which already opened .wrap + heading), to avoid nesting.
+		if ( $wrap ) : ?>
 		<div class="wrap g2a-corp-wrap">
 			<h1><?php echo $is_edit ? esc_html__( 'Edit Corporate Group', 'memberistic' ) : esc_html__( 'Create Corporate Group', 'memberistic' ); ?></h1>
 			<a href="<?php echo esc_url( $back ); ?>">&larr; <?php esc_html_e( 'Back to all groups', 'memberistic' ); ?></a>
+		<?php endif; ?>
 
 			<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" class="g2a-corp-card">
 				<input type="hidden" name="action" value="<?php echo esc_attr( $action ); ?>">
@@ -619,7 +630,9 @@ final class Corporate_Admin {
 					<button type="submit" class="button button-primary"><?php echo $is_edit ? esc_html__( 'Save Changes', 'memberistic' ) : esc_html__( 'Create Group', 'memberistic' ); ?></button>
 				</p>
 			</form>
+		<?php if ( $wrap ) : ?>
 		</div>
+		<?php endif; ?>
 		<?php
 	}
 
@@ -630,10 +643,126 @@ final class Corporate_Admin {
 			echo '<div class="wrap"><p>' . esc_html__( 'Group not found.', 'memberistic' ) . '</p></div>';
 			return;
 		}
-		// Phase 1 single view == the edit form prefilled. Tabs for
-		// Members / Payments / Waivers / QR / Emails / Activity land
-		// in later phases (see plan doc).
-		self::render_form( $group );
+		$tab = isset( $_GET['tab'] ) ? sanitize_key( wp_unslash( $_GET['tab'] ) ) : 'overview'; // phpcs:ignore WordPress.Security.NonceVerification.Recommended
+		$base = admin_url( 'admin.php?page=' . self::PAGE . '&view=single&id=' . (int) $id );
+		$tabs = array(
+			'overview' => __( 'Overview', 'memberistic' ),
+			'members'  => __( 'Members', 'memberistic' ),
+			'settings' => __( 'Settings', 'memberistic' ),
+		);
+		echo '<div class="wrap g2a-corp-wrap">';
+		echo '<h1>' . esc_html( $group->group_name ?: ( '#' . $id ) ) . '</h1>';
+		echo '<a href="' . esc_url( admin_url( 'admin.php?page=' . self::PAGE ) ) . '">&larr; ' . esc_html__( 'All groups', 'memberistic' ) . '</a>';
+		echo '<h2 class="nav-tab-wrapper" style="margin-top:14px;">';
+		foreach ( $tabs as $key => $label ) {
+			$cls = 'nav-tab' . ( $tab === $key ? ' nav-tab-active' : '' );
+			echo '<a class="' . esc_attr( $cls ) . '" href="' . esc_url( add_query_arg( 'tab', $key, $base ) ) . '">' . esc_html( $label ) . '</a>';
+		}
+		echo '</h2>';
+
+		if ( 'members' === $tab ) {
+			self::render_members_tab( $group );
+		} elseif ( 'settings' === $tab ) {
+			echo '<div style="margin-top:18px;"></div>';
+			self::render_form( $group, false );
+		} else {
+			self::render_overview_tab( $group );
+		}
+		echo '</div>';
+	}
+
+	private static function render_overview_tab( $group ) {
+		$used  = Corporate_Members_Repository::active_count( $group->id );
+		$paid  = Corporate_Groups_Repository::paid_total( $group->id );
+		$payer = $group->primary_user_id ? get_userdata( $group->primary_user_id ) : null;
+		$cards = array(
+			array( __( 'Seats used', 'memberistic' ), $used . ' / ' . (int) $group->seats_total ),
+			array( __( 'Max future seats', 'memberistic' ), (int) $group->max_future_seats ),
+			array( __( 'Amount paid', 'memberistic' ), '$' . number_format( $paid, 2 ) ),
+			array( __( 'Custom price', 'memberistic' ), '$' . number_format( (float) $group->custom_price, 2 ) ),
+			array( __( 'Payment status', 'memberistic' ), ucfirst( $group->payment_status ) ),
+			array( __( 'Group status', 'memberistic' ), ucfirst( $group->status ) ),
+		);
+		echo '<div class="g2a-corp-grid" style="margin-top:18px;">';
+		foreach ( $cards as $c ) {
+			echo '<div class="g2a-corp-card"><div class="description" style="text-transform:uppercase;letter-spacing:.08em;font-size:11px;">' . esc_html( $c[0] ) . '</div><div style="font-size:24px;font-weight:700;margin-top:6px;">' . esc_html( $c[1] ) . '</div></div>';
+		}
+		echo '</div>';
+		echo '<p style="margin-top:12px;">' . esc_html__( 'Primary payer:', 'memberistic' ) . ' <strong>' . ( $payer ? esc_html( $payer->display_name . ' (' . $payer->user_email . ')' ) : '&mdash;' ) . '</strong></p>';
+		if ( $group->admin_notes ) {
+			echo '<div class="g2a-corp-card"><strong>' . esc_html__( 'Internal notes', 'memberistic' ) . '</strong><p>' . nl2br( esc_html( $group->admin_notes ) ) . '</p></div>';
+		}
+	}
+
+	private static function render_members_tab( $group ) {
+		$members  = Corporate_Members_Repository::for_group( $group->id );
+		$used     = count( $members );
+		$seats    = (int) $group->seats_total;
+		$full     = $used >= $seats;
+		$notice   = isset( $_GET['m_added'] ) ? (int) $_GET['m_added'] : -1; // phpcs:ignore WordPress.Security.NonceVerification.Recommended
+		$skipped  = isset( $_GET['m_skipped'] ) ? (int) $_GET['m_skipped'] : 0; // phpcs:ignore WordPress.Security.NonceVerification.Recommended
+		?>
+		<?php if ( $notice >= 0 ) : ?>
+			<div class="notice notice-success is-dismissible"><p><?php printf( esc_html__( '%1$d member(s) added. %2$d skipped.', 'memberistic' ), $notice, $skipped ); ?></p></div>
+		<?php endif; ?>
+
+		<p style="margin-top:16px;"><strong><?php echo esc_html( $used ); ?></strong> / <?php echo esc_html( $seats ); ?> <?php esc_html_e( 'seats used.', 'memberistic' ); ?>
+			<?php if ( $full ) : ?><span class="g2a-corp-badge pending"><?php esc_html_e( 'Seats full — increase seat count in Settings to add more.', 'memberistic' ); ?></span><?php endif; ?>
+		</p>
+
+		<table class="wp-list-table widefat fixed striped" style="margin-top:10px;">
+			<thead><tr>
+				<th><?php esc_html_e( 'Member', 'memberistic' ); ?></th>
+				<th><?php esc_html_e( 'Email', 'memberistic' ); ?></th>
+				<th><?php esc_html_e( 'Waiver', 'memberistic' ); ?></th>
+				<th><?php esc_html_e( 'QR', 'memberistic' ); ?></th>
+				<th><?php esc_html_e( 'Actions', 'memberistic' ); ?></th>
+			</tr></thead>
+			<tbody>
+				<?php if ( empty( $members ) ) : ?>
+					<tr><td colspan="5"><?php esc_html_e( 'No members yet. Add them below.', 'memberistic' ); ?></td></tr>
+				<?php else : foreach ( $members as $m ) :
+					$u = $m->user_id ? get_userdata( $m->user_id ) : null;
+					$resend_url = wp_nonce_url( admin_url( 'admin-post.php?action=memberistic_corp_resend&member_id=' . (int) $m->id ), 'memberistic_corp_resend_' . (int) $m->id );
+					$remove_url = wp_nonce_url( admin_url( 'admin-post.php?action=memberistic_corp_remove_member&member_id=' . (int) $m->id ), 'memberistic_corp_remove_' . (int) $m->id );
+				?>
+					<tr>
+						<td><strong><?php echo $u ? esc_html( $u->display_name ) : '&mdash;'; ?></strong></td>
+						<td><?php echo $u ? esc_html( $u->user_email ) : '&mdash;'; ?></td>
+						<td><span class="g2a-corp-badge <?php echo 'completed' === $m->waiver_status ? 'paid' : 'unpaid'; ?>"><?php echo esc_html( ucfirst( $m->waiver_status ?: 'missing' ) ); ?></span></td>
+						<td><?php echo $m->qr_token ? '<span class="g2a-corp-badge active">' . esc_html__( 'Ready', 'memberistic' ) . '</span>' : '&mdash;'; ?></td>
+						<td>
+							<a href="<?php echo esc_url( $resend_url ); ?>" class="button button-small"><?php esc_html_e( 'Resend email', 'memberistic' ); ?></a>
+							<a href="<?php echo esc_url( $remove_url ); ?>" class="button button-small" onclick="return confirm('<?php echo esc_js( __( 'Remove this member from the group?', 'memberistic' ) ); ?>');"><?php esc_html_e( 'Remove', 'memberistic' ); ?></a>
+						</td>
+					</tr>
+				<?php endforeach; endif; ?>
+			</tbody>
+		</table>
+
+		<div class="g2a-corp-grid" style="margin-top:20px;">
+			<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" class="g2a-corp-card">
+				<input type="hidden" name="action" value="memberistic_corp_add_member">
+				<input type="hidden" name="group_id" value="<?php echo (int) $group->id; ?>">
+				<?php wp_nonce_field( 'memberistic_corp_add_member_' . (int) $group->id ); ?>
+				<h3><?php esc_html_e( 'Add one member', 'memberistic' ); ?></h3>
+				<p class="g2a-corp-field"><label><?php esc_html_e( 'Full name', 'memberistic' ); ?></label><input type="text" name="member_name" required></p>
+				<p class="g2a-corp-field"><label><?php esc_html_e( 'Email', 'memberistic' ); ?></label><input type="email" name="member_email" required></p>
+				<p class="g2a-corp-field"><label><?php esc_html_e( 'Phone (optional)', 'memberistic' ); ?></label><input type="text" name="member_phone"></p>
+				<p><button class="button button-primary" <?php disabled( $full ); ?>><?php esc_html_e( 'Add + Send Welcome Email', 'memberistic' ); ?></button></p>
+			</form>
+
+			<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" class="g2a-corp-card">
+				<input type="hidden" name="action" value="memberistic_corp_bulk_members">
+				<input type="hidden" name="group_id" value="<?php echo (int) $group->id; ?>">
+				<?php wp_nonce_field( 'memberistic_corp_bulk_members_' . (int) $group->id ); ?>
+				<h3><?php esc_html_e( 'Bulk add', 'memberistic' ); ?></h3>
+				<p class="description"><?php esc_html_e( 'One per line: Full Name, email@example.com, phone (phone optional).', 'memberistic' ); ?></p>
+				<textarea name="bulk" rows="6" style="width:100%;" placeholder="John Doe, john@example.com, 6025551212&#10;Jane Roe, jane@example.com"></textarea>
+				<p><button class="button button-primary" <?php disabled( $full ); ?>><?php esc_html_e( 'Import + Send Welcome Emails', 'memberistic' ); ?></button></p>
+			</form>
+		</div>
+		<?php
 	}
 
 	public static function handle_create() {
@@ -656,7 +785,486 @@ final class Corporate_Admin {
 		$id = isset( $_POST['group_id'] ) ? (int) $_POST['group_id'] : 0;
 		check_admin_referer( 'memberistic_corp_update_' . $id );
 		Corporate_Groups_Repository::update( $id, wp_unslash( $_POST ) );
-		wp_safe_redirect( admin_url( 'admin.php?page=' . self::PAGE . '&updated=1' ) );
+		// Recount seats in case seats_total changed.
+		Corporate_Member_Service::recount_seats( $id );
+		wp_safe_redirect( admin_url( 'admin.php?page=' . self::PAGE . '&view=single&id=' . $id . '&tab=settings&updated=1' ) );
 		exit;
+	}
+
+	private static function single_redirect( $group_id, $tab = 'members', $extra = array() ) {
+		$args = array_merge( array(
+			'page' => self::PAGE,
+			'view' => 'single',
+			'id'   => (int) $group_id,
+			'tab'  => $tab,
+		), $extra );
+		wp_safe_redirect( add_query_arg( $args, admin_url( 'admin.php' ) ) );
+		exit;
+	}
+
+	public static function handle_add_member() {
+		if ( ! current_user_can( Corporate_Capabilities::manage_cap() ) ) {
+			wp_die( esc_html__( 'Permission denied.', 'memberistic' ) );
+		}
+		$gid = isset( $_POST['group_id'] ) ? (int) $_POST['group_id'] : 0;
+		check_admin_referer( 'memberistic_corp_add_member_' . $gid );
+		$res = Corporate_Member_Service::add_member(
+			$gid,
+			isset( $_POST['member_name'] ) ? wp_unslash( $_POST['member_name'] ) : '',
+			isset( $_POST['member_email'] ) ? wp_unslash( $_POST['member_email'] ) : '',
+			isset( $_POST['member_phone'] ) ? wp_unslash( $_POST['member_phone'] ) : ''
+		);
+		$added = ( 'added' === $res['status'] ) ? 1 : 0;
+		self::single_redirect( $gid, 'members', array( 'm_added' => $added, 'm_skipped' => $added ? 0 : 1 ) );
+	}
+
+	public static function handle_bulk_members() {
+		if ( ! current_user_can( Corporate_Capabilities::manage_cap() ) ) {
+			wp_die( esc_html__( 'Permission denied.', 'memberistic' ) );
+		}
+		$gid = isset( $_POST['group_id'] ) ? (int) $_POST['group_id'] : 0;
+		check_admin_referer( 'memberistic_corp_bulk_members_' . $gid );
+		$out = Corporate_Member_Service::bulk_add( $gid, isset( $_POST['bulk'] ) ? wp_unslash( $_POST['bulk'] ) : '' );
+		self::single_redirect( $gid, 'members', array( 'm_added' => (int) $out['added'], 'm_skipped' => (int) $out['skipped'] ) );
+	}
+
+	public static function handle_remove_member() {
+		if ( ! current_user_can( Corporate_Capabilities::manage_cap() ) ) {
+			wp_die( esc_html__( 'Permission denied.', 'memberistic' ) );
+		}
+		$mid = isset( $_GET['member_id'] ) ? (int) $_GET['member_id'] : 0;
+		check_admin_referer( 'memberistic_corp_remove_' . $mid );
+		$member = Corporate_Members_Repository::get( $mid );
+		if ( $member ) {
+			Corporate_Members_Repository::mark_removed( $mid );
+			Corporate_Member_Service::recount_seats( (int) $member->group_id );
+			Corporate_Groups_Repository::log_activity( (int) $member->group_id, 'member_removed', __( 'Member removed from group.', 'memberistic' ) );
+			self::single_redirect( (int) $member->group_id, 'members' );
+		}
+		self::single_redirect( 0, 'members' );
+	}
+
+	public static function handle_resend() {
+		if ( ! current_user_can( Corporate_Capabilities::manage_cap() ) ) {
+			wp_die( esc_html__( 'Permission denied.', 'memberistic' ) );
+		}
+		$mid = isset( $_GET['member_id'] ) ? (int) $_GET['member_id'] : 0;
+		check_admin_referer( 'memberistic_corp_resend_' . $mid );
+		$member = Corporate_Members_Repository::get( $mid );
+		if ( $member && $member->membership_id ) {
+			$group = Corporate_Groups_Repository::get( (int) $member->group_id );
+			$user  = get_userdata( (int) $member->user_id );
+			if ( $group && $user ) {
+				// Resend: existing user, so no set-password link (they
+				// can use Forgot Password). Pass is_new_user=false.
+				Corporate_Member_Service::send_welcome( (int) $member->membership_id, $group, $user, false );
+			}
+			self::single_redirect( (int) $member->group_id, 'members' );
+		}
+		self::single_redirect( 0, 'members' );
+	}
+}
+
+/**
+ * Phase 2 — group member data access.
+ */
+final class Corporate_Members_Repository {
+
+	public static function table() {
+		global $wpdb;
+		return $wpdb->prefix . 'memberistic_group_members';
+	}
+
+	public static function for_group( $group_id ) {
+		global $wpdb;
+		return $wpdb->get_results( $wpdb->prepare(
+			'SELECT * FROM ' . self::table() . " WHERE group_id = %d AND status != 'removed' ORDER BY role DESC, id ASC",
+			(int) $group_id
+		) );
+	}
+
+	public static function get( $id ) {
+		global $wpdb;
+		return $wpdb->get_row( $wpdb->prepare( 'SELECT * FROM ' . self::table() . ' WHERE id = %d', (int) $id ) );
+	}
+
+	public static function find( $group_id, $user_id ) {
+		global $wpdb;
+		return $wpdb->get_row( $wpdb->prepare(
+			'SELECT * FROM ' . self::table() . ' WHERE group_id = %d AND user_id = %d',
+			(int) $group_id,
+			(int) $user_id
+		) );
+	}
+
+	public static function active_count( $group_id ) {
+		global $wpdb;
+		return (int) $wpdb->get_var( $wpdb->prepare(
+			'SELECT COUNT(*) FROM ' . self::table() . " WHERE group_id = %d AND status != 'removed'",
+			(int) $group_id
+		) );
+	}
+
+	public static function insert( array $row ) {
+		global $wpdb;
+		$row['invited_at'] = current_time( 'mysql' );
+		$row['joined_at']  = current_time( 'mysql' );
+		return $wpdb->insert( self::table(), $row ) ? (int) $wpdb->insert_id : 0;
+	}
+
+	public static function mark_removed( $id ) {
+		global $wpdb;
+		return false !== $wpdb->update(
+			self::table(),
+			array( 'status' => 'removed', 'removed_at' => current_time( 'mysql' ) ),
+			array( 'id' => (int) $id )
+		);
+	}
+
+	public static function update_waiver( $id, $status ) {
+		global $wpdb;
+		return false !== $wpdb->update( self::table(), array( 'waiver_status' => sanitize_key( $status ) ), array( 'id' => (int) $id ) );
+	}
+}
+
+/**
+ * Phase 2 — orchestration: turn a name/email/phone into a real
+ * member account under a group, with membership, person record,
+ * QR token, and a branded confirmation email.
+ *
+ * Each group member is a FIRST-CLASS Memberistic membership where
+ * they are their own primary person — so they keep their own
+ * login, waiver, QR, and confirmation, exactly as the client
+ * asked. The group is the container; the membership is the access.
+ */
+final class Corporate_Member_Service {
+
+	/**
+	 * Add one member. Returns array{ status:string, message:string,
+	 * member_id?:int, user_id?:int }.
+	 *
+	 * status: added | reactivated | seat_full | invalid | exists | error
+	 */
+	public static function add_member( $group_id, $name, $email, $phone = '', $send_email = true ) {
+		$group = Corporate_Groups_Repository::get( $group_id );
+		if ( ! $group ) {
+			return array( 'status' => 'error', 'message' => __( 'Group not found.', 'memberistic' ) );
+		}
+
+		$name  = sanitize_text_field( (string) $name );
+		$email = sanitize_email( (string) $email );
+		$phone = sanitize_text_field( (string) $phone );
+
+		if ( ! $email || ! is_email( $email ) || '' === $name ) {
+			return array( 'status' => 'invalid', 'message' => sprintf( __( 'Skipped "%s": a valid name and email are required.', 'memberistic' ), $name ?: $email ) );
+		}
+
+		// Seat guard — never exceed seats_total.
+		$used = Corporate_Members_Repository::active_count( $group_id );
+		if ( $used >= (int) $group->seats_total ) {
+			return array( 'status' => 'seat_full', 'message' => sprintf( __( 'Seat limit reached (%d). Increase seats to add more.', 'memberistic' ), (int) $group->seats_total ) );
+		}
+
+		// Resolve / create the WP user.
+		$user = get_user_by( 'email', $email );
+		$is_new_user = false;
+		if ( ! $user ) {
+			$username = self::unique_username( $email );
+			$user_id  = wp_insert_user( array(
+				'user_login'   => $username,
+				'user_email'   => $email,
+				'user_pass'    => wp_generate_password( 24, true, true ),
+				'display_name' => $name,
+				'first_name'   => self::first_name( $name ),
+				'last_name'    => self::last_name( $name ),
+				'role'         => 'subscriber',
+			) );
+			if ( is_wp_error( $user_id ) ) {
+				return array( 'status' => 'error', 'message' => sprintf( __( 'Could not create user for %s: %s', 'memberistic' ), $email, $user_id->get_error_message() ) );
+			}
+			$user        = get_user_by( 'id', $user_id );
+			$is_new_user = true;
+		}
+
+		// Already in this group? Reactivate or report.
+		$existing = Corporate_Members_Repository::find( $group_id, $user->ID );
+		if ( $existing && 'removed' !== $existing->status ) {
+			return array( 'status' => 'exists', 'message' => sprintf( __( '%s is already in this group.', 'memberistic' ), $email ) );
+		}
+
+		// Resolve the corporate plan for the membership.
+		$plan_id = self::resolve_plan_id( $group->plan_key );
+
+		// Create the member's own Memberistic membership.
+		$membership_id = \WordPressistic\Memberistic\Database\Memberships_Repository::create( array(
+			'membership_uuid' => \WordPressistic\Memberistic\Database\Memberships_Repository::generate_membership_uuid(),
+			'primary_user_id' => $user->ID,
+			'plan_id'         => $plan_id,
+			'billing_cycle'   => 'annual', // corporate groups are yearly; 'corporate' isn't a valid cycle
+			'status'          => 'active',
+			'start_date'      => current_time( 'mysql' ),
+			'payment_source'  => 'corporate_group',
+			'notes'           => sprintf( __( 'Member of corporate group #%d (%s).', 'memberistic' ), (int) $group_id, $group->group_name ),
+			'created_by'      => get_current_user_id(),
+		) );
+		if ( ! $membership_id ) {
+			return array( 'status' => 'error', 'message' => sprintf( __( 'Could not create membership for %s.', 'memberistic' ), $email ) );
+		}
+
+		// Create their primary person record (carries waiver status).
+		\WordPressistic\Memberistic\Database\People_Repository::create( array(
+			'membership_id' => $membership_id,
+			'wp_user_id'    => $user->ID,
+			'role'          => 'primary',
+			'full_name'     => $name,
+			'email'         => $email,
+			'phone'         => $phone,
+			'waiver_status' => 'missing',
+			'status'        => 'active',
+		) );
+
+		// Generate their QR verification token (reuses the existing
+		// member-card QR + /?memberistic_verify=TOKEN live page).
+		$qr_token = '';
+		if ( class_exists( '\WordPressistic\Memberistic\Utilities\Verification' ) ) {
+			$qr_token = \WordPressistic\Memberistic\Utilities\Verification::get_or_create_token( $user->ID );
+		}
+
+		// Link into the group + bump seats_used.
+		$member_id = Corporate_Members_Repository::insert( array(
+			'group_id'      => (int) $group_id,
+			'user_id'       => (int) $user->ID,
+			'membership_id' => (int) $membership_id,
+			'role'          => 'member',
+			'status'        => 'active',
+			'waiver_status' => 'missing',
+			'qr_token'      => $qr_token,
+		) );
+		self::recount_seats( $group_id );
+
+		Corporate_Groups_Repository::log_activity( $group_id, 'member_added', sprintf(
+			/* translators: 1: member name, 2: email */
+			__( 'Member added: %1$s (%2$s).', 'memberistic' ),
+			$name,
+			$email
+		) );
+
+		if ( $send_email ) {
+			self::send_welcome( $membership_id, $group, $user, $is_new_user );
+		}
+
+		return array(
+			'status'    => 'added',
+			'message'   => sprintf( __( 'Added %s.', 'memberistic' ), $email ),
+			'member_id' => $member_id,
+			'user_id'   => $user->ID,
+		);
+	}
+
+	/**
+	 * Bulk add from a textarea: one member per line,
+	 * "Full Name, email@x.com, phone" (phone optional).
+	 *
+	 * @return array{added:int,skipped:int,messages:string[]}
+	 */
+	public static function bulk_add( $group_id, $raw ) {
+		$lines = preg_split( '/\r?\n/', (string) $raw );
+		$added = 0; $skipped = 0; $messages = array();
+		foreach ( $lines as $line ) {
+			$line = trim( $line );
+			if ( '' === $line ) {
+				continue;
+			}
+			$parts = array_map( 'trim', explode( ',', $line ) );
+			$name  = $parts[0] ?? '';
+			$email = $parts[1] ?? '';
+			$phone = $parts[2] ?? '';
+			$res   = self::add_member( $group_id, $name, $email, $phone, true );
+			if ( 'added' === $res['status'] ) {
+				$added++;
+			} else {
+				$skipped++;
+				$messages[] = $res['message'];
+			}
+			if ( 'seat_full' === $res['status'] ) {
+				break; // no point continuing once full
+			}
+		}
+		return array( 'added' => $added, 'skipped' => $skipped, 'messages' => $messages );
+	}
+
+	/**
+	 * Re-sync seats_used on the group from the live member count.
+	 */
+	public static function recount_seats( $group_id ) {
+		global $wpdb;
+		$used = Corporate_Members_Repository::active_count( $group_id );
+		$wpdb->update( Corporate_Groups_Repository::table(), array( 'seats_used' => $used ), array( 'id' => (int) $group_id ) );
+	}
+
+	/**
+	 * Send the branded "welcome to the group" email with set-password
+	 * + login + account + waiver + QR. Uses the existing Email_Service
+	 * pipeline (branded headers, kill-switch, logging) via the
+	 * group_member_welcome template registered in Corporate_Emails.
+	 */
+	public static function send_welcome( $membership_id, $group, $user, $is_new_user ) {
+		// Build the set-password link (new users) so they can claim
+		// their account in one click. Existing users just sign in.
+		$set_password_url = '';
+		if ( $is_new_user ) {
+			$key = get_password_reset_key( $user );
+			if ( ! is_wp_error( $key ) ) {
+				$set_password_url = network_site_url(
+					'wp-login.php?action=rp&key=' . rawurlencode( $key ) . '&login=' . rawurlencode( $user->user_login ),
+					'login'
+				);
+			}
+		}
+		$qr_url = class_exists( '\WordPressistic\Memberistic\Utilities\Verification' )
+			? \WordPressistic\Memberistic\Utilities\Verification::verify_url( $user->ID )
+			: '';
+
+		\WordPressistic\Memberistic\Emails\Email_Service::send_membership_email(
+			$membership_id,
+			'group_member_welcome',
+			array(
+				'corp_group_name'   => $group->group_name,
+				'corp_company_name' => $group->company_name,
+				'corp_set_password' => $set_password_url,
+				'corp_qr_url'       => $qr_url,
+				'corp_is_new_user'  => $is_new_user ? '1' : '0',
+			)
+		);
+	}
+
+	/**
+	 * Send a group summary email to the primary payer.
+	 */
+	public static function send_owner_summary( $group_id ) {
+		$group = Corporate_Groups_Repository::get( $group_id );
+		if ( ! $group || ! $group->primary_user_id ) {
+			return false;
+		}
+		$membership = \WordPressistic\Memberistic\Database\Memberships_Repository::get_by_user_id( (int) $group->primary_user_id );
+		if ( ! $membership ) {
+			return false; // payer isn't themselves a member; skip gracefully
+		}
+		return \WordPressistic\Memberistic\Emails\Email_Service::send_membership_email(
+			(int) $membership['id'],
+			'group_owner_summary',
+			array(
+				'corp_group_name' => $group->group_name,
+				'corp_seats_used' => (string) Corporate_Members_Repository::active_count( $group_id ),
+				'corp_seats_total'=> (string) (int) $group->seats_total,
+				'corp_paid_total' => number_format( Corporate_Groups_Repository::paid_total( $group_id ), 2 ),
+			)
+		);
+	}
+
+	/* ---- helpers ---- */
+
+	private static function resolve_plan_id( $plan_key ) {
+		$plan_key = $plan_key ?: 'corporate';
+		$plan = \WordPressistic\Memberistic\Database\Plans_Repository::get_by_slug( $plan_key );
+		if ( $plan && ! empty( $plan['id'] ) ) {
+			return (int) $plan['id'];
+		}
+		// Create a hidden corporate plan on first use.
+		$id = \WordPressistic\Memberistic\Database\Plans_Repository::create( array(
+			'name'            => 'Corporate / Group',
+			'slug'            => $plan_key,
+			'description'     => 'Corporate / group membership. Custom-priced, hidden from public pricing.',
+			'monthly_price'   => 0,
+			'annual_price'    => 0,
+			'included_people' => 0,
+			'is_featured'     => 0,
+			'sort_order'      => 99,
+			'status'          => 'active',
+		) );
+		return (int) $id;
+	}
+
+	private static function unique_username( $email ) {
+		$base = sanitize_user( current( explode( '@', $email ) ), true );
+		$base = $base ?: 'member';
+		$try  = $base;
+		$i    = 1;
+		while ( username_exists( $try ) ) {
+			$try = $base . $i;
+			$i++;
+		}
+		return $try;
+	}
+
+	private static function first_name( $name ) {
+		$parts = preg_split( '/\s+/', trim( $name ) );
+		return $parts[0] ?? '';
+	}
+	private static function last_name( $name ) {
+		$parts = preg_split( '/\s+/', trim( $name ) );
+		array_shift( $parts );
+		return implode( ' ', $parts );
+	}
+}
+
+/**
+ * Phase 2 — branded email templates + merge tags for the group
+ * member welcome + owner summary. Hooks into Email_Service's
+ * filters so we never edit the email core. All URLs are branded
+ * (/account/, /login/, /book-a-lane/) via the existing context.
+ */
+final class Corporate_Emails {
+
+	public static function subject( $subject, $template, $context ) {
+		if ( 'group_member_welcome' === $template ) {
+			return sprintf(
+				/* translators: %s: brand label */
+				__( 'Welcome to %s — your range account is ready', 'memberistic' ),
+				$context['{brand_label}'] ?? get_bloginfo( 'name' )
+			);
+		}
+		if ( 'group_owner_summary' === $template ) {
+			return sprintf(
+				__( 'Your %s group is set up', 'memberistic' ),
+				$context['{brand_label}'] ?? get_bloginfo( 'name' )
+			);
+		}
+		return $subject;
+	}
+
+	public static function body( $body, $template, $context ) {
+		if ( 'group_member_welcome' === $template ) {
+			$set_pw = $context['{corp_set_password}'] ?? '';
+			$claim_line = $set_pw
+				? "Set your password and claim your account:\n{corp_set_password}\n\n"
+				: "Sign in to your account:\n{login_url}\n\n";
+			return "Hi {member_name},\n\n"
+				. "You've been added to the {corp_group_name} group membership at {brand_label}. Your individual range account is ready.\n\n"
+				. $claim_line
+				. "Your account dashboard (digital card, booking, history):\n{account_url}\n\n"
+				. "Complete your range waiver before your first visit:\n{account_url}\n\n"
+				. "Your check-in QR code (show at the range desk or save your digital card):\n{corp_qr_url}\n\n"
+				. "Book a lane any time:\n{booking_url}\n\n"
+				. "Questions? Call {business_phone}.\n\n"
+				. "See you at the range.\n{brand_label}";
+		}
+		if ( 'group_owner_summary' === $template ) {
+			return "Hi {member_name},\n\n"
+				. "Your {corp_group_name} group at {brand_label} is set up.\n\n"
+				. "Seats used: {corp_seats_used} / {corp_seats_total}\n"
+				. "Amount paid: \${corp_paid_total}\n\n"
+				. "Each member has received their own welcome email with a set-password link, digital card, waiver, and check-in QR.\n\n"
+				. "Manage your group from your account:\n{account_url}\n\n"
+				. "Questions? Call {business_phone}.\n\n{brand_label}";
+		}
+		return $body;
+	}
+
+	public static function merge_tags( $context, $membership, $person, $extra ) {
+		foreach ( array( 'corp_group_name', 'corp_company_name', 'corp_set_password', 'corp_qr_url', 'corp_seats_used', 'corp_seats_total', 'corp_paid_total', 'corp_is_new_user' ) as $key ) {
+			$context[ '{' . $key . '}' ] = isset( $extra[ $key ] ) ? (string) $extra[ $key ] : '';
+		}
+		return $context;
 	}
 }
