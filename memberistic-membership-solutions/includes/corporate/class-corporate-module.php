@@ -75,6 +75,7 @@ final class Corporate_Module {
 		// Admin UI.
 		if ( is_admin() ) {
 			add_action( 'admin_menu', array( Corporate_Admin::class, 'menu' ), 30 );
+			add_action( 'admin_menu', array( Corporate_Reports::class, 'menu' ), 31 );
 			add_action( 'admin_post_memberistic_corp_create', array( Corporate_Admin::class, 'handle_create' ) );
 			add_action( 'admin_post_memberistic_corp_update', array( Corporate_Admin::class, 'handle_update' ) );
 			add_action( 'admin_post_memberistic_corp_add_member',  array( Corporate_Admin::class, 'handle_add_member' ) );
@@ -3058,5 +3059,167 @@ final class Corporate_Portal {
 		$url = add_query_arg( 'mgp_msg', rawurlencode( $msg ), wp_get_referer() ?: home_url( '/account/' ) );
 		wp_safe_redirect( $url );
 		exit;
+	}
+}
+
+/**
+ * Phase 7 — Corporate reports console.
+ *
+ * Read-only aggregates across all groups, computed live from the
+ * corporate tables (+ memberistic_checkins). Gives staff a single
+ * operational dashboard: active groups, seats, revenue, unpaid
+ * balances, waiver-pending people, open seats, and recent QR
+ * check-ins.
+ */
+final class Corporate_Reports {
+
+	const PAGE = 'memberistic-corporate-reports';
+
+	public static function menu() {
+		add_submenu_page(
+			'memberistic-dashboard',
+			__( 'Corporate Reports', 'memberistic' ),
+			__( 'Corporate Reports', 'memberistic' ),
+			Corporate_Capabilities::manage_cap(),
+			self::PAGE,
+			array( __CLASS__, 'render' )
+		);
+	}
+
+	public static function render() {
+		if ( ! current_user_can( Corporate_Capabilities::manage_cap() ) ) {
+			wp_die( esc_html__( 'You do not have permission to view corporate reports.', 'memberistic' ) );
+		}
+		global $wpdb;
+		$g  = Corporate_Groups_Repository::table();
+		$gm = Corporate_Members_Repository::table();
+		$gp = Corporate_Groups_Repository::payments_table();
+		$ck = $wpdb->prefix . 'memberistic_checkins';
+		$group_url = function ( $id, $tab = 'overview' ) {
+			return admin_url( 'admin.php?page=' . Corporate_Admin::PAGE . '&view=single&id=' . (int) $id . '&tab=' . $tab );
+		};
+
+		// --- Headline aggregates ---
+		$total_groups   = (int) $wpdb->get_var( "SELECT COUNT(*) FROM {$g}" );
+		$active_groups  = (int) $wpdb->get_var( $wpdb->prepare( "SELECT COUNT(*) FROM {$g} WHERE status = %s", 'active' ) );
+		$total_members  = (int) $wpdb->get_var( "SELECT COUNT(*) FROM {$gm} WHERE status != 'removed'" );
+		$total_revenue  = (float) $wpdb->get_var( "SELECT COALESCE(SUM(amount),0) FROM {$gp} WHERE payment_status = 'completed'" );
+		$waiver_pending = (int) $wpdb->get_var( "SELECT COUNT(*) FROM {$gm} WHERE status != 'removed' AND waiver_status != 'signed'" );
+
+		// --- Per-group rows for the tables ---
+		$groups = $wpdb->get_results( "SELECT * FROM {$g} ORDER BY created_at DESC LIMIT 500" );
+
+		$open_seats = array();   // groups with seats available
+		$unpaid     = array();   // groups with balance due
+		foreach ( (array) $groups as $row ) {
+			$used = (int) $wpdb->get_var( $wpdb->prepare( "SELECT COUNT(*) FROM {$gm} WHERE group_id = %d AND status != 'removed'", $row->id ) );
+			$paid = (float) $wpdb->get_var( $wpdb->prepare( "SELECT COALESCE(SUM(amount),0) FROM {$gp} WHERE group_id = %d AND payment_status = 'completed'", $row->id ) );
+			$row->_used = $used;
+			$row->_paid = $paid;
+			$row->_avail = max( 0, (int) $row->seats_total - $used );
+			$row->_balance = max( 0, (float) $row->custom_price - $paid );
+			if ( $row->_avail > 0 && 'cancelled' !== $row->status ) {
+				$open_seats[] = $row;
+			}
+			if ( $row->_balance > 0 && 'comped' !== $row->payment_status && 'cancelled' !== $row->status ) {
+				$unpaid[] = $row;
+			}
+		}
+
+		// --- Waiver-pending people ---
+		$pending_people = $wpdb->get_results(
+			"SELECT m.user_id, m.group_id, m.waiver_status FROM {$gm} m WHERE m.status != 'removed' AND m.waiver_status != 'signed' ORDER BY m.group_id ASC LIMIT 100"
+		);
+
+		// --- Recent check-ins for corporate/guest members ---
+		$recent = $wpdb->get_results(
+			"SELECT c.checked_in_at, c.checkin_type, c.membership_id, c.checked_in_by
+			 FROM {$ck} c ORDER BY c.checked_in_at DESC LIMIT 25"
+		);
+		?>
+		<div class="wrap g2a-corp-wrap">
+			<h1><?php esc_html_e( 'Corporate Reports', 'memberistic' ); ?></h1>
+
+			<div class="g2a-corp-grid" style="margin-top:16px;">
+				<div class="g2a-corp-card"><div class="description" style="text-transform:uppercase;letter-spacing:.08em;font-size:11px;"><?php esc_html_e( 'Active groups', 'memberistic' ); ?></div><div style="font-size:26px;font-weight:700;margin-top:6px;"><?php echo esc_html( $active_groups . ' / ' . $total_groups ); ?></div></div>
+				<div class="g2a-corp-card"><div class="description" style="text-transform:uppercase;letter-spacing:.08em;font-size:11px;"><?php esc_html_e( 'Total members', 'memberistic' ); ?></div><div style="font-size:26px;font-weight:700;margin-top:6px;"><?php echo (int) $total_members; ?></div></div>
+				<div class="g2a-corp-card"><div class="description" style="text-transform:uppercase;letter-spacing:.08em;font-size:11px;"><?php esc_html_e( 'Group revenue', 'memberistic' ); ?></div><div style="font-size:26px;font-weight:700;margin-top:6px;">$<?php echo esc_html( number_format( $total_revenue, 2 ) ); ?></div></div>
+				<div class="g2a-corp-card"><div class="description" style="text-transform:uppercase;letter-spacing:.08em;font-size:11px;"><?php esc_html_e( 'Waivers pending', 'memberistic' ); ?></div><div style="font-size:26px;font-weight:700;margin-top:6px;<?php echo $waiver_pending > 0 ? 'color:#b5611f;' : ''; ?>"><?php echo (int) $waiver_pending; ?></div></div>
+			</div>
+
+			<h2 style="margin-top:28px;"><?php esc_html_e( 'Unpaid balances', 'memberistic' ); ?></h2>
+			<table class="wp-list-table widefat fixed striped">
+				<thead><tr><th><?php esc_html_e( 'Group', 'memberistic' ); ?></th><th><?php esc_html_e( 'Price', 'memberistic' ); ?></th><th><?php esc_html_e( 'Paid', 'memberistic' ); ?></th><th><?php esc_html_e( 'Balance', 'memberistic' ); ?></th></tr></thead>
+				<tbody>
+				<?php if ( empty( $unpaid ) ) : ?>
+					<tr><td colspan="4"><?php esc_html_e( 'All groups are paid in full. 🎉', 'memberistic' ); ?></td></tr>
+				<?php else : foreach ( $unpaid as $row ) : ?>
+					<tr>
+						<td><a href="<?php echo esc_url( $group_url( $row->id, 'payments' ) ); ?>"><?php echo esc_html( $row->group_name ?: ( '#' . $row->id ) ); ?></a></td>
+						<td>$<?php echo esc_html( number_format( (float) $row->custom_price, 2 ) ); ?></td>
+						<td>$<?php echo esc_html( number_format( $row->_paid, 2 ) ); ?></td>
+						<td style="color:#b5611f;font-weight:600;">$<?php echo esc_html( number_format( $row->_balance, 2 ) ); ?></td>
+					</tr>
+				<?php endforeach; endif; ?>
+				</tbody>
+			</table>
+
+			<h2 style="margin-top:28px;"><?php esc_html_e( 'Groups with open seats', 'memberistic' ); ?></h2>
+			<table class="wp-list-table widefat fixed striped">
+				<thead><tr><th><?php esc_html_e( 'Group', 'memberistic' ); ?></th><th><?php esc_html_e( 'Used', 'memberistic' ); ?></th><th><?php esc_html_e( 'Total', 'memberistic' ); ?></th><th><?php esc_html_e( 'Available', 'memberistic' ); ?></th></tr></thead>
+				<tbody>
+				<?php if ( empty( $open_seats ) ) : ?>
+					<tr><td colspan="4"><?php esc_html_e( 'No groups have open seats.', 'memberistic' ); ?></td></tr>
+				<?php else : foreach ( $open_seats as $row ) : ?>
+					<tr>
+						<td><a href="<?php echo esc_url( $group_url( $row->id, 'members' ) ); ?>"><?php echo esc_html( $row->group_name ?: ( '#' . $row->id ) ); ?></a></td>
+						<td><?php echo (int) $row->_used; ?></td>
+						<td><?php echo (int) $row->seats_total; ?></td>
+						<td style="color:#5a8a2c;font-weight:600;"><?php echo (int) $row->_avail; ?></td>
+					</tr>
+				<?php endforeach; endif; ?>
+				</tbody>
+			</table>
+
+			<h2 style="margin-top:28px;"><?php esc_html_e( 'Waiver-pending members', 'memberistic' ); ?></h2>
+			<table class="wp-list-table widefat fixed striped">
+				<thead><tr><th><?php esc_html_e( 'Member', 'memberistic' ); ?></th><th><?php esc_html_e( 'Email', 'memberistic' ); ?></th><th><?php esc_html_e( 'Group', 'memberistic' ); ?></th></tr></thead>
+				<tbody>
+				<?php if ( empty( $pending_people ) ) : ?>
+					<tr><td colspan="3"><?php esc_html_e( 'Every group member has a signed waiver. 🎉', 'memberistic' ); ?></td></tr>
+				<?php else : foreach ( $pending_people as $p ) :
+					$u  = $p->user_id ? get_userdata( (int) $p->user_id ) : null;
+					$gr = Corporate_Groups_Repository::get( (int) $p->group_id );
+				?>
+					<tr>
+						<td><?php echo $u ? esc_html( $u->display_name ) : '—'; ?></td>
+						<td><?php echo $u ? esc_html( $u->user_email ) : '—'; ?></td>
+						<td><a href="<?php echo esc_url( $group_url( (int) $p->group_id, 'waivers' ) ); ?>"><?php echo $gr ? esc_html( $gr->group_name ) : ( '#' . (int) $p->group_id ); ?></a></td>
+					</tr>
+				<?php endforeach; endif; ?>
+				</tbody>
+			</table>
+
+			<h2 style="margin-top:28px;"><?php esc_html_e( 'Recent check-ins', 'memberistic' ); ?></h2>
+			<table class="wp-list-table widefat fixed striped">
+				<thead><tr><th><?php esc_html_e( 'When', 'memberistic' ); ?></th><th><?php esc_html_e( 'Type', 'memberistic' ); ?></th><th><?php esc_html_e( 'By staff', 'memberistic' ); ?></th></tr></thead>
+				<tbody>
+				<?php if ( empty( $recent ) ) : ?>
+					<tr><td colspan="3"><?php esc_html_e( 'No check-ins recorded yet.', 'memberistic' ); ?></td></tr>
+				<?php else : foreach ( $recent as $c ) :
+					$staff = $c->checked_in_by ? get_userdata( (int) $c->checked_in_by ) : null;
+				?>
+					<tr>
+						<td><?php echo esc_html( mysql2date( get_option( 'date_format' ) . ' g:i a', $c->checked_in_at ) ); ?></td>
+						<td><?php echo esc_html( ucwords( str_replace( '_', ' ', (string) $c->checkin_type ) ) ); ?></td>
+						<td><?php echo $staff ? esc_html( $staff->display_name ) : '—'; ?></td>
+					</tr>
+				<?php endforeach; endif; ?>
+				</tbody>
+			</table>
+
+			<p class="description" style="margin-top:18px;"><?php esc_html_e( 'All membership revenue figures here come from Memberistic (the single source of truth) — not WooCommerce product sales.', 'memberistic' ); ?></p>
+		</div>
+		<?php
 	}
 }

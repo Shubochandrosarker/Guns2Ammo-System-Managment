@@ -49,7 +49,13 @@ group-specific tables.
 
 ## B. Implementation plan (phased)
 
-### Phase 1 — DB + admin group management  ← THIS RELEASE
+> **STATUS (Memberistic 1.28.0): Phases 1–7 ALL COMPLETE.** ✅
+> 1 DB+admin · 2 members+emails · 3 custom Stripe payment links ·
+> 4 waivers · 5 QR check-in + Guest Pass · 6 front-end portal
+> (admin-gated) · 7 reports. Each phase verified with a stub
+> harness before release.
+
+### Phase 1 — DB + admin group management  ✅ DONE
 - New tables: `memberistic_corporate_groups`,
   `memberistic_group_members`, `memberistic_group_payments`,
   `memberistic_payment_links` (dbDelta, versioned, additive).
