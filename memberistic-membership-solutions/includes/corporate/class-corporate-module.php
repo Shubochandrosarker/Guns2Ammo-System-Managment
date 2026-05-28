@@ -32,7 +32,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 final class Corporate_Module {
 
 	/** Bump when any corporate table changes. */
-	const DB_VERSION = '1.0.0';
+	const DB_VERSION = '1.1.0';
 	const DB_OPTION  = 'memberistic_corporate_db_version';
 
 	/**
@@ -60,6 +60,11 @@ final class Corporate_Module {
 		add_action( 'memberistic_verify_card_after', array( Corporate_Checkin::class, 'staff_panel' ), 10, 2 );
 		add_shortcode( 'memberistic_guest_pass', array( Corporate_Guest_Service::class, 'shortcode' ) );
 		add_action( 'init', array( Corporate_Guest_Service::class, 'maybe_handle_submit' ) );
+		// Phase 6 — front-end group portal (owner self-service gated by
+		// the per-group owner_portal toggle) + member group context.
+		add_shortcode( 'memberistic_group_portal', array( Corporate_Portal::class, 'shortcode' ) );
+		add_action( 'memberistic_account_dashboard_end', array( Corporate_Portal::class, 'render_for_user' ) );
+		add_action( 'init', array( Corporate_Portal::class, 'maybe_handle_owner_action' ) );
 		// Phase 4 — public waiver signing endpoint + waiver merge tag.
 		add_action( 'template_redirect', array( Corporate_Waiver::class, 'maybe_handle_public_waiver' ), 1 );
 		// Payment separation — flag membership-payment WC orders so they
@@ -117,6 +122,7 @@ final class Corporate_Module {
 			payment_status VARCHAR(20) NOT NULL DEFAULT 'unpaid',
 			payment_method VARCHAR(30) NOT NULL DEFAULT '',
 			visibility VARCHAR(20) NOT NULL DEFAULT 'private',
+			owner_portal TINYINT(1) NOT NULL DEFAULT 0,
 			admin_notes LONGTEXT NULL,
 			created_by BIGINT UNSIGNED NOT NULL DEFAULT 0,
 			created_at DATETIME NOT NULL,
@@ -345,6 +351,15 @@ final class Corporate_Groups_Repository {
 		return (int) $wpdb->get_var( 'SELECT COUNT(*) FROM ' . self::table() );
 	}
 
+	/** The group this user is the primary payer/owner of, if any. */
+	public static function get_by_owner( $user_id ) {
+		global $wpdb;
+		return $wpdb->get_row( $wpdb->prepare(
+			'SELECT * FROM ' . self::table() . " WHERE primary_user_id = %d AND status != 'cancelled' ORDER BY id DESC LIMIT 1",
+			(int) $user_id
+		) );
+	}
+
 	/**
 	 * Sum of completed payments for a group.
 	 */
@@ -397,6 +412,7 @@ final class Corporate_Groups_Repository {
 			'payment_status'   => $pstatus,
 			'payment_method'   => $method,
 			'visibility'       => $vis,
+			'owner_portal'     => ! empty( $d['owner_portal'] ) ? 1 : 0,
 			'admin_notes'      => sanitize_textarea_field( (string) ( $d['admin_notes'] ?? '' ) ),
 		);
 	}
@@ -631,6 +647,14 @@ final class Corporate_Admin {
 							<?php endforeach; ?>
 						</select>
 					</div>
+				</div>
+
+				<div class="g2a-corp-field" style="margin-top:14px;">
+					<label style="display:flex;align-items:flex-start;gap:10px;cursor:pointer;font-weight:600;">
+						<input type="checkbox" name="owner_portal" value="1" <?php checked( (int) $val( 'owner_portal', 0 ), 1 ); ?> style="margin-top:3px;">
+						<span><?php esc_html_e( 'Allow the group owner to manage this group from their account (view members, seats, payment, and invite people).', 'memberistic' ); ?><br>
+						<span style="font-weight:400;color:#646970;font-size:12px;"><?php esc_html_e( 'When off, the owner only sees their own membership — no group management front-end.', 'memberistic' ); ?></span></span>
+					</label>
 				</div>
 
 				<?php if ( ! $is_edit ) : ?>
@@ -1218,6 +1242,15 @@ final class Corporate_Members_Repository {
 	public static function update_waiver( $id, $status ) {
 		global $wpdb;
 		return false !== $wpdb->update( self::table(), array( 'waiver_status' => sanitize_key( $status ) ), array( 'id' => (int) $id ) );
+	}
+
+	/** First active group-member row for a user (any group). */
+	public static function first_for_user( $user_id ) {
+		global $wpdb;
+		return $wpdb->get_row( $wpdb->prepare(
+			'SELECT * FROM ' . self::table() . " WHERE user_id = %d AND status != 'removed' ORDER BY id ASC LIMIT 1",
+			(int) $user_id
+		) );
 	}
 }
 
@@ -2803,6 +2836,227 @@ final class Corporate_Guest_Service {
 		);
 		$redirect = add_query_arg( 'guest_pass', 'ok' === $res['status'] ? 'done' : 'error', wp_get_referer() ?: home_url( '/' ) );
 		wp_safe_redirect( $redirect );
+		exit;
+	}
+}
+
+/**
+ * Phase 6 — front-end group portal.
+ *
+ * Renders inside the member account dashboard (and via the
+ * [memberistic_group_portal] shortcode):
+ *  - Group OWNER (primary payer) AND the per-group owner_portal
+ *    toggle is ON  → self-service management: group summary, seats
+ *    used/available, payment status + balance, members list, an
+ *    invite-member form (seat-guarded), and a "request more seats"
+ *    button.
+ *  - Owner with the toggle OFF, or a regular member → a compact
+ *    read-only "You're part of {group}" context panel (their card,
+ *    waiver, QR already live on the account page).
+ *  - Nobody in a group → renders nothing.
+ *
+ * The admin controls the toggle per group in the Settings tab, so
+ * the client decides exactly which owners get self-service.
+ */
+final class Corporate_Portal {
+
+	/** Hooked to memberistic_account_dashboard_end. */
+	public static function render_for_user( $user ) {
+		if ( ! $user || empty( $user->ID ) ) {
+			return;
+		}
+		echo self::build( (int) $user->ID ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
+	}
+
+	/** Shortcode entry. */
+	public static function shortcode( $atts = array() ) {
+		if ( ! is_user_logged_in() ) {
+			return '';
+		}
+		return self::build( get_current_user_id() );
+	}
+
+	/**
+	 * Build the portal HTML for a user. Returns '' when the user is
+	 * not connected to any group.
+	 */
+	public static function build( $user_id ) {
+		$owner_group = Corporate_Groups_Repository::get_by_owner( $user_id );
+		$member_row  = Corporate_Members_Repository::first_for_user( $user_id );
+
+		// Owner with management enabled → full self-service view.
+		if ( $owner_group && (int) $owner_group->owner_portal === 1 ) {
+			return self::render_owner( $owner_group, $user_id );
+		}
+		// Owner without management, OR a linked member → context panel.
+		$ctx_group = $owner_group;
+		if ( ! $ctx_group && $member_row ) {
+			$ctx_group = Corporate_Groups_Repository::get( (int) $member_row->group_id );
+		}
+		if ( $ctx_group ) {
+			return self::render_member_context( $ctx_group );
+		}
+		return '';
+	}
+
+	private static function styles() {
+		return '<style>
+		.mgp{max-width:980px;margin:18px 0;background:#1A1F26;border:1px solid #2A323D;border-radius:10px;padding:22px;color:#F4F4F6;}
+		.mgp h3{font-family:var(--font-display,"Bebas Neue",sans-serif);font-size:22px;margin:0 0 4px;letter-spacing:.03em;}
+		.mgp .sub{color:#8A95A5;font-size:13px;margin:0 0 16px;}
+		.mgp-cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:10px;margin-bottom:16px;}
+		.mgp-card{background:#11161D;border:1px solid #2A323D;border-radius:8px;padding:14px;}
+		.mgp-card .l{font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:#8A95A5;}
+		.mgp-card .v{font-size:22px;font-weight:700;margin-top:4px;}
+		.mgp table{width:100%;border-collapse:collapse;font-size:14px;}
+		.mgp th,.mgp td{text-align:left;padding:9px 8px;border-bottom:1px solid #2A323D;}
+		.mgp th{color:#8A95A5;font-size:11px;letter-spacing:.1em;text-transform:uppercase;}
+		.mgp .badge{display:inline-block;padding:2px 9px;border-radius:999px;font-size:11px;font-weight:600;}
+		.mgp .ok{background:rgba(157,224,91,.15);color:#9DE05B;}.mgp .no{background:rgba(232,128,47,.15);color:#E8802F;}
+		.mgp form.inv{margin-top:16px;display:grid;grid-template-columns:1fr 1fr auto;gap:8px;align-items:end;}
+		@media(max-width:640px){.mgp form.inv{grid-template-columns:1fr;}}
+		.mgp input{width:100%;padding:10px;background:#0F1115;border:1px solid #2A323D;border-radius:6px;color:#fff;}
+		.mgp .btn-go{background:#E8802F;color:#111;border:0;border-radius:6px;padding:12px 18px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;cursor:pointer;}
+		.mgp .note{margin-top:8px;font-size:13px;color:#9DE05B;}
+		.mgp .full{color:#E8802F;}
+		</style>';
+	}
+
+	private static function render_owner( $group, $user_id ) {
+		$members = Corporate_Members_Repository::for_group( $group->id );
+		$used    = count( $members );
+		$seats   = (int) $group->seats_total;
+		$avail   = max( 0, $seats - $used );
+		$paid    = Corporate_Groups_Repository::paid_total( $group->id );
+		$balance = max( 0, (float) $group->custom_price - $paid );
+		$notice  = isset( $_GET['mgp_msg'] ) ? sanitize_text_field( wp_unslash( $_GET['mgp_msg'] ) ) : ''; // phpcs:ignore WordPress.Security.NonceVerification.Recommended
+
+		ob_start();
+		echo self::styles(); // phpcs:ignore
+		?>
+		<div class="mgp">
+			<h3><?php echo esc_html( $group->group_name ); ?></h3>
+			<p class="sub"><?php esc_html_e( 'Group membership — you manage the people and seats.', 'memberistic' ); ?></p>
+			<?php if ( $notice ) : ?><p class="note"><?php echo esc_html( $notice ); ?></p><?php endif; ?>
+			<div class="mgp-cards">
+				<div class="mgp-card"><div class="l"><?php esc_html_e( 'Seats used', 'memberistic' ); ?></div><div class="v"><?php echo esc_html( $used . ' / ' . $seats ); ?></div></div>
+				<div class="mgp-card"><div class="l"><?php esc_html_e( 'Available', 'memberistic' ); ?></div><div class="v"><?php echo esc_html( $avail ); ?></div></div>
+				<div class="mgp-card"><div class="l"><?php esc_html_e( 'Paid', 'memberistic' ); ?></div><div class="v">$<?php echo esc_html( number_format( $paid, 2 ) ); ?></div></div>
+				<div class="mgp-card"><div class="l"><?php esc_html_e( 'Balance', 'memberistic' ); ?></div><div class="v"<?php echo $balance > 0 ? ' style="color:#E8802F"' : ''; ?>>$<?php echo esc_html( number_format( $balance, 2 ) ); ?></div></div>
+			</div>
+
+			<table>
+				<thead><tr><th><?php esc_html_e( 'Member', 'memberistic' ); ?></th><th><?php esc_html_e( 'Email', 'memberistic' ); ?></th><th><?php esc_html_e( 'Waiver', 'memberistic' ); ?></th></tr></thead>
+				<tbody>
+				<?php if ( empty( $members ) ) : ?>
+					<tr><td colspan="3"><?php esc_html_e( 'No members yet — invite your first below.', 'memberistic' ); ?></td></tr>
+				<?php else : foreach ( $members as $m ) :
+					$u = $m->user_id ? get_userdata( $m->user_id ) : null; ?>
+					<tr>
+						<td><?php echo $u ? esc_html( $u->display_name ) : '—'; ?></td>
+						<td><?php echo $u ? esc_html( $u->user_email ) : '—'; ?></td>
+						<td><span class="badge <?php echo 'signed' === $m->waiver_status ? 'ok' : 'no'; ?>"><?php echo esc_html( 'signed' === $m->waiver_status ? __( 'Signed', 'memberistic' ) : __( 'Pending', 'memberistic' ) ); ?></span></td>
+					</tr>
+				<?php endforeach; endif; ?>
+				</tbody>
+			</table>
+
+			<?php if ( $avail > 0 ) : ?>
+			<form class="inv" method="post" action="">
+				<?php wp_nonce_field( 'mgp_invite_' . (int) $group->id, 'mgp_nonce' ); ?>
+				<input type="hidden" name="mgp_action" value="invite">
+				<input type="hidden" name="mgp_group" value="<?php echo (int) $group->id; ?>">
+				<div><label class="l"><?php esc_html_e( 'Name', 'memberistic' ); ?></label><input type="text" name="mgp_name" required></div>
+				<div><label class="l"><?php esc_html_e( 'Email', 'memberistic' ); ?></label><input type="email" name="mgp_email" required></div>
+				<button type="submit" class="btn-go"><?php esc_html_e( 'Invite', 'memberistic' ); ?></button>
+			</form>
+			<?php else : ?>
+			<p class="full"><?php esc_html_e( 'All seats are used.', 'memberistic' ); ?>
+				<?php if ( (int) $group->max_future_seats > $seats ) : ?>
+				<form method="post" action="" style="display:inline;">
+					<?php wp_nonce_field( 'mgp_request_' . (int) $group->id, 'mgp_nonce' ); ?>
+					<input type="hidden" name="mgp_action" value="request_seats">
+					<input type="hidden" name="mgp_group" value="<?php echo (int) $group->id; ?>">
+					<button type="submit" class="btn-go" style="margin-left:8px;"><?php esc_html_e( 'Request more seats', 'memberistic' ); ?></button>
+				</form>
+				<?php endif; ?>
+			</p>
+			<?php endif; ?>
+		</div>
+		<?php
+		return ob_get_clean();
+	}
+
+	private static function render_member_context( $group ) {
+		ob_start();
+		echo self::styles(); // phpcs:ignore
+		?>
+		<div class="mgp">
+			<h3><?php echo esc_html( $group->group_name ); ?></h3>
+			<p class="sub"><?php esc_html_e( 'You are part of this group membership. Your digital card, waiver, and check-in QR are on this page.', 'memberistic' ); ?></p>
+		</div>
+		<?php
+		return ob_get_clean();
+	}
+
+	/**
+	 * Handle owner-initiated invite / request-seats. Owner-only,
+	 * nonce-gated, seat-guarded.
+	 */
+	public static function maybe_handle_owner_action() {
+		if ( empty( $_POST['mgp_action'] ) || empty( $_POST['mgp_nonce'] ) || ! is_user_logged_in() ) {
+			return;
+		}
+		$action   = sanitize_key( wp_unslash( $_POST['mgp_action'] ) );
+		$group_id = isset( $_POST['mgp_group'] ) ? (int) $_POST['mgp_group'] : 0;
+		$group    = Corporate_Groups_Repository::get( $group_id );
+		// Must be THIS group's owner AND owner portal enabled.
+		if ( ! $group || (int) $group->primary_user_id !== get_current_user_id() || (int) $group->owner_portal !== 1 ) {
+			return;
+		}
+
+		if ( 'invite' === $action && wp_verify_nonce( sanitize_text_field( wp_unslash( $_POST['mgp_nonce'] ) ), 'mgp_invite_' . $group_id ) ) {
+			$res = Corporate_Member_Service::add_member(
+				$group_id,
+				wp_unslash( $_POST['mgp_name'] ?? '' ),
+				wp_unslash( $_POST['mgp_email'] ?? '' ),
+				'',
+				true
+			);
+			$msg = 'added' === $res['status']
+				? __( 'Member invited — they have an email to set up their account, waiver, and QR.', 'memberistic' )
+				: $res['message'];
+			self::redirect_back( $msg );
+		}
+
+		if ( 'request_seats' === $action && wp_verify_nonce( sanitize_text_field( wp_unslash( $_POST['mgp_nonce'] ) ), 'mgp_request_' . $group_id ) ) {
+			// Notify the site admin; staff bump seats_total in the admin.
+			$admin = get_option( 'admin_email' );
+			$owner = wp_get_current_user();
+			if ( $admin && is_email( $admin ) ) {
+				$brand = function_exists( '\WordPressistic\Memberistic\memberistic_get_brand_label' )
+					? \WordPressistic\Memberistic\memberistic_get_brand_label() : get_bloginfo( 'name' );
+				wp_mail(
+					$admin,
+					sprintf( __( '[%s] Group seat request', 'memberistic' ), $brand ),
+					sprintf(
+						__( "%1\$s (owner of group \"%2\$s\", #%3\$d) has requested more seats.\nCurrent: %4\$d seats / max %5\$d.\nReview in Memberistic → Corporate Groups.", 'memberistic' ),
+						$owner->display_name,
+						$group->group_name,
+						$group_id,
+						(int) $group->seats_total,
+						(int) $group->max_future_seats
+					)
+				);
+			}
+			Corporate_Groups_Repository::log_activity( $group_id, 'seats_requested', __( 'Group owner requested more seats.', 'memberistic' ) );
+			self::redirect_back( __( 'Request sent — our team will be in touch about adding seats.', 'memberistic' ) );
+		}
+	}
+
+	private static function redirect_back( $msg ) {
+		$url = add_query_arg( 'mgp_msg', rawurlencode( $msg ), wp_get_referer() ?: home_url( '/account/' ) );
+		wp_safe_redirect( $url );
 		exit;
 	}
 }
