@@ -139,6 +139,20 @@ final class Stripe_Service {
 	 * @param string $return_url  Where Stripe returns the member after they finish.
 	 * @return array<string,mixed>|\WP_Error
 	 */
+	/**
+	 * Retrieve a Stripe subscription object by id (read-only).
+	 *
+	 * @param string $subscription_id Stripe subscription id (sub_…).
+	 * @return array<string,mixed>|\WP_Error
+	 */
+	public static function get_subscription( $subscription_id ) {
+		$subscription_id = trim( (string) $subscription_id );
+		if ( '' === $subscription_id ) {
+			return new \WP_Error( 'memberistic_missing_subscription', __( 'No subscription id provided.', 'memberistic' ) );
+		}
+		return self::request( 'GET', '/subscriptions/' . rawurlencode( $subscription_id ) );
+	}
+
 	public static function create_billing_portal_session( $customer_id, $return_url ) {
 		return self::request(
 			'POST',

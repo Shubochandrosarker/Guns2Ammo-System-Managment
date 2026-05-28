@@ -333,6 +333,28 @@ final class Memberships_Repository {
 		return $row ?: null;
 	}
 
+	/**
+	 * Memberships that have a Stripe subscription id but no Stripe customer id.
+	 *
+	 * Used by the customer-id backfill tool: imported (PMPro) members carry the
+	 * subscription id but not the cus_… id the billing portal needs, so we look
+	 * each up against Stripe and store it.
+	 *
+	 * @param int $limit Max rows to return.
+	 * @return array<int, array<string,mixed>>
+	 */
+	public static function get_needing_customer_backfill( $limit = 50 ) {
+		global $wpdb;
+		$limit = max( 1, min( 200, (int) $limit ) );
+		return $wpdb->get_results(
+			$wpdb->prepare(
+				'SELECT id, stripe_subscription_id FROM ' . self::table() . " WHERE stripe_subscription_id <> '' AND stripe_subscription_id IS NOT NULL AND ( stripe_customer_id = '' OR stripe_customer_id IS NULL ) ORDER BY id ASC LIMIT %d",
+				$limit
+			),
+			ARRAY_A
+		) ?: array();
+	}
+
 	public static function get_by_person_email( $email ) {
 		global $wpdb;
 		$email = sanitize_email( $email );
@@ -546,6 +568,12 @@ final class Memberships_Repository {
 			if ( isset( $data[ $field ] ) ) {
 				$clean[ $field ] = self::sanitize_datetime( $data[ $field ] );
 			}
+		}
+
+		if ( isset( $data['billing_amount'] ) ) {
+			$clean['billing_amount'] = '' === $data['billing_amount'] || null === $data['billing_amount']
+				? null
+				: round( (float) $data['billing_amount'], 2 );
 		}
 
 		$int_fields = array( 'woo_customer_id', 'woo_subscription_id', 'created_by' );
