@@ -635,6 +635,14 @@ CSS;
 		$val     = function ( $field, $default = '' ) use ( $group, $is_edit ) {
 			return $is_edit && isset( $group->$field ) ? $group->$field : $default;
 		};
+		// "Create group from selected members" — IDs handed over from
+		// the Members screen bulk action. Validated to ints; prefills
+		// the seat count and seeds a hidden field for handle_create.
+		$from_members = array();
+		if ( ! $is_edit && isset( $_GET['from_members'] ) ) { // phpcs:ignore WordPress.Security.NonceVerification.Recommended
+			$from_members = array_filter( array_map( 'absint', explode( ',', sanitize_text_field( wp_unslash( $_GET['from_members'] ) ) ) ) ); // phpcs:ignore WordPress.Security.NonceVerification.Recommended
+		}
+		$from_count = count( $from_members );
 		// $wrap=false when rendered inside the tabbed single-group view
 		// (which already opened .wrap + heading), to avoid nesting.
 		if ( $wrap ) : ?>
@@ -647,6 +655,12 @@ CSS;
 				<input type="hidden" name="action" value="<?php echo esc_attr( $action ); ?>">
 				<?php if ( $is_edit ) : ?><input type="hidden" name="group_id" value="<?php echo (int) $group->id; ?>"><?php endif; ?>
 				<?php wp_nonce_field( $nonce ); ?>
+				<?php if ( $from_count > 0 ) : ?>
+					<input type="hidden" name="from_members" value="<?php echo esc_attr( implode( ',', $from_members ) ); ?>">
+					<div class="notice notice-info inline" style="margin:0 0 16px;border-radius:8px;">
+						<p><strong><?php echo esc_html( sprintf( _n( '%d selected member', '%d selected members', $from_count, 'memberistic' ), $from_count ) ); ?></strong> <?php esc_html_e( 'will be added to this group once you create it. Their existing accounts, waivers, and QR codes are kept — they are simply linked into the group. Make sure “Seats Purchased” is at least this number.', 'memberistic' ); ?></p>
+					</div>
+				<?php endif; ?>
 
 				<div class="g2a-corp-grid">
 					<div class="g2a-corp-field">
@@ -676,7 +690,7 @@ CSS;
 					</div>
 					<div class="g2a-corp-field">
 						<label for="seats_total"><?php esc_html_e( 'Seats Purchased', 'memberistic' ); ?></label>
-						<input type="number" min="0" id="seats_total" name="seats_total" value="<?php echo esc_attr( $val( 'seats_total', 10 ) ); ?>">
+						<input type="number" min="0" id="seats_total" name="seats_total" value="<?php echo esc_attr( $val( 'seats_total', $from_count > 0 ? max( 10, $from_count ) : 10 ) ); ?>">
 					</div>
 					<div class="g2a-corp-field">
 						<label for="max_future_seats"><?php esc_html_e( 'Max Future Seats', 'memberistic' ); ?></label>
@@ -1058,10 +1072,29 @@ CSS;
 		}
 		check_admin_referer( 'memberistic_corp_create' );
 		$id = Corporate_Groups_Repository::create( wp_unslash( $_POST ) );
-		$redirect = $id
-			? admin_url( 'admin.php?page=' . self::PAGE . '&created=1' )
-			: admin_url( 'admin.php?page=' . self::PAGE . '&view=new&error=1' );
-		wp_safe_redirect( $redirect );
+		if ( ! $id ) {
+			wp_safe_redirect( admin_url( 'admin.php?page=' . self::PAGE . '&view=new&error=1' ) );
+			exit;
+		}
+		// "Create group from selected members" — attach the existing
+		// memberships handed over from the Members screen bulk action.
+		if ( ! empty( $_POST['from_members'] ) ) {
+			$ids = array_filter( array_map( 'absint', explode( ',', sanitize_text_field( wp_unslash( $_POST['from_members'] ) ) ) ) );
+			if ( $ids ) {
+				$res = Corporate_Member_Service::attach_many( $id, $ids, false );
+				$args = array(
+					'page'      => self::PAGE,
+					'view'      => 'single',
+					'id'        => (int) $id,
+					'tab'       => 'members',
+					'm_added'   => (int) $res['added'],
+					'm_skipped' => (int) $res['skipped'],
+				);
+				wp_safe_redirect( add_query_arg( $args, admin_url( 'admin.php' ) ) );
+				exit;
+			}
+		}
+		wp_safe_redirect( admin_url( 'admin.php?page=' . self::PAGE . '&created=1' ) );
 		exit;
 	}
 
@@ -1496,6 +1529,92 @@ final class Corporate_Member_Service {
 			}
 		}
 		return array( 'added' => $added, 'skipped' => $skipped, 'messages' => $messages );
+	}
+
+	/**
+	 * Attach an EXISTING membership's primary user to a group
+	 * (used by the "Create group from selected members" bulk action
+	 * on the Members screen). Unlike add_member() this does NOT
+	 * create a new account/membership — it links the member that
+	 * already exists. Seat-guarded, dedup-safe.
+	 *
+	 * @return string added|seat_full|exists|invalid
+	 */
+	public static function attach_membership( $group_id, $membership_id, $send_email = false ) {
+		$group = Corporate_Groups_Repository::get( $group_id );
+		if ( ! $group ) {
+			return 'invalid';
+		}
+		$membership = \WordPressistic\Memberistic\Database\Memberships_Repository::get( (int) $membership_id );
+		if ( ! $membership ) {
+			return 'invalid';
+		}
+		$membership = (array) $membership;
+		$user_id = (int) ( $membership['primary_user_id'] ?? 0 );
+		if ( $user_id <= 0 ) {
+			return 'invalid';
+		}
+		if ( Corporate_Members_Repository::active_count( $group_id ) >= (int) $group->seats_total ) {
+			return 'seat_full';
+		}
+		$existing = Corporate_Members_Repository::find( $group_id, $user_id );
+		if ( $existing && 'removed' !== $existing->status ) {
+			return 'exists';
+		}
+
+		// Waiver status mirror from the membership's primary person.
+		$waiver = 'missing';
+		$person = \WordPressistic\Memberistic\Database\People_Repository::get_primary_by_membership( (int) $membership['id'] );
+		if ( $person && ! empty( $person['waiver_status'] ) ) {
+			$waiver = $person['waiver_status'];
+		}
+		$qr_token = '';
+		if ( class_exists( '\WordPressistic\Memberistic\Utilities\Verification' ) ) {
+			$qr_token = \WordPressistic\Memberistic\Utilities\Verification::get_or_create_token( $user_id );
+		}
+
+		Corporate_Members_Repository::insert( array(
+			'group_id'      => (int) $group_id,
+			'user_id'       => $user_id,
+			'membership_id' => (int) $membership['id'],
+			'role'          => 'member',
+			'status'        => 'active',
+			'waiver_status' => $waiver,
+			'qr_token'      => $qr_token,
+		) );
+		self::recount_seats( $group_id );
+
+		$u = get_userdata( $user_id );
+		Corporate_Groups_Repository::log_activity( $group_id, 'member_attached', sprintf(
+			/* translators: %s: member name */
+			__( 'Existing member added to group: %s.', 'memberistic' ),
+			$u ? $u->display_name : ( '#' . $user_id )
+		) );
+
+		if ( $send_email && $u ) {
+			// Existing account → sign-in welcome (no set-password link).
+			self::send_welcome( (int) $membership['id'], $group, $u, false );
+		}
+		return 'added';
+	}
+
+	/**
+	 * Attach many existing memberships to a group. Returns counts.
+	 */
+	public static function attach_many( $group_id, array $membership_ids, $send_email = false ) {
+		$added = 0; $skipped = 0;
+		foreach ( $membership_ids as $mid ) {
+			$mid = (int) $mid;
+			if ( $mid <= 0 ) { continue; }
+			$r = self::attach_membership( $group_id, $mid, $send_email );
+			if ( 'added' === $r ) {
+				$added++;
+			} else {
+				$skipped++;
+				if ( 'seat_full' === $r ) { break; }
+			}
+		}
+		return array( 'added' => $added, 'skipped' => $skipped );
 	}
 
 	/**
