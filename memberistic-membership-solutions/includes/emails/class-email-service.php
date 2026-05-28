@@ -223,7 +223,7 @@ final class Email_Service {
 		if ( ! $account_url ) {
 			$account_url = memberistic_get_page_url( 'account_page_id', 'memberistic-account', home_url( '/account/' ) );
 		}
-		$renewal_url  = memberistic_get_page_url( 'renewal_page_id', 'renew-membership', $account_url );
+		$renewal_url  = memberistic_get_page_url( 'renewal_page_id', 'account', $account_url );
 		// Booking URL: prefer a real Book-a-Lane page, then the
 		// legacy memberistic-memberships slug, then home.
 		$booking_url  = memberistic_get_page_url( 'booking_page_id', 'book-a-lane', '' );

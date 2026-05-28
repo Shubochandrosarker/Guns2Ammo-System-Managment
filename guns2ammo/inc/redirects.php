@@ -97,6 +97,12 @@ function g2a_redirect_map() {
 		'/price-and-fees/'           => '/pricing/',
 		'/about-our-range/'          => '/about/',
 		'/membership-checkout/'      => '/memberships/',
+		'/membership-levels/'        => '/memberships/',
+		'/membership-account/'       => '/account/',
+		'/membership-billing/'       => '/account/',
+		'/membership-invoice/'       => '/account/',
+		'/membership-cancel/'        => '/account/',
+		'/membership-confirmation/'  => '/account/',
 		'/memberistic-account/'      => '/account/',
 		'/memberistic-memberships/'  => '/memberships/',
 		'/memberistic-checkout/'     => '/memberships/',
@@ -111,9 +117,18 @@ function g2a_redirect_map() {
  */
 function g2a_redirect_patterns() {
 	return apply_filters( 'g2a_redirect_patterns', array(
-		// Legacy PMPro level checkout (/membership-checkout/?pmpro_level=N)
+		// Legacy PMPro level checkout (/membership-checkout/?pmpro_level=N).
 		array(
 			'pattern' => '#^/membership-checkout/?#i',
+			'to'      => '/memberships/',
+		),
+		// Legacy PMPro account/billing URLs found in renewal and card-update emails.
+		array(
+			'pattern' => '#^/membership-(account|billing|invoice|cancel|confirmation)/?#i',
+			'to'      => '/account/',
+		),
+		array(
+			'pattern' => '#^/membership-levels/?#i',
 			'to'      => '/memberships/',
 		),
 		// "hello world" old WP starter post
@@ -122,4 +137,21 @@ function g2a_redirect_patterns() {
 			'to'      => '/blog/',
 		),
 	) );
+}
+
+
+/**
+ * Legacy PMPro email guard.
+ *
+ * The site now uses Memberistic for customer memberships. If Paid
+ * Memberships Pro (or its Extra Expiration Warning Emails add-on) remains
+ * installed during migration, its cron can still send stale expiration notices
+ * containing PMPro checkout/billing URLs. Keep the old URLs redirected above,
+ * and suppress PMPro expiration-warning email jobs so only Memberistic owns
+ * customer renewal messaging.
+ */
+add_filter( 'pmpro_send_expiration_warning_email', '__return_false' );
+add_filter( 'pmproeewe_email_frequency_and_templates', 'g2a_disable_pmpro_extra_expiration_warning_emails', 99 );
+function g2a_disable_pmpro_extra_expiration_warning_emails( $templates ) {
+	return array();
 }

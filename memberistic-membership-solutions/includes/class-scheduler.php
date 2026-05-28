@@ -142,18 +142,69 @@ final class Scheduler {
 		$expired = Memberships_Repository::get_active_expired();
 
 		foreach ( $expired as $row ) {
-			Memberships_Repository::change_status( (int) $row['id'], 'expired' );
+			$membership_id = (int) $row['id'];
+
+			// Recurring Stripe memberships should not be hard-expired just because
+			// the local renewal_date is stale. A delayed/missed Stripe webhook can
+			// leave the site one cycle behind even when Stripe will retry or has
+			// already charged the member. Give subscriptions a short grace window,
+			// then mark them past_due and send the payment-update template instead
+			// of a misleading "membership expired" notice.
+			if ( self::row_has_recurring_billing( $row ) ) {
+				if ( ! self::is_beyond_recurring_grace_period( $row ) ) {
+					continue;
+				}
+
+				Memberships_Repository::change_status( $membership_id, 'past_due' );
+
+				Activity_Repository::log(
+					array(
+						'membership_id' => $membership_id,
+						'activity_type' => 'payment_past_due',
+						'title'         => __( 'Recurring membership marked past due after renewal grace period', 'memberistic' ),
+					)
+				);
+
+				if ( ! Email_Logs_Repository::was_sent_for_membership(
+					$membership_id,
+					'payment_failed',
+					wp_date( 'Y-m-d H:i:s', current_time( 'timestamp' ) - 7 * DAY_IN_SECONDS )
+				) ) {
+					Email_Service::send_membership_email( $membership_id, 'payment_failed' );
+				}
+
+				continue;
+			}
+
+			Memberships_Repository::change_status( $membership_id, 'expired' );
 
 			Activity_Repository::log(
 				array(
-					'membership_id' => (int) $row['id'],
+					'membership_id' => $membership_id,
 					'activity_type' => 'membership_expired',
 					'title'         => __( 'Membership expired automatically', 'memberistic' ),
 				)
 			);
 
-			Email_Service::send_membership_email( (int) $row['id'], 'membership_expired' );
+			Email_Service::send_membership_email( $membership_id, 'membership_expired' );
 		}
+	}
+
+	private static function row_has_recurring_billing( $row ) {
+		$payment_source = isset( $row['payment_source'] ) ? (string) $row['payment_source'] : '';
+		return ! empty( $row['stripe_subscription_id'] ) || 'stripe' === $payment_source || 'stripe_subscription' === $payment_source;
+	}
+
+	private static function is_beyond_recurring_grace_period( $row ) {
+		$renewal_timestamp = ! empty( $row['renewal_date'] ) ? strtotime( (string) $row['renewal_date'] ) : false;
+		if ( ! $renewal_timestamp ) {
+			return true;
+		}
+
+		$grace_days = (int) apply_filters( 'memberistic_recurring_expiry_grace_days', 3, $row );
+		$grace_days = max( 0, min( 30, $grace_days ) );
+
+		return current_time( 'timestamp' ) > ( $renewal_timestamp + $grace_days * DAY_IN_SECONDS );
 	}
 
 	/**
