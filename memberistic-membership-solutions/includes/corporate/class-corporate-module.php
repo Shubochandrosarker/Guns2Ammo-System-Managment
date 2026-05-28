@@ -47,6 +47,11 @@ final class Corporate_Module {
 		add_filter( 'memberistic_email_template_subject', array( Corporate_Emails::class, 'subject' ), 10, 3 );
 		add_filter( 'memberistic_email_template_body',    array( Corporate_Emails::class, 'body' ),    10, 3 );
 		add_filter( 'memberistic_email_merge_tags',       array( Corporate_Emails::class, 'merge_tags' ), 10, 4 );
+		// Phase 3 — public payment-link endpoint + WC paid hooks.
+		add_action( 'template_redirect', array( Corporate_Pay::class, 'maybe_handle_public_pay' ), 1 );
+		add_action( 'woocommerce_payment_complete',        array( Corporate_Pay::class, 'on_wc_paid' ) );
+		add_action( 'woocommerce_order_status_completed',  array( Corporate_Pay::class, 'on_wc_paid' ) );
+		add_action( 'woocommerce_order_status_processing', array( Corporate_Pay::class, 'on_wc_paid' ) );
 		// Admin UI.
 		if ( is_admin() ) {
 			add_action( 'admin_menu', array( Corporate_Admin::class, 'menu' ), 30 );
@@ -56,6 +61,11 @@ final class Corporate_Module {
 			add_action( 'admin_post_memberistic_corp_bulk_members', array( Corporate_Admin::class, 'handle_bulk_members' ) );
 			add_action( 'admin_post_memberistic_corp_remove_member', array( Corporate_Admin::class, 'handle_remove_member' ) );
 			add_action( 'admin_post_memberistic_corp_resend',       array( Corporate_Admin::class, 'handle_resend' ) );
+			add_action( 'admin_post_memberistic_corp_record_payment', array( Corporate_Admin::class, 'handle_record_payment' ) );
+			add_action( 'admin_post_memberistic_corp_create_link',    array( Corporate_Admin::class, 'handle_create_link' ) );
+			add_action( 'admin_post_memberistic_corp_resend_link',    array( Corporate_Admin::class, 'handle_resend_link' ) );
+			add_action( 'admin_post_memberistic_corp_mark_link_paid', array( Corporate_Admin::class, 'handle_mark_link_paid' ) );
+			add_action( 'admin_post_memberistic_corp_void_link',      array( Corporate_Admin::class, 'handle_void_link' ) );
 			add_action( 'admin_enqueue_scripts', array( Corporate_Admin::class, 'assets' ) );
 		}
 	}
@@ -648,6 +658,7 @@ final class Corporate_Admin {
 		$tabs = array(
 			'overview' => __( 'Overview', 'memberistic' ),
 			'members'  => __( 'Members', 'memberistic' ),
+			'payments' => __( 'Payments', 'memberistic' ),
 			'settings' => __( 'Settings', 'memberistic' ),
 		);
 		echo '<div class="wrap g2a-corp-wrap">';
@@ -662,6 +673,8 @@ final class Corporate_Admin {
 
 		if ( 'members' === $tab ) {
 			self::render_members_tab( $group );
+		} elseif ( 'payments' === $tab ) {
+			self::render_payments_tab( $group );
 		} elseif ( 'settings' === $tab ) {
 			echo '<div style="margin-top:18px;"></div>';
 			self::render_form( $group, false );
@@ -669,6 +682,99 @@ final class Corporate_Admin {
 			self::render_overview_tab( $group );
 		}
 		echo '</div>';
+	}
+
+	private static function render_payments_tab( $group ) {
+		$paid     = Corporate_Groups_Repository::paid_total( $group->id );
+		$price    = (float) $group->custom_price;
+		$balance  = max( 0, $price - $paid );
+		$links    = Corporate_Payment_Links_Repository::for_group( $group->id );
+		$wc       = Corporate_Payment_Service::wc_active();
+		?>
+		<?php if ( isset( $_GET['p_msg'] ) ) : // phpcs:ignore WordPress.Security.NonceVerification.Recommended ?>
+			<div class="notice notice-success is-dismissible"><p><?php echo esc_html( sanitize_text_field( wp_unslash( $_GET['p_msg'] ) ) ); // phpcs:ignore WordPress.Security.NonceVerification.Recommended ?></p></div>
+		<?php endif; ?>
+
+		<div class="g2a-corp-grid" style="margin-top:18px;">
+			<div class="g2a-corp-card"><div class="description" style="text-transform:uppercase;letter-spacing:.08em;font-size:11px;"><?php esc_html_e( 'Amount paid', 'memberistic' ); ?></div><div style="font-size:24px;font-weight:700;margin-top:6px;">$<?php echo esc_html( number_format( $paid, 2 ) ); ?></div></div>
+			<div class="g2a-corp-card"><div class="description" style="text-transform:uppercase;letter-spacing:.08em;font-size:11px;"><?php esc_html_e( 'Group price', 'memberistic' ); ?></div><div style="font-size:24px;font-weight:700;margin-top:6px;">$<?php echo esc_html( number_format( $price, 2 ) ); ?></div></div>
+			<div class="g2a-corp-card"><div class="description" style="text-transform:uppercase;letter-spacing:.08em;font-size:11px;"><?php esc_html_e( 'Balance due', 'memberistic' ); ?></div><div style="font-size:24px;font-weight:700;margin-top:6px;color:<?php echo $balance > 0 ? '#b5611f' : '#5a8a2c'; ?>;">$<?php echo esc_html( number_format( $balance, 2 ) ); ?></div></div>
+		</div>
+
+		<h3 style="margin-top:24px;"><?php esc_html_e( 'Payment links', 'memberistic' ); ?></h3>
+		<?php if ( ! $wc ) : ?>
+			<p class="description"><?php esc_html_e( 'WooCommerce is not active/enabled, so links cannot auto-charge. They still generate a trackable request; record the payment manually once received, or enable WooCommerce in Memberistic → Settings for online card payment.', 'memberistic' ); ?></p>
+		<?php endif; ?>
+		<table class="wp-list-table widefat fixed striped">
+			<thead><tr>
+				<th><?php esc_html_e( 'Amount', 'memberistic' ); ?></th>
+				<th><?php esc_html_e( 'Description', 'memberistic' ); ?></th>
+				<th><?php esc_html_e( 'Recipient', 'memberistic' ); ?></th>
+				<th><?php esc_html_e( 'Status', 'memberistic' ); ?></th>
+				<th><?php esc_html_e( 'Link', 'memberistic' ); ?></th>
+				<th><?php esc_html_e( 'Actions', 'memberistic' ); ?></th>
+			</tr></thead>
+			<tbody>
+				<?php if ( empty( $links ) ) : ?>
+					<tr><td colspan="6"><?php esc_html_e( 'No payment links yet.', 'memberistic' ); ?></td></tr>
+				<?php else : foreach ( $links as $l ) :
+					$url = Corporate_Payment_Service::public_url( $l->token );
+					$resend = wp_nonce_url( admin_url( 'admin-post.php?action=memberistic_corp_resend_link&link_id=' . (int) $l->id ), 'memberistic_corp_resend_link_' . (int) $l->id );
+					$markpaid = wp_nonce_url( admin_url( 'admin-post.php?action=memberistic_corp_mark_link_paid&link_id=' . (int) $l->id ), 'memberistic_corp_mark_link_paid_' . (int) $l->id );
+					$void = wp_nonce_url( admin_url( 'admin-post.php?action=memberistic_corp_void_link&link_id=' . (int) $l->id ), 'memberistic_corp_void_link_' . (int) $l->id );
+				?>
+					<tr>
+						<td><strong>$<?php echo esc_html( number_format( (float) $l->amount, 2 ) ); ?></strong></td>
+						<td><?php echo esc_html( $l->description ?: '—' ); ?></td>
+						<td><?php echo esc_html( $l->recipient_email ?: '—' ); ?></td>
+						<td><span class="g2a-corp-badge <?php echo 'paid' === $l->status ? 'paid' : ( 'void' === $l->status ? 'cancelled' : 'unpaid' ); ?>"><?php echo esc_html( ucfirst( $l->status ) ); ?></span></td>
+						<td><input type="text" readonly onclick="this.select();" value="<?php echo esc_attr( $url ); ?>" style="width:100%;font-size:11px;"></td>
+						<td>
+							<?php if ( 'paid' !== $l->status && 'void' !== $l->status ) : ?>
+								<?php if ( $l->recipient_email ) : ?><a class="button button-small" href="<?php echo esc_url( $resend ); ?>"><?php esc_html_e( 'Email', 'memberistic' ); ?></a><?php endif; ?>
+								<a class="button button-small" href="<?php echo esc_url( $markpaid ); ?>" onclick="return confirm('<?php echo esc_js( __( 'Mark this link as paid? This records a payment on the group.', 'memberistic' ) ); ?>');"><?php esc_html_e( 'Mark paid', 'memberistic' ); ?></a>
+								<a class="button button-small" href="<?php echo esc_url( $void ); ?>" onclick="return confirm('<?php echo esc_js( __( 'Void this link?', 'memberistic' ) ); ?>');"><?php esc_html_e( 'Void', 'memberistic' ); ?></a>
+							<?php endif; ?>
+						</td>
+					</tr>
+				<?php endforeach; endif; ?>
+			</tbody>
+		</table>
+
+		<div class="g2a-corp-grid" style="margin-top:20px;">
+			<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" class="g2a-corp-card">
+				<input type="hidden" name="action" value="memberistic_corp_create_link">
+				<input type="hidden" name="group_id" value="<?php echo (int) $group->id; ?>">
+				<?php wp_nonce_field( 'memberistic_corp_create_link_' . (int) $group->id ); ?>
+				<h3><?php esc_html_e( 'Generate payment link', 'memberistic' ); ?></h3>
+				<p class="description"><?php esc_html_e( 'Enter ANY amount — fully custom per link. Send it to the customer to pay online.', 'memberistic' ); ?></p>
+				<p class="g2a-corp-field"><label><?php esc_html_e( 'Amount ($)', 'memberistic' ); ?></label><input type="number" step="0.01" min="0.01" name="amount" required value="<?php echo esc_attr( $balance > 0 ? number_format( $balance, 2, '.', '' ) : '600.00' ); ?>"></p>
+				<p class="g2a-corp-field"><label><?php esc_html_e( 'Description', 'memberistic' ); ?></label><input type="text" name="description" value="<?php echo esc_attr( sprintf( __( '%s group membership', 'memberistic' ), $group->group_name ) ); ?>"></p>
+				<p class="g2a-corp-field"><label><?php esc_html_e( 'Send to email (optional)', 'memberistic' ); ?></label><input type="email" name="recipient_email"></p>
+				<p class="g2a-corp-field"><label><?php esc_html_e( 'Expires in (days, 0 = never)', 'memberistic' ); ?></label><input type="number" min="0" name="expiry_days" value="14"></p>
+				<p><button class="button button-primary"><?php esc_html_e( 'Create Link', 'memberistic' ); ?></button></p>
+			</form>
+
+			<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" class="g2a-corp-card">
+				<input type="hidden" name="action" value="memberistic_corp_record_payment">
+				<input type="hidden" name="group_id" value="<?php echo (int) $group->id; ?>">
+				<?php wp_nonce_field( 'memberistic_corp_record_payment_' . (int) $group->id ); ?>
+				<h3><?php esc_html_e( 'Record a payment', 'memberistic' ); ?></h3>
+				<p class="description"><?php esc_html_e( 'For cash / POS / card taken in store, or a deposit.', 'memberistic' ); ?></p>
+				<p class="g2a-corp-field"><label><?php esc_html_e( 'Amount ($)', 'memberistic' ); ?></label><input type="number" step="0.01" min="0.01" name="amount" required></p>
+				<p class="g2a-corp-field"><label><?php esc_html_e( 'Method', 'memberistic' ); ?></label>
+					<select name="payment_method">
+						<?php foreach ( Corporate_Groups_Repository::payment_methods() as $m ) : ?>
+							<option value="<?php echo esc_attr( $m ); ?>"><?php echo esc_html( ucwords( str_replace( '_', ' ', $m ) ) ); ?></option>
+						<?php endforeach; ?>
+					</select>
+				</p>
+				<p class="g2a-corp-field"><label><?php esc_html_e( 'Reference (POS receipt #, etc.)', 'memberistic' ); ?></label><input type="text" name="payment_reference"></p>
+				<p class="g2a-corp-field"><label><?php esc_html_e( 'Notes', 'memberistic' ); ?></label><input type="text" name="notes"></p>
+				<p><button class="button button-primary"><?php esc_html_e( 'Record Payment', 'memberistic' ); ?></button></p>
+			</form>
+		</div>
+		<?php
 	}
 
 	private static function render_overview_tab( $group ) {
@@ -862,6 +968,82 @@ final class Corporate_Admin {
 			self::single_redirect( (int) $member->group_id, 'members' );
 		}
 		self::single_redirect( 0, 'members' );
+	}
+
+	/* ---- Phase 3 payment handlers ---- */
+
+	public static function handle_record_payment() {
+		if ( ! current_user_can( Corporate_Capabilities::manage_cap() ) ) {
+			wp_die( esc_html__( 'Permission denied.', 'memberistic' ) );
+		}
+		$gid = isset( $_POST['group_id'] ) ? (int) $_POST['group_id'] : 0;
+		check_admin_referer( 'memberistic_corp_record_payment_' . $gid );
+		$res = Corporate_Payment_Service::record_manual_payment(
+			$gid,
+			isset( $_POST['amount'] ) ? (float) $_POST['amount'] : 0,
+			isset( $_POST['payment_method'] ) ? sanitize_key( wp_unslash( $_POST['payment_method'] ) ) : 'cash',
+			isset( $_POST['payment_reference'] ) ? sanitize_text_field( wp_unslash( $_POST['payment_reference'] ) ) : '',
+			isset( $_POST['notes'] ) ? sanitize_text_field( wp_unslash( $_POST['notes'] ) ) : ''
+		);
+		self::single_redirect( $gid, 'payments', array( 'p_msg' => rawurlencode( $res['message'] ) ) );
+	}
+
+	public static function handle_create_link() {
+		if ( ! current_user_can( Corporate_Capabilities::manage_cap() ) ) {
+			wp_die( esc_html__( 'Permission denied.', 'memberistic' ) );
+		}
+		$gid = isset( $_POST['group_id'] ) ? (int) $_POST['group_id'] : 0;
+		check_admin_referer( 'memberistic_corp_create_link_' . $gid );
+		$res = Corporate_Payment_Service::create_payment_link(
+			$gid,
+			isset( $_POST['amount'] ) ? (float) $_POST['amount'] : 0,
+			isset( $_POST['description'] ) ? sanitize_text_field( wp_unslash( $_POST['description'] ) ) : '',
+			isset( $_POST['recipient_email'] ) ? sanitize_email( wp_unslash( $_POST['recipient_email'] ) ) : '',
+			isset( $_POST['expiry_days'] ) ? (int) $_POST['expiry_days'] : 14
+		);
+		self::single_redirect( $gid, 'payments', array( 'p_msg' => rawurlencode( $res['message'] ) ) );
+	}
+
+	public static function handle_resend_link() {
+		if ( ! current_user_can( Corporate_Capabilities::manage_cap() ) ) {
+			wp_die( esc_html__( 'Permission denied.', 'memberistic' ) );
+		}
+		$lid = isset( $_GET['link_id'] ) ? (int) $_GET['link_id'] : 0;
+		check_admin_referer( 'memberistic_corp_resend_link_' . $lid );
+		$link = Corporate_Payment_Links_Repository::get( $lid );
+		if ( $link ) {
+			Corporate_Payment_Service::send_link_email( $lid );
+			self::single_redirect( (int) $link->group_id, 'payments', array( 'p_msg' => rawurlencode( __( 'Payment link emailed.', 'memberistic' ) ) ) );
+		}
+		self::single_redirect( 0, 'payments' );
+	}
+
+	public static function handle_mark_link_paid() {
+		if ( ! current_user_can( Corporate_Capabilities::manage_cap() ) ) {
+			wp_die( esc_html__( 'Permission denied.', 'memberistic' ) );
+		}
+		$lid = isset( $_GET['link_id'] ) ? (int) $_GET['link_id'] : 0;
+		check_admin_referer( 'memberistic_corp_mark_link_paid_' . $lid );
+		$link = Corporate_Payment_Links_Repository::get( $lid );
+		if ( $link ) {
+			Corporate_Payment_Service::mark_paid( $lid, 'manual_comp', __( 'Marked paid by staff', 'memberistic' ) );
+			self::single_redirect( (int) $link->group_id, 'payments', array( 'p_msg' => rawurlencode( __( 'Link marked paid.', 'memberistic' ) ) ) );
+		}
+		self::single_redirect( 0, 'payments' );
+	}
+
+	public static function handle_void_link() {
+		if ( ! current_user_can( Corporate_Capabilities::manage_cap() ) ) {
+			wp_die( esc_html__( 'Permission denied.', 'memberistic' ) );
+		}
+		$lid = isset( $_GET['link_id'] ) ? (int) $_GET['link_id'] : 0;
+		check_admin_referer( 'memberistic_corp_void_link_' . $lid );
+		$link = Corporate_Payment_Links_Repository::get( $lid );
+		if ( $link ) {
+			Corporate_Payment_Service::void_link( $lid );
+			self::single_redirect( (int) $link->group_id, 'payments', array( 'p_msg' => rawurlencode( __( 'Link voided.', 'memberistic' ) ) ) );
+		}
+		self::single_redirect( 0, 'payments' );
 	}
 }
 
@@ -1266,5 +1448,432 @@ final class Corporate_Emails {
 			$context[ '{' . $key . '}' ] = isset( $extra[ $key ] ) ? (string) $extra[ $key ] : '';
 		}
 		return $context;
+	}
+}
+
+/**
+ * Phase 3 — payment-link data access.
+ */
+final class Corporate_Payment_Links_Repository {
+
+	public static function table() {
+		global $wpdb;
+		return $wpdb->prefix . 'memberistic_payment_links';
+	}
+
+	public static function for_group( $group_id ) {
+		global $wpdb;
+		return $wpdb->get_results( $wpdb->prepare(
+			'SELECT * FROM ' . self::table() . ' WHERE group_id = %d ORDER BY created_at DESC',
+			(int) $group_id
+		) );
+	}
+
+	public static function get( $id ) {
+		global $wpdb;
+		return $wpdb->get_row( $wpdb->prepare( 'SELECT * FROM ' . self::table() . ' WHERE id = %d', (int) $id ) );
+	}
+
+	public static function get_by_token( $token ) {
+		global $wpdb;
+		return $wpdb->get_row( $wpdb->prepare( 'SELECT * FROM ' . self::table() . ' WHERE token = %s', $token ) );
+	}
+
+	public static function get_by_order( $order_id ) {
+		global $wpdb;
+		return $wpdb->get_row( $wpdb->prepare( 'SELECT * FROM ' . self::table() . ' WHERE wc_order_id = %d', (int) $order_id ) );
+	}
+
+	public static function insert( array $row ) {
+		global $wpdb;
+		$row['created_by'] = get_current_user_id();
+		$row['created_at'] = current_time( 'mysql' );
+		return $wpdb->insert( self::table(), $row ) ? (int) $wpdb->insert_id : 0;
+	}
+
+	public static function update( $id, array $row ) {
+		global $wpdb;
+		return false !== $wpdb->update( self::table(), $row, array( 'id' => (int) $id ) );
+	}
+}
+
+/**
+ * Phase 3 — payments + payment links.
+ *
+ * Amounts are 100% client-defined per link/payment. Nothing is
+ * hard-coded — the $600 figure is only an example default in the
+ * admin form and is fully editable.
+ *
+ * Payment-link mechanics: when WooCommerce is active we create a
+ * pending WC order carrying a single fee line of the custom amount
+ * (no product needed), tag it with group metadata, and the public
+ * link redirects to WC's hosted, gateway-agnostic pay page (Stripe,
+ * PayPal, Authnet — whatever the store has). On payment, WC fires
+ * the order-paid hook → we mark the link paid + write a group
+ * payment row + re-sync the group's payment_status. If WC is not
+ * active, the link still records the request and the public page
+ * shows a branded "call to complete payment" fallback; staff can
+ * always record the payment manually (cash/POS).
+ */
+final class Corporate_Payment_Service {
+
+	/**
+	 * Record a manual / offline payment (cash, POS, card, comp).
+	 */
+	public static function record_manual_payment( $group_id, $amount, $method, $reference = '', $notes = '' ) {
+		$amount = round( (float) $amount, 2 );
+		if ( $amount <= 0 ) {
+			return array( 'status' => 'invalid', 'message' => __( 'Enter an amount greater than zero.', 'memberistic' ) );
+		}
+		Corporate_Groups_Repository::add_payment( $group_id, array(
+			'amount'            => $amount,
+			'payment_method'    => $method,
+			'payment_status'    => 'completed',
+			'payment_reference' => $reference,
+			'notes'             => $notes,
+		) );
+		self::sync_status( $group_id );
+		Corporate_Groups_Repository::log_activity( $group_id, 'payment_recorded', sprintf(
+			/* translators: 1: amount, 2: method */
+			__( 'Payment recorded: $%1$s via %2$s.', 'memberistic' ),
+			number_format( $amount, 2 ),
+			ucwords( str_replace( '_', ' ', $method ) )
+		) );
+		return array( 'status' => 'ok', 'message' => __( 'Payment recorded.', 'memberistic' ) );
+	}
+
+	/**
+	 * Create a custom-amount payment link.
+	 *
+	 * @param int    $group_id
+	 * @param float  $amount       Client-defined; any positive value.
+	 * @param string $description
+	 * @param string $recipient    Email to send the link to (optional).
+	 * @param int    $expiry_days  0 = no expiry.
+	 * @param bool   $send_email
+	 */
+	public static function create_payment_link( $group_id, $amount, $description, $recipient = '', $expiry_days = 14, $send_email = true ) {
+		$amount = round( (float) $amount, 2 );
+		if ( $amount <= 0 ) {
+			return array( 'status' => 'invalid', 'message' => __( 'Enter an amount greater than zero.', 'memberistic' ) );
+		}
+		$recipient = sanitize_email( (string) $recipient );
+		$token     = self::random_token();
+		$expires   = ( (int) $expiry_days > 0 ) ? gmdate( 'Y-m-d H:i:s', time() + ( (int) $expiry_days * DAY_IN_SECONDS ) ) : null;
+
+		$wc_order_id = 0;
+		if ( self::wc_active() ) {
+			$wc_order_id = self::create_wc_order( $group_id, $amount, $description, $recipient );
+		}
+
+		$link_id = Corporate_Payment_Links_Repository::insert( array(
+			'group_id'        => (int) $group_id,
+			'amount'          => $amount,
+			'description'     => sanitize_text_field( (string) $description ),
+			'recipient_email' => $recipient,
+			'token'           => $token,
+			'status'          => 'unpaid',
+			'wc_order_id'     => (int) $wc_order_id,
+			'expires_at'      => $expires,
+		) );
+
+		// Link the WC order back to the payment-link id for the
+		// reverse lookup on the paid hook.
+		if ( $wc_order_id && function_exists( 'wc_get_order' ) ) {
+			$order = wc_get_order( $wc_order_id );
+			if ( $order ) {
+				$order->update_meta_data( '_memberistic_payment_link_id', $link_id );
+				$order->save();
+			}
+		}
+
+		Corporate_Groups_Repository::log_activity( $group_id, 'payment_link_created', sprintf(
+			__( 'Payment link created for $%s.', 'memberistic' ),
+			number_format( $amount, 2 )
+		) );
+
+		if ( $send_email && $recipient ) {
+			self::send_link_email( $link_id );
+		}
+
+		return array(
+			'status'  => 'ok',
+			'message' => __( 'Payment link created.', 'memberistic' ),
+			'link_id' => $link_id,
+			'url'     => self::public_url( $token ),
+		);
+	}
+
+	/** Public-facing pay URL for a token. */
+	public static function public_url( $token ) {
+		return add_query_arg( 'memberistic_pay', $token, home_url( '/' ) );
+	}
+
+	/**
+	 * Mark a link paid (called from the WC hook OR manual "mark paid"
+	 * action). Writes a group payment row once, idempotently.
+	 */
+	public static function mark_paid( $link_id, $method = 'payment_link', $reference = '' ) {
+		$link = Corporate_Payment_Links_Repository::get( $link_id );
+		if ( ! $link || 'paid' === $link->status ) {
+			return false; // already settled — idempotent
+		}
+		Corporate_Payment_Links_Repository::update( $link_id, array(
+			'status'  => 'paid',
+			'paid_at' => current_time( 'mysql' ),
+		) );
+		Corporate_Groups_Repository::add_payment( (int) $link->group_id, array(
+			'amount'            => (float) $link->amount,
+			'payment_method'    => $method,
+			'payment_status'    => 'completed',
+			'payment_reference' => $reference ?: ( $link->wc_order_id ? ( 'WC #' . (int) $link->wc_order_id ) : '' ),
+			'wc_order_id'       => (int) $link->wc_order_id,
+			'payment_link_id'   => (int) $link_id,
+			'notes'             => $link->description,
+		) );
+		self::sync_status( (int) $link->group_id );
+		Corporate_Groups_Repository::log_activity( (int) $link->group_id, 'payment_link_paid', sprintf(
+			__( 'Payment link paid: $%s.', 'memberistic' ),
+			number_format( (float) $link->amount, 2 )
+		) );
+		return true;
+	}
+
+	public static function void_link( $link_id ) {
+		$link = Corporate_Payment_Links_Repository::get( $link_id );
+		if ( ! $link || 'paid' === $link->status ) {
+			return false;
+		}
+		Corporate_Payment_Links_Repository::update( $link_id, array( 'status' => 'void' ) );
+		return true;
+	}
+
+	/**
+	 * Re-sync a group's payment_status from its paid total vs the
+	 * custom price. paid >= price → paid; >0 → partial; else unpaid.
+	 */
+	public static function sync_status( $group_id ) {
+		global $wpdb;
+		$group = Corporate_Groups_Repository::get( $group_id );
+		if ( ! $group ) {
+			return;
+		}
+		$paid  = Corporate_Groups_Repository::paid_total( $group_id );
+		$price = (float) $group->custom_price;
+		if ( $price > 0 && $paid >= $price ) {
+			$status = 'paid';
+		} elseif ( $paid > 0 ) {
+			$status = 'partial';
+		} else {
+			$status = 'unpaid';
+		}
+		// Don't override a manual 'comped' flag.
+		if ( 'comped' === $group->payment_status ) {
+			return;
+		}
+		$wpdb->update( Corporate_Groups_Repository::table(), array( 'payment_status' => $status ), array( 'id' => (int) $group_id ) );
+	}
+
+	/**
+	 * Branded payment-link email. Sent via wp_mail with the brand
+	 * label, respecting the global kill-switch + staging override,
+	 * and logged to memberistic_email_logs.
+	 */
+	public static function send_link_email( $link_id ) {
+		$link = Corporate_Payment_Links_Repository::get( $link_id );
+		if ( ! $link || ! $link->recipient_email || ! is_email( $link->recipient_email ) ) {
+			return false;
+		}
+		// Kill-switch.
+		if ( ( defined( 'MEMBERISTIC_EMAIL_DISABLED' ) && MEMBERISTIC_EMAIL_DISABLED )
+			|| (bool) get_option( 'memberistic_emails_disabled', false ) ) {
+			return false;
+		}
+		$brand = function_exists( '\WordPressistic\Memberistic\memberistic_get_brand_label' )
+			? \WordPressistic\Memberistic\memberistic_get_brand_label()
+			: get_bloginfo( 'name' );
+		$phone = (string) \WordPressistic\Memberistic\memberistic_get_setting( 'business_phone', '' );
+		$url   = self::public_url( $link->token );
+		$amount = number_format( (float) $link->amount, 2 );
+
+		$subject = sprintf(
+			/* translators: %s: brand */
+			__( 'Payment request from %s', 'memberistic' ),
+			$brand
+		);
+		$body  = sprintf( __( "Hello,\n\n%1\$s has sent you a secure payment request.\n\n", 'memberistic' ), $brand );
+		if ( $link->description ) {
+			$body .= sprintf( __( "For: %s\n", 'memberistic' ), $link->description );
+		}
+		$body .= sprintf( __( "Amount due: \$%s\n\n", 'memberistic' ), $amount );
+		$body .= sprintf( __( "Pay securely here:\n%s\n\n", 'memberistic' ), $url );
+		if ( $link->expires_at ) {
+			$body .= sprintf( __( "This link expires on %s.\n\n", 'memberistic' ), mysql2date( get_option( 'date_format' ), $link->expires_at ) );
+		}
+		if ( $phone ) {
+			$body .= sprintf( __( "Questions? Call %s.\n\n", 'memberistic' ), $phone );
+		}
+		$body .= $brand;
+
+		// Staging redirect override.
+		$recipient = $link->recipient_email;
+		$override  = defined( 'MEMBERISTIC_EMAIL_OVERRIDE_RECIPIENT' )
+			? MEMBERISTIC_EMAIL_OVERRIDE_RECIPIENT
+			: (string) get_option( 'memberistic_email_override_recipient', '' );
+		if ( $override && is_email( $override ) ) {
+			$subject  = '[REROUTED -> ' . $recipient . '] ' . $subject;
+			$recipient = $override;
+		}
+
+		$headers = array( 'Content-Type: text/plain; charset=UTF-8', 'From: ' . $brand . ' <' . get_option( 'admin_email' ) . '>' );
+		$sent    = wp_mail( $recipient, $subject, $body, $headers );
+
+		if ( class_exists( '\WordPressistic\Memberistic\Database\Email_Logs_Repository' ) ) {
+			\WordPressistic\Memberistic\Database\Email_Logs_Repository::log( array(
+				'membership_id' => 0,
+				'template'      => 'corporate_payment_link',
+				'recipient'     => $recipient,
+				'subject'       => $subject,
+				'status'        => $sent ? 'sent' : 'failed',
+			) );
+		}
+		return (bool) $sent;
+	}
+
+	/* ---- WooCommerce ---- */
+
+	public static function wc_active() {
+		return class_exists( 'WooCommerce' ) && function_exists( 'wc_create_order' );
+	}
+
+	/**
+	 * Create a pending WC order with a single custom-amount fee line
+	 * and group metadata. Returns order id or 0.
+	 */
+	private static function create_wc_order( $group_id, $amount, $description, $recipient ) {
+		try {
+			$order = wc_create_order();
+			if ( is_wp_error( $order ) ) {
+				return 0;
+			}
+			// Add the custom amount as a fee (no product needed, never
+			// shown publicly in the shop).
+			$item = new \WC_Order_Item_Fee();
+			$item->set_name( $description ?: __( 'Corporate group payment', 'memberistic' ) );
+			$item->set_amount( $amount );
+			$item->set_total( $amount );
+			$order->add_item( $item );
+
+			if ( $recipient ) {
+				$order->set_billing_email( $recipient );
+			}
+			$group = Corporate_Groups_Repository::get( $group_id );
+			$order->update_meta_data( '_memberistic_group_id', (int) $group_id );
+			$order->update_meta_data( '_memberistic_payment_purpose', 'corporate_group_payment' );
+			$order->update_meta_data( '_memberistic_primary_user_id', $group ? (int) $group->primary_user_id : 0 );
+			$order->update_meta_data( '_memberistic_created_by', get_current_user_id() );
+			$order->calculate_totals();
+			$order->set_status( 'pending' );
+			$order->save();
+			return (int) $order->get_id();
+		} catch ( \Throwable $e ) {
+			return 0;
+		}
+	}
+
+	private static function random_token() {
+		// 40-char non-guessable token.
+		if ( function_exists( 'wp_generate_password' ) ) {
+			return wp_generate_password( 40, false, false );
+		}
+		return bin2hex( random_bytes( 20 ) );
+	}
+}
+
+/**
+ * Phase 3 — public payment endpoint + WC paid hook.
+ */
+final class Corporate_Pay {
+
+	/**
+	 * Handle /?memberistic_pay=TOKEN. Validates the token + status +
+	 * expiry, then redirects to the WC hosted pay page (gateway
+	 * agnostic). If WC isn't available or the order is gone, shows a
+	 * branded "contact us to complete payment" fallback.
+	 */
+	public static function maybe_handle_public_pay() {
+		if ( empty( $_GET['memberistic_pay'] ) ) { // phpcs:ignore WordPress.Security.NonceVerification.Recommended
+			return;
+		}
+		$token = sanitize_text_field( wp_unslash( $_GET['memberistic_pay'] ) ); // phpcs:ignore WordPress.Security.NonceVerification.Recommended
+		$link  = Corporate_Payment_Links_Repository::get_by_token( $token );
+
+		if ( ! $link ) {
+			self::render_message( __( 'Payment link not found', 'memberistic' ), __( 'This payment link is invalid. Please contact us for a new one.', 'memberistic' ), 404 );
+		}
+		if ( 'paid' === $link->status ) {
+			self::render_message( __( 'Already paid', 'memberistic' ), __( 'This payment has already been completed. Thank you!', 'memberistic' ), 200 );
+		}
+		if ( 'void' === $link->status ) {
+			self::render_message( __( 'Link cancelled', 'memberistic' ), __( 'This payment link has been cancelled. Please contact us.', 'memberistic' ), 410 );
+		}
+		if ( $link->expires_at && strtotime( $link->expires_at ) < time() ) {
+			self::render_message( __( 'Link expired', 'memberistic' ), __( 'This payment link has expired. Please contact us for a new one.', 'memberistic' ), 410 );
+		}
+
+		// WC order → hosted pay page.
+		if ( $link->wc_order_id && function_exists( 'wc_get_order' ) ) {
+			$order = wc_get_order( (int) $link->wc_order_id );
+			if ( $order && $order->needs_payment() ) {
+				wp_safe_redirect( $order->get_checkout_payment_url() );
+				exit;
+			}
+			if ( $order && ! $order->needs_payment() ) {
+				// Already paid at the WC layer — settle our record too.
+				Corporate_Payment_Service::mark_paid( (int) $link->id );
+				self::render_message( __( 'Already paid', 'memberistic' ), __( 'This payment has already been completed. Thank you!', 'memberistic' ), 200 );
+			}
+		}
+
+		// No WC order (WC inactive at creation) — branded fallback.
+		$amount = number_format( (float) $link->amount, 2 );
+		self::render_message(
+			sprintf( __( 'Amount due: $%s', 'memberistic' ), $amount ),
+			$link->description
+				? sprintf( __( '%1$s — to complete this payment, please call us. Reference: %2$s', 'memberistic' ), $link->description, esc_html( $token ) )
+				: __( 'To complete this payment, please call us.', 'memberistic' ),
+			200
+		);
+	}
+
+	/**
+	 * WC order paid → settle the matching payment link.
+	 */
+	public static function on_wc_paid( $order_id ) {
+		$order_id = (int) $order_id;
+		if ( ! $order_id ) {
+			return;
+		}
+		$link = Corporate_Payment_Links_Repository::get_by_order( $order_id );
+		if ( $link && 'paid' !== $link->status ) {
+			Corporate_Payment_Service::mark_paid( (int) $link->id, 'payment_link', 'WC #' . $order_id );
+		}
+	}
+
+	private static function render_message( $title, $body, $code = 200 ) {
+		nocache_headers();
+		status_header( (int) $code );
+		header( 'Content-Type: text/html; charset=utf-8' );
+		$brand = function_exists( '\WordPressistic\Memberistic\memberistic_get_brand_label' )
+			? \WordPressistic\Memberistic\memberistic_get_brand_label()
+			: get_bloginfo( 'name' );
+		echo '<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">';
+		echo '<title>' . esc_html( $brand ) . ' — ' . esc_html( $title ) . '</title>';
+		echo '<style>body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;background:#0F1115;color:#fff;margin:0;min-height:100vh;display:grid;place-items:center;padding:24px;}'
+			. '.b{max-width:440px;background:#1A1F26;border:1px solid #2A323D;border-radius:12px;padding:32px;text-align:center;}'
+			. '.brand{font-family:"Bebas Neue",Impact,sans-serif;letter-spacing:.18em;color:#C9A84C;text-transform:uppercase;font-size:13px;margin-bottom:18px;}'
+			. 'h1{font-size:24px;margin:0 0 12px;}p{color:#8A95A5;line-height:1.6;}</style></head><body>';
+		echo '<div class="b"><div class="brand">' . esc_html( $brand ) . '</div><h1>' . esc_html( $title ) . '</h1><p>' . esc_html( $body ) . '</p></div></body></html>';
+		exit;
 	}
 }
