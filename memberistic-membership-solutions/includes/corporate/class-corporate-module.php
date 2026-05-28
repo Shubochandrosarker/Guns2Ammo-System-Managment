@@ -52,6 +52,8 @@ final class Corporate_Module {
 		add_action( 'woocommerce_payment_complete',        array( Corporate_Pay::class, 'on_wc_paid' ) );
 		add_action( 'woocommerce_order_status_completed',  array( Corporate_Pay::class, 'on_wc_paid' ) );
 		add_action( 'woocommerce_order_status_processing', array( Corporate_Pay::class, 'on_wc_paid' ) );
+		// Stripe webhook backstop for payment links.
+		add_action( 'memberistic_stripe_webhook_event', array( Corporate_Pay::class, 'on_stripe_webhook' ), 10, 2 );
 		// Phase 4 — public waiver signing endpoint + waiver merge tag.
 		add_action( 'template_redirect', array( Corporate_Waiver::class, 'maybe_handle_public_waiver' ), 1 );
 		// Payment separation — flag membership-payment WC orders so they
@@ -701,7 +703,9 @@ final class Corporate_Admin {
 		$price    = (float) $group->custom_price;
 		$balance  = max( 0, $price - $paid );
 		$links    = Corporate_Payment_Links_Repository::for_group( $group->id );
+		$stripe   = Corporate_Payment_Service::stripe_active();
 		$wc       = Corporate_Payment_Service::wc_active();
+		$can_charge = $stripe || $wc;
 		?>
 		<?php if ( isset( $_GET['p_msg'] ) ) : // phpcs:ignore WordPress.Security.NonceVerification.Recommended ?>
 			<div class="notice notice-success is-dismissible"><p><?php echo esc_html( sanitize_text_field( wp_unslash( $_GET['p_msg'] ) ) ); // phpcs:ignore WordPress.Security.NonceVerification.Recommended ?></p></div>
@@ -714,8 +718,12 @@ final class Corporate_Admin {
 		</div>
 
 		<h3 style="margin-top:24px;"><?php esc_html_e( 'Payment links', 'memberistic' ); ?></h3>
-		<?php if ( ! $wc ) : ?>
-			<p class="description"><?php esc_html_e( 'WooCommerce is not active/enabled, so links cannot auto-charge. They still generate a trackable request; record the payment manually once received, or enable WooCommerce in Memberistic → Settings for online card payment.', 'memberistic' ); ?></p>
+		<?php if ( $stripe ) : ?>
+			<p class="description"><?php esc_html_e( 'Links open a branded Guns 2 Ammo invoice page; "Pay Now" takes the customer to secure Stripe checkout. Paid links auto-record on this group.', 'memberistic' ); ?></p>
+		<?php elseif ( $wc ) : ?>
+			<p class="description"><?php esc_html_e( 'Stripe is not enabled, so links use the WooCommerce pay page as a fallback after the branded invoice. Enable Stripe in Memberistic → Settings for the cleanest flow.', 'memberistic' ); ?></p>
+		<?php else : ?>
+			<p class="description"><?php esc_html_e( 'No payment gateway is enabled, so links show a branded invoice with a "call to pay" message. Enable Stripe in Memberistic → Settings to accept online card payments, or record payments manually below.', 'memberistic' ); ?></p>
 		<?php endif; ?>
 		<table class="wp-list-table widefat fixed striped">
 			<thead><tr>
@@ -1674,8 +1682,14 @@ final class Corporate_Payment_Service {
 		$token     = self::random_token();
 		$expires   = ( (int) $expiry_days > 0 ) ? gmdate( 'Y-m-d H:i:s', time() + ( (int) $expiry_days * DAY_IN_SECONDS ) ) : null;
 
+		// Payment rail priority: Stripe Checkout (branded, preceded by
+		// our branded invoice page on the membership URL). A WC order is
+		// only pre-created as a LEGACY fallback when Stripe isn't
+		// enabled but WooCommerce is — the public flow no longer dumps
+		// the customer onto a raw WC page; it always shows the branded
+		// Guns 2 Ammo invoice first.
 		$wc_order_id = 0;
-		if ( self::wc_active() ) {
+		if ( ! self::stripe_active() && self::wc_active() ) {
 			$wc_order_id = self::create_wc_order( $group_id, $amount, $description, $recipient );
 		}
 
@@ -1856,7 +1870,77 @@ final class Corporate_Payment_Service {
 		return (bool) $sent;
 	}
 
-	/* ---- WooCommerce ---- */
+	/* ---- Stripe (primary rail) ---- */
+
+	public static function stripe_active() {
+		return class_exists( '\WordPressistic\Memberistic\Payments\Stripe_Service' )
+			&& \WordPressistic\Memberistic\Payments\Stripe_Service::is_enabled();
+	}
+
+	/**
+	 * Create a one-time Stripe Checkout Session for a payment link's
+	 * custom amount. Returns the hosted Stripe checkout URL (on
+	 * checkout.stripe.com — branded with the store's Stripe logo +
+	 * business name) or a WP_Error. Metadata carries the link id so
+	 * the webhook + the success-return can settle it.
+	 */
+	public static function create_stripe_session( $link, $email = '' ) {
+		if ( ! self::stripe_active() ) {
+			return new \WP_Error( 'memberistic_stripe_off', __( 'Stripe is not enabled.', 'memberistic' ) );
+		}
+		$currency = strtolower( (string) \WordPressistic\Memberistic\memberistic_get_setting( 'currency', 'USD' ) );
+		$brand    = function_exists( '\WordPressistic\Memberistic\memberistic_get_brand_label' )
+			? \WordPressistic\Memberistic\memberistic_get_brand_label()
+			: get_bloginfo( 'name' );
+		$return   = self::public_url( $link->token );
+		// Stripe requires the literal {CHECKOUT_SESSION_ID} placeholder
+		// in success_url — it must NOT be URL-encoded, so we append it
+		// as a raw string rather than via add_query_arg.
+		$success  = add_query_arg( 'mpay', 'done', $return ) . '&session_id={CHECKOUT_SESSION_ID}';
+		$payload  = array(
+			'mode'                                          => 'payment',
+			'success_url'                                   => $success,
+			'cancel_url'                                    => add_query_arg( 'mpay', 'cancel', $return ),
+			'line_items[0][quantity]'                       => 1,
+			'line_items[0][price_data][currency]'           => $currency,
+			'line_items[0][price_data][unit_amount]'        => (int) round( (float) $link->amount * 100 ),
+			'line_items[0][price_data][product_data][name]' => $link->description ?: ( $brand . ' — ' . __( 'Group payment', 'memberistic' ) ),
+			'metadata[memberistic_payment_link_id]'         => (int) $link->id,
+			'metadata[memberistic_group_id]'                => (int) $link->group_id,
+			'metadata[memberistic_payment_purpose]'         => 'corporate_group_payment',
+			'payment_intent_data[metadata][memberistic_payment_link_id]' => (int) $link->id,
+		);
+		if ( $email && is_email( $email ) ) {
+			$payload['customer_email'] = $email;
+		}
+		$resp = \WordPressistic\Memberistic\Payments\Stripe_Service::request( 'POST', '/checkout/sessions', $payload );
+		if ( is_wp_error( $resp ) ) {
+			return $resp;
+		}
+		return ! empty( $resp['url'] ) ? $resp['url'] : new \WP_Error( 'memberistic_stripe_nourl', __( 'Stripe did not return a checkout URL.', 'memberistic' ) );
+	}
+
+	/**
+	 * Verify a returned Stripe session is paid, then settle the link.
+	 * Server-side (we re-fetch from Stripe), so it's safe to trust on
+	 * the success return without waiting for the webhook.
+	 */
+	public static function verify_and_settle_session( $link, $session_id ) {
+		if ( ! self::stripe_active() || '' === $session_id ) {
+			return false;
+		}
+		$session = \WordPressistic\Memberistic\Payments\Stripe_Service::request( 'GET', '/checkout/sessions/' . rawurlencode( $session_id ) );
+		if ( is_wp_error( $session ) ) {
+			return false;
+		}
+		if ( ( $session['payment_status'] ?? '' ) === 'paid' ) {
+			self::mark_paid( (int) $link->id, 'payment_link', 'Stripe ' . ( $session['payment_intent'] ?? $session_id ) );
+			return true;
+		}
+		return false;
+	}
+
+	/* ---- WooCommerce (legacy fallback rail) ---- */
 
 	public static function wc_active() {
 		return class_exists( 'WooCommerce' ) && function_exists( 'wc_create_order' );
@@ -1912,10 +1996,17 @@ final class Corporate_Payment_Service {
 final class Corporate_Pay {
 
 	/**
-	 * Handle /?memberistic_pay=TOKEN. Validates the token + status +
-	 * expiry, then redirects to the WC hosted pay page (gateway
-	 * agnostic). If WC isn't available or the order is gone, shows a
-	 * branded "contact us to complete payment" fallback.
+	 * Handle /?memberistic_pay=TOKEN.
+	 *
+	 * The customer always lands on a BRANDED Guns 2 Ammo invoice page
+	 * (this membership URL — never a raw WooCommerce page). The
+	 * invoice shows the line item + amount and a "Pay Now" button.
+	 * Pay Now (a nonce-protected POST back to this same URL) creates
+	 * a Stripe Checkout Session and redirects to Stripe's hosted,
+	 * branded payment page. On return we verify the session server-
+	 * side and settle the link; the Stripe webhook settles it too as
+	 * a backstop. Legacy links that already carry a WC order fall
+	 * back to the WC pay URL on Pay Now.
 	 */
 	public static function maybe_handle_public_pay() {
 		if ( empty( $_GET['memberistic_pay'] ) ) { // phpcs:ignore WordPress.Security.NonceVerification.Recommended
@@ -1925,45 +2016,138 @@ final class Corporate_Pay {
 		$link  = Corporate_Payment_Links_Repository::get_by_token( $token );
 
 		if ( ! $link ) {
-			self::render_message( __( 'Payment link not found', 'memberistic' ), __( 'This payment link is invalid. Please contact us for a new one.', 'memberistic' ), 404 );
+			self::render_invoice_message( __( 'Payment link not found', 'memberistic' ), __( 'This payment link is invalid. Please contact us for a new one.', 'memberistic' ), 404 );
 		}
+
+		// Returning from a Stripe checkout — verify + settle.
+		$mpay = isset( $_GET['mpay'] ) ? sanitize_key( wp_unslash( $_GET['mpay'] ) ) : ''; // phpcs:ignore WordPress.Security.NonceVerification.Recommended
+		if ( 'done' === $mpay ) {
+			$sid = isset( $_GET['session_id'] ) ? sanitize_text_field( wp_unslash( $_GET['session_id'] ) ) : ''; // phpcs:ignore WordPress.Security.NonceVerification.Recommended
+			if ( 'paid' !== $link->status && $sid ) {
+				Corporate_Payment_Service::verify_and_settle_session( $link, $sid );
+				$link = Corporate_Payment_Links_Repository::get_by_token( $token ); // refresh
+			}
+			self::render_invoice_message( __( 'Payment complete', 'memberistic' ), __( 'Thank you — your payment has been received. A receipt is on its way.', 'memberistic' ), 200 );
+		}
+		if ( 'cancel' === $mpay ) {
+			self::render_invoice( $link, $token, __( 'Payment cancelled — you can try again below.', 'memberistic' ) );
+		}
+
 		if ( 'paid' === $link->status ) {
-			self::render_message( __( 'Already paid', 'memberistic' ), __( 'This payment has already been completed. Thank you!', 'memberistic' ), 200 );
+			self::render_invoice_message( __( 'Already paid', 'memberistic' ), __( 'This payment has already been completed. Thank you!', 'memberistic' ), 200 );
 		}
 		if ( 'void' === $link->status ) {
-			self::render_message( __( 'Link cancelled', 'memberistic' ), __( 'This payment link has been cancelled. Please contact us.', 'memberistic' ), 410 );
+			self::render_invoice_message( __( 'Link cancelled', 'memberistic' ), __( 'This payment link has been cancelled. Please contact us.', 'memberistic' ), 410 );
 		}
 		if ( $link->expires_at && strtotime( $link->expires_at ) < time() ) {
-			self::render_message( __( 'Link expired', 'memberistic' ), __( 'This payment link has expired. Please contact us for a new one.', 'memberistic' ), 410 );
+			self::render_invoice_message( __( 'Link expired', 'memberistic' ), __( 'This payment link has expired. Please contact us for a new one.', 'memberistic' ), 410 );
 		}
 
-		// WC order → hosted pay page.
-		if ( $link->wc_order_id && function_exists( 'wc_get_order' ) ) {
-			$order = wc_get_order( (int) $link->wc_order_id );
-			if ( $order && $order->needs_payment() ) {
-				wp_safe_redirect( $order->get_checkout_payment_url() );
-				exit;
+		// Pay Now POST → start the payment.
+		if ( 'POST' === strtoupper( (string) ( $_SERVER['REQUEST_METHOD'] ?? '' ) ) ) {
+			if ( ! isset( $_POST['memberistic_pay_nonce'] ) || ! wp_verify_nonce( sanitize_text_field( wp_unslash( $_POST['memberistic_pay_nonce'] ) ), 'memberistic_pay_' . $token ) ) {
+				self::render_invoice( $link, $token, __( 'Session expired — please try again.', 'memberistic' ) );
 			}
-			if ( $order && ! $order->needs_payment() ) {
-				// Already paid at the WC layer — settle our record too.
-				Corporate_Payment_Service::mark_paid( (int) $link->id );
-				self::render_message( __( 'Already paid', 'memberistic' ), __( 'This payment has already been completed. Thank you!', 'memberistic' ), 200 );
+			// Primary: Stripe Checkout (branded hosted page).
+			if ( Corporate_Payment_Service::stripe_active() ) {
+				$url = Corporate_Payment_Service::create_stripe_session( $link, $link->recipient_email );
+				if ( ! is_wp_error( $url ) ) {
+					wp_redirect( $url ); // checkout.stripe.com — external, so wp_redirect not wp_safe_redirect
+					exit;
+				}
+				self::render_invoice( $link, $token, __( 'We could not start the secure checkout. Please try again or call us.', 'memberistic' ) );
 			}
+			// Legacy fallback: WC hosted pay page.
+			if ( $link->wc_order_id && function_exists( 'wc_get_order' ) ) {
+				$order = wc_get_order( (int) $link->wc_order_id );
+				if ( $order && $order->needs_payment() ) {
+					wp_safe_redirect( $order->get_checkout_payment_url() );
+					exit;
+				}
+			}
+			// No gateway available.
+			self::render_invoice( $link, $token, __( 'Online payment is not available right now — please call us to complete this payment.', 'memberistic' ) );
 		}
 
-		// No WC order (WC inactive at creation) — branded fallback.
-		$amount = number_format( (float) $link->amount, 2 );
-		self::render_message(
-			sprintf( __( 'Amount due: $%s', 'memberistic' ), $amount ),
-			$link->description
-				? sprintf( __( '%1$s — to complete this payment, please call us. Reference: %2$s', 'memberistic' ), $link->description, esc_html( $token ) )
-				: __( 'To complete this payment, please call us.', 'memberistic' ),
-			200
-		);
+		// GET → show the branded invoice.
+		self::render_invoice( $link, $token );
 	}
 
 	/**
-	 * WC order paid → settle the matching payment link.
+	 * Branded Guns 2 Ammo invoice page with a Pay Now button.
+	 */
+	private static function render_invoice( $link, $token, $notice = '' ) {
+		$brand = function_exists( '\WordPressistic\Memberistic\memberistic_get_brand_label' )
+			? \WordPressistic\Memberistic\memberistic_get_brand_label()
+			: get_bloginfo( 'name' );
+		$logo_id  = (int) get_theme_mod( 'custom_logo' );
+		$logo_url = $logo_id ? wp_get_attachment_image_url( $logo_id, 'medium' ) : '';
+		$amount   = number_format( (float) $link->amount, 2 );
+		$inv_no   = 'INV-' . str_pad( (string) (int) $link->id, 5, '0', STR_PAD_LEFT );
+		$phone    = (string) \WordPressistic\Memberistic\memberistic_get_setting( 'business_phone', '' );
+		$can_pay  = Corporate_Payment_Service::stripe_active() || ( $link->wc_order_id && function_exists( 'wc_get_order' ) );
+
+		nocache_headers();
+		status_header( 200 );
+		header( 'Content-Type: text/html; charset=utf-8' );
+		?>
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title><?php echo esc_html( $brand ); ?> — <?php echo esc_html( $inv_no ); ?></title>
+<style>
+*{box-sizing:border-box}body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;background:#0F1115;color:#fff;margin:0;min-height:100vh;display:grid;place-items:center;padding:24px;}
+.inv{max-width:480px;width:100%;background:#1A1F26;border:1px solid #2A323D;border-radius:14px;overflow:hidden;box-shadow:0 24px 70px rgba(0,0,0,.5);}
+.inv__head{background:#0F1115;padding:24px;border-bottom:3px solid #C9A84C;text-align:center;}
+.inv__head img{max-height:48px;width:auto;max-width:220px;}
+.inv__brand{font-family:"Bebas Neue",Impact,sans-serif;letter-spacing:.12em;color:#C9A84C;text-transform:uppercase;font-size:22px;}
+.inv__no{font-family:"Space Mono",monospace;font-size:11px;letter-spacing:.2em;color:#8A95A5;text-transform:uppercase;margin-top:8px;}
+.inv__body{padding:28px 24px;}
+.inv__row{display:flex;justify-content:space-between;align-items:flex-start;padding:14px 0;border-bottom:1px solid #2A323D;}
+.inv__row .lbl{color:#8A95A5;font-size:13px;}.inv__row .val{color:#fff;font-size:15px;text-align:right;max-width:60%;}
+.inv__total{display:flex;justify-content:space-between;align-items:center;padding:18px 0 4px;}
+.inv__total .lbl{font-family:"Space Mono",monospace;letter-spacing:.18em;text-transform:uppercase;color:#8A95A5;font-size:12px;}
+.inv__total .amt{font-family:"Bebas Neue",Impact,sans-serif;font-size:38px;color:#C9A84C;line-height:1;}
+.inv__btn{display:block;width:100%;margin-top:22px;padding:16px;background:#E8802F;color:#111;border:0;border-radius:6px;font-weight:700;font-size:16px;letter-spacing:.06em;text-transform:uppercase;cursor:pointer;}
+.inv__btn:hover{background:#f4922f;}
+.inv__secure{text-align:center;color:#5A6371;font-size:11px;letter-spacing:.08em;margin-top:14px;}
+.inv__notice{background:rgba(232,128,47,.12);border:1px solid rgba(232,128,47,.4);color:#E8802F;padding:10px 14px;border-radius:6px;font-size:13px;margin-bottom:16px;}
+.inv__foot{text-align:center;color:#5A6371;font-size:12px;padding:0 24px 22px;}
+</style></head><body>
+<div class="inv">
+  <div class="inv__head">
+    <?php if ( $logo_url ) : ?><img src="<?php echo esc_url( $logo_url ); ?>" alt="<?php echo esc_attr( $brand ); ?>"><?php else : ?><div class="inv__brand"><?php echo esc_html( $brand ); ?></div><?php endif; ?>
+    <div class="inv__no"><?php echo esc_html( $inv_no ); ?></div>
+  </div>
+  <div class="inv__body">
+    <?php if ( $notice ) : ?><div class="inv__notice"><?php echo esc_html( $notice ); ?></div><?php endif; ?>
+    <div class="inv__row"><span class="lbl"><?php esc_html_e( 'Description', 'memberistic' ); ?></span><span class="val"><?php echo esc_html( $link->description ?: __( 'Membership payment', 'memberistic' ) ); ?></span></div>
+    <?php if ( $link->expires_at ) : ?>
+    <div class="inv__row"><span class="lbl"><?php esc_html_e( 'Pay before', 'memberistic' ); ?></span><span class="val"><?php echo esc_html( mysql2date( get_option( 'date_format' ), $link->expires_at ) ); ?></span></div>
+    <?php endif; ?>
+    <div class="inv__total"><span class="lbl"><?php esc_html_e( 'Amount due', 'memberistic' ); ?></span><span class="amt">$<?php echo esc_html( $amount ); ?></span></div>
+    <?php if ( $can_pay ) : ?>
+      <form method="post">
+        <?php wp_nonce_field( 'memberistic_pay_' . $token, 'memberistic_pay_nonce' ); ?>
+        <button type="submit" class="inv__btn"><?php esc_html_e( 'Pay Now', 'memberistic' ); ?></button>
+      </form>
+      <div class="inv__secure">🔒 <?php esc_html_e( 'Secure payment via Stripe', 'memberistic' ); ?></div>
+    <?php else : ?>
+      <p style="color:#8A95A5;text-align:center;margin-top:18px;"><?php echo esc_html( $phone ? sprintf( __( 'To pay, please call us at %s.', 'memberistic' ), $phone ) : __( 'To pay, please contact us.', 'memberistic' ) ); ?></p>
+    <?php endif; ?>
+  </div>
+  <div class="inv__foot"><?php echo esc_html( $brand ); ?><?php echo $phone ? ' · ' . esc_html( $phone ) : ''; ?></div>
+</div>
+</body></html>
+		<?php
+		exit;
+	}
+
+	/** Simple branded message page (paid / expired / error states). */
+	private static function render_invoice_message( $title, $body, $code = 200 ) {
+		self::render_message( $title, $body, $code );
+	}
+
+	/**
+	 * WC order paid → settle the matching payment link (legacy links).
 	 */
 	public static function on_wc_paid( $order_id ) {
 		$order_id = (int) $order_id;
@@ -1973,6 +2157,29 @@ final class Corporate_Pay {
 		$link = Corporate_Payment_Links_Repository::get_by_order( $order_id );
 		if ( $link && 'paid' !== $link->status ) {
 			Corporate_Payment_Service::mark_paid( (int) $link->id, 'payment_link', 'WC #' . $order_id );
+		}
+	}
+
+	/**
+	 * Stripe webhook backstop. Fires for every webhook event via the
+	 * memberistic_stripe_webhook_event action. Settles a payment link
+	 * when its checkout session completes (idempotent — the success
+	 * return may have already settled it).
+	 *
+	 * @param string $type  Event type.
+	 * @param array  $obj   The event data object.
+	 */
+	public static function on_stripe_webhook( $type, $obj ) {
+		if ( 'checkout.session.completed' !== $type || ! is_array( $obj ) ) {
+			return;
+		}
+		$link_id = isset( $obj['metadata']['memberistic_payment_link_id'] ) ? (int) $obj['metadata']['memberistic_payment_link_id'] : 0;
+		if ( $link_id <= 0 ) {
+			return; // not one of ours (membership-plan checkouts handled elsewhere)
+		}
+		if ( ( $obj['payment_status'] ?? '' ) === 'paid' ) {
+			$pi = isset( $obj['payment_intent'] ) ? (string) $obj['payment_intent'] : '';
+			Corporate_Payment_Service::mark_paid( $link_id, 'payment_link', 'Stripe ' . $pi );
 		}
 	}
 
