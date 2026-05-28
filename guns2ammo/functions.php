@@ -138,6 +138,7 @@ add_filter( 'body_class', function ( $classes ) {
 } );
 
 /* ---------- SEO + Schema ---------- */
+require_once G2A_DIR . '/inc/business-info.php';
 require_once G2A_DIR . '/inc/seo.php';
 
 /* ---------- WooCommerce tweaks ---------- */

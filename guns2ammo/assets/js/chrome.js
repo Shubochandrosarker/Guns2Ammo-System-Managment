@@ -145,17 +145,40 @@
     });
 
     /* ===== Live Open/Closed pill =====
+     * Reads from window.g2aBiz (localized by inc/business-info.php)
+     * so the schema JSON-LD, the footer hours block, the contact
+     * page, and this pill all draw from one source of truth. No
+     * more hard-coded "Today Tue" or 449/500 drift.
+     *
      * Uses Mesa, AZ local time (America/Phoenix — no DST) so a
-     * visitor in any timezone sees the range's real status. The old
-     * implementation used `new Date()` directly which is the user's
-     * local time, so a Mesa customer in Phoenix saw correct hours
-     * but anyone outside Arizona saw the wrong status.
+     * visitor in any timezone sees the range's real status.
      */
     var liveEl = document.getElementById('g2a-live-status');
     if (liveEl) {
+      var BIZ = (window.g2aBiz && typeof window.g2aBiz === 'object') ? window.g2aBiz : null;
+      var TZ  = (BIZ && BIZ.tz)  ? BIZ.tz  : 'America/Phoenix';
       var fmt = function (m) { var h = Math.floor(m / 60); var am = h < 12; var h12 = h % 12 || 12; return h12 + (am ? 'am' : 'pm'); };
-      // Mesa hours (minutes from midnight). Sun(0): 12-6 / Mon-Thu(1-4): 10-6 / Fri(5): 10-7 / Sat(6): 10-7.
-      var ranges = { 0: [720, 1080], 1: [600, 1080], 2: [600, 1080], 3: [600, 1080], 4: [600, 1080], 5: [600, 1140], 6: [600, 1140] };
+      var weekdayName = function (d) { return ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'][d]; };
+      var weekdayShort = function (d) { return ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][d]; };
+      // Build ranges from the localized BIZ.hours map. Each entry
+      // is either { open, close } in minutes-from-midnight or null
+      // for closed-on-this-day. Falls back to the historical
+      // hardcoded schedule only if BIZ is missing entirely (which
+      // would mean the localizer didn't run — broken install).
+      var ranges = {};
+      if (BIZ && BIZ.hours) {
+        for (var k in BIZ.hours) {
+          if (Object.prototype.hasOwnProperty.call(BIZ.hours, k)) {
+            var h = BIZ.hours[k];
+            if (h && typeof h.open === 'number' && typeof h.close === 'number' && h.close > h.open) {
+              ranges[k] = [h.open, h.close];
+            }
+          }
+        }
+      }
+      if (Object.keys(ranges).length === 0) {
+        ranges = { 0:[720,1080], 1:[600,1080], 2:[600,1080], 3:[600,1080], 4:[600,1080], 5:[600,1140], 6:[600,1140] };
+      }
       function mesaNow() {
         // Robust Mesa-time read. Earlier version used
         // hourCycle: 'h23', which Safari + some Firefox builds
@@ -170,7 +193,7 @@
         try {
           var d = new Date();
           var time = d.toLocaleString('en-US', {
-            timeZone: 'America/Phoenix',
+            timeZone: TZ,
             hour: '2-digit', minute: '2-digit', hour12: false
           });
           // time is "HH:MM" or "HH:MM:SS" or "24:00" — match HH:MM only.
@@ -180,7 +203,7 @@
           if (hr === 24) hr = 0; // some engines report 24:00 for midnight
           // Weekday separately — short en-US ("Mon", "Tue", …)
           var wd = d.toLocaleString('en-US', {
-            timeZone: 'America/Phoenix',
+            timeZone: TZ,
             weekday: 'short'
           });
           var wdMap = { Sun: 0, Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6 };
@@ -196,12 +219,43 @@
         var m = mesaNow();
         var r = ranges[m.day];
         var open = r && m.mins >= r[0] && m.mins < r[1];
+        var closed_today = !r; // entire day flagged closed in settings
+        var before_open = r && m.mins < r[0];
         liveEl.classList.toggle('open', !!open);
         liveEl.classList.toggle('closed', !open);
         var lbl = document.getElementById('g2a-live-label');
         var tm  = document.getElementById('g2a-live-time');
+        // Real day name (instead of literal "Today Tue" hard-coded
+        // earlier). When closed today, surface the NEXT open day
+        // and its hours so a visitor at 9pm Sunday isn't left
+        // staring at "Closed" with no next-step info.
+        var todayShort = weekdayShort(m.day);
         if (lbl) lbl.textContent = open ? 'Open Now' : 'Closed';
-        if (tm)  tm.textContent  = open ? ' Until ' + fmt(r[1]) + ' MST' : (r ? ' Today ' + fmt(r[0]) + '-' + fmt(r[1]) + ' MST' : 'Closed');
+        if (tm) {
+          if (open) {
+            tm.textContent = ' Until ' + fmt(r[1]) + ' MST';
+          } else if (before_open) {
+            tm.textContent = ' Opens ' + fmt(r[0]) + ' MST';
+          } else if (closed_today) {
+            // Find next day with hours
+            var nextDay = m.day, hops = 0;
+            while (hops < 7) {
+              nextDay = (nextDay + 1) % 7; hops++;
+              if (ranges[nextDay]) {
+                tm.textContent = ' Opens ' + weekdayShort(nextDay) + ' ' + fmt(ranges[nextDay][0]) + ' MST';
+                return;
+              }
+            }
+            tm.textContent = ' Hours unavailable';
+          } else {
+            // After close — show today's hours and next day's open
+            var nextDay2 = (m.day + 1) % 7;
+            var nr = ranges[nextDay2];
+            tm.textContent = nr
+              ? ' Opens ' + weekdayShort(nextDay2) + ' ' + fmt(nr[0]) + ' MST'
+              : ' Closed today  ' + todayShort;
+          }
+        }
       };
       update();
       setInterval(update, 60000);
