@@ -52,6 +52,13 @@ final class Corporate_Module {
 		add_action( 'woocommerce_payment_complete',        array( Corporate_Pay::class, 'on_wc_paid' ) );
 		add_action( 'woocommerce_order_status_completed',  array( Corporate_Pay::class, 'on_wc_paid' ) );
 		add_action( 'woocommerce_order_status_processing', array( Corporate_Pay::class, 'on_wc_paid' ) );
+		// Phase 4 — public waiver signing endpoint + waiver merge tag.
+		add_action( 'template_redirect', array( Corporate_Waiver::class, 'maybe_handle_public_waiver' ), 1 );
+		// Payment separation — flag membership-payment WC orders so they
+		// are never counted as product sales; Memberistic is the single
+		// source of truth for membership revenue.
+		add_action( 'woocommerce_admin_order_data_after_order_details', array( Corporate_WC_Separation::class, 'admin_order_badge' ) );
+		add_filter( 'woocommerce_analytics_update_order_stats_data', array( Corporate_WC_Separation::class, 'exclude_from_analytics' ), 10, 2 );
 		// Admin UI.
 		if ( is_admin() ) {
 			add_action( 'admin_menu', array( Corporate_Admin::class, 'menu' ), 30 );
@@ -66,6 +73,8 @@ final class Corporate_Module {
 			add_action( 'admin_post_memberistic_corp_resend_link',    array( Corporate_Admin::class, 'handle_resend_link' ) );
 			add_action( 'admin_post_memberistic_corp_mark_link_paid', array( Corporate_Admin::class, 'handle_mark_link_paid' ) );
 			add_action( 'admin_post_memberistic_corp_void_link',      array( Corporate_Admin::class, 'handle_void_link' ) );
+			add_action( 'admin_post_memberistic_corp_resend_waiver',   array( Corporate_Admin::class, 'handle_resend_waiver' ) );
+			add_action( 'admin_post_memberistic_corp_waiver_exception', array( Corporate_Admin::class, 'handle_waiver_exception' ) );
 			add_action( 'admin_enqueue_scripts', array( Corporate_Admin::class, 'assets' ) );
 		}
 	}
@@ -659,6 +668,7 @@ final class Corporate_Admin {
 			'overview' => __( 'Overview', 'memberistic' ),
 			'members'  => __( 'Members', 'memberistic' ),
 			'payments' => __( 'Payments', 'memberistic' ),
+			'waivers'  => __( 'Waivers', 'memberistic' ),
 			'settings' => __( 'Settings', 'memberistic' ),
 		);
 		echo '<div class="wrap g2a-corp-wrap">';
@@ -675,6 +685,8 @@ final class Corporate_Admin {
 			self::render_members_tab( $group );
 		} elseif ( 'payments' === $tab ) {
 			self::render_payments_tab( $group );
+		} elseif ( 'waivers' === $tab ) {
+			self::render_waivers_tab( $group );
 		} elseif ( 'settings' === $tab ) {
 			echo '<div style="margin-top:18px;"></div>';
 			self::render_form( $group, false );
@@ -800,6 +812,59 @@ final class Corporate_Admin {
 		}
 	}
 
+	private static function render_waivers_tab( $group ) {
+		$members = Corporate_Members_Repository::for_group( $group->id );
+		$signed = 0;
+		foreach ( $members as $m ) {
+			if ( 'signed' === $m->waiver_status ) {
+				$signed++;
+			}
+		}
+		$total = count( $members );
+		$pct   = $total ? round( ( $signed / $total ) * 100 ) : 0;
+		?>
+		<?php if ( isset( $_GET['w_msg'] ) ) : // phpcs:ignore WordPress.Security.NonceVerification.Recommended ?>
+			<div class="notice notice-success is-dismissible"><p><?php echo esc_html( sanitize_text_field( wp_unslash( $_GET['w_msg'] ) ) ); // phpcs:ignore WordPress.Security.NonceVerification.Recommended ?></p></div>
+		<?php endif; ?>
+		<p style="margin-top:18px;"><strong><?php echo esc_html( $signed . ' / ' . $total ); ?></strong> <?php esc_html_e( 'waivers signed', 'memberistic' ); ?> (<?php echo esc_html( $pct ); ?>%).</p>
+		<table class="wp-list-table widefat fixed striped" style="margin-top:10px;">
+			<thead><tr>
+				<th><?php esc_html_e( 'Member', 'memberistic' ); ?></th>
+				<th><?php esc_html_e( 'Email', 'memberistic' ); ?></th>
+				<th><?php esc_html_e( 'Waiver status', 'memberistic' ); ?></th>
+				<th><?php esc_html_e( 'Actions', 'memberistic' ); ?></th>
+			</tr></thead>
+			<tbody>
+				<?php if ( empty( $members ) ) : ?>
+					<tr><td colspan="4"><?php esc_html_e( 'No members yet.', 'memberistic' ); ?></td></tr>
+				<?php else : foreach ( $members as $m ) :
+					$u      = $m->user_id ? get_userdata( $m->user_id ) : null;
+					$signed_ok = ( 'signed' === $m->waiver_status );
+					$resend = wp_nonce_url( admin_url( 'admin-post.php?action=memberistic_corp_resend_waiver&member_id=' . (int) $m->id ), 'memberistic_corp_resend_waiver_' . (int) $m->id );
+					$openurl = $m->user_id ? Corporate_Waiver_Service::waiver_url( (int) $m->user_id ) : '';
+					$except = wp_nonce_url( admin_url( 'admin-post.php?action=memberistic_corp_waiver_exception&member_id=' . (int) $m->id ), 'memberistic_corp_waiver_exception_' . (int) $m->id );
+				?>
+					<tr>
+						<td><strong><?php echo $u ? esc_html( $u->display_name ) : '&mdash;'; ?></strong></td>
+						<td><?php echo $u ? esc_html( $u->user_email ) : '&mdash;'; ?></td>
+						<td><span class="g2a-corp-badge <?php echo $signed_ok ? 'paid' : 'unpaid'; ?>"><?php echo esc_html( ucfirst( $m->waiver_status ?: 'missing' ) ); ?></span></td>
+						<td>
+							<?php if ( ! $signed_ok ) : ?>
+								<?php if ( $u ) : ?><a class="button button-small" href="<?php echo esc_url( $resend ); ?>"><?php esc_html_e( 'Resend waiver', 'memberistic' ); ?></a><?php endif; ?>
+								<?php if ( $openurl ) : ?><a class="button button-small" href="<?php echo esc_url( $openurl ); ?>" target="_blank" rel="noopener"><?php esc_html_e( 'Open signing link', 'memberistic' ); ?></a><?php endif; ?>
+								<a class="button button-small" href="<?php echo esc_url( $except ); ?>" onclick="return confirm('<?php echo esc_js( __( 'Mark this waiver complete as a manual staff exception?', 'memberistic' ) ); ?>');"><?php esc_html_e( 'Mark complete (exception)', 'memberistic' ); ?></a>
+							<?php else : ?>
+								&mdash;
+							<?php endif; ?>
+						</td>
+					</tr>
+				<?php endforeach; endif; ?>
+			</tbody>
+		</table>
+		<p class="description" style="margin-top:10px;"><?php esc_html_e( 'Members receive a waiver link in their welcome email. They can sign from any device with no login required. Signed waivers are valid for one year.', 'memberistic' ); ?></p>
+		<?php
+	}
+
 	private static function render_members_tab( $group ) {
 		$members  = Corporate_Members_Repository::for_group( $group->id );
 		$used     = count( $members );
@@ -835,7 +900,7 @@ final class Corporate_Admin {
 					<tr>
 						<td><strong><?php echo $u ? esc_html( $u->display_name ) : '&mdash;'; ?></strong></td>
 						<td><?php echo $u ? esc_html( $u->user_email ) : '&mdash;'; ?></td>
-						<td><span class="g2a-corp-badge <?php echo 'completed' === $m->waiver_status ? 'paid' : 'unpaid'; ?>"><?php echo esc_html( ucfirst( $m->waiver_status ?: 'missing' ) ); ?></span></td>
+						<td><span class="g2a-corp-badge <?php echo 'signed' === $m->waiver_status ? 'paid' : 'unpaid'; ?>"><?php echo esc_html( ucfirst( $m->waiver_status ?: 'missing' ) ); ?></span></td>
 						<td><?php echo $m->qr_token ? '<span class="g2a-corp-badge active">' . esc_html__( 'Ready', 'memberistic' ) . '</span>' : '&mdash;'; ?></td>
 						<td>
 							<a href="<?php echo esc_url( $resend_url ); ?>" class="button button-small"><?php esc_html_e( 'Resend email', 'memberistic' ); ?></a>
@@ -1044,6 +1109,39 @@ final class Corporate_Admin {
 			self::single_redirect( (int) $link->group_id, 'payments', array( 'p_msg' => rawurlencode( __( 'Link voided.', 'memberistic' ) ) ) );
 		}
 		self::single_redirect( 0, 'payments' );
+	}
+
+	/* ---- Phase 4 waiver handlers ---- */
+
+	public static function handle_resend_waiver() {
+		if ( ! current_user_can( Corporate_Capabilities::manage_cap() ) ) {
+			wp_die( esc_html__( 'Permission denied.', 'memberistic' ) );
+		}
+		$mid = isset( $_GET['member_id'] ) ? (int) $_GET['member_id'] : 0;
+		check_admin_referer( 'memberistic_corp_resend_waiver_' . $mid );
+		$member = Corporate_Members_Repository::get( $mid );
+		if ( $member && $member->user_id && $member->membership_id ) {
+			$user = get_userdata( (int) $member->user_id );
+			if ( $user ) {
+				Corporate_Waiver_Service::send_waiver_email( (int) $member->membership_id, $user );
+			}
+			self::single_redirect( (int) $member->group_id, 'waivers', array( 'w_msg' => rawurlencode( __( 'Waiver email sent.', 'memberistic' ) ) ) );
+		}
+		self::single_redirect( 0, 'waivers' );
+	}
+
+	public static function handle_waiver_exception() {
+		if ( ! current_user_can( Corporate_Capabilities::manage_cap() ) ) {
+			wp_die( esc_html__( 'Permission denied.', 'memberistic' ) );
+		}
+		$mid = isset( $_GET['member_id'] ) ? (int) $_GET['member_id'] : 0;
+		check_admin_referer( 'memberistic_corp_waiver_exception_' . $mid );
+		$member = Corporate_Members_Repository::get( $mid );
+		if ( $member && $member->user_id ) {
+			Corporate_Waiver_Service::mark_signed( (int) $member->user_id, __( 'Staff manual exception', 'memberistic' ) );
+			self::single_redirect( (int) $member->group_id, 'waivers', array( 'w_msg' => rawurlencode( __( 'Waiver marked complete (staff exception).', 'memberistic' ) ) ) );
+		}
+		self::single_redirect( 0, 'waivers' );
 	}
 }
 
@@ -1306,6 +1404,7 @@ final class Corporate_Member_Service {
 		$qr_url = class_exists( '\WordPressistic\Memberistic\Utilities\Verification' )
 			? \WordPressistic\Memberistic\Utilities\Verification::verify_url( $user->ID )
 			: '';
+		$waiver_url = Corporate_Waiver_Service::waiver_url( $user->ID );
 
 		\WordPressistic\Memberistic\Emails\Email_Service::send_membership_email(
 			$membership_id,
@@ -1315,6 +1414,7 @@ final class Corporate_Member_Service {
 				'corp_company_name' => $group->company_name,
 				'corp_set_password' => $set_password_url,
 				'corp_qr_url'       => $qr_url,
+				'corp_waiver_url'   => $waiver_url,
 				'corp_is_new_user'  => $is_new_user ? '1' : '0',
 			)
 		);
@@ -1412,6 +1512,13 @@ final class Corporate_Emails {
 				$context['{brand_label}'] ?? get_bloginfo( 'name' )
 			);
 		}
+		if ( 'corporate_waiver_request' === $template ) {
+			return sprintf(
+				/* translators: %s: brand */
+				__( 'Action needed: sign your %s range waiver', 'memberistic' ),
+				$context['{brand_label}'] ?? get_bloginfo( 'name' )
+			);
+		}
 		return $subject;
 	}
 
@@ -1425,11 +1532,17 @@ final class Corporate_Emails {
 				. "You've been added to the {corp_group_name} group membership at {brand_label}. Your individual range account is ready.\n\n"
 				. $claim_line
 				. "Your account dashboard (digital card, booking, history):\n{account_url}\n\n"
-				. "Complete your range waiver before your first visit:\n{account_url}\n\n"
+				. "Complete your range waiver before your first visit (takes 30 seconds):\n{corp_waiver_url}\n\n"
 				. "Your check-in QR code (show at the range desk or save your digital card):\n{corp_qr_url}\n\n"
 				. "Book a lane any time:\n{booking_url}\n\n"
 				. "Questions? Call {business_phone}.\n\n"
 				. "See you at the range.\n{brand_label}";
+		}
+		if ( 'corporate_waiver_request' === $template ) {
+			return "Hi {member_name},\n\n"
+				. "Before your first visit to {brand_label}, please complete your range waiver. It only takes about 30 seconds and means you're ready to shoot the moment you arrive.\n\n"
+				. "Sign your waiver here:\n{corp_waiver_url}\n\n"
+				. "Questions? Call {business_phone}.\n\n{brand_label}";
 		}
 		if ( 'group_owner_summary' === $template ) {
 			return "Hi {member_name},\n\n"
@@ -1444,7 +1557,7 @@ final class Corporate_Emails {
 	}
 
 	public static function merge_tags( $context, $membership, $person, $extra ) {
-		foreach ( array( 'corp_group_name', 'corp_company_name', 'corp_set_password', 'corp_qr_url', 'corp_seats_used', 'corp_seats_total', 'corp_paid_total', 'corp_is_new_user' ) as $key ) {
+		foreach ( array( 'corp_group_name', 'corp_company_name', 'corp_set_password', 'corp_qr_url', 'corp_waiver_url', 'corp_seats_used', 'corp_seats_total', 'corp_paid_total', 'corp_is_new_user' ) as $key ) {
 			$context[ '{' . $key . '}' ] = isset( $extra[ $key ] ) ? (string) $extra[ $key ] : '';
 		}
 		return $context;
@@ -1578,11 +1691,14 @@ final class Corporate_Payment_Service {
 		) );
 
 		// Link the WC order back to the payment-link id for the
-		// reverse lookup on the paid hook.
+		// reverse lookup on the paid hook, and stamp an order note so
+		// staff reading the WC order know this is a membership payment
+		// (recorded authoritatively in Memberistic, not a product sale).
 		if ( $wc_order_id && function_exists( 'wc_get_order' ) ) {
 			$order = wc_get_order( $wc_order_id );
 			if ( $order ) {
 				$order->update_meta_data( '_memberistic_payment_link_id', $link_id );
+				$order->add_order_note( __( 'Membership / group payment link. Recorded in Memberistic; excluded from product-sales reports.', 'memberistic' ) );
 				$order->save();
 			}
 		}
@@ -1875,5 +1991,276 @@ final class Corporate_Pay {
 			. 'h1{font-size:24px;margin:0 0 12px;}p{color:#8A95A5;line-height:1.6;}</style></head><body>';
 		echo '<div class="b"><div class="brand">' . esc_html( $brand ) . '</div><h1>' . esc_html( $title ) . '</h1><p>' . esc_html( $body ) . '</p></div></body></html>';
 		exit;
+	}
+}
+
+/**
+ * Phase 4 — waiver automation.
+ *
+ * Reuses the canonical waiver fields on memberistic_people
+ * (waiver_status: missing|signed|expired|needs_review|rejected,
+ * waiver_signed_at, waiver_expires_at) and mirrors the signed
+ * state onto memberistic_group_members for the group view. The
+ * signing surface is a tokenized public page; no login required so
+ * a member can sign from the link in their welcome email before
+ * they've ever set a password.
+ */
+final class Corporate_Waiver_Service {
+
+	const TOKEN_META = 'memberistic_waiver_token';
+	const QUERY      = 'memberistic_waiver';
+
+	/** Validity window in days (filterable). */
+	public static function validity_days() {
+		return (int) apply_filters( 'memberistic_waiver_validity_days', 365 );
+	}
+
+	public static function get_or_create_token( $user_id ) {
+		$user_id = (int) $user_id;
+		if ( $user_id <= 0 ) {
+			return '';
+		}
+		$t = (string) get_user_meta( $user_id, self::TOKEN_META, true );
+		if ( '' === $t ) {
+			$t = wp_generate_password( 40, false, false );
+			update_user_meta( $user_id, self::TOKEN_META, $t );
+		}
+		return $t;
+	}
+
+	public static function waiver_url( $user_id ) {
+		$t = self::get_or_create_token( $user_id );
+		return $t ? add_query_arg( self::QUERY, $t, home_url( '/' ) ) : home_url( '/account/' );
+	}
+
+	public static function user_by_token( $token ) {
+		global $wpdb;
+		$uid = (int) $wpdb->get_var( $wpdb->prepare(
+			"SELECT user_id FROM {$wpdb->usermeta} WHERE meta_key = %s AND meta_value = %s LIMIT 1",
+			self::TOKEN_META,
+			$token
+		) );
+		return $uid ?: 0;
+	}
+
+	/**
+	 * Default waiver body. Filterable so the client can replace it
+	 * without code (e.g. via a settings field later). Plain, neutral
+	 * liability language — NOT legal advice; the range should have
+	 * counsel review the final text.
+	 */
+	public static function waiver_text() {
+		$brand = function_exists( '\WordPressistic\Memberistic\memberistic_get_brand_label' )
+			? \WordPressistic\Memberistic\memberistic_get_brand_label()
+			: get_bloginfo( 'name' );
+		$default = sprintf(
+			__( 'I acknowledge that the use of firearms and the shooting range at %s involves inherent risks. I confirm I am legally permitted to handle firearms, will follow all posted range rules and staff instructions at all times, and assume responsibility for my own safety and conduct on the premises. I release %s, its owners, staff, and affiliates from liability for injury or loss arising from my voluntary participation, to the extent permitted by law.', 'memberistic' ),
+			$brand,
+			$brand
+		);
+		return (string) apply_filters( 'memberistic_waiver_text', $default );
+	}
+
+	/**
+	 * Record a signature. Updates the person record (canonical) and
+	 * the group_members mirror. Returns true on success.
+	 */
+	public static function mark_signed( $user_id, $typed_name = '' ) {
+		$user_id = (int) $user_id;
+		if ( $user_id <= 0 ) {
+			return false;
+		}
+		$now     = current_time( 'mysql' );
+		$expires = gmdate( 'Y-m-d H:i:s', time() + ( self::validity_days() * DAY_IN_SECONDS ) );
+
+		// Update every person record tied to this user (a user may be a
+		// primary on their own membership). Canonical status = 'signed'.
+		$membership = \WordPressistic\Memberistic\Database\Memberships_Repository::get_by_user_id( $user_id );
+		if ( $membership ) {
+			$person = \WordPressistic\Memberistic\Database\People_Repository::get_primary_by_membership( (int) $membership['id'] );
+			if ( $person ) {
+				\WordPressistic\Memberistic\Database\People_Repository::update( (int) $person['id'], array(
+					'waiver_status'     => 'signed',
+					'waiver_signed_at'  => $now,
+					'waiver_expires_at' => $expires,
+				) );
+			}
+		}
+		// Mirror onto any group_members rows for this user.
+		global $wpdb;
+		$rows = $wpdb->get_results( $wpdb->prepare(
+			'SELECT id, group_id FROM ' . Corporate_Members_Repository::table() . " WHERE user_id = %d AND status != 'removed'",
+			$user_id
+		) );
+		foreach ( (array) $rows as $r ) {
+			Corporate_Members_Repository::update_waiver( (int) $r->id, 'signed' );
+			Corporate_Groups_Repository::log_activity( (int) $r->group_id, 'waiver_signed', sprintf(
+				/* translators: %s: signer name */
+				__( 'Waiver signed by %s.', 'memberistic' ),
+				$typed_name ?: ( get_userdata( $user_id ) ? get_userdata( $user_id )->display_name : ( '#' . $user_id ) )
+			) );
+		}
+		update_user_meta( $user_id, 'memberistic_waiver_signed_name', sanitize_text_field( $typed_name ) );
+		update_user_meta( $user_id, 'memberistic_waiver_signed_at', $now );
+		return true;
+	}
+
+	public static function status_for_user( $user_id ) {
+		$membership = \WordPressistic\Memberistic\Database\Memberships_Repository::get_by_user_id( (int) $user_id );
+		if ( $membership ) {
+			$person = \WordPressistic\Memberistic\Database\People_Repository::get_primary_by_membership( (int) $membership['id'] );
+			if ( $person && ! empty( $person['waiver_status'] ) ) {
+				return $person['waiver_status'];
+			}
+		}
+		return 'missing';
+	}
+
+	/**
+	 * Send the branded waiver email to a group member. Uses the
+	 * Email_Service pipeline via the corporate_waiver_request
+	 * template registered in Corporate_Emails.
+	 */
+	public static function send_waiver_email( $membership_id, $user ) {
+		$waiver_url = self::waiver_url( $user->ID );
+		return \WordPressistic\Memberistic\Emails\Email_Service::send_membership_email(
+			(int) $membership_id,
+			'corporate_waiver_request',
+			array( 'corp_waiver_url' => $waiver_url )
+		);
+	}
+}
+
+/**
+ * Phase 4 — public waiver signing page.
+ */
+final class Corporate_Waiver {
+
+	public static function maybe_handle_public_waiver() {
+		if ( empty( $_GET[ Corporate_Waiver_Service::QUERY ] ) ) { // phpcs:ignore WordPress.Security.NonceVerification.Recommended
+			return;
+		}
+		$token   = sanitize_text_field( wp_unslash( $_GET[ Corporate_Waiver_Service::QUERY ] ) ); // phpcs:ignore WordPress.Security.NonceVerification.Recommended
+		$user_id = Corporate_Waiver_Service::user_by_token( $token );
+		if ( ! $user_id ) {
+			self::render( __( 'Waiver not found', 'memberistic' ), '<p>' . esc_html__( 'This waiver link is invalid. Please contact us.', 'memberistic' ) . '</p>', 404 );
+		}
+		$user = get_userdata( $user_id );
+
+		// POST = submit signature.
+		if ( 'POST' === strtoupper( (string) ( $_SERVER['REQUEST_METHOD'] ?? '' ) ) ) {
+			if ( ! isset( $_POST['memberistic_waiver_nonce'] ) || ! wp_verify_nonce( sanitize_text_field( wp_unslash( $_POST['memberistic_waiver_nonce'] ) ), 'memberistic_waiver_' . $token ) ) {
+				self::render( __( 'Session expired', 'memberistic' ), '<p>' . esc_html__( 'Please reload the page and try again.', 'memberistic' ) . '</p>', 400 );
+			}
+			$typed = isset( $_POST['signature_name'] ) ? sanitize_text_field( wp_unslash( $_POST['signature_name'] ) ) : '';
+			$agree = ! empty( $_POST['agree'] );
+			if ( ! $agree || '' === $typed ) {
+				self::render_form( $user, $token, __( 'Please type your full name and check the agreement box.', 'memberistic' ) );
+			}
+			Corporate_Waiver_Service::mark_signed( $user_id, $typed );
+			$account = home_url( '/account/' );
+			self::render(
+				__( 'Waiver complete', 'memberistic' ),
+				'<p>' . esc_html__( 'Thank you — your waiver is on file. You can show your member QR at the range desk on your next visit.', 'memberistic' ) . '</p>'
+				. '<p><a class="btn" href="' . esc_url( $account ) . '">' . esc_html__( 'Go to my account', 'memberistic' ) . '</a></p>',
+				200
+			);
+		}
+
+		// Already signed?
+		if ( 'signed' === Corporate_Waiver_Service::status_for_user( $user_id ) ) {
+			self::render( __( 'Waiver already on file', 'memberistic' ), '<p>' . esc_html__( 'Your waiver is already signed and on file. Thank you!', 'memberistic' ) . '</p>', 200 );
+		}
+
+		self::render_form( $user, $token );
+	}
+
+	private static function render_form( $user, $token, $error = '' ) {
+		$text = Corporate_Waiver_Service::waiver_text();
+		ob_start();
+		if ( $error ) {
+			echo '<p style="color:#E8802F;font-weight:600;">' . esc_html( $error ) . '</p>';
+		}
+		echo '<div style="text-align:left;background:#11161D;border:1px solid #2A323D;border-radius:8px;padding:18px;max-height:280px;overflow:auto;color:#CBCAD2;line-height:1.6;font-size:14px;">' . esc_html( $text ) . '</div>';
+		echo '<form method="post" style="margin-top:18px;text-align:left;">';
+		wp_nonce_field( 'memberistic_waiver_' . $token, 'memberistic_waiver_nonce' );
+		echo '<label style="display:block;font-size:12px;letter-spacing:.12em;text-transform:uppercase;color:#8A95A5;margin-bottom:6px;">' . esc_html__( 'Type your full legal name', 'memberistic' ) . '</label>';
+		echo '<input type="text" name="signature_name" required value="' . esc_attr( $user->display_name ) . '" style="width:100%;padding:12px 14px;background:#0F1115;border:1px solid #2A323D;border-radius:4px;color:#fff;font-size:16px;margin-bottom:14px;">';
+		echo '<label style="display:flex;gap:10px;align-items:flex-start;color:#CBCAD2;font-size:14px;cursor:pointer;"><input type="checkbox" name="agree" value="1" required style="width:20px;height:20px;margin-top:2px;"> <span>' . esc_html__( 'I have read and agree to the waiver above, and I am signing electronically.', 'memberistic' ) . '</span></label>';
+		echo '<button type="submit" style="margin-top:18px;width:100%;padding:14px;background:#E8802F;color:#111;border:0;border-radius:4px;font-weight:700;font-size:15px;letter-spacing:.06em;text-transform:uppercase;cursor:pointer;">' . esc_html__( 'Sign Waiver', 'memberistic' ) . '</button>';
+		echo '</form>';
+		self::render( __( 'Range Waiver', 'memberistic' ), ob_get_clean(), 200 );
+	}
+
+	private static function render( $title, $html, $code = 200 ) {
+		nocache_headers();
+		status_header( (int) $code );
+		header( 'Content-Type: text/html; charset=utf-8' );
+		$brand = function_exists( '\WordPressistic\Memberistic\memberistic_get_brand_label' )
+			? \WordPressistic\Memberistic\memberistic_get_brand_label()
+			: get_bloginfo( 'name' );
+		echo '<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">';
+		echo '<title>' . esc_html( $brand ) . ' — ' . esc_html( $title ) . '</title>';
+		echo '<style>body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;background:#0F1115;color:#fff;margin:0;min-height:100vh;display:grid;place-items:center;padding:24px;}'
+			. '.b{max-width:520px;width:100%;background:#1A1F26;border:1px solid #2A323D;border-radius:12px;padding:32px;text-align:center;}'
+			. '.brand{font-family:"Bebas Neue",Impact,sans-serif;letter-spacing:.18em;color:#C9A84C;text-transform:uppercase;font-size:13px;margin-bottom:14px;}'
+			. 'h1{font-size:26px;margin:0 0 16px;}.btn{display:inline-block;margin-top:8px;padding:12px 22px;background:#C9A84C;color:#111;border-radius:4px;text-decoration:none;font-weight:700;}</style></head><body>';
+		echo '<div class="b"><div class="brand">' . esc_html( $brand ) . '</div><h1>' . esc_html( $title ) . '</h1>' . $html . '</div></body></html>'; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
+		exit;
+	}
+}
+
+/**
+ * Payment separation — keep WooCommerce reporting to PRODUCT sales
+ * only. Membership/group money is authoritatively recorded in
+ * Memberistic (memberistic_group_payments / memberistic_payments).
+ * The WC order created for a payment link is purely the charging
+ * rail; we flag it and exclude it from WC Analytics so it never
+ * double-counts as product revenue.
+ */
+final class Corporate_WC_Separation {
+
+	const META = '_memberistic_payment_purpose';
+
+	/** Is this WC order a membership/group payment (not a product sale)? */
+	public static function is_membership_order( $order ) {
+		if ( is_numeric( $order ) && function_exists( 'wc_get_order' ) ) {
+			$order = wc_get_order( (int) $order );
+		}
+		if ( ! $order || ! is_object( $order ) ) {
+			return false;
+		}
+		return (bool) $order->get_meta( self::META );
+	}
+
+	/** Show a clear badge on the WC order screen. */
+	public static function admin_order_badge( $order ) {
+		if ( ! self::is_membership_order( $order ) ) {
+			return;
+		}
+		echo '<p style="background:#1A1F26;color:#C9A84C;border:1px solid #C9A84C;border-radius:4px;padding:8px 12px;display:inline-block;font-weight:600;">'
+			. esc_html__( 'Membership payment — recorded in Memberistic. Excluded from product-sales reports.', 'memberistic' )
+			. '</p>';
+	}
+
+	/**
+	 * Exclude membership-payment orders from WooCommerce Analytics so
+	 * the store's product-sales numbers stay product-only. WC passes
+	 * the stats data array + the order; returning the data unchanged
+	 * for product orders, and zeroing the net/gross for membership
+	 * orders keeps them out of revenue totals.
+	 */
+	public static function exclude_from_analytics( $data, $order ) {
+		if ( self::is_membership_order( $order ) ) {
+			// Zero the monetary contribution so membership money never
+			// shows up as product revenue. The authoritative record is
+			// in Memberistic.
+			foreach ( array( 'net_total', 'gross_total', 'total_sales', 'tax_total', 'shipping_total' ) as $k ) {
+				if ( isset( $data[ $k ] ) ) {
+					$data[ $k ] = 0;
+				}
+			}
+		}
+		return $data;
 	}
 }
