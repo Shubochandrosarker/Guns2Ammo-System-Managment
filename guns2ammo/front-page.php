@@ -9,6 +9,11 @@
 if ( ! defined( 'ABSPATH' ) ) exit;
 get_header();
 
+// Pull the canonical business info (NAP, founding year, review
+// count + rating, hours). Single source of truth — keeps the
+// homepage from drifting against the footer / schema / GBP.
+$g2a_biz = g2a_biz();
+
 $g2a_page_id            = get_the_ID();
 $g2a_event_shortcode    = get_post_meta( $g2a_page_id, 'event_shortcode', true );
 $g2a_mg_callout_text    = get_post_meta( $g2a_page_id, 'mg_callout_text', true );
@@ -32,10 +37,10 @@ $g2a_mg4_desc           = get_post_meta( $g2a_page_id, 'mg_fourth_weapon_desc', 
     </div>
     <div class="hero-trust">
       <div class="trust-strip">
-        <span class="item"><span class="stars"> 4.7</span> 449+ Google Reviews</span>
+        <span class="item"><span class="stars"> <?php echo esc_html( number_format( (float) $g2a_biz['review_rating'], 1 ) ); ?></span> <?php /* translators: %1$d: review count e.g. 449, %2$s: source e.g. Google */ printf( esc_html__( '%1$d %2$s Reviews', 'guns2ammo' ), (int) $g2a_biz['review_count'], esc_html( $g2a_biz['review_source'] ) ); ?></span>
         <span class="item">NRA Certified</span>
         <span class="item">FFL Licensed</span>
-        <span class="item">Est. 2015</span>
+        <span class="item"><?php /* translators: %d: founding year */ printf( esc_html__( 'Est. %d', 'guns2ammo' ), (int) $g2a_biz['founded_year'] ); ?></span>
       </div>
     </div>
   </div>
@@ -111,8 +116,8 @@ $g2a_mg4_desc           = get_post_meta( $g2a_page_id, 'mg_fourth_weapon_desc', 
         <a class="btn btn-ghost" href="<?php echo esc_url( home_url( "/machine-gun/" ) ); ?>#tiers">View Packages</a>
       </div>
       <div class="mg-reviews">
-        <span class="num"><span class="star"></span> 4.7</span>
-        <div class="meta">449+ Google reviews<small>Mesa's most-trusted indoor range since 2015</small></div>
+        <span class="num"><span class="star"></span> <?php echo esc_html( number_format( (float) $g2a_biz['review_rating'], 1 ) ); ?></span>
+        <div class="meta"><?php printf( esc_html__( '%1$d %2$s reviews', 'guns2ammo' ), (int) $g2a_biz['review_count'], esc_html( $g2a_biz['review_source'] ) ); ?><small><?php echo esc_html( $g2a_biz['slogan'] ); ?> <?php printf( esc_html__( 'Since %d.', 'guns2ammo' ), (int) $g2a_biz['founded_year'] ); ?></small></div>
       </div>
     </div>
     <div class="right">
@@ -158,12 +163,26 @@ $g2a_mg4_desc           = get_post_meta( $g2a_page_id, 'mg_fourth_weapon_desc', 
       <a class="btn btn-ghost btn-arrow" href="<?php echo esc_url( home_url( "/shop/" ) ); ?>">View All Products</a>
     </div>
 
+    <?php
+    // Category card "SKU" counts read live from the WooCommerce
+    // product_cat term counts (cached via business-info.php).
+    // Was previously hard-coded 38/24/52/18 — drifted out of sync
+    // with both the actual catalog AND the nav menu. Now there is
+    // one source of truth.
+    $g2a_cat_counts = g2a_biz_category_counts();
+    $g2a_cat_label = function ( $slug, $fallback = '' ) use ( $g2a_cat_counts ) {
+        if ( isset( $g2a_cat_counts[ $slug ] ) && (int) $g2a_cat_counts[ $slug ] > 0 ) {
+            return sprintf( _n( '%d SKU', '%d SKUs', (int) $g2a_cat_counts[ $slug ], 'guns2ammo' ), (int) $g2a_cat_counts[ $slug ] );
+        }
+        return $fallback;
+    };
+    ?>
     <div class="col-grid">
       <a class="col-tile feat" href="<?php echo esc_url( home_url( "/collections/handguns/" ) ); ?>">
         <div class="bg" style="background-image: linear-gradient(180deg, rgba(26,25,30,0.3), rgba(26,25,30,0.9)), url('https://guns2ammo.com/wp-content/uploads/2026/04/15.webp');"></div>
         <div class="scrim"></div>
         <div class="body">
-          <div class="cat">Featured Collection  38 SKUs</div>
+          <div class="cat"><?php echo esc_html( trim( __( 'Featured Collection', 'guns2ammo' ) . '  ' . $g2a_cat_label( 'handguns' ) ) ); ?></div>
           <h3>HANDGUNS</h3>
           <span class="more">Shop Handguns </span>
         </div>
@@ -172,7 +191,7 @@ $g2a_mg4_desc           = get_post_meta( $g2a_page_id, 'mg_fourth_weapon_desc', 
         <div class="bg" style="background-image: linear-gradient(180deg, rgba(26,25,30,0.3), rgba(26,25,30,0.85)), url('https://guns2ammo.com/wp-content/uploads/2025/06/noveske-gen4-556-sbr-bazooka-green-guns2ammo-mesa-az.webp');"></div>
         <div class="scrim"></div>
         <div class="body">
-          <div class="cat">24 SKUs</div>
+          <div class="cat"><?php echo esc_html( $g2a_cat_label( 'rifles', __( 'Shop Rifles', 'guns2ammo' ) ) ); ?></div>
           <h3>RIFLES</h3>
           <span class="more">Shop </span>
         </div>
@@ -181,7 +200,7 @@ $g2a_mg4_desc           = get_post_meta( $g2a_page_id, 'mg_fourth_weapon_desc', 
         <div class="bg" style="background-image: linear-gradient(180deg, rgba(26,25,30,0.3), rgba(26,25,30,0.85)), url('https://guns2ammo.com/wp-content/uploads/2026/04/Gun-Rental-Near-Me-What-to-Expect.webp');"></div>
         <div class="scrim"></div>
         <div class="body">
-          <div class="cat">52 SKUs</div>
+          <div class="cat"><?php echo esc_html( $g2a_cat_label( 'ammunition', __( 'Shop Ammo', 'guns2ammo' ) ) ); ?></div>
           <h3>AMMUNITION</h3>
           <span class="more">Shop </span>
         </div>
@@ -190,7 +209,7 @@ $g2a_mg4_desc           = get_post_meta( $g2a_page_id, 'mg_fourth_weapon_desc', 
         <div class="bg" style="background-image: linear-gradient(180deg, rgba(26,25,30,0.3), rgba(26,25,30,0.85)), url('https://guns2ammo.com/wp-content/uploads/2026/04/2025-03-23.webp');"></div>
         <div class="scrim"></div>
         <div class="body">
-          <div class="cat">18 SKUs</div>
+          <div class="cat"><?php echo esc_html( $g2a_cat_label( 'magazines', __( 'Shop Magazines', 'guns2ammo' ) ) ); ?></div>
           <h3>MAGAZINES</h3>
           <span class="more">Shop </span>
         </div>
@@ -242,22 +261,55 @@ $g2a_mg4_desc           = get_post_meta( $g2a_page_id, 'mg_fourth_weapon_desc', 
 </section>
 
 <!-- COLLECTIONS / VISIT -->
+<?php
+// Hours block is now generated from $g2a_biz['hours'] — the same
+// table that drives the live-status pill and the LocalBusiness
+// JSON-LD — so the homepage can never show a different schedule
+// than the rest of the site. Today's row is highlighted based on
+// actual America/Phoenix weekday (was previously hard-coded "Tue").
+$g2a_day_names = array(
+	0 => __( 'Sunday',    'guns2ammo' ),
+	1 => __( 'Monday',    'guns2ammo' ),
+	2 => __( 'Tuesday',   'guns2ammo' ),
+	3 => __( 'Wednesday', 'guns2ammo' ),
+	4 => __( 'Thursday',  'guns2ammo' ),
+	5 => __( 'Friday',    'guns2ammo' ),
+	6 => __( 'Saturday',  'guns2ammo' ),
+);
+try {
+	$g2a_now_mesa = new DateTime( 'now', new DateTimeZone( $g2a_biz['timezone'] ) );
+	$g2a_today_dow = (int) $g2a_now_mesa->format( 'w' );
+} catch ( \Exception $e ) {
+	$g2a_today_dow = (int) gmdate( 'w' );
+}
+$g2a_fmt_hour = function ( $mins ) {
+	$h = intdiv( $mins, 60 ); $am = $h < 12; $h12 = $h % 12 ?: 12;
+	return $h12 . ( $am ? 'am' : 'pm' );
+};
+// Render Mon→Sun order so the week reads naturally.
+$g2a_week_order = array( 1, 2, 3, 4, 5, 6, 0 );
+?>
 <section class="visit">
   <div class="wrap">
     <div class="visit-info">
-      <span class="eb-pill">Visit Us</span>
-      <h2 style="margin-top: 20px;">6030 E Main St</h2>
-      <p class="addr">Suite 103  Mesa, AZ 85205</p>
+      <span class="eb-pill"><?php esc_html_e( 'Visit Us', 'guns2ammo' ); ?></span>
+      <h2 style="margin-top: 20px;"><?php echo esc_html( $g2a_biz['addr1'] ); ?></h2>
+      <p class="addr"><?php echo esc_html( $g2a_biz['addr2'] ); ?></p>
       <div class="hours">
-        <div class="row now"><span class="d"> Today  Tue</span><span class="t">10am  6pm</span></div>
-        <div class="row"><span class="d">Mon, Wed, Thu</span><span class="t">10am  6pm</span></div>
-        <div class="row closed"><span class="d">Friday</span><span class="t">Closed</span></div>
-        <div class="row"><span class="d">Saturday</span><span class="t">9am  8pm</span></div>
-        <div class="row"><span class="d">Sunday</span><span class="t">12pm  6pm</span></div>
+        <?php foreach ( $g2a_week_order as $dow ) :
+          $hrs       = $g2a_biz['hours'][ $dow ] ?? null;
+          $is_today  = ( $dow === $g2a_today_dow );
+          $is_closed = ! $hrs;
+          $cls       = 'row' . ( $is_today ? ' now' : '' ) . ( $is_closed ? ' closed' : '' );
+          $label     = ( $is_today ? __( 'Today ·', 'guns2ammo' ) . ' ' : '' ) . $g2a_day_names[ $dow ];
+          $time      = $is_closed ? __( 'Closed', 'guns2ammo' ) : ( $g2a_fmt_hour( $hrs['open'] ) . ' – ' . $g2a_fmt_hour( $hrs['close'] ) );
+        ?>
+        <div class="<?php echo esc_attr( $cls ); ?>"><span class="d"><?php echo esc_html( $label ); ?></span><span class="t"><?php echo esc_html( $time ); ?></span></div>
+        <?php endforeach; ?>
       </div>
       <div class="actions">
-        <a class="btn btn-ember btn-arrow" href="<?php echo esc_url( home_url( "/contact/" ) ); ?>">Get Directions</a>
-        <a class="btn btn-ghost" href="tel:+16027152677">Call (602) 715-2677</a>
+        <a class="btn btn-ember btn-arrow" href="<?php echo esc_url( $g2a_biz['directions_url'] ); ?>" target="_blank" rel="noopener"><?php esc_html_e( 'Get Directions', 'guns2ammo' ); ?></a>
+        <a class="btn btn-ghost" href="<?php echo esc_url( g2a_biz_tel_href() ); ?>"><?php printf( esc_html__( 'Call %s', 'guns2ammo' ), esc_html( $g2a_biz['phone'] ) ); ?></a>
       </div>
     </div>
     <div class="visit-photo">
@@ -270,10 +322,10 @@ $g2a_mg4_desc           = get_post_meta( $g2a_page_id, 'mg_fourth_weapon_desc', 
 <section class="reviews">
   <div class="wrap">
     <div class="head">
-      <h2>449 REVIEWS.<br>4.7 <span class="a">STARS.</span></h2>
+      <h2><?php echo (int) $g2a_biz['review_count']; ?> REVIEWS.<br><?php echo esc_html( number_format( (float) $g2a_biz['review_rating'], 1 ) ); ?> <span class="a">STARS.</span></h2>
       <div class="stars-meta">
-        <span class="num">4.7</span>
-        <span class="stars"></span>  449+ verified Google reviews
+        <span class="num"><?php echo esc_html( number_format( (float) $g2a_biz['review_rating'], 1 ) ); ?></span>
+        <span class="stars"></span>  <?php printf( esc_html__( '%1$d verified %2$s reviews', 'guns2ammo' ), (int) $g2a_biz['review_count'], esc_html( $g2a_biz['review_source'] ) ); ?>
       </div>
     </div>
     <div class="rv-grid">

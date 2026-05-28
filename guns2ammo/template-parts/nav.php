@@ -8,6 +8,16 @@ if ( ! defined( 'ABSPATH' ) ) exit;
 
 $here = trim( parse_url( $_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH ) ?? '/', '/' );
 
+// Live WooCommerce product-category counts (cached 1hr, busted on
+// product edits) — replaces the old hard-coded "24/12/38/21" meta
+// numbers that drifted out of sync with the catalog + homepage.
+$g2a_shop_counts = function_exists( 'g2a_biz_category_counts' ) ? g2a_biz_category_counts() : array();
+$g2a_shop_meta   = function ( $slug ) use ( $g2a_shop_counts ) {
+	return ( isset( $g2a_shop_counts[ $slug ] ) && (int) $g2a_shop_counts[ $slug ] > 0 )
+		? sprintf( '%02d', (int) $g2a_shop_counts[ $slug ] )
+		: '';
+};
+
 $nav = [
 	[ 'label' => 'Range',      'href' => home_url( '/book-a-lane/' ),  'sub' => [
 		[ 'label' => 'Book A Lane',     'href' => home_url( '/book-a-lane/' ),         'meta' => '01' ],
@@ -31,11 +41,11 @@ $nav = [
 		[ 'label' => 'Free Arizona CCW',     'href' => home_url( '/free-ccw-class/' ),     'meta' => '04' ],
 	] ],
 	[ 'label' => 'Shop',       'href' => home_url( '/shop/' ), 'sub' => [
-		[ 'label' => 'All Products', 'href' => home_url( '/shop/' ),                                'meta' => 'ALL' ],
-		[ 'label' => 'Handguns',     'href' => home_url( '/collections/handguns/' ),           'meta' => '24' ],
-		[ 'label' => 'Rifles',       'href' => home_url( '/collections/rifles/' ),             'meta' => '12' ],
-		[ 'label' => 'Ammunition',   'href' => home_url( '/collections/ammunition/' ),         'meta' => '38' ],
-		[ 'label' => 'Magazines',    'href' => home_url( '/collections/magazines/' ),          'meta' => '21' ],
+		[ 'label' => 'All Products', 'href' => home_url( '/shop/' ),                      'meta' => 'ALL' ],
+		[ 'label' => 'Handguns',     'href' => home_url( '/collections/handguns/' ),   'meta' => $g2a_shop_meta( 'handguns' ) ],
+		[ 'label' => 'Rifles',       'href' => home_url( '/collections/rifles/' ),     'meta' => $g2a_shop_meta( 'rifles' ) ],
+		[ 'label' => 'Ammunition',   'href' => home_url( '/collections/ammunition/' ), 'meta' => $g2a_shop_meta( 'ammunition' ) ],
+		[ 'label' => 'Magazines',    'href' => home_url( '/collections/magazines/' ),  'meta' => $g2a_shop_meta( 'magazines' ) ],
 	] ],
 	[ 'label' => 'Transfers',  'href' => home_url( '/transfers/' ), 'sub' => [
 		[ 'label' => 'FFL Transfer',      'href' => home_url( '/transfers/' ),               'meta' => '01' ],

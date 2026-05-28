@@ -124,44 +124,53 @@ function g2a_seo_image() {
 
 /* ---------- JSON-LD: always-on LocalBusiness on every page ---------- */
 add_action( 'wp_head', function () {
-	$rating  = (float) get_theme_mod( 'g2a_rating', '4.7' );
-	$reviews = (int) preg_replace( '/[^0-9]/', '', get_theme_mod( 'g2a_review_count', '449' ) );
-	$phone   = get_theme_mod( 'g2a_phone', '(602) 715-2677' );
+	// All values pulled from the centralized business-info module
+	// so the schema can never disagree with the visible page
+	// content (NAP, hours, rating, review count). aggregateRating
+	// is emitted ONLY when a real, admin-verified count + rating
+	// exist — never fabricated.
+	$biz = function_exists( 'g2a_biz' ) ? g2a_biz() : array();
+
+	$day_names = [ 0 => 'Sunday', 1 => 'Monday', 2 => 'Tuesday', 3 => 'Wednesday', 4 => 'Thursday', 5 => 'Friday', 6 => 'Saturday' ];
+	$hours_spec = [];
+	if ( ! empty( $biz['hours'] ) ) {
+		foreach ( $biz['hours'] as $dow => $h ) {
+			if ( ! $h ) {
+				continue; // closed that day — omit from spec
+			}
+			$hours_spec[] = [
+				'@type'     => 'OpeningHoursSpecification',
+				'dayOfWeek' => $day_names[ $dow ],
+				'opens'     => sprintf( '%02d:%02d', intdiv( $h['open'], 60 ), $h['open'] % 60 ),
+				'closes'    => sprintf( '%02d:%02d', intdiv( $h['close'], 60 ), $h['close'] % 60 ),
+			];
+		}
+	}
 
 	$ld = [
 		'@context' => 'https://schema.org',
 		'@type'    => [ 'LocalBusiness', 'SportsActivityLocation', 'Store' ],
 		'@id'      => home_url( '/#business' ),
-		'name'     => 'Guns 2 Ammo',
+		'name'     => $biz['name'] ?? get_bloginfo( 'name' ),
 		'image'    => g2a_seo_image() ?: home_url( '/wp-content/uploads/g2a-storefront.jpg' ),
 		'url'      => home_url( '/' ),
-		'telephone' => $phone,
+		'telephone' => $biz['phone'] ?? '',
 		'priceRange' => '$$',
+		'foundingDate' => (string) ( $biz['founded_year'] ?? '' ),
 		'address'  => [
 			'@type'           => 'PostalAddress',
-			'streetAddress'   => get_theme_mod( 'g2a_addr1', '6030 E Main St, Suite 103' ),
-			'addressLocality' => 'Mesa',
-			'addressRegion'   => 'AZ',
-			'postalCode'      => '85205',
-			'addressCountry'  => 'US',
+			'streetAddress'   => $biz['addr1'] ?? '',
+			'addressLocality' => $biz['city'] ?? 'Mesa',
+			'addressRegion'   => $biz['region'] ?? 'AZ',
+			'postalCode'      => $biz['postal'] ?? '85205',
+			'addressCountry'  => $biz['country'] ?? 'US',
 		],
 		'geo' => [
 			'@type'     => 'GeoCoordinates',
-			'latitude'  => (float) get_theme_mod( 'g2a_lat',  '33.4152' ),
-			'longitude' => (float) get_theme_mod( 'g2a_lng', '-111.7066' ),
+			'latitude'  => (float) ( $biz['lat'] ?? 33.4152 ),
+			'longitude' => (float) ( $biz['lng'] ?? -111.7066 ),
 		],
-		'openingHoursSpecification' => [
-			[ '@type' => 'OpeningHoursSpecification', 'dayOfWeek' => [ 'Monday', 'Tuesday', 'Wednesday', 'Thursday' ], 'opens' => '10:00', 'closes' => '18:00' ],
-			[ '@type' => 'OpeningHoursSpecification', 'dayOfWeek' => 'Friday',   'opens' => '10:00', 'closes' => '19:00' ],
-			[ '@type' => 'OpeningHoursSpecification', 'dayOfWeek' => 'Saturday', 'opens' => '10:00', 'closes' => '19:00' ],
-			[ '@type' => 'OpeningHoursSpecification', 'dayOfWeek' => 'Sunday',   'opens' => '12:00', 'closes' => '18:00' ],
-		],
-		'aggregateRating' => [
-			'@type'       => 'AggregateRating',
-			'ratingValue' => $rating,
-			'reviewCount' => $reviews ?: 449,
-			'bestRating'  => '5',
-		],
+		'openingHoursSpecification' => $hours_spec,
 		/* Local SEO  the East Valley communities Guns 2 Ammo serves. */
 		'areaServed' => array_map(
 			function ( $city ) {
@@ -169,7 +178,7 @@ add_action( 'wp_head', function () {
 			},
 			[ 'Mesa', 'Phoenix', 'Gilbert', 'Tempe', 'Chandler', 'Scottsdale', 'Apache Junction', 'Queen Creek', 'Maricopa County' ]
 		),
-		'hasMap'     => 'https://www.google.com/maps?q=Guns+2+Ammo+6030+E+Main+St+Mesa+AZ+85205',
+		'hasMap'     => $biz['maps_url'] ?? 'https://www.google.com/maps?q=Guns+2+Ammo+6030+E+Main+St+Mesa+AZ+85205',
 		'currenciesAccepted' => 'USD',
 		'paymentAccepted'    => 'Cash, Credit Card, Debit Card',
 		'knowsAbout' => [
@@ -177,7 +186,7 @@ add_action( 'wp_head', function () {
 			'FFL firearm transfers', 'Firearm sales', 'Buying used firearms', 'NRA firearms training',
 			'Machine gun shooting experience', 'Range membership',
 		],
-		'slogan' => "Mesa's most-trusted indoor range, FFL firearm store, and NRA-certified training facility.",
+		'slogan' => $biz['slogan'] ?? "Mesa's most-trusted indoor range, FFL firearm store, and NRA-certified training facility.",
 		/* Membership plans surfaced for AI answer engines and rich results. */
 		'hasOfferCatalog' => [
 			'@type' => 'OfferCatalog',
@@ -189,12 +198,28 @@ add_action( 'wp_head', function () {
 			],
 		],
 		'sameAs' => array_values( array_filter( [
-			get_theme_mod( 'g2a_social_fb' ),
-			get_theme_mod( 'g2a_social_ig' ),
-			get_theme_mod( 'g2a_social_x' ),
-			get_theme_mod( 'g2a_social_yt' ),
+			$biz['social']['fb'] ?? '',
+			$biz['social']['ig'] ?? '',
+			$biz['social']['x']  ?? '',
+			$biz['social']['yt'] ?? '',
 		] ) ),
 	];
+
+	// aggregateRating: emit ONLY when an admin-verified rating +
+	// review count are present. Never fabricate. The values are
+	// the same ones rendered visibly on the homepage + footer, so
+	// they're substantiated by on-page content (Google's policy).
+	$rating = (float) ( $biz['review_rating'] ?? 0 );
+	$count  = (int)   ( $biz['review_count'] ?? 0 );
+	if ( $rating > 0 && $count > 0 ) {
+		$ld['aggregateRating'] = [
+			'@type'       => 'AggregateRating',
+			'ratingValue' => $rating,
+			'reviewCount' => $count,
+			'bestRating'  => '5',
+			'worstRating' => '1',
+		];
+	}
 
 	g2a_emit_jsonld( $ld );
 }, 8 );
@@ -271,9 +296,41 @@ function g2a_emit_jsonld( $data ) {
 
 /* ---------- Robots + sitemap nudge ---------- */
 add_filter( 'wp_robots', function ( $robots ) {
-	if ( is_singular() || is_front_page() || is_home() ) {
+	// Private / transactional pages: noindex,nofollow. These have
+	// no search value and may carry session/PII context. We use
+	// meta-robots noindex (NOT just robots.txt Disallow) per
+	// Google's guidance — robots.txt only blocks crawl, noindex
+	// actually keeps them out of the index.
+	$private_slugs = array(
+		'account', 'my-account', 'cart', 'checkout', 'login',
+		'g2a-members-login', 'thank-you', 'payment-failed',
+		'staff-dashboard', 'renew-membership', 'membership-checkout-page',
+		'memberistic-account', 'memberistic-checkout',
+	);
+	$is_private = false;
+	if ( is_page() ) {
+		$slug = get_post_field( 'post_name', get_queried_object_id() );
+		if ( in_array( $slug, $private_slugs, true ) ) {
+			$is_private = true;
+		}
+	}
+	// WooCommerce cart/checkout/account pages by function (covers
+	// installs where the slug differs).
+	if ( function_exists( 'is_cart' ) && ( is_cart() || is_checkout() || is_account_page() ) ) {
+		$is_private = true;
+	}
+
+	if ( $is_private ) {
+		$robots['noindex']  = true;
+		$robots['nofollow'] = true;
+		unset( $robots['max-image-preview'], $robots['max-snippet'], $robots['max-video-preview'] );
+		return $robots;
+	}
+
+	if ( is_singular() || is_front_page() || is_home() || is_archive() ) {
 		$robots['max-image-preview'] = 'large';
-		$robots['max-snippet'] = -1;
+		$robots['max-snippet']       = -1;
+		$robots['max-video-preview'] = -1;
 	}
 	return $robots;
 } );

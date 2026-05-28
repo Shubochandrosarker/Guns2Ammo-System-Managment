@@ -1,15 +1,25 @@
 <?php
 /**
- * Footer  Guns 2 Ammo child theme
+ * Footer  Guns 2 Ammo child theme.
+ *
+ * All NAP + review + founding info comes from g2a_biz()
+ * (inc/business-info.php) so footer can't drift from header /
+ * homepage / schema.
  */
 if ( ! defined( 'ABSPATH' ) ) exit;
 
-$phone   = get_theme_mod( 'g2a_phone', '(602) 715-2677' );
-$email   = get_theme_mod( 'g2a_email', 'sales@guns2ammo.com' );
-$addr1   = get_theme_mod( 'g2a_addr1', '6030 E Main St, Suite 103' );
-$addr2   = get_theme_mod( 'g2a_addr2', 'Mesa, AZ 85205' );
-$rating  = get_theme_mod( 'g2a_rating', '4.7' );
-$reviews = get_theme_mod( 'g2a_review_count', '449+' );
+$biz       = g2a_biz();
+$phone     = $biz['phone'];
+$phone_tel = $biz['phone_tel'];
+$email     = $biz['email'];
+$addr1     = $biz['addr1'];
+$addr2     = $biz['addr2'];
+$rating    = number_format( (float) $biz['review_rating'], 1 );
+// "449+" / "500+" was an inconsistent suffix — drop the "+" so
+// the public number always matches the GBP / Customizer number
+// exactly. Use the raw integer.
+$reviews   = (int) $biz['review_count'];
+$founded   = (int) $biz['founded_year'];
 ?>
 </main><!-- /#g2a-main -->
 
@@ -88,7 +98,7 @@ $reviews = get_theme_mod( 'g2a_review_count', '449+' );
 	<div class="grid">
 		<div>
 			<div class="brand"><span class="mark"></span>GUNS&nbsp;2&nbsp;AMMO</div>
-			<div style="color: var(--color-fog); font-size:14px; max-width:32ch; margin-bottom:22px; line-height: 1.65;">Mesa's most-trusted indoor shooting range, FFL-licensed firearms store, and NRA-certified training facility. Since 2014.</div>
+			<div style="color: var(--color-fog); font-size:14px; max-width:32ch; margin-bottom:22px; line-height: 1.65;"><?php echo esc_html( $biz['slogan'] ); ?> <?php /* translators: %d: founding year, e.g. 2014 */ printf( esc_html__( 'Since %d.', 'guns2ammo' ), $founded ); ?></div>
 			<div style="display:inline-flex; align-items:center; gap:12px; padding: 10px 16px; border:1px solid var(--color-hairline-bright); margin-bottom: 18px;">
 				<span style="color: var(--color-brass-bright); font-family: var(--font-mono); font-size: 14px; letter-spacing: 0.08em;">*****</span>
 				<span style="font-family: var(--font-condensed); font-weight:600; font-size:18px; color: var(--color-white);"><?php echo esc_html( $rating ); ?></span>
@@ -149,11 +159,11 @@ $reviews = get_theme_mod( 'g2a_review_count', '449+' );
 		<div class="qv-image" id="g2a-qv-img" data-pl="PRODUCT IMAGE PLACEHOLDER"></div>
 		<div class="qv-body">
 			<button class="qv-close" id="g2a-qv-close" aria-label="Close"></button>
-			<div class="qv-brand" id="g2a-qv-brand">BRAND</div>
-			<h3 class="qv-title" id="g2a-qv-title">Product</h3>
-			<div class="qv-price"><span id="g2a-qv-price">$0</span> <span class="was" id="g2a-qv-was"></span></div>
-			<div class="star-rating" style="color: var(--color-brass-bright); font-family: var(--font-mono); font-size:13px; letter-spacing:0.1em; margin-top:8px;">* * * * *</div>
-			<p class="qv-desc" id="g2a-qv-desc">Description.</p>
+			<div class="qv-brand" id="g2a-qv-brand"></div>
+			<h3 class="qv-title" id="g2a-qv-title"></h3>
+			<div class="qv-price"><span id="g2a-qv-price"></span> <span class="was" id="g2a-qv-was"></span></div>
+			<div class="star-rating" id="g2a-qv-stars" style="color: var(--color-brass-bright); font-family: var(--font-mono); font-size:13px; letter-spacing:0.1em; margin-top:8px;"></div>
+			<p class="qv-desc" id="g2a-qv-desc"></p>
 			<div class="qv-meta" id="g2a-qv-meta"></div>
 			<div style="display:flex; gap:10px; flex-wrap:wrap;">
 				<a class="btn btn-ember" id="g2a-qv-cart">Add To Cart</a>
