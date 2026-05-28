@@ -17,7 +17,6 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-$renewal_url = memberistic_get_page_url( 'renewal_page_id', 'account', home_url( '/account/' ) );
 $plans_url   = memberistic_get_page_url( 'plans_page_id', 'memberships', '' );
 if ( ! $plans_url ) { $plans_url = memberistic_get_page_url( 'plans_page_id', 'memberistic-memberships', home_url( '/memberships/' ) ); }
 $support_url = home_url( '/get-support/' );
@@ -50,6 +49,16 @@ $lane_url    = home_url( '/book-a-lane/' );
 	$status      = (string) $current['status'];
 	$status_ok   = in_array( $status, array( 'active', 'comped', 'trial' ), true );
 	$member_email = $user->user_email ? $user->user_email : ( $current['email'] ?? '' );
+	// Self-serve billing destination. Members with a Stripe customer go to the
+	// Stripe-hosted billing portal (update card, view invoices, cancel); legacy
+	// / cash / POS members (no Stripe customer) are routed to the plans page to
+	// start a real recurring subscription. This replaces the old $renewal_url,
+	// which resolved back to /account/ itself — the dead "Update Payment
+	// Method" link members were reporting.
+	$has_stripe_customer = ! empty( $current['stripe_customer_id'] );
+	$manage_billing_url  = $has_stripe_customer
+		? \WordPressistic\Memberistic\Payments\Stripe_Service::billing_portal_action_url()
+		: $plans_url;
 	// Dynamic QR payload — encodes this member's verification details, so a
 	// scan at the range desk reveals their name, email and membership level.
 	$qr_payload  = implode( "\n", array(
@@ -82,13 +91,26 @@ $lane_url    = home_url( '/book-a-lane/' );
 		</span>
 	</div>
 
+	<?php
+	// Notice surfaced when the billing-portal handler could not open a Stripe
+	// session (portal not yet enabled in the Stripe dashboard, or a transient
+	// error). Keeps members from hitting a dead end.
+	$billing_notice = isset( $_GET['memberistic_billing'] ) ? sanitize_key( wp_unslash( $_GET['memberistic_billing'] ) ) : ''; // phpcs:ignore WordPress.Security.NonceVerification
+	if ( 'unavailable' === $billing_notice ) :
+		?>
+		<div class="memberistic-acct-banner">
+			<?php esc_html_e( 'Online payment management is briefly unavailable. Please try again shortly or contact the range desk to update your payment.', 'memberistic' ); ?>
+		</div>
+	<?php endif; ?>
+
 	<?php if ( in_array( $status, array( 'past_due', 'expired' ), true ) ) : ?>
 		<div class="memberistic-acct-banner">
 			<?php if ( 'past_due' === $status ) : ?>
 				<?php esc_html_e( 'Your membership payment is past due — please update your payment method.', 'memberistic' ); ?>
+				<a href="<?php echo esc_url( $manage_billing_url ); ?>"><?php esc_html_e( 'Update payment', 'memberistic' ); ?></a>
 			<?php else : ?>
 				<?php esc_html_e( 'Your membership has expired.', 'memberistic' ); ?>
-				<a href="<?php echo esc_url( $renewal_url ); ?>"><?php esc_html_e( 'Renew now', 'memberistic' ); ?></a>
+				<a href="<?php echo esc_url( $manage_billing_url ); ?>"><?php esc_html_e( 'Renew now', 'memberistic' ); ?></a>
 			<?php endif; ?>
 		</div>
 	<?php endif; ?>
@@ -150,13 +172,13 @@ $lane_url    = home_url( '/book-a-lane/' );
 					</a>
 					<div class="memberistic-acct-action is-static">
 						<span class="memberistic-acct-ic">◴</span>
-						<span><strong><?php esc_html_e( 'Range Hours', 'memberistic' ); ?></strong><small><?php esc_html_e( 'Mon–Thu 10–6 · Sat 9–8 · Sun 12–6', 'memberistic' ); ?></small></span>
+						<span><strong><?php esc_html_e( 'Range Hours', 'memberistic' ); ?></strong><small><?php esc_html_e( 'Mon–Thu 10–6 · Fri & Sat 10–7 · Sun 12–6', 'memberistic' ); ?></small></span>
 					</div>
 					<a class="memberistic-acct-action" href="#members" data-tab="members">
 						<span class="memberistic-acct-ic">⚇</span>
 						<span><strong><?php esc_html_e( 'Manage Members', 'memberistic' ); ?></strong><small><?php esc_html_e( 'Add, edit or remove people', 'memberistic' ); ?></small></span>
 					</a>
-					<a class="memberistic-acct-action" href="#billing" data-tab="billing">
+					<a class="memberistic-acct-action" href="<?php echo esc_url( $manage_billing_url ); ?>">
 						<span class="memberistic-acct-ic">▭</span>
 						<span><strong><?php esc_html_e( 'Update Payment', 'memberistic' ); ?></strong><small><?php echo esc_html( $pay_method ); ?></small></span>
 					</a>
@@ -208,7 +230,7 @@ $lane_url    = home_url( '/book-a-lane/' );
 					<?php endif; ?>
 					<div class="memberistic-acct-ctas">
 						<a class="memberistic-acct-cta memberistic-acct-cta--primary" href="<?php echo esc_url( $plans_url ); ?>"><?php esc_html_e( 'Change Plan', 'memberistic' ); ?></a>
-						<a class="memberistic-acct-cta memberistic-acct-cta--ghost" href="<?php echo esc_url( $renewal_url ); ?>"><?php echo esc_html( $is_annual ? __( 'Switch to Monthly', 'memberistic' ) : __( 'Switch to Annual', 'memberistic' ) ); ?></a>
+						<a class="memberistic-acct-cta memberistic-acct-cta--ghost" href="<?php echo esc_url( $manage_billing_url ); ?>"><?php echo esc_html( $is_annual ? __( 'Switch to Monthly', 'memberistic' ) : __( 'Switch to Annual', 'memberistic' ) ); ?></a>
 					</div>
 				</div>
 				<div class="memberistic-acct-block memberistic-acct-block--danger">
@@ -231,7 +253,7 @@ $lane_url    = home_url( '/book-a-lane/' );
 							<span class="memberistic-acct-mini"><?php esc_html_e( 'Method', 'memberistic' ); ?></span>
 							<strong><?php echo esc_html( $pay_method ); ?></strong>
 						</div>
-						<a class="memberistic-acct-cta memberistic-acct-cta--ghost" href="<?php echo esc_url( $renewal_url ); ?>"><?php esc_html_e( 'Update Payment Method', 'memberistic' ); ?></a>
+						<a class="memberistic-acct-cta memberistic-acct-cta--ghost" href="<?php echo esc_url( $manage_billing_url ); ?>"><?php esc_html_e( 'Update Payment Method', 'memberistic' ); ?></a>
 					</div>
 				</div>
 				<div class="memberistic-acct-block">

@@ -87,6 +87,7 @@ final class Plugin {
 	private function register_hooks() {
 		add_action( 'init', array( $this, 'load_textdomain' ) );
 		add_action( 'init', array( Payments\Stripe_Service::class, 'maybe_handle_public_checkout_request' ) );
+		add_action( 'init', array( Payments\Stripe_Service::class, 'maybe_handle_billing_portal_request' ) );
 		add_action( 'admin_menu', array( Admin\Admin_Menu::class, 'register' ) );
 		add_action( 'admin_init', array( Installer::class, 'maybe_upgrade' ) );
 		add_action( 'admin_init', array( Admin\Settings_Page::class, 'register_settings' ) );

@@ -132,8 +132,8 @@ get_header();
         <div class="v">6030 E Main St, Suite 103<br>Mesa, Arizona 85205</div>
         <div style="margin-top: 18px;">
           <div class="row"><span>Mon  Thu</span><span class="vh">10am  6pm</span></div>
-          <div class="row"><span>Fri</span><span class="vh">Closed</span></div>
-          <div class="row"><span>Sat</span><span class="vh">9am  8pm</span></div>
+          <div class="row"><span>Fri</span><span class="vh">10am   7pm</span></div>
+          <div class="row"><span>Sat</span><span class="vh">10am  7pm</span></div>
           <div class="row"><span>Sun</span><span class="vh">12pm  6pm</span></div>
         </div>
       </div>

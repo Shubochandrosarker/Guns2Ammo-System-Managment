@@ -55,6 +55,101 @@ final class Stripe_Service {
 		return add_query_arg( 'memberistic_checkout_handler', '1', home_url( '/' ) );
 	}
 
+	/**
+	 * Nonced URL that opens the logged-in member's Stripe billing portal.
+	 *
+	 * Used by the account dashboard "Update Payment Method" / "Update Payment"
+	 * buttons. Hitting it routes through maybe_handle_billing_portal_request(),
+	 * which exchanges the member's stored stripe_customer_id for a one-time
+	 * Stripe-hosted portal session (update card, view invoices, cancel) and
+	 * redirects there. Members with no Stripe customer (legacy / cash / POS)
+	 * are sent to the plans page to start a recurring subscription instead.
+	 */
+	public static function billing_portal_action_url() {
+		return wp_nonce_url(
+			add_query_arg( 'memberistic_billing_portal', '1', home_url( '/' ) ),
+			'memberistic_billing_portal',
+			'memberistic_bp_nonce'
+		);
+	}
+
+	/**
+	 * Front-end handler: open the Stripe customer billing portal for the
+	 * current member. Registered on `init` alongside the checkout handler.
+	 */
+	public static function maybe_handle_billing_portal_request() {
+		if ( empty( $_GET['memberistic_billing_portal'] ) ) { // phpcs:ignore WordPress.Security.NonceVerification
+			return;
+		}
+
+		$account_url = memberistic_get_page_url( 'account_page_id', 'account', home_url( '/account/' ) );
+		$plans_url   = memberistic_get_page_url( 'plans_page_id', 'memberships', '' );
+		if ( ! $plans_url ) {
+			$plans_url = memberistic_get_page_url( 'plans_page_id', 'memberistic-memberships', home_url( '/memberships/' ) );
+		}
+
+		if ( ! is_user_logged_in() ) {
+			auth_redirect();
+			exit;
+		}
+
+		if ( empty( $_GET['memberistic_bp_nonce'] ) || ! wp_verify_nonce( sanitize_text_field( wp_unslash( $_GET['memberistic_bp_nonce'] ) ), 'memberistic_billing_portal' ) ) {
+			wp_safe_redirect( add_query_arg( 'memberistic_billing', 'invalid', $account_url ) );
+			exit;
+		}
+
+		$membership  = Memberships_Repository::get_by_user_id( get_current_user_id() );
+		$customer_id = $membership && ! empty( $membership['stripe_customer_id'] ) ? (string) $membership['stripe_customer_id'] : '';
+
+		// Legacy / non-Stripe members have no Stripe customer to manage. Send
+		// them to the plans page so they can start a real recurring
+		// subscription — this is the self-serve fix for imported members who
+		// were never set up to auto-charge.
+		if ( ! self::is_enabled() || '' === $customer_id ) {
+			wp_safe_redirect( $plans_url ?: $account_url );
+			exit;
+		}
+
+		$session = self::create_billing_portal_session( $customer_id, $account_url );
+
+		if ( is_wp_error( $session ) || empty( $session['url'] ) ) {
+			// Portal not configured in the Stripe dashboard yet, or a transient
+			// Stripe error. Fail safe back to the account page with a notice
+			// rather than a white wp_die() screen.
+			wp_safe_redirect( add_query_arg( 'memberistic_billing', 'unavailable', $account_url ) );
+			exit;
+		}
+
+		$url  = esc_url_raw( $session['url'] );
+		$host = wp_parse_url( $url, PHP_URL_HOST );
+
+		if ( 'billing.stripe.com' !== $host ) {
+			wp_safe_redirect( $account_url );
+			exit;
+		}
+
+		wp_redirect( $url ); // phpcs:ignore WordPress.Security.SafeRedirect.wp_redirect_wp_redirect
+		exit;
+	}
+
+	/**
+	 * Create a Stripe customer billing-portal session.
+	 *
+	 * @param string $customer_id Stripe customer id (cus_...).
+	 * @param string $return_url  Where Stripe returns the member after they finish.
+	 * @return array<string,mixed>|\WP_Error
+	 */
+	public static function create_billing_portal_session( $customer_id, $return_url ) {
+		return self::request(
+			'POST',
+			'/billing_portal/sessions',
+			array(
+				'customer'   => $customer_id,
+				'return_url' => $return_url,
+			)
+		);
+	}
+
 	public static function handle_checkout_request() {
 		if ( empty( $_POST['_wpnonce'] ) || ! wp_verify_nonce( sanitize_text_field( wp_unslash( $_POST['_wpnonce'] ) ), 'memberistic_checkout' ) ) {
 			wp_die( esc_html__( 'Checkout request could not be verified.', 'memberistic' ) );

@@ -352,8 +352,21 @@ final class Email_Service {
 
 		if ( is_email( $from_email ) ) {
 			$headers[] = 'From: ' . sanitize_text_field( $from_name ) . ' <' . sanitize_email( $from_email ) . '>';
+
+			// Reply-To: prefer a dedicated reply address (e.g. range@…) so member
+			// replies reach staff rather than a no-reply SMTP relay; fall back to
+			// the From address. A valid Reply-To also improves deliverability with
+			// inbox providers that penalise unrepliable bulk mail.
+			$reply_to = (string) memberistic_get_setting( 'email_reply_to_address', $from_email );
+			if ( is_email( $reply_to ) ) {
+				$headers[] = 'Reply-To: ' . sanitize_email( $reply_to );
+			}
 		}
 
-		return $headers;
+		/**
+		 * Allow integrations (e.g. an SMTP/deliverability add-on) to append
+		 * headers such as List-Unsubscribe without overriding the branded From.
+		 */
+		return apply_filters( 'memberistic_email_headers', $headers );
 	}
 }
