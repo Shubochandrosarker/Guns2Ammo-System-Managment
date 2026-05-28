@@ -78,6 +78,7 @@ final class Corporate_Module {
 			add_action( 'admin_menu', array( Corporate_Reports::class, 'menu' ), 31 );
 			add_action( 'admin_post_memberistic_corp_create', array( Corporate_Admin::class, 'handle_create' ) );
 			add_action( 'admin_post_memberistic_corp_update', array( Corporate_Admin::class, 'handle_update' ) );
+			add_action( 'admin_post_memberistic_corp_delete', array( Corporate_Admin::class, 'handle_delete' ) );
 			add_action( 'admin_post_memberistic_corp_add_member',  array( Corporate_Admin::class, 'handle_add_member' ) );
 			add_action( 'admin_post_memberistic_corp_bulk_members', array( Corporate_Admin::class, 'handle_bulk_members' ) );
 			add_action( 'admin_post_memberistic_corp_remove_member', array( Corporate_Admin::class, 'handle_remove_member' ) );
@@ -362,6 +363,26 @@ final class Corporate_Groups_Repository {
 	}
 
 	/**
+	 * Delete a group and everything tied to it: the member LINKS,
+	 * the group-level payments, and the payment links. The members'
+	 * own WordPress accounts and individual Memberistic memberships
+	 * are NOT touched — they remain as standalone members; only the
+	 * group container and its links/records are removed.
+	 */
+	public static function delete( $id ) {
+		global $wpdb;
+		$id = (int) $id;
+		if ( $id <= 0 ) {
+			return false;
+		}
+		$wpdb->delete( Corporate_Members_Repository::table(),       array( 'group_id' => $id ), array( '%d' ) );
+		$wpdb->delete( self::payments_table(),                      array( 'group_id' => $id ), array( '%d' ) );
+		$wpdb->delete( Corporate_Payment_Links_Repository::table(), array( 'group_id' => $id ), array( '%d' ) );
+		$ok = $wpdb->delete( self::table(), array( 'id' => $id ), array( '%d' ) );
+		return false !== $ok;
+	}
+
+	/**
 	 * Sum of completed payments for a group.
 	 */
 	public static function paid_total( $group_id ) {
@@ -588,6 +609,9 @@ CSS;
 			<?php if ( isset( $_GET['updated'] ) ) : ?>
 				<div class="notice notice-success is-dismissible"><p><?php esc_html_e( 'Corporate group updated.', 'memberistic' ); ?></p></div>
 			<?php endif; ?>
+			<?php if ( isset( $_GET['deleted'] ) ) : ?>
+				<div class="notice notice-success is-dismissible"><p><?php esc_html_e( 'Corporate group deleted. The members keep their individual accounts and memberships.', 'memberistic' ); ?></p></div>
+			<?php endif; ?>
 
 			<p class="description"><?php esc_html_e( 'One organization pays once; each member keeps their own account, waiver, and QR check-in. Group plans stay hidden from public pricing unless set to "Call for Details" or "Public".', 'memberistic' ); ?></p>
 
@@ -610,9 +634,17 @@ CSS;
 						$payer = $g->primary_user_id ? get_userdata( $g->primary_user_id ) : null;
 						$paid  = Corporate_Groups_Repository::paid_total( $g->id );
 						$single_url = admin_url( 'admin.php?page=' . self::PAGE . '&view=single&id=' . (int) $g->id );
+						$delete_url = wp_nonce_url( admin_url( 'admin-post.php?action=memberistic_corp_delete&group_id=' . (int) $g->id ), 'memberistic_corp_delete_' . (int) $g->id );
 					?>
 						<tr>
-							<td><strong><a href="<?php echo esc_url( $single_url ); ?>"><?php echo esc_html( $g->group_name ?: $g->company_name ?: ( '#' . $g->id ) ); ?></a></strong><?php if ( $g->company_name && $g->company_name !== $g->group_name ) : ?><br><span class="description"><?php echo esc_html( $g->company_name ); ?></span><?php endif; ?></td>
+							<td>
+								<strong><a href="<?php echo esc_url( $single_url ); ?>"><?php echo esc_html( $g->group_name ?: $g->company_name ?: ( '#' . $g->id ) ); ?></a></strong>
+								<?php if ( $g->company_name && $g->company_name !== $g->group_name ) : ?><br><span class="description"><?php echo esc_html( $g->company_name ); ?></span><?php endif; ?>
+								<div class="row-actions">
+									<span class="edit"><a href="<?php echo esc_url( $single_url ); ?>"><?php esc_html_e( 'Manage', 'memberistic' ); ?></a> | </span>
+									<span class="trash"><a href="<?php echo esc_url( $delete_url ); ?>" style="color:#b32d2e;" onclick="return confirm('<?php echo esc_js( __( 'Delete this group? The group + its payment records are removed. Members KEEP their individual accounts, memberships, waivers, and QR codes.', 'memberistic' ) ); ?>');"><?php esc_html_e( 'Delete', 'memberistic' ); ?></a></span>
+								</div>
+							</td>
 							<td><?php echo $payer ? esc_html( $payer->display_name . ' (' . $payer->user_email . ')' ) : '&mdash;'; ?></td>
 							<td><?php echo esc_html( (int) $g->seats_used . ' / ' . (int) $g->seats_total ); ?><?php if ( (int) $g->max_future_seats > (int) $g->seats_total ) : ?> <span class="description">(<?php echo esc_html( sprintf( __( 'up to %d', 'memberistic' ), (int) $g->max_future_seats ) ); ?>)</span><?php endif; ?></td>
 							<td>$<?php echo esc_html( number_format( $paid, 2 ) ); ?><?php if ( (float) $g->custom_price > 0 ) : ?> <span class="description">/ $<?php echo esc_html( number_format( (float) $g->custom_price, 2 ) ); ?></span><?php endif; ?></td>
@@ -814,10 +846,25 @@ CSS;
 		} elseif ( 'settings' === $tab ) {
 			echo '<div style="margin-top:18px;"></div>';
 			self::render_form( $group, false );
+			self::render_danger_zone( $group );
 		} else {
 			self::render_overview_tab( $group );
 		}
 		echo '</div>';
+	}
+
+	private static function render_danger_zone( $group ) {
+		$delete_url = wp_nonce_url(
+			admin_url( 'admin-post.php?action=memberistic_corp_delete&group_id=' . (int) $group->id ),
+			'memberistic_corp_delete_' . (int) $group->id
+		);
+		?>
+		<div class="g2a-corp-card" style="border-color:#e6b4b4;background:#fdf5f5;margin-top:24px;">
+			<h3 style="color:#b32d2e;margin-top:0;"><?php esc_html_e( 'Danger zone', 'memberistic' ); ?></h3>
+			<p style="color:#646970;"><?php esc_html_e( 'Deleting removes this group and its payment records. Members KEEP their individual accounts, memberships, waivers, and QR codes — they simply stop being part of this group.', 'memberistic' ); ?></p>
+			<a href="<?php echo esc_url( $delete_url ); ?>" class="button" style="color:#b32d2e;border-color:#b32d2e;" onclick="return confirm('<?php echo esc_js( __( 'Delete this group? This cannot be undone. Members keep their own accounts and memberships.', 'memberistic' ) ); ?>');"><?php esc_html_e( 'Delete this group', 'memberistic' ); ?></a>
+		</div>
+		<?php
 	}
 
 	private static function render_payments_tab( $group ) {
@@ -1081,7 +1128,10 @@ CSS;
 		if ( ! empty( $_POST['from_members'] ) ) {
 			$ids = array_filter( array_map( 'absint', explode( ',', sanitize_text_field( wp_unslash( $_POST['from_members'] ) ) ) ) );
 			if ( $ids ) {
-				$res = Corporate_Member_Service::attach_many( $id, $ids, false );
+				// send_email = true so members who get a brand-new WP
+				// account from this step receive their set-password +
+				// QR + waiver welcome (respects the email kill-switch).
+				$res = Corporate_Member_Service::attach_many( $id, $ids, true );
 				$args = array(
 					'page'      => self::PAGE,
 					'view'      => 'single',
@@ -1108,6 +1158,19 @@ CSS;
 		// Recount seats in case seats_total changed.
 		Corporate_Member_Service::recount_seats( $id );
 		wp_safe_redirect( admin_url( 'admin.php?page=' . self::PAGE . '&view=single&id=' . $id . '&tab=settings&updated=1' ) );
+		exit;
+	}
+
+	public static function handle_delete() {
+		if ( ! current_user_can( Corporate_Capabilities::manage_cap() ) ) {
+			wp_die( esc_html__( 'Permission denied.', 'memberistic' ) );
+		}
+		$id = isset( $_REQUEST['group_id'] ) ? (int) $_REQUEST['group_id'] : 0;
+		check_admin_referer( 'memberistic_corp_delete_' . $id );
+		if ( $id > 0 ) {
+			Corporate_Groups_Repository::delete( $id );
+		}
+		wp_safe_redirect( admin_url( 'admin.php?page=' . self::PAGE . '&deleted=1' ) );
 		exit;
 	}
 
@@ -1532,13 +1595,20 @@ final class Corporate_Member_Service {
 	}
 
 	/**
-	 * Attach an EXISTING membership's primary user to a group
-	 * (used by the "Create group from selected members" bulk action
-	 * on the Members screen). Unlike add_member() this does NOT
-	 * create a new account/membership — it links the member that
-	 * already exists. Seat-guarded, dedup-safe.
+	 * Attach an EXISTING membership to a group (the "Create group
+	 * from selected members" bulk action). Links the member that
+	 * already exists rather than creating a new membership.
 	 *
-	 * @return string added|seat_full|exists|invalid
+	 * IMPORTANT: core Memberistic members often have NO WordPress
+	 * user (the membership/person can exist without one). A group
+	 * member needs an account for login + waiver + QR, so when the
+	 * membership has no linked WP user we provision one from the
+	 * primary person's email (find-or-create) and link it back —
+	 * which also fixes "members don't generate WordPress users".
+	 *
+	 * Seat-guarded, dedup-safe.
+	 *
+	 * @return string added|seat_full|exists|invalid|no_email
 	 */
 	public static function attach_membership( $group_id, $membership_id, $send_email = false ) {
 		$group = Corporate_Groups_Repository::get( $group_id );
@@ -1550,10 +1620,46 @@ final class Corporate_Member_Service {
 			return 'invalid';
 		}
 		$membership = (array) $membership;
+		$mid    = (int) $membership['id'];
+		$person = \WordPressistic\Memberistic\Database\People_Repository::get_primary_by_membership( $mid );
+
+		// Resolve (or provision) the WP user for this member.
 		$user_id = (int) ( $membership['primary_user_id'] ?? 0 );
+		$is_new_user = false;
 		if ( $user_id <= 0 ) {
-			return 'invalid';
+			$email = $person && ! empty( $person['email'] ) ? sanitize_email( $person['email'] ) : '';
+			$name  = $person && ! empty( $person['full_name'] ) ? $person['full_name'] : '';
+			if ( ! $email || ! is_email( $email ) ) {
+				return 'no_email'; // can't make an account without an email
+			}
+			$user = get_user_by( 'email', $email );
+			if ( ! $user ) {
+				$username = self::unique_username( $email );
+				$new_id   = wp_insert_user( array(
+					'user_login'   => $username,
+					'user_email'   => $email,
+					'user_pass'    => wp_generate_password( 24, true, true ),
+					'display_name' => $name ?: $username,
+					'first_name'   => self::first_name( $name ),
+					'last_name'    => self::last_name( $name ),
+					'role'         => 'subscriber',
+				) );
+				if ( is_wp_error( $new_id ) ) {
+					return 'invalid';
+				}
+				$user_id     = (int) $new_id;
+				$is_new_user = true;
+			} else {
+				$user_id = (int) $user->ID;
+			}
+			// Link the new/found user back onto the membership + person
+			// so the member now has a real account going forward.
+			\WordPressistic\Memberistic\Database\Memberships_Repository::update( $mid, array( 'primary_user_id' => $user_id ) );
+			if ( $person && ! empty( $person['id'] ) ) {
+				\WordPressistic\Memberistic\Database\People_Repository::update( (int) $person['id'], array( 'wp_user_id' => $user_id ) );
+			}
 		}
+
 		if ( Corporate_Members_Repository::active_count( $group_id ) >= (int) $group->seats_total ) {
 			return 'seat_full';
 		}
@@ -1562,12 +1668,7 @@ final class Corporate_Member_Service {
 			return 'exists';
 		}
 
-		// Waiver status mirror from the membership's primary person.
-		$waiver = 'missing';
-		$person = \WordPressistic\Memberistic\Database\People_Repository::get_primary_by_membership( (int) $membership['id'] );
-		if ( $person && ! empty( $person['waiver_status'] ) ) {
-			$waiver = $person['waiver_status'];
-		}
+		$waiver = ( $person && ! empty( $person['waiver_status'] ) ) ? $person['waiver_status'] : 'missing';
 		$qr_token = '';
 		if ( class_exists( '\WordPressistic\Memberistic\Utilities\Verification' ) ) {
 			$qr_token = \WordPressistic\Memberistic\Utilities\Verification::get_or_create_token( $user_id );
@@ -1576,7 +1677,7 @@ final class Corporate_Member_Service {
 		Corporate_Members_Repository::insert( array(
 			'group_id'      => (int) $group_id,
 			'user_id'       => $user_id,
-			'membership_id' => (int) $membership['id'],
+			'membership_id' => $mid,
 			'role'          => 'member',
 			'status'        => 'active',
 			'waiver_status' => $waiver,
@@ -1591,9 +1692,10 @@ final class Corporate_Member_Service {
 			$u ? $u->display_name : ( '#' . $user_id )
 		) );
 
+		// Email: if we just created their account, send the full
+		// welcome (with set-password link); otherwise a sign-in welcome.
 		if ( $send_email && $u ) {
-			// Existing account → sign-in welcome (no set-password link).
-			self::send_welcome( (int) $membership['id'], $group, $u, false );
+			self::send_welcome( $mid, $group, $u, $is_new_user );
 		}
 		return 'added';
 	}
