@@ -54,6 +54,12 @@ final class Corporate_Module {
 		add_action( 'woocommerce_order_status_processing', array( Corporate_Pay::class, 'on_wc_paid' ) );
 		// Stripe webhook backstop for payment links.
 		add_action( 'memberistic_stripe_webhook_event', array( Corporate_Pay::class, 'on_stripe_webhook' ), 10, 2 );
+		// Phase 5 — staff QR check-in (attaches to the verify page) +
+		// non-member Guest Pass registration.
+		add_action( 'memberistic_verify_request',    array( Corporate_Checkin::class, 'maybe_record' ), 10, 3 );
+		add_action( 'memberistic_verify_card_after', array( Corporate_Checkin::class, 'staff_panel' ), 10, 2 );
+		add_shortcode( 'memberistic_guest_pass', array( Corporate_Guest_Service::class, 'shortcode' ) );
+		add_action( 'init', array( Corporate_Guest_Service::class, 'maybe_handle_submit' ) );
 		// Phase 4 — public waiver signing endpoint + waiver merge tag.
 		add_action( 'template_redirect', array( Corporate_Waiver::class, 'maybe_handle_public_waiver' ), 1 );
 		// Payment separation — flag membership-payment WC orders so they
@@ -1527,6 +1533,13 @@ final class Corporate_Emails {
 				$context['{brand_label}'] ?? get_bloginfo( 'name' )
 			);
 		}
+		if ( 'guest_pass_welcome' === $template ) {
+			return sprintf(
+				/* translators: %s: brand */
+				__( 'Your %s range pass + check-in QR', 'memberistic' ),
+				$context['{brand_label}'] ?? get_bloginfo( 'name' )
+			);
+		}
 		return $subject;
 	}
 
@@ -1560,6 +1573,18 @@ final class Corporate_Emails {
 				. "Each member has received their own welcome email with a set-password link, digital card, waiver, and check-in QR.\n\n"
 				. "Manage your group from your account:\n{account_url}\n\n"
 				. "Questions? Call {business_phone}.\n\n{brand_label}";
+		}
+		if ( 'guest_pass_welcome' === $template ) {
+			$set_pw = $context['{corp_set_password}'] ?? '';
+			$claim  = $set_pw
+				? "Set a password to manage your pass (optional):\n{corp_set_password}\n\n"
+				: '';
+			return "Hi {member_name},\n\n"
+				. "Thanks for visiting {brand_label}! Your range guest pass is ready.\n\n"
+				. "Your check-in QR code — show this at the range desk:\n{corp_qr_url}\n\n"
+				. "Please sign your range waiver before you arrive (takes 30 seconds):\n{corp_waiver_url}\n\n"
+				. $claim
+				. "See you at the range.\n\n{brand_label}\n{business_phone}";
 		}
 		return $body;
 	}
@@ -2469,5 +2494,315 @@ final class Corporate_WC_Separation {
 			}
 		}
 		return $data;
+	}
+}
+
+/**
+ * Phase 5 — staff QR check-in.
+ *
+ * The member/guest QR already resolves to the public verification
+ * card at /?memberistic_verify=TOKEN. For a logged-in STAFF user
+ * (capability memberistic_checkin_members or manage_memberistic_
+ * groups) we attach a check-in panel to that same page: member
+ * details (name, plan/group, waiver, eligibility, notes) + a
+ * "Check In" button. Public viewers see nothing extra — one QR,
+ * two audiences.
+ */
+final class Corporate_Checkin {
+
+	public static function can_checkin() {
+		return current_user_can( 'memberistic_checkin_members' )
+			|| current_user_can( 'manage_memberistic_groups' )
+			|| current_user_can( 'manage_options' );
+	}
+
+	/**
+	 * Record a check-in when staff submits the panel form on the
+	 * verify page. Fires on memberistic_verify_request (before render).
+	 */
+	public static function maybe_record( $user, $membership, $token ) {
+		if ( 'POST' !== strtoupper( (string) ( $_SERVER['REQUEST_METHOD'] ?? '' ) ) ) {
+			return;
+		}
+		if ( empty( $_POST['memberistic_checkin_nonce'] ) || ! self::can_checkin() ) {
+			return;
+		}
+		if ( ! wp_verify_nonce( sanitize_text_field( wp_unslash( $_POST['memberistic_checkin_nonce'] ) ), 'memberistic_checkin_' . $token ) ) {
+			return;
+		}
+		if ( ! is_array( $membership ) || empty( $membership['id'] ) ) {
+			return;
+		}
+		$person = \WordPressistic\Memberistic\Database\People_Repository::get_primary_by_membership( (int) $membership['id'] );
+		if ( ! $person ) {
+			return;
+		}
+		\WordPressistic\Memberistic\Database\Checkins_Repository::create( array(
+			'membership_id' => (int) $membership['id'],
+			'person_id'     => (int) $person['id'],
+			'checkin_type'  => 'qr_scan',
+			'status'        => 'checked_in',
+			'notes'         => sanitize_text_field( wp_unslash( $_POST['checkin_notes'] ?? '' ) ),
+		) );
+		\WordPressistic\Memberistic\Database\Activity_Repository::log( array(
+			'membership_id'       => (int) $membership['id'],
+			'person_id'           => (int) $person['id'],
+			'activity_type'       => 'checkin_created',
+			'title'               => __( 'QR check-in', 'memberistic' ),
+			'description'         => sprintf( __( 'Checked in at the range desk via QR by %s.', 'memberistic' ), wp_get_current_user()->display_name ),
+		) );
+		// Flag so the panel shows a confirmation banner.
+		$GLOBALS['memberistic_checkin_done'] = true;
+	}
+
+	/**
+	 * Render the staff check-in panel below the verification card.
+	 */
+	public static function staff_panel( $user, $membership ) {
+		if ( ! self::can_checkin() ) {
+			return;
+		}
+		$status = is_array( $membership ) ? (string) ( $membership['status'] ?? '' ) : '';
+		$plan   = is_array( $membership ) ? (string) ( $membership['plan_name'] ?? '' ) : '';
+		$mid    = is_array( $membership ) ? (int) ( $membership['id'] ?? 0 ) : 0;
+		$token  = isset( $_GET['memberistic_verify'] ) ? sanitize_text_field( wp_unslash( $_GET['memberistic_verify'] ) ) : ''; // phpcs:ignore WordPress.Security.NonceVerification.Recommended
+
+		// Resolve waiver + group context.
+		$waiver = 'missing';
+		$person = $mid ? \WordPressistic\Memberistic\Database\People_Repository::get_primary_by_membership( $mid ) : null;
+		if ( $person && ! empty( $person['waiver_status'] ) ) {
+			$waiver = $person['waiver_status'];
+		}
+		$group_name = '';
+		global $wpdb;
+		$gm = $wpdb->get_row( $wpdb->prepare(
+			'SELECT group_id FROM ' . Corporate_Members_Repository::table() . " WHERE user_id = %d AND status != 'removed' LIMIT 1",
+			(int) $user->ID
+		) );
+		if ( $gm ) {
+			$g = Corporate_Groups_Repository::get( (int) $gm->group_id );
+			$group_name = $g ? $g->group_name : '';
+		}
+
+		$status_ok  = in_array( $status, array( 'active', 'comped', 'trial', 'guest' ), true );
+		$waiver_ok  = ( 'signed' === $waiver );
+		$eligible   = $status_ok; // membership active; waiver shown as a warning if missing
+		$done       = ! empty( $GLOBALS['memberistic_checkin_done'] );
+
+		$last_in = '';
+		if ( $mid && class_exists( '\WordPressistic\Memberistic\Database\Checkins_Repository' ) ) {
+			$rows = \WordPressistic\Memberistic\Database\Checkins_Repository::get_by_membership( $mid );
+			if ( ! empty( $rows ) && is_array( $rows ) ) {
+				$last = is_array( $rows[0] ) ? $rows[0] : (array) $rows[0];
+				$last_in = $last['checked_in_at'] ?? '';
+			}
+		}
+		?>
+		<style>
+		.mck{max-width:420px;margin:14px auto 0;background:#11161D;border:1px solid #2A323D;border-radius:12px;padding:22px;text-align:left;color:#fff;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;}
+		.mck h2{font-size:13px;letter-spacing:.18em;text-transform:uppercase;color:#C9A84C;margin:0 0 14px;}
+		.mck .row{display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid #2A323D;font-size:14px;}
+		.mck .row .l{color:#8A95A5;}.mck .row .v{color:#fff;font-weight:600;}
+		.mck .ok{color:#9DE05B;}.mck .warn{color:#E8802F;}
+		.mck textarea{width:100%;margin-top:12px;background:#0F1115;border:1px solid #2A323D;border-radius:6px;color:#fff;padding:10px;font-size:14px;}
+		.mck button{width:100%;margin-top:12px;padding:15px;border:0;border-radius:6px;font-weight:700;font-size:15px;letter-spacing:.06em;text-transform:uppercase;cursor:pointer;}
+		.mck .btn-go{background:#9DE05B;color:#0F1115;}.mck .btn-go.dis{background:#3a4654;color:#8A95A5;cursor:not-allowed;}
+		.mck .done{background:rgba(157,224,91,.15);border:1px solid rgba(157,224,91,.5);color:#9DE05B;padding:12px;border-radius:6px;text-align:center;font-weight:700;}
+		</style>
+		<div class="mck">
+			<h2><?php esc_html_e( 'Staff Check-In', 'memberistic' ); ?></h2>
+			<?php if ( $done ) : ?>
+				<div class="done">✓ <?php esc_html_e( 'Checked in', 'memberistic' ); ?> · <?php echo esc_html( wp_date( 'g:i a' ) ); ?></div>
+			<?php else : ?>
+				<div class="row"><span class="l"><?php esc_html_e( 'Member', 'memberistic' ); ?></span><span class="v"><?php echo esc_html( $user->display_name ); ?></span></div>
+				<div class="row"><span class="l"><?php esc_html_e( 'Membership', 'memberistic' ); ?></span><span class="v <?php echo $status_ok ? 'ok' : 'warn'; ?>"><?php echo esc_html( $status ? ucfirst( $status ) : '—' ); ?></span></div>
+				<?php if ( $plan ) : ?><div class="row"><span class="l"><?php esc_html_e( 'Plan', 'memberistic' ); ?></span><span class="v"><?php echo esc_html( $plan ); ?></span></div><?php endif; ?>
+				<?php if ( $group_name ) : ?><div class="row"><span class="l"><?php esc_html_e( 'Group', 'memberistic' ); ?></span><span class="v"><?php echo esc_html( $group_name ); ?></span></div><?php endif; ?>
+				<div class="row"><span class="l"><?php esc_html_e( 'Waiver', 'memberistic' ); ?></span><span class="v <?php echo $waiver_ok ? 'ok' : 'warn'; ?>"><?php echo $waiver_ok ? esc_html__( 'Signed', 'memberistic' ) : esc_html__( 'NOT on file', 'memberistic' ); ?></span></div>
+				<?php if ( $last_in ) : ?><div class="row"><span class="l"><?php esc_html_e( 'Last check-in', 'memberistic' ); ?></span><span class="v"><?php echo esc_html( mysql2date( get_option( 'date_format' ) . ' g:i a', $last_in ) ); ?></span></div><?php endif; ?>
+				<?php if ( ! $waiver_ok ) : ?><div class="row"><span class="warn" style="font-size:13px;">⚠ <?php esc_html_e( 'Collect a signed waiver before range access.', 'memberistic' ); ?></span></div><?php endif; ?>
+				<form method="post">
+					<?php wp_nonce_field( 'memberistic_checkin_' . $token, 'memberistic_checkin_nonce' ); ?>
+					<textarea name="checkin_notes" rows="2" placeholder="<?php esc_attr_e( 'Notes (optional)', 'memberistic' ); ?>"></textarea>
+					<button type="submit" class="btn-go<?php echo $eligible ? '' : ' dis'; ?>"<?php echo $eligible ? '' : ' disabled'; ?>><?php echo $eligible ? esc_html__( 'Check In Now', 'memberistic' ) : esc_html__( 'Not eligible — see status', 'memberistic' ); ?></button>
+				</form>
+			<?php endif; ?>
+		</div>
+		<?php
+	}
+}
+
+/**
+ * Phase 5 — non-member "Guest Pass".
+ *
+ * A non-member who buys online (or registers at the desk) gets a
+ * lightweight Guest Pass: their own WP account + a membership on a
+ * hidden "guest-pass" plan + QR check-in token + emailed waiver +
+ * a digital ID card (the standard account card works for them).
+ * Staff scan the same QR to check them in. This reuses every piece
+ * of the member infrastructure — the guest IS a (guest-tier)
+ * member, so nothing special is needed downstream.
+ *
+ * Surfaced via the [memberistic_guest_pass] shortcode (a public
+ * registration form) and a filterable hook so WooCommerce online
+ * buyers can be auto-enrolled later.
+ */
+final class Corporate_Guest_Service {
+
+	const PLAN_SLUG = 'guest-pass';
+
+	/**
+	 * Create (or fetch) a guest pass for an email. Returns the same
+	 * status shape as the member service.
+	 */
+	public static function create_guest( $name, $email, $phone = '', $send_email = true ) {
+		$name  = sanitize_text_field( (string) $name );
+		$email = sanitize_email( (string) $email );
+		$phone = sanitize_text_field( (string) $phone );
+		if ( ! $email || ! is_email( $email ) || '' === $name ) {
+			return array( 'status' => 'invalid', 'message' => __( 'A valid name and email are required.', 'memberistic' ) );
+		}
+
+		$user = get_user_by( 'email', $email );
+		$is_new = false;
+		if ( ! $user ) {
+			$base = sanitize_user( current( explode( '@', $email ) ), true ) ?: 'guest';
+			$try = $base; $i = 1;
+			while ( username_exists( $try ) ) { $try = $base . $i; $i++; }
+			$uid = wp_insert_user( array(
+				'user_login'   => $try,
+				'user_email'   => $email,
+				'user_pass'    => wp_generate_password( 24, true, true ),
+				'display_name' => $name,
+				'role'         => 'subscriber',
+			) );
+			if ( is_wp_error( $uid ) ) {
+				return array( 'status' => 'error', 'message' => $uid->get_error_message() );
+			}
+			$user = get_user_by( 'id', $uid );
+			$is_new = true;
+		}
+
+		// Already has a membership? Just (re)issue QR + waiver.
+		$existing = \WordPressistic\Memberistic\Database\Memberships_Repository::get_by_user_id( $user->ID );
+		if ( ! $existing ) {
+			$plan_id = self::guest_plan_id();
+			$mid = \WordPressistic\Memberistic\Database\Memberships_Repository::create( array(
+				'membership_uuid' => \WordPressistic\Memberistic\Database\Memberships_Repository::generate_membership_uuid(),
+				'primary_user_id' => $user->ID,
+				'plan_id'         => $plan_id,
+				'billing_cycle'   => 'annual',
+				'status'          => 'active',
+				'start_date'      => current_time( 'mysql' ),
+				'payment_source'  => 'guest_pass',
+				'created_by'      => get_current_user_id(),
+			) );
+			\WordPressistic\Memberistic\Database\People_Repository::create( array(
+				'membership_id' => $mid,
+				'wp_user_id'    => $user->ID,
+				'role'          => 'primary',
+				'full_name'     => $name,
+				'email'         => $email,
+				'phone'         => $phone,
+				'waiver_status' => 'missing',
+				'status'        => 'active',
+			) );
+		} else {
+			$mid = (int) $existing['id'];
+		}
+
+		// QR token (reuses the member verification QR + live card).
+		if ( class_exists( '\WordPressistic\Memberistic\Utilities\Verification' ) ) {
+			\WordPressistic\Memberistic\Utilities\Verification::get_or_create_token( $user->ID );
+		}
+
+		if ( $send_email ) {
+			self::send_guest_email( $mid, $user, $is_new );
+			Corporate_Waiver_Service::send_waiver_email( $mid, $user );
+		}
+
+		return array(
+			'status'    => 'ok',
+			'message'   => __( "You're all set — check your email for your range pass + waiver.", 'memberistic' ),
+			'user_id'   => $user->ID,
+			'qr_url'    => class_exists( '\WordPressistic\Memberistic\Utilities\Verification' ) ? \WordPressistic\Memberistic\Utilities\Verification::verify_url( $user->ID ) : '',
+		);
+	}
+
+	private static function guest_plan_id() {
+		$plan = \WordPressistic\Memberistic\Database\Plans_Repository::get_by_slug( self::PLAN_SLUG );
+		if ( $plan && ! empty( $plan['id'] ) ) {
+			return (int) $plan['id'];
+		}
+		return (int) \WordPressistic\Memberistic\Database\Plans_Repository::create( array(
+			'name'            => 'Guest Pass',
+			'slug'            => self::PLAN_SLUG,
+			'description'     => 'Non-member range guest pass: QR check-in + waiver on file. Hidden from public pricing.',
+			'monthly_price'   => 0,
+			'annual_price'    => 0,
+			'included_people' => 0,
+			'is_featured'     => 0,
+			'sort_order'      => 98,
+			'status'          => 'active',
+		) );
+	}
+
+	private static function send_guest_email( $membership_id, $user, $is_new ) {
+		$set_password_url = '';
+		if ( $is_new ) {
+			$key = get_password_reset_key( $user );
+			if ( ! is_wp_error( $key ) ) {
+				$set_password_url = network_site_url( 'wp-login.php?action=rp&key=' . rawurlencode( $key ) . '&login=' . rawurlencode( $user->user_login ), 'login' );
+			}
+		}
+		$qr_url = class_exists( '\WordPressistic\Memberistic\Utilities\Verification' )
+			? \WordPressistic\Memberistic\Utilities\Verification::verify_url( $user->ID ) : '';
+		\WordPressistic\Memberistic\Emails\Email_Service::send_membership_email(
+			(int) $membership_id,
+			'guest_pass_welcome',
+			array(
+				'corp_set_password' => $set_password_url,
+				'corp_qr_url'       => $qr_url,
+				'corp_waiver_url'   => Corporate_Waiver_Service::waiver_url( $user->ID ),
+			)
+		);
+	}
+
+	/** Public registration form. */
+	public static function shortcode( $atts = array() ) {
+		$done = isset( $_GET['guest_pass'] ) ? sanitize_key( wp_unslash( $_GET['guest_pass'] ) ) : ''; // phpcs:ignore WordPress.Security.NonceVerification.Recommended
+		ob_start();
+		if ( 'done' === $done ) {
+			echo '<div class="memberistic-frontend"><p>' . esc_html__( "You're all set! Check your email for your range pass QR code and waiver link. Show the QR at the range desk on your next visit.", 'memberistic' ) . '</p></div>';
+			return ob_get_clean();
+		}
+		?>
+		<form class="memberistic-frontend memberistic-guest-pass" method="post">
+			<?php wp_nonce_field( 'memberistic_guest_pass', 'memberistic_guest_nonce' ); ?>
+			<p><label><?php esc_html_e( 'Full name', 'memberistic' ); ?><br><input type="text" name="guest_name" required style="width:100%;padding:10px;"></label></p>
+			<p><label><?php esc_html_e( 'Email', 'memberistic' ); ?><br><input type="email" name="guest_email" required style="width:100%;padding:10px;"></label></p>
+			<p><label><?php esc_html_e( 'Phone (optional)', 'memberistic' ); ?><br><input type="text" name="guest_phone" style="width:100%;padding:10px;"></label></p>
+			<p><button type="submit" class="btn btn-ember"><?php esc_html_e( 'Get My Range Pass', 'memberistic' ); ?></button></p>
+		</form>
+		<?php
+		return ob_get_clean();
+	}
+
+	/** Handle the public form submit. */
+	public static function maybe_handle_submit() {
+		if ( empty( $_POST['memberistic_guest_nonce'] ) ) {
+			return;
+		}
+		if ( ! wp_verify_nonce( sanitize_text_field( wp_unslash( $_POST['memberistic_guest_nonce'] ) ), 'memberistic_guest_pass' ) ) {
+			return;
+		}
+		$res = self::create_guest(
+			wp_unslash( $_POST['guest_name'] ?? '' ),
+			wp_unslash( $_POST['guest_email'] ?? '' ),
+			wp_unslash( $_POST['guest_phone'] ?? '' )
+		);
+		$redirect = add_query_arg( 'guest_pass', 'ok' === $res['status'] ? 'done' : 'error', wp_get_referer() ?: home_url( '/' ) );
+		wp_safe_redirect( $redirect );
+		exit;
 	}
 }
