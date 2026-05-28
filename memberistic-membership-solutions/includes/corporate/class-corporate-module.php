@@ -60,6 +60,15 @@ final class Corporate_Module {
 		add_action( 'memberistic_verify_card_after', array( Corporate_Checkin::class, 'staff_panel' ), 10, 2 );
 		add_shortcode( 'memberistic_guest_pass', array( Corporate_Guest_Service::class, 'shortcode' ) );
 		add_action( 'init', array( Corporate_Guest_Service::class, 'maybe_handle_submit' ) );
+		// Auto-enroll non-members as Guest members so their details
+		// persist with a login + Digital Card + dynamic QR + waiver:
+		//  - any product buyer with no membership level, and
+		//  - any range booker who is not yet a member.
+		add_action( 'woocommerce_payment_complete',        array( Corporate_Guest_Service::class, 'maybe_enroll_from_wc_order' ), 20 );
+		add_action( 'woocommerce_order_status_completed',  array( Corporate_Guest_Service::class, 'maybe_enroll_from_wc_order' ), 20 );
+		add_action( 'woocommerce_order_status_processing', array( Corporate_Guest_Service::class, 'maybe_enroll_from_wc_order' ), 20 );
+		add_action( 'g2ab_booking_created', array( Corporate_Guest_Service::class, 'maybe_enroll_from_booking' ), 20, 2 );
+		add_action( 'g2ab_booking_paid',    array( Corporate_Guest_Service::class, 'maybe_enroll_from_booking' ), 20, 2 );
 		// Phase 6 — front-end group portal (owner self-service gated by
 		// the per-group owner_portal toggle) + member group context.
 		add_shortcode( 'memberistic_group_portal', array( Corporate_Portal::class, 'shortcode' ) );
@@ -3059,6 +3068,117 @@ final class Corporate_Guest_Service {
 			'user_id'   => $user->ID,
 			'qr_url'    => class_exists( '\WordPressistic\Memberistic\Utilities\Verification' ) ? \WordPressistic\Memberistic\Utilities\Verification::verify_url( $user->ID ) : '',
 		);
+	}
+
+	/**
+	 * True when this email already maps to a WP user that owns a
+	 * Memberistic membership (paid member OR existing guest). Used to
+	 * keep auto-enrollment idempotent so we never spam an existing
+	 * member with a fresh "welcome" + waiver on every purchase/booking.
+	 */
+	private static function email_has_membership( $email ) {
+		$email = sanitize_email( (string) $email );
+		if ( ! $email || ! is_email( $email ) ) {
+			return false;
+		}
+		$user = get_user_by( 'email', $email );
+		if ( ! $user ) {
+			return false;
+		}
+		$existing = \WordPressistic\Memberistic\Database\Memberships_Repository::get_by_user_id( $user->ID );
+		return ! empty( $existing );
+	}
+
+	/**
+	 * Auto-enroll a non-member as a Guest member after a WooCommerce
+	 * purchase. Anyone who buys a product but has no membership level
+	 * is saved as a Guest member so they get a login account + Digital
+	 * Card + dynamic QR + waiver, and their details persist for next
+	 * time. Membership-payment orders (corporate group invoices, plan
+	 * checkout) are skipped — those are not "products" and the buyer is
+	 * handled by their own flow.
+	 *
+	 * Hooked to woocommerce_payment_complete + order_status_completed/
+	 * processing. Idempotent: existing members/guests are left alone.
+	 */
+	public static function maybe_enroll_from_wc_order( $order_id ) {
+		if ( ! function_exists( 'wc_get_order' ) ) {
+			return;
+		}
+		$order = wc_get_order( $order_id );
+		if ( ! $order ) {
+			return;
+		}
+		// Skip membership / group-invoice payments — not a product sale.
+		if ( Corporate_WC_Separation::is_membership_order( $order ) ) {
+			return;
+		}
+		$email = sanitize_email( (string) $order->get_billing_email() );
+		if ( ! $email || ! is_email( $email ) ) {
+			return;
+		}
+		if ( self::email_has_membership( $email ) ) {
+			return;
+		}
+		$name = trim( $order->get_billing_first_name() . ' ' . $order->get_billing_last_name() );
+		if ( '' === $name ) {
+			$name = current( explode( '@', $email ) );
+		}
+		self::create_guest( $name, $email, (string) $order->get_billing_phone() );
+	}
+
+	/**
+	 * Auto-enroll a non-member as a Guest member from a range booking.
+	 * A non-member who books a lane and comes in to shoot is saved as a
+	 * Guest member with their full details, a login account, Digital
+	 * Card + dynamic QR, and a waiver — so the next time they book the
+	 * desk can pull them up by QR scan and their info is remembered.
+	 *
+	 * Hooked to both g2ab_booking_created (passes a booking id) and
+	 * g2ab_booking_paid (passes the booking row object). Idempotent:
+	 * existing members/guests are left alone.
+	 */
+	public static function maybe_enroll_from_booking( $booking, $context = array() ) {
+		$row = self::resolve_booking_row( $booking );
+		if ( ! $row ) {
+			return;
+		}
+		$email = sanitize_email( isset( $row['customer_email'] ) ? (string) $row['customer_email'] : '' );
+		if ( ! $email || ! is_email( $email ) ) {
+			return;
+		}
+		if ( self::email_has_membership( $email ) ) {
+			return;
+		}
+		$name = isset( $row['customer_name'] ) ? trim( (string) $row['customer_name'] ) : '';
+		if ( '' === $name ) {
+			$name = current( explode( '@', $email ) );
+		}
+		$phone = isset( $row['customer_phone'] ) ? (string) $row['customer_phone'] : '';
+		self::create_guest( $name, $email, $phone );
+	}
+
+	/**
+	 * Normalize the varied payloads the booking engine fires:
+	 *  - g2ab_booking_created → (int) booking id
+	 *  - g2ab_booking_paid    → stdClass booking row
+	 * Returns an associative array of the booking row, or null.
+	 */
+	private static function resolve_booking_row( $booking ) {
+		if ( is_object( $booking ) ) {
+			return (array) $booking;
+		}
+		if ( is_array( $booking ) ) {
+			return $booking;
+		}
+		$booking_id = (int) $booking;
+		if ( $booking_id <= 0 ) {
+			return null;
+		}
+		global $wpdb;
+		$table = $wpdb->prefix . 'g2ab_bookings';
+		$found = $wpdb->get_row( $wpdb->prepare( "SELECT * FROM {$table} WHERE id = %d", $booking_id ), ARRAY_A ); // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared, WordPress.DB.DirectDatabaseQuery
+		return $found ?: null;
 	}
 
 	private static function guest_plan_id() {

@@ -38,6 +38,20 @@ sign a waiver, and carry a QR:
    account + QR + waiver email.
 4. **Online membership checkout** (Stripe). The buyer's account is
    created when payment completes.
+5. **Range booking by a non-member** (NEW in 1.33.0). When someone
+   who is not yet a member books a lane, they're saved automatically
+   as a **Guest member** — login account + Digital Card with dynamic
+   QR + waiver — so next time the desk can pull them up by QR scan and
+   their details are remembered.
+6. **Buying any product without a membership** (NEW in 1.33.0). Any
+   WooCommerce purchase by someone with no membership level also
+   creates a Guest member (account + QR card + waiver). Membership and
+   group-invoice payments are excluded — those aren't product sales.
+
+> These are **idempotent**: if the booker/buyer already has a
+> membership (paid member *or* an existing guest), nothing is
+> duplicated and no welcome/waiver email is re-sent. A repeat
+> customer is recognised by their email every time.
 
 > A member must have a valid **email** for an account to be created.
 > If a selected member has no email, the bulk action safely skips
