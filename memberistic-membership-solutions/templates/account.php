@@ -17,7 +17,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-$renewal_url = memberistic_get_page_url( 'renewal_page_id', 'memberistic-renewal', home_url( '/' ) );
+$renewal_url = memberistic_get_page_url( 'renewal_page_id', 'account', home_url( '/account/' ) );
 $plans_url   = memberistic_get_page_url( 'plans_page_id', 'memberships', '' );
 if ( ! $plans_url ) { $plans_url = memberistic_get_page_url( 'plans_page_id', 'memberistic-memberships', home_url( '/memberships/' ) ); }
 $support_url = home_url( '/get-support/' );

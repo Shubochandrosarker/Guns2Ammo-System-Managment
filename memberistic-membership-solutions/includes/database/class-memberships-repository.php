@@ -479,7 +479,7 @@ final class Memberships_Repository {
 
 		return $wpdb->get_results(
 			$wpdb->prepare(
-				'SELECT id FROM ' . self::table() . ' WHERE status = %s AND renewal_date IS NOT NULL AND renewal_date < %s ORDER BY renewal_date ASC LIMIT %d',
+				'SELECT id, renewal_date, payment_source, stripe_subscription_id FROM ' . self::table() . ' WHERE status = %s AND renewal_date IS NOT NULL AND renewal_date < %s ORDER BY renewal_date ASC LIMIT %d',
 				'active',
 				$now,
 				$limit
