@@ -192,6 +192,10 @@ final class Import_Page {
 			self::render_backfill_result();
 			return;
 		}
+		if ( 'fix_renewals' === $step && check_admin_referer( 'memberistic_import_fixrenewals' ) ) {
+			self::render_renewal_fix_result();
+			return;
+		}
 		self::render_start();
 	}
 
@@ -253,9 +257,93 @@ final class Import_Page {
 					</tbody>
 				</table>
 			</div>
+			<?php self::render_renewal_fix_card(); ?>
 			<?php self::render_backfill_card(); ?>
 		</div>
 		<?php
+	}
+
+	/**
+	 * "Set renewal dates from activation" maintenance tool.
+	 *
+	 * Active members imported (or created) without a renewal_date get one
+	 * computed from their start date: advance by the billing cycle until the
+	 * date lands in the future, so the renewal falls on the same day each
+	 * month/year as their activation. Batched.
+	 */
+	private static function render_renewal_fix_card() {
+		$pending = Memberships_Repository::count_active_missing_renewal();
+		?>
+		<div class="memberistic-card">
+			<h2><?php esc_html_e( 'Set renewal dates from activation', 'memberistic' ); ?></h2>
+			<p><?php esc_html_e( 'Active members with no renewal date get one calculated from their activation/start date and billing cycle — landing on the same day each month or year. Runs in batches; click until it reports zero remaining.', 'memberistic' ); ?></p>
+			<p><strong><?php
+				/* translators: %d: number of active memberships missing a renewal date */
+				printf( esc_html__( 'Active memberships missing a renewal date: %d', 'memberistic' ), (int) $pending );
+			?></strong></p>
+			<?php if ( $pending > 0 ) : ?>
+			<form method="post">
+				<?php wp_nonce_field( 'memberistic_import_fixrenewals' ); ?>
+				<input type="hidden" name="memberistic_import_step" value="fix_renewals">
+				<p><button type="submit" class="button button-secondary"><?php esc_html_e( 'Set next 200', 'memberistic' ); ?></button></p>
+			</form>
+			<?php endif; ?>
+		</div>
+		<?php
+	}
+
+	/**
+	 * Run one batch of the renewal-date backfill, then re-render start.
+	 */
+	private static function render_renewal_fix_result() {
+		$rows    = Memberships_Repository::get_active_missing_renewal( 200 );
+		$updated = 0;
+		$now_ts  = current_time( 'timestamp' );
+
+		foreach ( $rows as $row ) {
+			// Resolve a sane anchor timestamp. start_date / created_at can be a
+			// MySQL zero-datetime ('0000-00-00 00:00:00') on imported rows,
+			// which strtotime() turns into a negative/garbage value — guard
+			// against that and fall back to "now" so the computed renewal is
+			// always a real future date, never an ancient one.
+			$anchor_ts = ! empty( $row['start_date'] ) ? strtotime( (string) $row['start_date'] ) : false;
+			if ( ! $anchor_ts || $anchor_ts <= 0 ) {
+				$anchor_ts = ! empty( $row['created_at'] ) ? strtotime( (string) $row['created_at'] ) : false;
+			}
+			if ( ! $anchor_ts || $anchor_ts <= 0 ) {
+				$anchor_ts = $now_ts;
+			}
+
+			$cycle = ( 'annual' === $row['billing_cycle'] || 'yearly' === $row['billing_cycle'] ) ? 'annual' : 'monthly';
+
+			// Advance from the activation date by whole cycles until the
+			// renewal lands in the future, so it falls on the same day each
+			// month/year as activation. Cap iterations defensively.
+			$next  = wp_date( 'Y-m-d H:i:s', $anchor_ts );
+			$guard = 0;
+			do {
+				$candidate    = \WordPressistic\Memberistic\Integrations\WooCommerce_Bridge::compute_next_renewal( $cycle, $next );
+				$candidate_ts = strtotime( $candidate );
+				if ( ! $candidate_ts ) {
+					break; // Unparseable — keep the last good value rather than write garbage.
+				}
+				$next = $candidate;
+				$guard++;
+			} while ( $candidate_ts <= $now_ts && $guard < 600 );
+
+			// Only write a genuinely future renewal date.
+			if ( strtotime( $next ) > $now_ts ) {
+				Memberships_Repository::update( (int) $row['id'], array( 'renewal_date' => $next ) );
+				$updated++;
+			}
+		}
+
+		$notice = sprintf(
+			/* translators: %d: number of renewal dates set */
+			__( 'Renewal dates set for %d membership(s) from their activation date.', 'memberistic' ),
+			$updated
+		);
+		self::render_start( '', $notice );
 	}
 
 	/**
@@ -271,7 +359,7 @@ final class Import_Page {
 		if ( ! \WordPressistic\Memberistic\Payments\Stripe_Service::is_enabled() ) {
 			return;
 		}
-		$pending = count( Memberships_Repository::get_needing_customer_backfill( 200 ) );
+		$pending = Memberships_Repository::count_needing_customer_backfill();
 		?>
 		<div class="memberistic-card">
 			<h2><?php esc_html_e( 'Backfill Stripe customer IDs', 'memberistic' ); ?></h2>
