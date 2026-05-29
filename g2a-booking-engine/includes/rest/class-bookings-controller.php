@@ -35,6 +35,20 @@ final class G2AB_REST_Bookings_Controller {
 				'party_size'      => array( 'required' => false, 'sanitize_callback' => 'absint', 'default' => 1 ),
 			),
 		) );
+		// Event-driven availability: only the dates/times that have a
+		// published Event of the given type are bookable. Powers the Ladies
+		// Tuesday (and any other event-gated) calendar.
+		register_rest_route( G2AB_REST_NAMESPACE, '/event-availability', array(
+			'methods' => WP_REST_Server::READABLE,
+			'callback' => array( $this, 'get_event_availability' ),
+			'permission_callback' => array( $this, 'permission_public_read' ),
+			'args' => array(
+				'resource_id'     => array( 'required' => true, 'sanitize_callback' => 'absint', 'validate_callback' => static fn( $v ) => $v > 0 ),
+				'event_type'      => array( 'required' => false, 'sanitize_callback' => 'sanitize_key', 'default' => '' ),
+				'booking_type_id' => array( 'required' => false, 'sanitize_callback' => 'absint', 'default' => 0 ),
+				'party_size'      => array( 'required' => false, 'sanitize_callback' => 'absint', 'default' => 1 ),
+			),
+		) );
 		register_rest_route( G2AB_REST_NAMESPACE, '/resources', array(
 			'methods' => WP_REST_Server::READABLE,
 			'callback' => array( $this, 'list_resources' ),
@@ -303,6 +317,174 @@ final class G2AB_REST_Bookings_Controller {
 	}
 
 	/**
+	 * Parse a free-text event time ("10:00 AM", "14:30") into a site-tz
+	 * DateTimeImmutable anchored on $date. Returns null when unparseable.
+	 *
+	 * Unlike strtotime(), this never drifts across the server/site timezone
+	 * gap — it extracts wall-clock hour/minute and rebuilds the moment in
+	 * the site timezone.
+	 *
+	 * @param string $date     Y-m-d.
+	 * @param string $time_str Free-text time.
+	 * @param string $fallback Time to use when $time_str is empty.
+	 * @return DateTimeImmutable|null
+	 */
+	private function parse_event_datetime( $date, $time_str, $fallback = '' ) {
+		$time_str = trim( (string) $time_str );
+		if ( '' === $time_str && '' !== $fallback ) {
+			$time_str = $fallback;
+		}
+		if ( '' === $time_str ) {
+			return null;
+		}
+		$parts = date_parse( $time_str );
+		if ( ! empty( $parts['errors'] ) || ! isset( $parts['hour'] ) || false === $parts['hour'] || null === $parts['hour'] ) {
+			return null;
+		}
+		$hour   = (int) $parts['hour'];
+		$minute = (int) ( $parts['minute'] ?: 0 );
+		return $this->parse_site_datetime( sprintf( '%s %02d:%02d:00', $date, $hour, $minute ) );
+	}
+
+	/**
+	 * Event-driven availability. Returns ONLY the dates that have a published
+	 * Event of the requested type, each with the time slots that fall inside
+	 * the event's start→end window. Booked/over-capacity slots are flagged
+	 * unavailable using the same overlap math as the regular grid.
+	 *
+	 * Shape: { dates: ['Y-m-d', …], by_date: { 'Y-m-d': { title, slots[] } } }
+	 */
+	public function get_event_availability( WP_REST_Request $request ) {
+		if ( ! class_exists( 'G2AB_Events' ) ) {
+			return rest_ensure_response( array( 'success' => true, 'data' => array( 'dates' => array(), 'by_date' => (object) array() ) ) );
+		}
+
+		global $wpdb;
+		$resource_id     = (int) $request->get_param( 'resource_id' );
+		$event_type      = sanitize_key( (string) $request->get_param( 'event_type' ) );
+		$booking_type_id = (int) $request->get_param( 'booking_type_id' );
+		$party_size      = max( 1, (int) $request->get_param( 'party_size' ) );
+
+		// Booking-type config (duration, capacity model, buffers).
+		$duration      = 60;
+		$capacity_mode = 'booking_count';
+		$buffer_before = 0;
+		$buffer_after  = 0;
+		if ( $booking_type_id ) {
+			$bt = $wpdb->get_row( $wpdb->prepare( "SELECT * FROM {$wpdb->prefix}g2ab_booking_types WHERE id = %d AND is_active = 1", $booking_type_id ) );
+			if ( $bt ) {
+				$duration      = max( 15, min( 480, (int) $bt->duration_min ) );
+				$capacity_mode = $this->normalize_capacity_mode( $bt->capacity_mode ?? '' );
+				$buffer_before = (int) $bt->buffer_before;
+				$buffer_after  = (int) $bt->buffer_after;
+			}
+		}
+
+		$resource = $wpdb->get_row( $wpdb->prepare(
+			"SELECT capacity FROM {$wpdb->prefix}g2ab_resources WHERE id = %d AND is_active = 1",
+			$resource_id
+		) );
+		$resource_capacity = $resource ? max( 1, (int) $resource->capacity ) : 1;
+
+		$tz           = $this->tz();
+		$min_lead_min = (int) get_option( 'g2ab_min_booking_lead_minutes', 30 );
+		$earliest_ts  = $this->now_site()->modify( '+' . $min_lead_min . ' minutes' )->getTimestamp();
+		$max_advance  = (int) get_option( 'g2ab_max_booking_advance_days', 90 );
+		$latest_ts    = $this->now_site()->modify( '+' . max( 1, $max_advance ) . ' days' )->getTimestamp();
+		$time_format  = get_option( 'time_format', 'g:i A' );
+
+		$events  = G2AB_Events::instance()->get_bookable_events_by_type( $event_type, 100 );
+		$dates   = array();
+		$by_date = array();
+
+		foreach ( $events as $event ) {
+			$date = $event['date'];
+			if ( ! preg_match( '/^\d{4}-\d{2}-\d{2}$/', (string) $date ) ) {
+				continue;
+			}
+
+			$start_dt = $this->parse_event_datetime( $date, $event['time'], '10:00 AM' );
+			if ( ! $start_dt ) {
+				continue;
+			}
+			$end_dt = $this->parse_event_datetime( $date, $event['end'], '' );
+			if ( ! $end_dt || $end_dt <= $start_dt ) {
+				$end_dt = $start_dt->modify( '+' . $duration . ' minutes' );
+			}
+
+			// Per-event seat cap wins over the resource capacity.
+			$capacity = ( ! empty( $event['seats'] ) && (int) $event['seats'] > 0 ) ? (int) $event['seats'] : $resource_capacity;
+
+			$day_anchor = DateTimeImmutable::createFromFormat( 'Y-m-d H:i:s', $date . ' 12:00:00', $tz );
+			if ( ! $day_anchor ) {
+				continue;
+			}
+			$existing = $this->fetch_overlapping_bookings_for_day( $resource_id, $date, $day_anchor );
+
+			$slots   = array();
+			$step    = $duration * 60;
+			$cursor  = $start_dt;
+			$end_ts  = $end_dt->getTimestamp();
+			$made    = 0;
+			while ( ( $cursor->getTimestamp() + $step <= $end_ts ) || 0 === $made ) {
+				$s_start_ts = $cursor->getTimestamp();
+				$s_end_ts   = $s_start_ts + $step;
+				if ( $made > 0 && $s_end_ts > $end_ts ) {
+					break;
+				}
+				$cand_start_eff = $s_start_ts - ( $buffer_before * 60 );
+				$cand_end_eff   = $s_end_ts + ( $buffer_after * 60 );
+				$load           = $this->compute_overlap_load( $existing, $cand_start_eff, $cand_end_eff, $capacity_mode );
+				$projected      = $load + ( 'party_size' === $capacity_mode ? $party_size : 1 );
+				$is_past        = $s_start_ts < $earliest_ts;
+				$too_far        = $s_start_ts > $latest_ts;
+				$is_full        = $projected > $capacity;
+
+				$slots[] = array(
+					'start'      => $cursor->format( 'Y-m-d H:i:s' ),
+					'end'        => $cursor->modify( '+' . $duration . ' minutes' )->format( 'Y-m-d H:i:s' ),
+					'label'      => $cursor->format( $time_format ),
+					'available'  => ! $is_past && ! $too_far && ! $is_full,
+					'seats_left' => max( 0, $capacity - $load ),
+					'reason'     => $is_past ? 'past' : ( $too_far ? 'too_far' : ( $is_full ? 'full' : '' ) ),
+				);
+
+				$cursor = $cursor->modify( '+' . $duration . ' minutes' );
+				$made++;
+				if ( $made > 48 ) {
+					break; // hard safety cap
+				}
+			}
+
+			// Skip events whose every slot is in the past / unbookable.
+			$has_live = false;
+			foreach ( $slots as $s ) {
+				if ( $s['available'] ) {
+					$has_live = true;
+					break;
+				}
+			}
+			if ( empty( $slots ) || ! $has_live ) {
+				continue;
+			}
+
+			$dates[]           = $date;
+			$by_date[ $date ]  = array(
+				'title' => $event['title'],
+				'slots' => $slots,
+			);
+		}
+
+		$dates = array_values( array_unique( $dates ) );
+		sort( $dates );
+
+		return rest_ensure_response( array( 'success' => true, 'data' => array(
+			'dates'   => $dates,
+			'by_date' => empty( $by_date ) ? (object) array() : $by_date,
+		) ) );
+	}
+
+	/**
 	 * Pull every relevant booking for the requested resource on the given day,
 	 * joined with each booking's own buffer_before/buffer_after so we honor
 	 * each existing booking's clean-up window when checking overlap.
@@ -400,6 +582,62 @@ final class G2AB_REST_Bookings_Controller {
 	private function booking_type_settings( $booking_type ) {
 		$settings = isset( $booking_type->settings ) ? json_decode( (string) $booking_type->settings, true ) : array();
 		return is_array( $settings ) ? $settings : array();
+	}
+
+	/**
+	 * Resolve whether a booking type is "event-gated" — i.e. only bookable
+	 * on dates/times that have a published Event. Driven by the booking
+	 * type's own settings (event_source / event_type), with a built-in
+	 * convention so the bundled Ladies Tuesday type works out of the box.
+	 *
+	 * @return array{enabled:bool,type:string}
+	 */
+	private function event_gate_for_booking_type( $booking_type, $settings = null ) {
+		$settings = is_array( $settings ) ? $settings : $this->booking_type_settings( $booking_type );
+		$enabled  = ! empty( $settings['event_source'] ) && 'events' === sanitize_key( (string) $settings['event_source'] );
+		$type     = ! empty( $settings['event_type'] ) ? sanitize_key( (string) $settings['event_type'] ) : '';
+
+		// Convention fallback: the bundled "ladies-tuesday" type maps to the
+		// "ladies-day" event type even with no explicit settings row.
+		$slug = isset( $booking_type->slug ) ? sanitize_title( $booking_type->slug ) : '';
+		if ( ! $enabled && 'ladies-tuesday' === $slug ) {
+			$enabled = true;
+			$type    = $type ?: 'ladies-day';
+		}
+
+		$gate = array( 'enabled' => (bool) $enabled, 'type' => $type );
+		/** Allow integrations to flag any booking type as event-gated. */
+		return apply_filters( 'g2ab_event_gate', $gate, $booking_type, $settings );
+	}
+
+	/**
+	 * True when [$start_dt, $end_dt] fits inside the window of a published
+	 * Event of $event_type on that calendar date.
+	 */
+	private function slot_matches_event_window( $event_type, DateTimeImmutable $start_dt, DateTimeImmutable $end_dt ) {
+		if ( ! class_exists( 'G2AB_Events' ) ) {
+			return false;
+		}
+		$date   = $start_dt->format( 'Y-m-d' );
+		$events = G2AB_Events::instance()->get_bookable_events_by_type( $event_type, 100 );
+		foreach ( $events as $event ) {
+			if ( $event['date'] !== $date ) {
+				continue;
+			}
+			$ev_start = $this->parse_event_datetime( $date, $event['time'], '10:00 AM' );
+			if ( ! $ev_start ) {
+				continue;
+			}
+			$ev_end = $this->parse_event_datetime( $date, $event['end'], '' );
+			if ( ! $ev_end || $ev_end <= $ev_start ) {
+				// No explicit end → allow the booking's own duration to define it.
+				$ev_end = $end_dt > $ev_start ? $end_dt : $ev_start->modify( '+60 minutes' );
+			}
+			if ( $start_dt >= $ev_start && $end_dt <= $ev_end ) {
+				return true;
+			}
+		}
+		return false;
 	}
 
 	/**
@@ -670,22 +908,34 @@ final class G2AB_REST_Bookings_Controller {
 			return new WP_Error( 'g2ab_start_too_far', __( 'Booking is too far in the future.', 'g2a-booking' ), array( 'status' => 400 ) );
 		}
 
-		// Slot must fall within business hours for that weekday and not on a blackout.
+		// Slot validation. Event-gated booking types (e.g. Ladies Tuesday) are
+		// validated against the published Event window for that date; everyone
+		// else must fall inside the weekday business hours. Blackouts always
+		// apply.
 		$rules_table = $wpdb->prefix . 'g2ab_availability_rules';
-		$dow         = (int) $start_dt->format( 'w' );
-		$hours       = $wpdb->get_row( $wpdb->prepare(
-			"SELECT start_time, end_time FROM {$rules_table} WHERE rule_type = 'business_hours' AND day_of_week = %d AND is_active = 1 ORDER BY priority DESC LIMIT 1",
-			$dow
-		) );
-		if ( ! $hours ) {
-			return new WP_Error( 'g2ab_closed', __( 'Bookings are not available on this day.', 'g2a-booking' ), array( 'status' => 400 ) );
+		$date_str    = $start_dt->format( 'Y-m-d' );
+		$event_gate  = $this->event_gate_for_booking_type( $booking_type, $booking_type_settings );
+
+		if ( ! empty( $event_gate['enabled'] ) ) {
+			if ( ! $this->slot_matches_event_window( $event_gate['type'], $start_dt, $end_dt ) ) {
+				return new WP_Error( 'g2ab_not_event_slot', __( 'This time is not part of a scheduled event. Please pick a highlighted date and time.', 'g2a-booking' ), array( 'status' => 400 ) );
+			}
+		} else {
+			$dow   = (int) $start_dt->format( 'w' );
+			$hours = $wpdb->get_row( $wpdb->prepare(
+				"SELECT start_time, end_time FROM {$rules_table} WHERE rule_type = 'business_hours' AND day_of_week = %d AND is_active = 1 ORDER BY priority DESC LIMIT 1",
+				$dow
+			) );
+			if ( ! $hours ) {
+				return new WP_Error( 'g2ab_closed', __( 'Bookings are not available on this day.', 'g2a-booking' ), array( 'status' => 400 ) );
+			}
+			$open_dt  = $this->parse_site_datetime( $date_str . ' ' . substr( (string) $hours->start_time, 0, 8 ) );
+			$close_dt = $this->parse_site_datetime( $date_str . ' ' . substr( (string) $hours->end_time, 0, 8 ) );
+			if ( ! $open_dt || ! $close_dt || $start_dt < $open_dt || $end_dt > $close_dt ) {
+				return new WP_Error( 'g2ab_outside_hours', __( 'This time is outside business hours.', 'g2a-booking' ), array( 'status' => 400 ) );
+			}
 		}
-		$date_str   = $start_dt->format( 'Y-m-d' );
-		$open_dt    = $this->parse_site_datetime( $date_str . ' ' . substr( (string) $hours->start_time, 0, 8 ) );
-		$close_dt   = $this->parse_site_datetime( $date_str . ' ' . substr( (string) $hours->end_time, 0, 8 ) );
-		if ( ! $open_dt || ! $close_dt || $start_dt < $open_dt || $end_dt > $close_dt ) {
-			return new WP_Error( 'g2ab_outside_hours', __( 'This time is outside business hours.', 'g2a-booking' ), array( 'status' => 400 ) );
-		}
+
 		$blackout = $wpdb->get_var( $wpdb->prepare(
 			"SELECT id FROM {$rules_table} WHERE rule_type = 'blackout' AND is_active = 1 AND start_date <= %s AND end_date >= %s LIMIT 1",
 			$date_str, $date_str

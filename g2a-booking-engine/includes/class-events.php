@@ -234,6 +234,35 @@ final class G2AB_Events {
 	}
 
 	/**
+	 * Public: upcoming bookable events of a given type, normalized for the
+	 * booking calendar. Returns only events that have a parseable future
+	 * date, already ordered ascending. An empty $type returns every type.
+	 *
+	 * Used by the REST event-availability endpoint that powers the
+	 * event-driven booking calendar (e.g. Ladies Tuesday), so the calendar
+	 * can restrict selectable dates/times to published events only.
+	 *
+	 * @param string $type  _g2ab_event_type slug filter (empty = all types).
+	 * @param int    $limit Max events to scan.
+	 * @return array[] List of event_data() arrays.
+	 */
+	public function get_bookable_events_by_type( $type = '', $limit = 100 ) {
+		$type = sanitize_key( (string) $type );
+		$out  = array();
+		foreach ( $this->get_events( $limit, false ) as $post ) {
+			$event = $this->event_data( $post );
+			if ( empty( $event['date'] ) || empty( $event['ts'] ) ) {
+				continue;
+			}
+			if ( '' !== $type && sanitize_key( (string) $event['type'] ) !== $type ) {
+				continue;
+			}
+			$out[] = $event;
+		}
+		return $out;
+	}
+
+	/**
 	 * Normalize one event post into a flat data array for rendering.
 	 */
 	private function event_data( $post ) {

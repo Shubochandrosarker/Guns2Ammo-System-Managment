@@ -8,11 +8,12 @@ All zips are at the repo root and can be uploaded directly via **WP Admin → Pl
 
 | Artifact | Filename | Current version |
 |---|---|---|
-| Theme | `WPistic-Theme-For-G2A-Version-1.8.9.zip` *(also in `releases/`)* | **1.14.0** |
-| Booking Engine plugin | `g2a-booking-engine.zip` | **1.9.0** (DB schema 1.5.0) |
+| Theme | `WPistic-Theme-For-G2A-Version-1.8.9.zip` *(also in `releases/`)* | **1.21.0** |
+| Booking Engine plugin | `g2a-booking-engine.zip` | **1.10.0** (DB schema 1.6.0) |
 | Memberistic Membership Solutions plugin | `memberistic-membership-solutions.zip` | **1.15.0** |
 | WPistic Contact Form plugin | `wpistic-contact-form-main.zip` | **1.5.0** (DB schema 1.2.0) |
 | G2A Theme Control plugin | `g2a-theme-control.zip` | **1.0.0** |
+| Verifyistic (age verification) plugin | `verifyistic.zip` | **1.1.0** |
 
 > The root `WPistic-Theme-For-G2A-Version-1.8.9.zip` filename is preserved so the WP "Replace existing theme" flow recognises the upgrade. The `style.css` header inside reads `Version: 1.13.0` so WP treats it as an update, not a downgrade.
 
@@ -24,7 +25,8 @@ Plugins first, theme last, so the theme activation can see the plugins.
 2. **G2A Booking Engine** — bookings + payments + reminders. Upload, activate. Confirm DB schema v1.5.0. Visit `Booking Engine → Resources` and `Booking Types` for seed data.
 3. **Memberistic Membership Solutions** — plans, member portal, content restriction. Upload, activate. Visit `Memberistic → Settings → Pages` to wire the linked pages.
 4. **WPistic Contact Form** — contact form + auto-responder. Upload, activate.
-5. **WPistic Theme (guns2ammo)** — upload as theme, activate.
+5. **Verifyistic** — age verification popup + multi-webhook delivery. Upload, activate. Then `Verifyistic → Settings` (see `docs/VERIFYISTIC_SETUP_G2A.md`). Replaces Ottertext — see `docs/OTTERTEXT_REMOVAL.md`.
+6. **WPistic Theme (guns2ammo)** — upload as theme, activate.
 
 ## Upgrade in place (existing site)
 
