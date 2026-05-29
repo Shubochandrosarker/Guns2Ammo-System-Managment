@@ -76,31 +76,104 @@ final class Admin_Menu {
 
 	public static function render_integrations() {
 		self::guard_dashboard();
-		$cards = array(
-			array( 'name' => 'G2A Booking Engine', 'desc' => __( 'Member eligibility, free lane booking rules, booking activity, and front desk visibility.', 'memberistic' ), 'active' => class_exists( 'G2AB_Plugin' ), 'icon' => 'B', 'status' => class_exists( 'G2AB_Plugin' ) ? 'connected' : 'not_connected' ),
-			array( 'name' => 'Stripe Checkout', 'desc' => __( 'Hosted membership subscription checkout and webhooks.', 'memberistic' ), 'active' => 'yes' === memberistic_get_setting( 'stripe_enabled', 'no' ), 'icon' => 'S', 'status' => 'yes' === memberistic_get_setting( 'stripe_enabled', 'no' ) ? 'connected' : 'not_connected' ),
-			array( 'name' => 'WooCommerce', 'desc' => __( 'Completed-order sync for membership purchases.', 'memberistic' ), 'active' => class_exists( 'WooCommerce' ) && 'yes' === memberistic_get_setting( 'woocommerce_enabled', 'no' ), 'icon' => 'W', 'status' => class_exists( 'WooCommerce' ) && 'yes' === memberistic_get_setting( 'woocommerce_enabled', 'no' ) ? 'connected' : 'not_connected' ),
-			array( 'name' => 'Email Automation', 'desc' => __( 'Lifecycle notifications for checkout, activation, failed payment, cancellation, renewals, and waivers.', 'memberistic' ), 'active' => true, 'icon' => 'M', 'status' => 'connected' ),
-			array( 'name' => 'Klaviyo Sync', 'desc' => __( 'Export member segments, renewal windows, and failed payment audiences into marketing automation.', 'memberistic' ), 'active' => false, 'icon' => 'K', 'status' => 'coming_soon' ),
-			array( 'name' => 'POS Bridge', 'desc' => __( 'Connect memberships with retail counter sales, barcode lookup, and staff checkout workflows.', 'memberistic' ), 'active' => false, 'icon' => 'P', 'status' => 'coming_soon' ),
-			array( 'name' => 'Waiver Provider', 'desc' => __( 'Connect signed range waivers with each person record and staff check-in status.', 'memberistic' ), 'active' => false, 'icon' => 'W', 'status' => 'coming_soon' ),
-			array( 'name' => 'SMS Reminders', 'desc' => __( 'Send renewal, failed payment, check-in, and booking reminders by text message.', 'memberistic' ), 'active' => false, 'icon' => 'T', 'status' => 'coming_soon' ),
-		);
+		$registry = '\\WordPressistic\\Memberistic\\Integrations\\Integrations_Registry';
+		$defs     = $registry::definitions();
 		?>
 		<div class="wrap memberistic-wrap">
 			<h1><?php esc_html_e( 'Memberistic Integrations', 'memberistic' ); ?></h1>
-			<div class="memberistic-addon-grid">
-				<?php foreach ( $cards as $card ) : ?>
-					<div class="memberistic-addon-card <?php echo $card['active'] ? 'is-active' : ''; ?> <?php echo 'coming_soon' === $card['status'] ? 'is-coming-soon' : ''; ?>">
-						<span class="memberistic-addon-icon"><?php echo esc_html( $card['icon'] ); ?></span>
-						<h2><?php echo esc_html( $card['name'] ); ?></h2>
-						<p><?php echo esc_html( $card['desc'] ); ?></p>
-						<strong><?php echo esc_html( 'coming_soon' === $card['status'] ? __( 'Coming Soon', 'memberistic' ) : ( $card['active'] ? __( 'Connected', 'memberistic' ) : __( 'Not Connected', 'memberistic' ) ) ); ?></strong>
-					</div>
-				<?php endforeach; ?>
-			</div>
+			<?php if ( isset( $_GET['updated'] ) ) : // phpcs:ignore WordPress.Security.NonceVerification.Recommended ?>
+				<div class="notice notice-success is-dismissible"><p><?php esc_html_e( 'Integrations updated.', 'memberistic' ); ?></p></div>
+			<?php endif; ?>
+			<p class="description" style="max-width:680px;"><?php esc_html_e( 'Turn each integration on or off. Connectable integrations show a switch; "Coming Soon" ones are listed for reference.', 'memberistic' ); ?></p>
+
+			<style>
+				.memberistic-switch{position:relative;display:inline-block;width:44px;height:24px;vertical-align:middle;}
+				.memberistic-switch input{opacity:0;width:0;height:0;}
+				.memberistic-switch .track{position:absolute;cursor:pointer;inset:0;background:#c3c4c7;border-radius:24px;transition:.2s;}
+				.memberistic-switch .track:before{content:"";position:absolute;height:18px;width:18px;left:3px;top:3px;background:#fff;border-radius:50%;transition:.2s;}
+				.memberistic-switch input:checked + .track{background:#0a7c3f;}
+				.memberistic-switch input:checked + .track:before{transform:translateX(20px);}
+				.memberistic-switch input:disabled + .track{opacity:.5;cursor:not-allowed;}
+				.memberistic-addon-foot{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:10px;}
+				.memberistic-addon-subopts{margin-top:10px;padding-top:10px;border-top:1px solid #e2e4e7;font-size:13px;}
+				.memberistic-addon-subopts label{display:block;margin:4px 0;}
+			</style>
+
+			<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
+				<input type="hidden" name="action" value="memberistic_save_integrations" />
+				<?php wp_nonce_field( 'memberistic_integrations', 'memberistic_integrations_nonce' ); ?>
+				<div class="memberistic-addon-grid">
+					<?php
+					foreach ( $defs as $key => $def ) :
+						$coming    = ! empty( $def['coming_soon'] );
+						$available = $registry::is_available( $key );
+						$enabled   = $registry::is_enabled( $key );
+						$status    = $coming ? __( 'Coming Soon', 'memberistic' ) : ( ! $available ? __( 'Plugin not detected', 'memberistic' ) : ( $enabled ? __( 'Enabled', 'memberistic' ) : __( 'Disabled', 'memberistic' ) ) );
+						?>
+						<div class="memberistic-addon-card <?php echo $enabled ? 'is-active' : ''; ?> <?php echo $coming ? 'is-coming-soon' : ''; ?>">
+							<span class="memberistic-addon-icon"><?php echo esc_html( $def['icon'] ); ?></span>
+							<h2><?php echo esc_html( $def['name'] ); ?></h2>
+							<p><?php echo esc_html( $def['desc'] ); ?></p>
+							<?php if ( ! $coming && ! $available && ! empty( $def['dep_label'] ) ) : ?>
+								<p class="description" style="color:#b32d2e;"><?php echo esc_html( $def['dep_label'] ); ?></p>
+							<?php endif; ?>
+							<div class="memberistic-addon-foot">
+								<strong><?php echo esc_html( $status ); ?></strong>
+								<?php if ( ! $coming ) : ?>
+									<label class="memberistic-switch" title="<?php esc_attr_e( 'Toggle integration', 'memberistic' ); ?>">
+										<input type="checkbox" name="memberistic_integrations[<?php echo esc_attr( $key ); ?>]" value="1" <?php checked( $enabled ); ?> <?php disabled( ! $available ); ?> />
+										<span class="track"></span>
+									</label>
+								<?php endif; ?>
+							</div>
+
+							<?php if ( 'verifyistic' === $key && $available ) : ?>
+								<div class="memberistic-addon-subopts">
+									<label>
+										<input type="checkbox" name="memberistic_verifyistic_autostamp" value="1" <?php checked( 'no' !== memberistic_get_setting( 'integration_verifyistic_autostamp', 'yes' ) ); ?> />
+										<?php esc_html_e( 'Auto-stamp member records with verified age/DOB', 'memberistic' ); ?>
+									</label>
+									<label>
+										<input type="checkbox" name="memberistic_verifyistic_require_signup" value="1" <?php checked( 'yes' === memberistic_get_setting( 'integration_verifyistic_require_signup', 'no' ) ); ?> />
+										<?php esc_html_e( 'Require age verification before membership signup', 'memberistic' ); ?>
+									</label>
+								</div>
+							<?php endif; ?>
+						</div>
+					<?php endforeach; ?>
+				</div>
+				<p class="submit"><button type="submit" class="button button-primary"><?php esc_html_e( 'Save Integrations', 'memberistic' ); ?></button></p>
+			</form>
 		</div>
 		<?php
+	}
+
+	/**
+	 * Persist Integrations-page toggles (admin-post handler).
+	 */
+	public static function save_integrations() {
+		if ( ! current_user_can( 'manage_memberistic_settings' ) ) {
+			wp_die( esc_html__( 'You are not allowed to manage integrations.', 'memberistic' ) );
+		}
+		check_admin_referer( 'memberistic_integrations', 'memberistic_integrations_nonce' );
+
+		$registry = '\\WordPressistic\\Memberistic\\Integrations\\Integrations_Registry';
+		$posted   = isset( $_POST['memberistic_integrations'] ) && is_array( $_POST['memberistic_integrations'] )
+			? array_map( 'sanitize_text_field', wp_unslash( $_POST['memberistic_integrations'] ) )
+			: array();
+		$registry::save( $posted );
+
+		// Verifyistic sub-options.
+		$settings = get_option( 'memberistic_settings', array() );
+		if ( ! is_array( $settings ) ) {
+			$settings = array();
+		}
+		$settings['integration_verifyistic_autostamp']      = empty( $_POST['memberistic_verifyistic_autostamp'] ) ? 'no' : 'yes';
+		$settings['integration_verifyistic_require_signup']  = empty( $_POST['memberistic_verifyistic_require_signup'] ) ? 'no' : 'yes';
+		update_option( 'memberistic_settings', $settings, false );
+
+		wp_safe_redirect( add_query_arg( array( 'page' => 'memberistic-integrations', 'updated' => '1' ), admin_url( 'admin.php' ) ) );
+		exit;
 	}
 
 	public static function render_tools() {
