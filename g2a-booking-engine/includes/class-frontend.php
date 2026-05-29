@@ -731,6 +731,7 @@ final class G2AB_Frontend {
 				'loading'  => __( 'Loading available times…', 'g2a-booking' ),
 				'no_slots' => __( 'No times available on this date.', 'g2a-booking' ),
 				'closed'   => __( 'Closed on this date.', 'g2a-booking' ),
+				'load_error' => __( 'Could not load times. Please refresh or contact us.', 'g2a-booking' ),
 				'submitting' => __( 'Reserving…', 'g2a-booking' ),
 				'failed'   => __( 'Could not complete booking. Please try again.', 'g2a-booking' ),
 				'pick_first' => __( 'Please choose a date and time first.', 'g2a-booking' ),
@@ -850,10 +851,19 @@ final class G2AB_Frontend {
 				if (hint) { hint.style.display = ''; hint.textContent = config.i18n.loading; }
 				box.innerHTML = '';
 				fetch(config.rest_url + 'availability?resource_id=' + encodeURIComponent(state.resourceId) + '&date=' + encodeURIComponent(state.date) + '&duration=' + encodeURIComponent(root.dataset.duration || 60), { headers: headers(false) })
-					.then(function(r){ return r.json(); })
-					.then(function(json){
-						var data = json && json.success ? json.data : null;
+					.then(function(r){ return r.text().then(function(t){ return { status: r.status, text: t }; }); })
+					.then(function(res){
 						if (hint) hint.style.display = 'none';
+						var json = null;
+						try { json = JSON.parse(res.text); } catch (e) {
+							console.error('[G2A Booking] availability returned non-JSON (HTTP ' + res.status + '):', (res.text||'').slice(0, 600));
+							box.innerHTML = '<p class="g2ab-muted">' + (config.i18n.load_error || 'Could not load times. Please refresh or contact us.') + '</p>'; return;
+						}
+						if (!json || !json.success) {
+							console.error('[G2A Booking] availability error (HTTP ' + res.status + '):', json);
+							box.innerHTML = '<p class="g2ab-muted">' + ((json && json.error) ? json.error : (config.i18n.load_error || 'Could not load times. Please refresh or contact us.')) + '</p>'; return;
+						}
+						var data = json.data;
 						if (!data) { box.innerHTML = '<p class="g2ab-muted">' + config.i18n.no_slots + '</p>'; return; }
 						if (data.closed) { box.innerHTML = '<p class="g2ab-muted">' + config.i18n.closed + '</p>'; return; }
 						if (!data.slots || !data.slots.length) { box.innerHTML = '<p class="g2ab-muted">' + config.i18n.no_slots + '</p>'; return; }
@@ -878,9 +888,10 @@ final class G2AB_Frontend {
 							box.appendChild(btn);
 						});
 					})
-					.catch(function(){
+					.catch(function(err){
 						if (hint) hint.style.display = 'none';
-						box.innerHTML = '<p class="g2ab-muted">' + config.i18n.no_slots + '</p>';
+						console.error('[G2A Booking] availability request failed:', err);
+						box.innerHTML = '<p class="g2ab-muted">' + (config.i18n.load_error || 'Could not load times. Please refresh or contact us.') + '</p>';
 					});
 			}
 

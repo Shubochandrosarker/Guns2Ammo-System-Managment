@@ -181,7 +181,26 @@ final class G2AB_REST_Bookings_Controller {
 		return new DateTimeImmutable( 'now', $this->tz() );
 	}
 
+	/**
+	 * Availability endpoint wrapper. Guarantees a JSON response even if the
+	 * slot computation throws — a raw PHP fatal/HTML 500 would otherwise reach
+	 * the booking widget as non-JSON and surface as a misleading "No times
+	 * available". On error we return success:false + the message so the widget
+	 * can show a real reason (and it's visible in the browser console).
+	 */
 	public function get_availability( WP_REST_Request $request ) {
+		try {
+			return $this->get_availability_impl( $request );
+		} catch ( \Throwable $e ) {
+			return rest_ensure_response( array(
+				'success' => false,
+				'error'   => $e->getMessage(),
+				'where'   => 'availability',
+			) );
+		}
+	}
+
+	private function get_availability_impl( WP_REST_Request $request ) {
 		global $wpdb;
 		$resource_id     = (int) $request->get_param( 'resource_id' );
 		$date            = $request->get_param( 'date' );
