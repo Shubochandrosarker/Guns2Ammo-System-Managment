@@ -67,7 +67,7 @@ get_header();
     </div>
     <div class="actions">
       <a class="btn btn-brass btn-sm" href="<?php echo esc_url( home_url( "/account/" ) ); ?>">Manage Plan</a>
-      <a class="btn btn-ember btn-sm" href="<?php echo esc_url( home_url( '/checkout/' ) ); ?>?plan=guardian&upgrade=1">Upgrade To Guardian</a>
+      <a class="btn btn-ember btn-sm" href="<?php echo esc_url( home_url( '/checkout/?memberistic_plan=guardian&upgrade=1' ) ); ?>">Upgrade To Guardian</a>
     </div>
   </div>
 </div>
@@ -102,7 +102,7 @@ get_header();
       <li>Per-person waiver + check-in tracking</li>
       <li>Walk-in lane fee for non-members: <strong>$20/hr</strong></li>
     </ul>
-    <a class="btn btn-brass" href="<?php echo esc_url( home_url( '/checkout/' ) ); ?>?plan=defender">Select Monthly Plan</a>
+    <a class="btn btn-brass" href="<?php echo esc_url( home_url( '/checkout/?memberistic_plan=defender' ) ); ?>">Select Monthly Plan</a>
   </article>
 
   <article class="plan popular fade-up d2">
@@ -120,7 +120,7 @@ get_header();
       <li>Per-person waiver + check-in tracking</li>
       <li>Each member gets their own digital card</li>
     </ul>
-    <a class="btn btn-ember" href="<?php echo esc_url( home_url( '/checkout/' ) ); ?>?plan=patriot">Select Monthly Plan</a>
+    <a class="btn btn-ember" href="<?php echo esc_url( home_url( '/checkout/?memberistic_plan=patriot' ) ); ?>">Select Monthly Plan</a>
   </article>
 
   <article class="plan fade-up d3">
@@ -137,7 +137,7 @@ get_header();
       <li>Per-person waiver + check-in tracking</li>
       <li>Each member gets their own digital card</li>
     </ul>
-    <a class="btn btn-brass" href="<?php echo esc_url( home_url( '/checkout/' ) ); ?>?plan=guardian">Select Monthly Plan</a>
+    <a class="btn btn-brass" href="<?php echo esc_url( home_url( '/checkout/?memberistic_plan=guardian' ) ); ?>">Select Monthly Plan</a>
   </article>
 </div>
 

@@ -57,7 +57,15 @@ function g2a_redirects_handle() {
 	$map = g2a_redirect_map();
 
 	if ( isset( $map[ $path ] ) ) {
-		wp_safe_redirect( home_url( $map[ $path ] ), 301 );
+		$target = home_url( $map[ $path ] );
+		// Preserve the original query string (e.g. ?memberistic_plan=defender)
+		// so a legacy /memberistic-checkout/?memberistic_plan=… link still
+		// lands on the right plan after the redirect.
+		$qs = isset( $_SERVER['REQUEST_URI'] ) ? (string) wp_parse_url( wp_unslash( $_SERVER['REQUEST_URI'] ), PHP_URL_QUERY ) : '';
+		if ( '' !== $qs ) {
+			$target .= ( false === strpos( $target, '?' ) ? '?' : '&' ) . $qs;
+		}
+		wp_safe_redirect( $target, 301 );
 		exit;
 	}
 
@@ -105,10 +113,10 @@ function g2a_redirect_map() {
 		'/membership-confirmation/'  => '/account/',
 		'/memberistic-account/'      => '/account/',
 		'/memberistic-memberships/'  => '/memberships/',
-		'/memberistic-checkout/'     => '/memberships/',
+		'/memberistic-checkout/'     => '/checkout/',
 		'/memberistic-login/'        => '/login/',
-		'/memberistic-thank-you/'    => '/account/',
-		'/memberistic-renewal/'      => '/account/',
+		'/memberistic-thank-you/'    => '/thank-you/',
+		'/memberistic-renewal/'      => '/renewal/',
 	) );
 }
 

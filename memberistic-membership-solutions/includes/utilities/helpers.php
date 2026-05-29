@@ -127,12 +127,56 @@ function memberistic_get_page_url( $setting_key, $fallback_slug = '', $fallback_
 		}
 	}
 
-	if ( ! $url && $fallback_slug ) {
-		$page = get_page_by_path( sanitize_title( $fallback_slug ) );
-		$url  = $page && 'trash' !== get_post_status( $page ) ? get_permalink( $page ) : '';
+	if ( ! $url ) {
+		// Resolve by page slug. Guns 2 Ammo uses CLEAN, unbranded slugs
+		// (/checkout/, /memberships/, /renewal/, /thank-you/, /payment-failed/,
+		// /account/), so try the clean slug for this setting FIRST, then the
+		// caller's slug, then a prefix-stripped variant. This makes the right
+		// page resolve even when the page IDs aren't configured in Settings.
+		$candidates = array();
+		$clean      = memberistic_clean_page_slug( $setting_key );
+		if ( $clean ) {
+			$candidates[] = $clean;
+		}
+		if ( $fallback_slug ) {
+			$candidates[] = sanitize_title( $fallback_slug );
+			// Strip a "memberistic-" / "membership-" prefix as a last resort.
+			$stripped = preg_replace( '/^(memberistic|membership)-/', '', sanitize_title( $fallback_slug ) );
+			if ( $stripped && $stripped !== sanitize_title( $fallback_slug ) ) {
+				$candidates[] = $stripped;
+			}
+		}
+		foreach ( array_unique( array_filter( $candidates ) ) as $cand ) {
+			$page = get_page_by_path( $cand );
+			if ( $page && 'trash' !== get_post_status( $page ) ) {
+				$url = get_permalink( $page );
+				break;
+			}
+		}
 	}
 
 	return $url ? $url : $fallback_url;
+}
+
+/**
+ * Map a page-ID setting key to Guns 2 Ammo's clean (unbranded) page slug.
+ * Filterable so other sites can override the slug scheme.
+ *
+ * @param string $setting_key e.g. checkout_page_id
+ * @return string Clean slug, or '' when unmapped.
+ */
+function memberistic_clean_page_slug( $setting_key ) {
+	$map = array(
+		'plans_page_id'          => 'memberships',
+		'checkout_page_id'       => 'checkout',
+		'renewal_page_id'        => 'renewal',
+		'thank_you_page_id'      => 'thank-you',
+		'failed_payment_page_id' => 'payment-failed',
+		'account_page_id'        => 'account',
+		'login_page_id'          => 'login',
+	);
+	$map = apply_filters( 'memberistic_clean_page_slugs', $map );
+	return isset( $map[ $setting_key ] ) ? $map[ $setting_key ] : '';
 }
 
 /**

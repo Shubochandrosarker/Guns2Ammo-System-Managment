@@ -80,7 +80,7 @@ $g2a_pricing_unlimited_text     = get_post_meta( $g2a_page_id, 'pricing_unlimite
       <li>Per-person waiver + check-in tracking</li>
       <li>Walk-in lane fee for non-members: <strong>$20/hr</strong></li>
     </ul>
-    <a class="btn btn-brass" href="<?php echo esc_url( home_url( '/checkout/' ) ); ?>?plan=defender">Select Defender</a>
+    <a class="btn btn-brass" href="<?php echo esc_url( home_url( '/checkout/?memberistic_plan=defender' ) ); ?>">Select Defender</a>
   </article>
 
   <article class="plan popular fade-up d2" data-plan="patriot">
@@ -98,7 +98,7 @@ $g2a_pricing_unlimited_text     = get_post_meta( $g2a_page_id, 'pricing_unlimite
       <li>Per-person waiver + check-in tracking</li>
       <li>Each member gets their own digital card</li>
     </ul>
-    <a class="btn btn-ember" href="<?php echo esc_url( home_url( '/checkout/' ) ); ?>?plan=patriot">Select Patriot</a>
+    <a class="btn btn-ember" href="<?php echo esc_url( home_url( '/checkout/?memberistic_plan=patriot' ) ); ?>">Select Patriot</a>
   </article>
 
   <article class="plan fade-up d3" data-plan="guardian">
@@ -115,7 +115,7 @@ $g2a_pricing_unlimited_text     = get_post_meta( $g2a_page_id, 'pricing_unlimite
       <li>Per-person waiver + check-in tracking</li>
       <li>Each member gets their own digital card</li>
     </ul>
-    <a class="btn btn-brass" href="<?php echo esc_url( home_url( '/checkout/' ) ); ?>?plan=guardian">Select Guardian</a>
+    <a class="btn btn-brass" href="<?php echo esc_url( home_url( '/checkout/?memberistic_plan=guardian' ) ); ?>">Select Guardian</a>
   </article>
 </div>
 
