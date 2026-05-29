@@ -166,6 +166,39 @@ final class G2AB_Frontend {
 		return $urls[ $key ] ?? '';
 	}
 
+	/**
+	 * Friendly timezone label for the booking widget.
+	 *
+	 * wp_timezone_string() returns a raw offset like "-07:00" when the site's
+	 * WordPress timezone is set as a manual UTC offset rather than a city —
+	 * which reads as gibberish to customers. Prefer the timezone abbreviation
+	 * (e.g. "MST" when the site uses America/Phoenix); fall back to a readable
+	 * "UTC-07:00". Override entirely with the g2ab_timezone_label filter, e.g.
+	 * to force "MST" or "Arizona Time".
+	 */
+	public static function friendly_tz_label() {
+		$tz    = function_exists( 'wp_timezone' ) ? wp_timezone() : null;
+		$abbr  = '';
+		$offset = '';
+		if ( $tz ) {
+			try {
+				$now    = new DateTime( 'now', $tz );
+				$abbr   = $now->format( 'T' );  // "MST" for named zones; offset-ish for manual.
+				$offset = $now->format( 'P' );  // "-07:00".
+			} catch ( \Throwable $e ) {
+				$abbr = '';
+			}
+		}
+		if ( $abbr && preg_match( '/^[A-Za-z]{2,5}$/', $abbr ) ) {
+			$label = $abbr;                 // e.g. MST
+		} elseif ( $offset ) {
+			$label = 'UTC' . $offset;       // e.g. UTC-07:00
+		} else {
+			$label = function_exists( 'wp_timezone_string' ) ? wp_timezone_string() : 'UTC';
+		}
+		return (string) apply_filters( 'g2ab_timezone_label', $label, $tz );
+	}
+
 	private function resource_type_for_booking_type( $booking_type ) {
 		$settings = isset( $booking_type->settings ) ? json_decode( (string) $booking_type->settings, true ) : array();
 		$configured = is_array( $settings ) && ! empty( $settings['resource_type'] ) ? sanitize_key( $settings['resource_type'] ) : '';
@@ -376,7 +409,7 @@ final class G2AB_Frontend {
 							<p class="g2ab-stage__meta">
 								<?php
 								/* translators: %s site timezone */
-								printf( esc_html__( 'Times shown in %s', 'g2a-booking' ), esc_html( wp_timezone_string() ) );
+								printf( esc_html__( 'Times shown in %s', 'g2a-booking' ), esc_html( self::friendly_tz_label() ) );
 								?>
 							</p>
 						</header>
