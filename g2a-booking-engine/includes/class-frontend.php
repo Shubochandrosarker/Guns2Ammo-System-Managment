@@ -225,10 +225,17 @@ final class G2AB_Frontend {
 				'booking_type' => 'lane-booking',
 				'form'         => 'default-lane-booking',
 				'theme'        => '',
+				// Event-driven mode: when source="events", the calendar only
+				// allows dates/times that have a published Event of event_type.
+				'source'       => '',
+				'event_type'   => '',
 			),
 			$atts,
 			'g2a_lane_booking'
 		);
+
+		$event_source = ( 'events' === sanitize_key( $atts['source'] ) );
+		$event_type   = sanitize_key( $atts['event_type'] );
 
 		$this->mark_booking_page_dynamic();
 		$this->enqueue_assets();
@@ -253,6 +260,22 @@ final class G2AB_Frontend {
 
 		$resource_type  = $this->resource_type_for_booking_type( $booking_type );
 		$resource_label = $this->resource_label_for_type( $resource_type );
+
+		// Event-gating may also be declared on the booking type's own settings
+		// (or by the bundled ladies-tuesday convention), so a plain
+		// [g2a_lane_booking booking_type="ladies-tuesday"] gates too. The
+		// shortcode `source="events"` attribute always wins when present.
+		if ( ! $event_source ) {
+			$bt_settings = isset( $booking_type->settings ) ? json_decode( (string) $booking_type->settings, true ) : array();
+			$bt_settings = is_array( $bt_settings ) ? $bt_settings : array();
+			if ( ! empty( $bt_settings['event_source'] ) && 'events' === sanitize_key( (string) $bt_settings['event_source'] ) ) {
+				$event_source = true;
+				$event_type   = $event_type ?: sanitize_key( (string) ( $bt_settings['event_type'] ?? '' ) );
+			} elseif ( 'ladies-tuesday' === sanitize_title( (string) $booking_type->slug ) ) {
+				$event_source = true;
+				$event_type   = $event_type ?: 'ladies-day';
+			}
+		}
 
 		$resources = $wpdb->get_results( $wpdb->prepare(
 			"SELECT id, name, slug, capacity FROM {$wpdb->prefix}g2ab_resources WHERE type = %s AND is_active = 1 ORDER BY sort_order ASC, name ASC",
@@ -312,6 +335,8 @@ final class G2AB_Frontend {
 			data-duration="<?php echo (int) $booking_type->duration_min; ?>"
 			data-today="<?php echo esc_attr( $today ); ?>"
 			data-max-days="<?php echo (int) $max_days; ?>"
+			data-event-source="<?php echo $event_source ? '1' : '0'; ?>"
+			data-event-type="<?php echo esc_attr( $event_type ); ?>"
 			style="<?php echo esc_attr( $this->build_css_vars( $tokens ) ); ?>">
 
 			<div class="g2ab-shell">
@@ -655,6 +680,11 @@ final class G2AB_Frontend {
 				'booking_type' => 'ladies-tuesday',
 				'form'         => 'ladies-tuesday-booking',
 				'theme'        => '',
+				// Ladies Tuesday is event-gated by default: bookings are only
+				// offered on dates/times that have a published "ladies-day"
+				// Event. Override with source="" to fall back to the open grid.
+				'source'       => 'events',
+				'event_type'   => 'ladies-day',
 			),
 			$atts,
 			'g2a_ladies_tuesday_booking'
@@ -734,6 +764,9 @@ final class G2AB_Frontend {
 				'submitting' => __( 'Reserving…', 'g2a-booking' ),
 				'failed'   => __( 'Could not complete booking. Please try again.', 'g2a-booking' ),
 				'pick_first' => __( 'Please choose a date and time first.', 'g2a-booking' ),
+				'loading_dates' => __( 'Loading available dates…', 'g2a-booking' ),
+				'no_events'  => __( 'No upcoming dates are open right now — please check back soon.', 'g2a-booking' ),
+				'pick_event' => __( 'Pick a highlighted date to see available times', 'g2a-booking' ),
 				'months'   => array(
 					__( 'January', 'g2a-booking' ), __( 'February', 'g2a-booking' ), __( 'March', 'g2a-booking' ), __( 'April', 'g2a-booking' ),
 					__( 'May', 'g2a-booking' ), __( 'June', 'g2a-booking' ), __( 'July', 'g2a-booking' ), __( 'August', 'g2a-booking' ),
@@ -787,6 +820,17 @@ final class G2AB_Frontend {
 				viewMonth: 0
 			};
 
+			// ── event-driven mode ───────────────────────────────────
+			// When data-event-source="1" the calendar only unlocks dates that
+			// have a published Event of data-event-type, and time slots come
+			// straight from each event's window (not the open business-hours
+			// grid). Used by Ladies Tuesday.
+			var eventMode    = root.dataset.eventSource === '1';
+			var eventType    = root.dataset.eventType || '';
+			var eventDates   = null;   // Set of 'YYYY-MM-DD' strings, null until loaded.
+			var eventByDate  = {};     // { 'YYYY-MM-DD': { title, slots:[…] } }
+			var eventLoading = false;
+
 			// ── stage navigation ────────────────────────────────────
 			function showStage(name){
 				$$('.g2ab-stage__panel').forEach(function(p){
@@ -823,8 +867,16 @@ final class G2AB_Frontend {
 					var isPast = iso < today;
 					var isTooFar = cellDate > maxDate;
 					var disabled = isPast || isTooFar;
+					var isEvent = false;
+					if (eventMode) {
+						// In event mode a date is bookable only if it's in the
+						// loaded event set. Until the set loads, everything is
+						// locked so users can't click a date with no times.
+						isEvent = eventDates ? eventDates.has(iso) : false;
+						if (!isEvent) disabled = true;
+					}
 					var selected = iso === state.date;
-					var cls = 'g2ab-cal__cell' + (disabled ? ' is-disabled' : ' is-clickable') + (selected ? ' is-selected' : '');
+					var cls = 'g2ab-cal__cell' + (disabled ? ' is-disabled' : ' is-clickable') + (selected ? ' is-selected' : '') + (isEvent ? ' is-event' : '');
 					html += '<button class="' + cls + '" type="button" data-date="' + iso + '"' + (disabled ? ' disabled' : '') + '>' + d + '</button>';
 				}
 				grid.innerHTML = html;
@@ -837,6 +889,80 @@ final class G2AB_Frontend {
 				renderCalendar();
 			}
 
+			// ── event-map loading (event mode only) ─────────────────
+			// Pulls the dates + per-date slot windows for the configured event
+			// type once per resource, then re-renders the calendar and jumps
+			// to the first month that has a bookable date.
+			function loadEventMap(done){
+				if (!eventMode || !state.resourceId) { if (done) done(); return; }
+				eventLoading = true;
+				var hint = $('[data-slots-hint]');
+				if (hint) { hint.style.display = ''; hint.textContent = config.i18n.loading_dates || config.i18n.loading; }
+				var url = config.rest_url + 'event-availability'
+					+ '?resource_id=' + encodeURIComponent(state.resourceId)
+					+ '&event_type=' + encodeURIComponent(eventType)
+					+ '&booking_type_id=' + encodeURIComponent(parseInt(root.dataset.bookingTypeId, 10) || 0);
+				fetch(url, { headers: headers(false) })
+					.then(function(r){ return r.json(); })
+					.then(function(json){
+						var data = (json && json.success) ? json.data : null;
+						eventByDate = (data && data.by_date && typeof data.by_date === 'object') ? data.by_date : {};
+						var list = (data && data.dates && data.dates.length) ? data.dates : [];
+						eventDates = new Set(list);
+						eventLoading = false;
+						// Jump the calendar to the first available month.
+						if (list.length) {
+							var first = list[0].split('-');
+							state.viewYear = parseInt(first[0], 10);
+							state.viewMonth = parseInt(first[1], 10) - 1;
+						}
+						renderCalendar();
+						if (hint) {
+							hint.style.display = '';
+							hint.textContent = list.length ? (config.i18n.pick_event || config.i18n.pick_first) : (config.i18n.no_events || config.i18n.no_slots);
+						}
+						if (done) done();
+					})
+					.catch(function(){
+						eventLoading = false;
+						eventDates = new Set();
+						eventByDate = {};
+						renderCalendar();
+						if (hint) { hint.style.display = ''; hint.textContent = config.i18n.no_events || config.i18n.no_slots; }
+						if (done) done();
+					});
+			}
+
+			// Render an array of slot objects into the slots box.
+			function renderSlots(slots){
+				var box = $('[data-slots]');
+				var hint = $('[data-slots-hint]');
+				if (!box) return;
+				if (hint) hint.style.display = 'none';
+				box.innerHTML = '';
+				if (!slots || !slots.length) { box.innerHTML = '<p class="g2ab-muted">' + config.i18n.no_slots + '</p>'; return; }
+				slots.forEach(function(slot){
+					var btn = document.createElement('button');
+					btn.type = 'button';
+					btn.className = 'g2ab-slot';
+					btn.textContent = slot.label;
+					btn.disabled = !slot.available;
+					btn.dataset.start = slot.start;
+					btn.dataset.end = slot.end;
+					if (slot.available) {
+						btn.addEventListener('click', function(){
+							$$('.g2ab-slot', box).forEach(function(s){ s.classList.remove('is-selected'); });
+							btn.classList.add('is-selected');
+							state.slot = { start: slot.start, end: slot.end, label: slot.label };
+							updateSummary();
+							var go = $('[data-go-form]');
+							if (go) go.disabled = false;
+						});
+					}
+					box.appendChild(btn);
+				});
+			}
+
 			// ── slot loading ────────────────────────────────────────
 			function loadSlots(){
 				var box = $('[data-slots]');
@@ -844,7 +970,14 @@ final class G2AB_Frontend {
 				if (!box) return;
 				if (!state.resourceId || !state.date) {
 					box.innerHTML = '';
-					if (hint) { hint.style.display = ''; hint.textContent = config.i18n.pick_first || 'Pick a date'; }
+					if (hint) { hint.style.display = ''; hint.textContent = (eventMode ? (config.i18n.pick_event || config.i18n.pick_first) : config.i18n.pick_first) || 'Pick a date'; }
+					return;
+				}
+				// Event mode: slots come from the pre-loaded event window — no
+				// per-date round-trip, and never the open business-hours grid.
+				if (eventMode) {
+					var entry = eventByDate[state.date];
+					renderSlots(entry ? entry.slots : []);
 					return;
 				}
 				if (hint) { hint.style.display = ''; hint.textContent = config.i18n.loading; }
@@ -853,30 +986,9 @@ final class G2AB_Frontend {
 					.then(function(r){ return r.json(); })
 					.then(function(json){
 						var data = json && json.success ? json.data : null;
-						if (hint) hint.style.display = 'none';
-						if (!data) { box.innerHTML = '<p class="g2ab-muted">' + config.i18n.no_slots + '</p>'; return; }
-						if (data.closed) { box.innerHTML = '<p class="g2ab-muted">' + config.i18n.closed + '</p>'; return; }
-						if (!data.slots || !data.slots.length) { box.innerHTML = '<p class="g2ab-muted">' + config.i18n.no_slots + '</p>'; return; }
-						data.slots.forEach(function(slot){
-							var btn = document.createElement('button');
-							btn.type = 'button';
-							btn.className = 'g2ab-slot';
-							btn.textContent = slot.label;
-							btn.disabled = !slot.available;
-							btn.dataset.start = slot.start;
-							btn.dataset.end = slot.end;
-							if (slot.available) {
-								btn.addEventListener('click', function(){
-									$$('.g2ab-slot', box).forEach(function(s){ s.classList.remove('is-selected'); });
-									btn.classList.add('is-selected');
-									state.slot = { start: slot.start, end: slot.end, label: slot.label };
-									updateSummary();
-									var go = $('[data-go-form]');
-									if (go) go.disabled = false;
-								});
-							}
-							box.appendChild(btn);
-						});
+						if (!data) { if (hint) hint.style.display = 'none'; box.innerHTML = '<p class="g2ab-muted">' + config.i18n.no_slots + '</p>'; return; }
+						if (data.closed) { if (hint) hint.style.display = 'none'; box.innerHTML = '<p class="g2ab-muted">' + config.i18n.closed + '</p>'; return; }
+						renderSlots(data.slots);
 					})
 					.catch(function(){
 						if (hint) hint.style.display = 'none';
@@ -911,7 +1023,13 @@ final class G2AB_Frontend {
 					state.resourceName = chip.dataset.resourceName || '';
 					state.slot = null;
 					var go = $('[data-go-form]'); if (go) go.disabled = true;
-					loadSlots();
+					if (eventMode) {
+						// Availability is per-resource, so re-pull the event map.
+						state.date = '';
+						loadEventMap(function(){ loadSlots(); });
+					} else {
+						loadSlots();
+					}
 					updateSummary();
 				});
 			});
@@ -1135,6 +1253,7 @@ final class G2AB_Frontend {
 			state.viewYear = now.getFullYear();
 			state.viewMonth = now.getMonth();
 			renderCalendar();
+			if (eventMode) { loadEventMap(); }
 			showStage('time');
 		})(<?php echo wp_json_encode( $config ); ?>);
 		</script>

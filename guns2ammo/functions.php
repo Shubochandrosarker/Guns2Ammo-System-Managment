@@ -159,6 +159,9 @@ require_once G2A_DIR . '/inc/sitemap.php';
 require_once G2A_DIR . '/inc/llms.php';
 require_once G2A_DIR . '/inc/robots.php';
 
+/* ---------- Ottertext decommission (retired in favour of Verifyistic) ---------- */
+require_once G2A_DIR . '/inc/ottertext-cleanup.php';
+
 /* ---------- Compat: repair malformed plugin-update transient ----------
  * Some plugins push entries into the `update_plugins` transient without the
  * `plugin` property WordPress core expects. When core later runs

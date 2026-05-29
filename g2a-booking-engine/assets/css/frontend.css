@@ -314,6 +314,31 @@
 	color: #fff;
 	box-shadow: 0 6px 14px color-mix(in srgb, var(--g2ab-primary) 35%, transparent);
 }
+/* Event-driven calendar: bookable event dates get an accent ring + dot so
+   it's obvious only the highlighted days are open (e.g. Ladies Tuesday). */
+.g2ab-cal__cell.is-event {
+	position: relative;
+	font-weight: 700;
+	color: var(--g2ab-text);
+	box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--g2ab-accent, var(--g2ab-primary)) 55%, transparent);
+}
+.g2ab-cal__cell.is-event::after {
+	content: "";
+	position: absolute;
+	bottom: 5px; left: 50%;
+	width: 4px; height: 4px;
+	transform: translateX(-50%);
+	border-radius: 50%;
+	background: var(--g2ab-accent, var(--g2ab-primary));
+}
+.g2ab-cal__cell.is-event:hover {
+	background: color-mix(in srgb, var(--g2ab-accent, var(--g2ab-primary)) 20%, transparent);
+}
+.g2ab-cal__cell.is-event.is-selected {
+	color: #fff;
+	box-shadow: 0 6px 14px color-mix(in srgb, var(--g2ab-primary) 35%, transparent);
+}
+.g2ab-cal__cell.is-event.is-selected::after { background: #fff; }
 
 /* ===== Slots ============================================================= */
 .g2ab-pick__hint {

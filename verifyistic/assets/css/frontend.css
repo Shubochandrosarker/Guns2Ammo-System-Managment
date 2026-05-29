@@ -1,0 +1,495 @@
+/* =========================================================
+   Verifyistic Frontend Popup CSS — by WordPressistic
+   ========================================================= */
+@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&display=swap');
+
+/* ── Defaults ──────────────────────────────────────────── */
+:root {
+  --vfy-popup-bg:       #0f172a;
+  --vfy-overlay:        rgba(0,0,0,0.80);
+  --vfy-font-clr:       #f8fafc;
+  --vfy-btn-yes:        #14b8a6;
+  --vfy-btn-no:         #475569;
+  --vfy-btn-yes-txt:    #ffffff;
+  --vfy-btn-no-txt:     #ffffff;
+  --vfy-btn-radius:     8px;
+  --vfy-popup-width:    480px;
+  --vfy-logo-width:     160px;
+  --vfy-accent:         #14b8a6;
+}
+
+/* ── Overlay ───────────────────────────────────────────── */
+#verifyistic-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 9999990;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--vfy-overlay);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  padding: 16px;
+  overflow: hidden;
+  animation: vfy-fade-in .25s ease both;
+}
+
+@keyframes vfy-fade-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+/* ── Popup Card ────────────────────────────────────────── */
+#verifyistic-popup {
+  background: var(--vfy-popup-bg);
+  border-radius: 20px;
+  width: 100%;
+  max-width: var(--vfy-popup-width);
+  position: relative;
+  box-shadow:
+    0 25px 50px rgba(0,0,0,.5),
+    0 0 0 1px rgba(255,255,255,.06);
+  overflow: hidden;
+  animation: vfy-slide-up .3s cubic-bezier(.34,1.56,.64,1) both;
+  animation-delay: .05s;
+}
+
+@keyframes vfy-slide-up {
+  from { opacity: 0; transform: translateY(28px) scale(.96); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+/* Accent top bar */
+#verifyistic-popup::before {
+  content: '';
+  display: block;
+  height: 3px;
+  background: linear-gradient(90deg, var(--vfy-accent), #6366f1, #0891b2);
+}
+
+/* ── Inner Padding ─────────────────────────────────────── */
+.vfy-inner {
+  padding: 32px 36px 36px;
+}
+
+@media (max-width: 480px) {
+  .vfy-inner { padding: 24px 22px 28px; }
+}
+
+/* ── Logo ──────────────────────────────────────────────── */
+.vfy-logo-wrap {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 22px;
+}
+
+.vfy-logo-wrap img {
+  max-width: var(--vfy-logo-width);
+  max-height: 64px;
+  object-fit: contain;
+  display: block;
+}
+
+/* ── Shield Icon (shown when no logo) ─────────────────── */
+.vfy-shield-icon {
+  width: 64px; height: 64px;
+  margin: 0 auto 22px;
+  background: linear-gradient(135deg, rgba(20,184,166,.2), rgba(99,102,241,.2));
+  border-radius: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid rgba(20,184,166,.25);
+}
+
+.vfy-shield-icon svg {
+  width: 32px; height: 32px;
+  stroke: var(--vfy-accent);
+}
+
+/* ── Heading & Text ────────────────────────────────────── */
+.vfy-heading {
+  color: var(--vfy-font-clr);
+  font-family: 'Outfit', sans-serif;
+  font-size: 22px;
+  font-weight: 800;
+  text-align: center;
+  margin: 0 0 10px;
+  line-height: 1.25;
+  letter-spacing: -0.3px;
+}
+
+.vfy-message {
+  color: rgba(248,250,252,.65);
+  font-family: 'Outfit', sans-serif;
+  font-size: 14px;
+  font-weight: 400;
+  text-align: center;
+  margin: 0 0 26px;
+  line-height: 1.6;
+}
+
+/* ── Age Badge ─────────────────────────────────────────── */
+.vfy-age-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  background: rgba(20,184,166,.12);
+  border: 1px solid rgba(20,184,166,.25);
+  color: var(--vfy-accent);
+  border-radius: 50px;
+  padding: 4px 12px;
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .5px;
+  margin: 0 auto 20px;
+  display: flex;
+  width: fit-content;
+}
+
+/* ── Divider ───────────────────────────────────────────── */
+.vfy-divider {
+  height: 1px;
+  background: rgba(255,255,255,.07);
+  margin: 0 0 24px;
+}
+
+/* ── DOB Form ──────────────────────────────────────────── */
+.vfy-form {}
+
+.vfy-form-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.vfy-form-group { margin-bottom: 12px; }
+.vfy-form-group:last-child { margin-bottom: 0; }
+
+.vfy-form-label {
+  display: block;
+  font-family: 'Outfit', sans-serif;
+  font-size: 12px;
+  font-weight: 600;
+  color: rgba(248,250,252,.55);
+  margin-bottom: 5px;
+  letter-spacing: .3px;
+  text-transform: uppercase;
+}
+
+.vfy-form-input {
+  width: 100%;
+  padding: 11px 14px;
+  background: rgba(255,255,255,.06);
+  border: 1.5px solid rgba(255,255,255,.1);
+  border-radius: 10px;
+  font-family: 'Outfit', sans-serif;
+  font-size: 14px;
+  font-weight: 500;
+  color: #f8fafc;
+  outline: none;
+  transition: all .18s ease;
+  -webkit-appearance: none;
+}
+
+.vfy-form-input:focus {
+  border-color: var(--vfy-accent);
+  background: rgba(20,184,166,.06);
+  box-shadow: 0 0 0 3px rgba(20,184,166,.15);
+}
+
+.vfy-form-input::placeholder { color: rgba(148,163,184,.5); }
+
+/* Date input fix */
+.vfy-form-input[type="date"]::-webkit-calendar-picker-indicator {
+  filter: invert(1) opacity(.5);
+  cursor: pointer;
+}
+
+/* ── File Upload ───────────────────────────────────────── */
+.vfy-upload-area {
+  border: 2px dashed rgba(255,255,255,.12);
+  border-radius: 10px;
+  padding: 18px;
+  text-align: center;
+  cursor: pointer;
+  transition: all .18s ease;
+  position: relative;
+  overflow: hidden;
+}
+
+.vfy-upload-area:hover {
+  border-color: var(--vfy-accent);
+  background: rgba(20,184,166,.05);
+}
+
+.vfy-upload-area input[type="file"] {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  cursor: pointer;
+  width: 100%; height: 100%;
+}
+
+.vfy-upload-icon {
+  width: 32px; height: 32px;
+  stroke: rgba(148,163,184,.6);
+  display: block;
+  margin: 0 auto 8px;
+}
+
+.vfy-upload-text {
+  font-family: 'Outfit', sans-serif;
+  font-size: 13px;
+  color: rgba(148,163,184,.7);
+  font-weight: 500;
+}
+
+.vfy-upload-text span {
+  color: var(--vfy-accent);
+  font-weight: 600;
+}
+
+.vfy-upload-preview {
+  margin-top: 6px;
+  font-size: 12px;
+  color: var(--vfy-accent);
+  font-weight: 600;
+}
+
+/* ── Remember Me ───────────────────────────────────────── */
+.vfy-remember {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 16px;
+  cursor: pointer;
+}
+
+.vfy-remember input[type="checkbox"] {
+  width: 16px; height: 16px;
+  accent-color: var(--vfy-accent);
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.vfy-remember-label {
+  font-family: 'Outfit', sans-serif;
+  font-size: 13px;
+  color: rgba(248,250,252,.55);
+  cursor: pointer;
+}
+
+/* ── Yes / No Buttons ──────────────────────────────────── */
+.vfy-btn-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin-bottom: 0;
+}
+
+.vfy-btn-yes,
+.vfy-btn-no,
+.vfy-btn-submit {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  width: 100%;
+  padding: 13px 20px;
+  border-radius: var(--vfy-btn-radius);
+  font-family: 'Outfit', sans-serif;
+  font-size: 15px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all .18s ease;
+  border: none;
+  outline: none;
+  letter-spacing: .1px;
+}
+
+.vfy-btn-yes {
+  background: var(--vfy-btn-yes);
+  color: var(--vfy-btn-yes-txt);
+}
+
+.vfy-btn-yes:hover {
+  filter: brightness(1.1);
+  transform: translateY(-1px);
+  box-shadow: 0 6px 20px rgba(0,0,0,.25);
+}
+
+.vfy-btn-no {
+  background: var(--vfy-btn-no);
+  color: var(--vfy-btn-no-txt);
+}
+
+.vfy-btn-no:hover {
+  filter: brightness(1.1);
+  transform: translateY(-1px);
+  box-shadow: 0 6px 20px rgba(0,0,0,.2);
+}
+
+.vfy-btn-submit {
+  background: var(--vfy-btn-yes);
+  color: var(--vfy-btn-yes-txt);
+  margin-top: 4px;
+}
+
+.vfy-btn-submit:hover {
+  filter: brightness(1.1);
+  transform: translateY(-1px);
+  box-shadow: 0 8px 24px rgba(0,0,0,.3);
+}
+
+.vfy-btn-submit:disabled {
+  opacity: .6;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+}
+
+.vfy-btn-icon {
+  width: 17px; height: 17px;
+  flex-shrink: 0;
+}
+
+/* ── Spinner inside button ─────────────────────────────── */
+.vfy-btn-spinner {
+  display: inline-block;
+  width: 16px; height: 16px;
+  border: 2px solid rgba(255,255,255,.3);
+  border-top-color: #fff;
+  border-radius: 50%;
+  animation: vfy-spin .6s linear infinite;
+}
+
+@keyframes vfy-spin {
+  to { transform: rotate(360deg); }
+}
+
+/* ── Error Message ─────────────────────────────────────── */
+.vfy-error {
+  background: rgba(239,68,68,.12);
+  border: 1px solid rgba(239,68,68,.25);
+  color: #fca5a5;
+  border-radius: 8px;
+  padding: 10px 14px;
+  font-family: 'Outfit', sans-serif;
+  font-size: 13px;
+  font-weight: 500;
+  margin-bottom: 14px;
+  display: none;
+  align-items: center;
+  gap: 7px;
+}
+
+.vfy-error.show { display: flex; }
+
+.vfy-error svg { width: 15px; height: 15px; stroke: #f87171; flex-shrink: 0; }
+
+/* ── Success ───────────────────────────────────────────── */
+.vfy-success-state {
+  text-align: center;
+  padding: 8px 0;
+  display: none;
+}
+
+.vfy-success-state.show { display: block; }
+
+.vfy-success-icon {
+  width: 60px; height: 60px;
+  background: rgba(16,185,129,.15);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto 16px;
+}
+
+.vfy-success-icon svg {
+  width: 28px; height: 28px;
+  stroke: #34d399;
+}
+
+.vfy-success-title {
+  font-family: 'Outfit', sans-serif;
+  font-size: 20px;
+  font-weight: 800;
+  color: #f8fafc;
+  margin: 0 0 8px;
+}
+
+.vfy-success-msg {
+  font-family: 'Outfit', sans-serif;
+  font-size: 14px;
+  color: rgba(248,250,252,.55);
+}
+
+/* ── Privacy Text ──────────────────────────────────────── */
+.vfy-privacy {
+  font-family: 'Outfit', sans-serif;
+  font-size: 11.5px;
+  color: rgba(148,163,184,.45);
+  text-align: center;
+  margin-top: 16px;
+  line-height: 1.5;
+}
+
+.vfy-privacy a { color: rgba(148,163,184,.65); text-decoration: underline; }
+
+/* ── Powered By ────────────────────────────────────────── */
+.vfy-powered {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  padding: 12px 0 4px;
+  font-family: 'Outfit', sans-serif;
+  font-size: 10.5px;
+  font-weight: 500;
+  color: rgba(148,163,184,.3);
+  text-decoration: none;
+}
+
+.vfy-powered:hover { color: rgba(148,163,184,.5); }
+
+.vfy-powered svg {
+  width: 12px; height: 12px;
+  stroke: currentColor;
+}
+
+/* ── Body lock ─────────────────────────────────────────── */
+body.verifyistic-locked {
+  overflow: hidden !important;
+}
+
+/* ── Responsive ────────────────────────────────────────── */
+@media (max-width: 480px) {
+  #verifyistic-popup {
+    border-radius: 16px;
+  }
+
+  .vfy-btn-row {
+    grid-template-columns: 1fr;
+  }
+
+  .vfy-form-row {
+    grid-template-columns: 1fr;
+  }
+
+  .vfy-heading { font-size: 19px; }
+}
+
+/* Anti-bot honeypot — visually removed but not display:none (bots skip
+   display:none fields). Hidden from AT and keyboard. */
+.vfy-hp{
+    position:absolute !important;
+    left:-9999px !important;
+    top:-9999px !important;
+    width:1px;height:1px;
+    opacity:0;
+    pointer-events:none;
+}
