@@ -74,6 +74,7 @@ final class Plugin {
 			'includes/rest/class-saved-views-controller.php',
 			'includes/rest/class-settings-controller.php',
 			'includes/corporate/class-corporate-module.php',
+			'includes/waivers/class-waivers.php',
 		);
 
 		foreach ( $files as $file ) {
@@ -94,6 +95,8 @@ final class Plugin {
 		add_action( 'admin_init', array( Admin\Settings_Page::class, 'handle_actions' ) );
 		add_action( 'admin_init', array( Admin\Plans_Page::class, 'handle_actions' ) );
 		add_action( 'admin_init', array( Admin\Members_Page::class, 'handle_actions' ) );
+		add_action( 'admin_init', array( Waivers\Waiver_Admin_Page::class, 'handle_actions' ) );
+		Waivers\Waiver_Public::register();
 		add_action( 'admin_notices', __NAMESPACE__ . '\\memberistic_admin_notices' );
 		add_action( 'admin_enqueue_scripts', array( $this, 'enqueue_admin_assets' ) );
 		add_action( 'wp_enqueue_scripts', array( $this, 'enqueue_frontend_assets' ) );

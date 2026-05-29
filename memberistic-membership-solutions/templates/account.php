@@ -108,6 +108,29 @@ $lane_url    = home_url( '/book-a-lane/' );
 		</div>
 	<?php endif; ?>
 
+	<?php
+	// Waiver CTA — shown when the signed-in member's waiver is missing or
+	// expired. Links to their tokenised self-serve waiver page.
+	$waiver_ok = false;
+	$primary   = null;
+	foreach ( (array) $people as $pp ) {
+		if ( 'primary' === ( $pp['role'] ?? '' ) || (int) ( $pp['wp_user_id'] ?? 0 ) === (int) $user->ID ) {
+			$primary = $pp;
+			break;
+		}
+	}
+	if ( $primary && class_exists( '\WordPressistic\Memberistic\Waivers\Waiver_Service' ) ) {
+		$waiver_ok = \WordPressistic\Memberistic\Waivers\Waiver_Service::is_current( $primary );
+	}
+	if ( ! $waiver_ok && class_exists( '\WordPressistic\Memberistic\Waivers\Waiver_Service' ) ) :
+		$waiver_link = \WordPressistic\Memberistic\Waivers\Waiver_Service::waiver_url( (int) $user->ID );
+		?>
+		<div class="memberistic-acct-banner">
+			<?php esc_html_e( 'Your range waiver is not signed. Please sign it before your next visit — it takes under a minute.', 'memberistic' ); ?>
+			<a href="<?php echo esc_url( $waiver_link ); ?>"><?php esc_html_e( 'Sign waiver', 'memberistic' ); ?></a>
+		</div>
+	<?php endif; ?>
+
 	<?php if ( in_array( $status, array( 'past_due', 'expired' ), true ) ) : ?>
 		<div class="memberistic-acct-banner">
 			<?php if ( 'past_due' === $status ) : ?>

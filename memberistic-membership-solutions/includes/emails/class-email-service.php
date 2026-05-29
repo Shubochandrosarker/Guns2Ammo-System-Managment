@@ -238,6 +238,13 @@ final class Email_Service {
 		$current_user = wp_get_current_user();
 		$staff_name   = $current_user && $current_user->exists() ? $current_user->display_name : '';
 
+		// Tokenised self-serve waiver link for this member (no login needed).
+		// Falls back to the account page if the person has no WP user yet.
+		$waiver_url = '';
+		if ( ! empty( $person['wp_user_id'] ) && class_exists( '\WordPressistic\Memberistic\Waivers\Waiver_Service' ) ) {
+			$waiver_url = \WordPressistic\Memberistic\Waivers\Waiver_Service::waiver_url( (int) $person['wp_user_id'] );
+		}
+
 		$context = array(
 			'{member_name}'        => (string) ( $person['full_name'] ?? '' ),
 			'{membership_id}'      => (string) ( $membership['membership_uuid'] ?? '' ),
@@ -259,6 +266,7 @@ final class Email_Service {
 			'{site_url}'           => home_url( '/' ),
 			'{linked_member_name}' => isset( $extra_context['linked_member_name'] ) ? (string) $extra_context['linked_member_name'] : '',
 			'{waiver_status}'      => ucwords( str_replace( '_', ' ', (string) ( $person['waiver_status'] ?? 'missing' ) ) ),
+			'{waiver_url}'         => $waiver_url ?: $account_url,
 			'{staff_name}'         => $staff_name,
 			'{support_email}'      => (string) memberistic_get_setting( 'email_from_address', get_option( 'admin_email' ) ),
 			'{logo_url}'           => (string) memberistic_get_setting( 'logo_url', '' ),
@@ -304,7 +312,7 @@ final class Email_Service {
 			),
 			'membership_activated' => array(
 				'subject' => __( 'Welcome to {brand_label} — your membership is active', 'memberistic' ),
-				'body'    => __( "Hi {member_name},\n\nWelcome to {brand_label}! Your {plan_name} membership is now active.\n\nMembership ID: {membership_id}\nBilling cycle: {billing_cycle}\nNext renewal: {renewal_date}\n\nSign in to your account:\n{login_url}\n\nForgot your password? Reset it here:\n{lostpassword_url}\n\nManage your membership and download your digital card:\n{account_url}\n\nBook a lane:\n{booking_url}\n\nSee you at the range.\n\n{brand_label}\n{business_phone}", 'memberistic' ),
+				'body'    => __( "Hi {member_name},\n\nWelcome to {brand_label}! Your {plan_name} membership is now active.\n\nMembership ID: {membership_id}\nBilling cycle: {billing_cycle}\nNext renewal: {renewal_date}\n\nSign in to your account:\n{login_url}\n\nForgot your password? Reset it here:\n{lostpassword_url}\n\nManage your membership and download your digital card:\n{account_url}\n\nSign your range waiver (required before your first visit):\n{waiver_url}\n\nBook a lane:\n{booking_url}\n\nSee you at the range.\n\n{brand_label}\n{business_phone}", 'memberistic' ),
 			),
 			'membership_renewed'   => array(
 				'subject' => __( 'Your {brand_label} membership was renewed', 'memberistic' ),
@@ -347,8 +355,8 @@ final class Email_Service {
 				'body'    => __( "Hi {member_name},\n\n{linked_member_name} was added as a linked member on your {plan_name} membership ({membership_id}).\n\nView linked members: {account_url}\n\n{brand_label}", 'memberistic' ),
 			),
 			'waiver_missing'       => array(
-				'subject' => __( 'Waiver needed for your {brand_label} membership', 'memberistic' ),
-				'body'    => __( "Hi {member_name},\n\nA waiver is still needed before membership benefits can be fully used. Please complete the waiver process with staff at your next visit.\n\nMembership: {membership_id}\n{account_url}\n\n{brand_label}", 'memberistic' ),
+				'subject' => __( 'Sign your {brand_label} range waiver', 'memberistic' ),
+				'body'    => __( "Hi {member_name},\n\nA signed waiver is needed before your range benefits can be fully used. You can sign it now from any device in under a minute — no login required:\n\n{waiver_url}\n\nMembership: {membership_id}\n\nSee you at the range.\n\n{brand_label}\n{business_phone}", 'memberistic' ),
 			),
 			'staff_manual'         => array(
 				'subject' => __( 'A message from {brand_label}', 'memberistic' ),
