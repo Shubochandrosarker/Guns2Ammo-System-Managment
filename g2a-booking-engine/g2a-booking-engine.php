@@ -3,7 +3,7 @@
  * Plugin Name:       G2A Booking Engine
  * Plugin URI:        https://wordpressistic.com/g2a-booking-engine
  * Description:       Custom booking engine for Guns 2 Ammo - shooting range lanes, firearms classes, and membership-based booking with real-time availability, online payments, pay-in-store support, and built-in Migration Tool (Amelia/Bookly/BookingPress/CSV).
- * Version:           1.9.4
+ * Version:           1.9.5
  * Requires at least: 6.2
  * Requires PHP:      8.0
  * Author:            Wordpressistic
@@ -22,14 +22,56 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 /**
  * REST responses must be pure JSON. On debug/staging sites a stray PHP
- * notice/warning/deprecation printed by ANY plugin or theme gets prepended to
- * the JSON body, which the browser then can't parse — surfacing in the booking
- * widget as "Could not load times (HTTP 200 · non-JSON)". Suppress error
- * DISPLAY (not logging) for REST requests so the JSON is never corrupted.
- * Errors still go to the PHP/WP debug log for developers.
+ * notice/warning, an echo, or trailing whitespace after a "?>" in ANY plugin
+ * or theme gets prepended to the JSON body, which the browser then can't parse
+ * — surfacing in the booking widget as "Could not load times (HTTP 200 ·
+ * non-JSON)".
+ *
+ * Two defenses, scoped to REST requests only:
+ *   1. Suppress error DISPLAY (errors still log) so notices can't leak.
+ *   2. Buffer the whole request and, at flush, strip anything before the JSON
+ *      so the body the browser receives is always valid JSON — regardless of
+ *      which other plugin/theme misbehaves. We only rewrite when the trailing
+ *      content actually parses as JSON, so non-JSON responses are never touched.
  */
 if ( ! empty( $_SERVER['REQUEST_URI'] ) && false !== strpos( (string) $_SERVER['REQUEST_URI'], '/wp-json/' ) ) {
 	@ini_set( 'display_errors', '0' ); // phpcs:ignore
+
+	ob_start(
+		static function ( $buffer ) {
+			if ( ! is_string( $buffer ) || '' === $buffer ) {
+				return $buffer;
+			}
+			// Already clean JSON? Leave it.
+			$trimmed = trim( $buffer );
+			if ( '' !== $trimmed && ( '{' === $trimmed[0] || '[' === $trimmed[0] ) ) {
+				json_decode( $trimmed );
+				if ( JSON_ERROR_NONE === json_last_error() ) {
+					return $buffer;
+				}
+			}
+			// Try each '{' / '[' offset (ascending) as a possible JSON start;
+			// return the first whose trailing substring parses as JSON. This
+			// strips a stray prefix even when that prefix itself contains
+			// brackets (e.g. a PHP notice mentioning an array). Bounded so a
+			// genuinely non-JSON body costs little.
+			$len      = strlen( $buffer );
+			$attempts = 0;
+			for ( $i = 0; $i < $len && $attempts < 40; $i++ ) {
+				$ch = $buffer[ $i ];
+				if ( '{' !== $ch && '[' !== $ch ) {
+					continue;
+				}
+				$attempts++;
+				$candidate = trim( substr( $buffer, $i ) );
+				json_decode( $candidate );
+				if ( JSON_ERROR_NONE === json_last_error() ) {
+					return $candidate; // Found the real JSON; junk stripped.
+				}
+			}
+			return $buffer; // No valid JSON found — never risk corrupting output.
+		}
+	);
 }
 
 /**
@@ -44,7 +86,7 @@ if ( ! empty( $_SERVER['REQUEST_URI'] ) && false !== strpos( (string) $_SERVER['
  * G2AB_TEXT_DOMAIN   — Text domain for i18n.
  * G2AB_REST_NAMESPACE — REST API namespace.
  */
-define( 'G2AB_VERSION', '1.9.4' );
+define( 'G2AB_VERSION', '1.9.5' );
 define( 'G2AB_DB_VERSION', '1.7.0' );
 define( 'G2AB_FILE', __FILE__ );
 define( 'G2AB_PATH', plugin_dir_path( __FILE__ ) );
