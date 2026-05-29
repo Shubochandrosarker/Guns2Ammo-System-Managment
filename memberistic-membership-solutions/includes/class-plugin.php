@@ -52,8 +52,10 @@ final class Plugin {
 			'includes/database/class-notes-repository.php',
 			'includes/database/class-email-logs-repository.php',
 			'includes/emails/class-email-service.php',
+			'includes/integrations/class-integrations-registry.php',
 			'includes/integrations/class-booking-engine.php',
 			'includes/integrations/class-woocommerce-bridge.php',
+			'includes/integrations/class-verifyistic-bridge.php',
 			'includes/payments/class-stripe-service.php',
 			'includes/admin/class-admin-menu.php',
 			'includes/admin/class-dashboard-page.php',
@@ -101,9 +103,18 @@ final class Plugin {
 		add_action( 'init', array( Frontend\Staff_Dashboard::class, 'register' ) );
 		add_action( 'init', array( Frontend\Staff_Dashboard::class, 'handle_actions' ) );
 		add_action( 'init', array( Content_Restrictions::class, 'register' ) );
-		add_action( 'init', array( Integrations\Booking_Engine::class, 'register' ) );
+		// Booking integration is gated by its Integrations toggle (default on
+		// whenever the Booking Engine plugin is present).
+		add_action( 'init', function () {
+			if ( Integrations\Integrations_Registry::is_enabled( 'booking' ) ) {
+				Integrations\Booking_Engine::register();
+			}
+		} );
 		add_action( 'init', array( Integrations\WooCommerce_Bridge::class, 'register' ) );
+		add_action( 'init', array( Integrations\Verifyistic_Bridge::class, 'register' ) );
 		add_action( 'init', array( Scheduler::class, 'register' ) );
+		// Save handler for the Integrations page toggles.
+		add_action( 'admin_post_memberistic_save_integrations', array( Admin\Admin_Menu::class, 'save_integrations' ) );
 		// Register Verification before `init` fires so its priority-5 init
 		// hook actually lands in the queue before WP processes priority 5.
 		Utilities\Verification::register();
