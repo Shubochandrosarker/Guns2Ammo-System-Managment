@@ -1,0 +1,121 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Guns 2 Ammo — Membership &amp; Check-In System</title>
+<style>
+  :root{ --bg:#0F1115; --panel:#1A1F26; --line:#2A323D; --ink:#FFFFFF; --mut:#8A95A5; --brass:#C9A84C; --orange:#E8802F; }
+  *{ box-sizing:border-box; }
+  body{ font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif; background:var(--bg); color:var(--ink); margin:0; padding:40px 20px; line-height:1.55; }
+  .wrap{ max-width:880px; margin:0 auto; }
+  .head{ border-bottom:2px solid var(--brass); padding-bottom:18px; margin-bottom:28px; }
+  .brand{ font-size:13px; letter-spacing:.28em; text-transform:uppercase; color:var(--brass); font-weight:700; }
+  h1{ font-size:30px; margin:8px 0 4px; }
+  .sub{ color:var(--mut); font-size:15px; }
+  h2{ font-size:13px; letter-spacing:.16em; text-transform:uppercase; color:var(--brass); margin:30px 0 12px; border-bottom:1px solid var(--line); padding-bottom:8px; }
+  h3{ font-size:15px; margin:18px 0 6px; color:#fff; }
+  p{ color:#CBCAD2; margin:0 0 12px; }
+  ul{ margin:0 0 14px; padding-left:20px; color:#CBCAD2; }
+  li{ margin:4px 0; }
+  .grid{ display:grid; grid-template-columns:1fr 1fr; gap:18px; }
+  .card{ background:var(--panel); border:1px solid var(--line); border-radius:10px; padding:18px 20px; }
+  .flow{ counter-reset:step; }
+  .flow .step{ background:var(--panel); border:1px solid var(--line); border-left:3px solid var(--orange); border-radius:8px; padding:14px 18px; margin:10px 0; }
+  .flow .step b{ color:#fff; }
+  .pill{ display:inline-block; background:rgba(201,168,76,.14); border:1px solid rgba(201,168,76,.4); color:var(--brass); border-radius:999px; padding:3px 12px; font-size:12px; font-family:monospace; }
+  .note{ background:rgba(232,128,47,.10); border:1px solid rgba(232,128,47,.4); border-radius:8px; padding:14px 18px; color:#F0A565; }
+  .foot{ margin-top:34px; border-top:1px solid var(--line); padding-top:14px; color:#5A6371; font-size:12px; }
+  @media (max-width:680px){ .grid{ grid-template-columns:1fr; } }
+  @media print{ body{ background:#fff; color:#111; padding:0; } .card,.flow .step{ background:#fafafa; border-color:#ddd; } p,li{ color:#222; } .sub,.foot{ color:#666; } h2,.brand{ color:#9a7d22; } .note{ color:#8a4b00; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="head">
+    <div class="brand">Guns 2 Ammo · Arizona Shooting Range</div>
+    <h1>Membership &amp; Check-In System</h1>
+    <div class="sub">How it works, and everything your team and members can use today.</div>
+  </div>
+
+  <h2>How it works</h2>
+  <div class="flow">
+    <div class="step"><b>1. Joining.</b> A customer picks a plan and checks out through Stripe. Their account, digital membership card, and record are created automatically, and they receive a welcome email with links to their account, waiver, and lane booking.</div>
+    <div class="step"><b>2. Automatic billing.</b> Monthly plans charge on the same day every month, annual plans on the same day every year — anchored to the day they joined. Renewal dates are set automatically.</div>
+    <div class="step"><b>3. Reminders &amp; receipts.</b> Members get a reminder about a week before renewal and again the day before. After each charge they receive a payment receipt and a renewal confirmation. Failed payments trigger an "update your card" notice.</div>
+    <div class="step"><b>4. Self-service.</b> From their account page members update their card, view billing history, switch plans, or cancel — no call to the desk.</div>
+    <div class="step"><b>5. Waivers.</b> Anyone can sign the range waiver from any device in under a minute — no login. Each signature stores the date, signer, and exact wording agreed to, and expires after a year. Guests and walk-ins can sign too.</div>
+    <div class="step"><b>6. At the door.</b> Staff scan the member's QR code and instantly see if the membership is active and whether the waiver is on file or expired. Guests scan a poster or use the tablet to sign before shooting.</div>
+  </div>
+
+  <h2>What members can use</h2>
+  <div class="grid">
+    <div class="card">
+      <h3>Member account <span class="pill">/account/</span></h3>
+      <ul>
+        <li>Digital membership card with personal QR</li>
+        <li>Update payment method / fix a failed charge</li>
+        <li>Billing history with payment references</li>
+        <li>Switch monthly ↔ annual, or cancel</li>
+        <li>Plan, renewal date, linked/family members</li>
+        <li>Booking history</li>
+        <li>Sign the waiver &amp; see its status</li>
+        <li>Upload documents (waiver, ID) — private</li>
+      </ul>
+    </div>
+    <div class="card">
+      <h3>Automatic emails</h3>
+      <ul>
+        <li>Welcome / membership activated</li>
+        <li>Payment receipt (every charge)</li>
+        <li>Renewal confirmation</li>
+        <li>Renewal reminders (~7 days &amp; ~24 hours out)</li>
+        <li>Payment failed — update card</li>
+        <li>Membership expired</li>
+        <li>Waiver needed (one-click sign link)</li>
+      </ul>
+    </div>
+  </div>
+
+  <h2>What your team can use</h2>
+  <div class="grid">
+    <div class="card">
+      <h3>Waivers <span class="pill">Memberistic → Waivers</span></h3>
+      <ul>
+        <li>Self-serve &amp; guest/non-member signing</li>
+        <li>Counts: signed / missing / expired</li>
+        <li>Mark paper waivers signed (one or bulk)</li>
+        <li>Email the waiver link to everyone missing</li>
+        <li>Edit waiver wording &amp; validity period</li>
+        <li>Download full signed-waiver archive (CSV)</li>
+        <li>Print any single waiver as PDF</li>
+        <li>Upload/download member documents</li>
+      </ul>
+    </div>
+    <div class="card">
+      <h3>Check-in</h3>
+      <ul>
+        <li>Kiosk page <span class="pill">/check-in/</span> for a counter tablet</li>
+        <li>Printable QR poster — customers scan to sign &amp; check in</li>
+        <li>Staff QR scan shows live membership + waiver status</li>
+      </ul>
+      <h3>Behind the scenes</h3>
+      <ul>
+        <li>Member directory, plans, payments, check-ins, activity</li>
+        <li>Tools to set renewal dates &amp; connect imported members to Stripe</li>
+        <li>Reporting on members, renewals, waivers</li>
+      </ul>
+    </div>
+  </div>
+
+  <h2>To switch everything on (one-time, handled by your web team)</h2>
+  <div class="note">
+    1. <b>Stripe</b> — enable the customer billing portal and the payment webhook (powers auto-charging, receipts, and the "update card" button).<br>
+    2. <b>Email delivery</b> — set up the domain's email authentication so member emails reach the inbox, not spam.<br>
+    3. <b>Existing members</b> — move legacy/imported members onto a Stripe subscription so they auto-renew (self-serve from their account, or a staff payment link).
+  </div>
+
+  <div class="foot">Prepared by WordPressistic for Guns 2 Ammo. Tip: print this page to PDF from your browser (Cmd/Ctrl + P).</div>
+</div>
+</body>
+</html>
