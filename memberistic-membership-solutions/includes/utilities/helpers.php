@@ -159,12 +159,10 @@ function memberistic_get_page_url( $setting_key, $fallback_slug = '', $fallback_
 		}
 	}
 
-	// 3) Guaranteed clean fallback for this site's known pages: even if the
-	//    page isn't found/published, the clean path is where it lives.
-	if ( $clean ) {
-		return home_url( '/' . $clean . '/' );
-	}
-
+	// 3) Nothing resolved to a real published page. Respect the caller's
+	//    fallback URL (e.g. Stripe success/cancel pass home_url('/')). We do
+	//    NOT synthesize home_url('/<clean>/') here: step 2 already verified the
+	//    clean page exists, so if we got this far that path would 404.
 	return $fallback_url;
 }
 
