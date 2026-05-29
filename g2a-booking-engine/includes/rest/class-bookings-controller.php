@@ -189,15 +189,24 @@ final class G2AB_REST_Bookings_Controller {
 	 * can show a real reason (and it's visible in the browser console).
 	 */
 	public function get_availability( WP_REST_Request $request ) {
+		// Capture and discard any stray output (PHP notices, debug echoes,
+		// accidental whitespace) emitted while building the response, so the
+		// REST body stays pure JSON and the booking widget can parse it.
+		ob_start();
 		try {
-			return $this->get_availability_impl( $request );
+			$response = $this->get_availability_impl( $request );
 		} catch ( \Throwable $e ) {
-			return rest_ensure_response( array(
+			$response = rest_ensure_response( array(
 				'success' => false,
 				'error'   => $e->getMessage(),
 				'where'   => 'availability',
 			) );
 		}
+		$stray = ob_get_clean();
+		if ( '' !== trim( (string) $stray ) && function_exists( 'error_log' ) ) {
+			error_log( '[G2A Booking] discarded stray output during availability: ' . substr( (string) $stray, 0, 300 ) );
+		}
+		return $response;
 	}
 
 	private function get_availability_impl( WP_REST_Request $request ) {
