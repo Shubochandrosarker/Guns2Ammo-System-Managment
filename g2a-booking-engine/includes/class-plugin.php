@@ -165,9 +165,21 @@ final class G2AB_Plugin
 			'G2AB_REST_Calendar_Controller',
 			'G2AB_REST_Frontdesk_Controller',
 		);
+		// Register each controller independently. rest_api_init fires on EVERY
+		// REST request, so a single controller throwing here would 500 the
+		// entire REST API (including /availability) and surface as "Could not
+		// load times". Isolate failures so one bad controller can't take the
+		// others — especially the public booking/availability routes — down.
 		foreach ($controllers as $c) {
-			if (class_exists($c)) {
+			if (! class_exists($c)) {
+				continue;
+			}
+			try {
 				(new $c())->register_routes();
+			} catch (\Throwable $e) {
+				if (function_exists('error_log')) {
+					error_log('[G2A Booking] REST controller failed to register: ' . $c . ' — ' . $e->getMessage());
+				}
 			}
 		}
 		do_action('g2ab_register_rest_routes');

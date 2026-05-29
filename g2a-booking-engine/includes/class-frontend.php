@@ -857,11 +857,13 @@ final class G2AB_Frontend {
 						var json = null;
 						try { json = JSON.parse(res.text); } catch (e) {
 							console.error('[G2A Booking] availability returned non-JSON (HTTP ' + res.status + '):', (res.text||'').slice(0, 600));
-							box.innerHTML = '<p class="g2ab-muted">' + (config.i18n.load_error || 'Could not load times. Please refresh or contact us.') + '</p>'; return;
+							box.innerHTML = '<p class="g2ab-muted">' + (config.i18n.load_error || 'Could not load times.') + ' (HTTP ' + res.status + ' · non-JSON)</p>'; return;
 						}
 						if (!json || !json.success) {
 							console.error('[G2A Booking] availability error (HTTP ' + res.status + '):', json);
-							box.innerHTML = '<p class="g2ab-muted">' + ((json && json.error) ? json.error : (config.i18n.load_error || 'Could not load times. Please refresh or contact us.')) + '</p>'; return;
+							var emsg = (json && (json.error || json.message)) ? (json.error || json.message) : (config.i18n.load_error || 'Could not load times.');
+							var ecode = (json && json.code) ? (' · ' + json.code) : '';
+							box.innerHTML = '<p class="g2ab-muted">' + emsg + ' (HTTP ' + res.status + ecode + ')</p>'; return;
 						}
 						var data = json.data;
 						if (!data) { box.innerHTML = '<p class="g2ab-muted">' + config.i18n.no_slots + '</p>'; return; }
@@ -891,7 +893,7 @@ final class G2AB_Frontend {
 					.catch(function(err){
 						if (hint) hint.style.display = 'none';
 						console.error('[G2A Booking] availability request failed:', err);
-						box.innerHTML = '<p class="g2ab-muted">' + (config.i18n.load_error || 'Could not load times. Please refresh or contact us.') + '</p>';
+						box.innerHTML = '<p class="g2ab-muted">' + (config.i18n.load_error || 'Could not load times.') + ' (network/blocked)</p>';
 					});
 			}
 
