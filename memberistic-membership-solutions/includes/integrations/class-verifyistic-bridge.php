@@ -183,4 +183,40 @@ final class Verifyistic_Bridge {
 	public static function require_signup_filter( $required ) {
 		return 'yes' === memberistic_get_setting( 'integration_verifyistic_require_signup', 'no' ) ? true : $required;
 	}
+
+	/**
+	 * Should the current public signup be blocked for lack of age
+	 * verification? Authoritative gate used by the checkout flow.
+	 *
+	 * Reads the setting directly (so it's correct regardless of hook order),
+	 * then lets the `memberistic_signup_requires_verification` filter override.
+	 * Fails OPEN when the integration is off or the Verifyistic plugin is
+	 * unavailable — a verification outage should not lock out every signup.
+	 * Staff (manage_memberistic_settings) always bypass.
+	 *
+	 * @return bool True = block the signup.
+	 */
+	public static function signup_blocked() {
+		if ( ! Integrations_Registry::is_enabled( 'verifyistic' ) ) {
+			return false;
+		}
+		$required = 'yes' === memberistic_get_setting( 'integration_verifyistic_require_signup', 'no' );
+		$required = (bool) apply_filters( 'memberistic_signup_requires_verification', $required );
+		if ( ! $required ) {
+			return false;
+		}
+		if ( function_exists( 'current_user_can' ) && current_user_can( 'manage_memberistic_settings' ) ) {
+			return false; // staff/admin testing the flow
+		}
+		// Verified right now (cookie) — allow.
+		if ( self::get_current_verification() ) {
+			return false;
+		}
+		// Logged-in member already stamped from a prior verification — allow.
+		$uid = get_current_user_id();
+		if ( $uid && self::get_user_verification( $uid ) ) {
+			return false;
+		}
+		return true;
+	}
 }

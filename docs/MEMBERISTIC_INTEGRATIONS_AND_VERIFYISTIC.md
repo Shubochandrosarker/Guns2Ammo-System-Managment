@@ -35,9 +35,22 @@ active) it:
   `memberistic_verified_at`, `memberistic_verify_token`. Fires
   `do_action( 'memberistic_member_verified', $user_id, $record )`.
 - **Shows an "✓ Age verified" line** on the member verification card.
-- **Optional signup gate** — the "Require age verification before membership
-  signup" checkbox flips `integration_verifyistic_require_signup`; other code can
-  honor `apply_filters( 'memberistic_signup_requires_verification', false )`.
+- **Signup gate (enforced)** — the "Require age verification before membership
+  signup" checkbox flips `integration_verifyistic_require_signup`. It is now
+  **wired into the checkout flow**: `Stripe_Service::handle_checkout_request()`
+  calls `Verifyistic_Bridge::signup_blocked()` and stops the signup (403 +
+  "verify first" screen with a back link) before any membership / Stripe session
+  is created. The gate:
+  - reads the setting directly (correct regardless of hook order) and still
+    honors `apply_filters( 'memberistic_signup_requires_verification', $bool )`;
+  - **fails open** when the integration is off or the Verifyistic plugin is
+    unavailable (a verification outage won't lock out every signup);
+  - **bypasses staff** (`manage_memberistic_settings`);
+  - accepts either a current verification cookie **or** a previously stamped
+    logged-in member.
+  Public self-service signup runs entirely through this one handler (the REST
+  create-membership routes are staff-only), so this is the single enforcement
+  point.
 - **Auto-stamp** can be turned off with the other checkbox
   (`integration_verifyistic_autostamp`).
 

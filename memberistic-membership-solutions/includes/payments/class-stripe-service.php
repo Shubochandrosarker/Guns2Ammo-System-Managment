@@ -197,6 +197,24 @@ final class Stripe_Service {
 			wp_die( esc_html__( 'You must accept the terms to continue.', 'memberistic' ) );
 		}
 
+		// Age-verification gate (Verifyistic integration). When "require
+		// verification before signup" is on and the visitor hasn't verified,
+		// stop here before any membership / Stripe session is created.
+		if ( class_exists( '\\WordPressistic\\Memberistic\\Integrations\\Verifyistic_Bridge' )
+			&& \WordPressistic\Memberistic\Integrations\Verifyistic_Bridge::signup_blocked() ) {
+			$back = wp_get_referer();
+			wp_die(
+				esc_html__( 'Please complete the age verification on the website before signing up for a membership.', 'memberistic' ),
+				esc_html__( 'Age verification required', 'memberistic' ),
+				array(
+					'response'  => 403,
+					'back_link' => true,
+					'link_url'  => $back ?: home_url( '/' ),
+					'link_text' => __( 'Go back and verify', 'memberistic' ),
+				)
+			);
+		}
+
 		if ( ! in_array( $billing_cycle, array( 'monthly', 'annual' ), true ) ) {
 			$billing_cycle = 'monthly';
 		}
