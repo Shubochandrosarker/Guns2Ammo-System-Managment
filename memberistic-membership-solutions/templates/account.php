@@ -39,6 +39,11 @@ $lane_url    = home_url( '/book-a-lane/' );
 	$benefits    = is_array( $benefits ) ? $benefits : array();
 	$is_annual   = 'annual' === $current['billing_cycle'];
 	$price       = $plan ? (float) ( $is_annual ? $plan['annual_price'] : $plan['monthly_price'] ) : 0;
+	// Prefer the member's own billing_amount (legacy/grandfathered price
+	// carried over at import) so "Next charge" reflects what they actually pay.
+	if ( isset( $current['billing_amount'] ) && (float) $current['billing_amount'] > 0 ) {
+		$price = (float) $current['billing_amount'];
+	}
 	$people_max  = (int) ( $current['included_people'] ?? ( $plan['included_people'] ?? 1 ) );
 	$people_have = (int) ( $current['people_count'] ?? count( $people ) );
 	$currency    = ! empty( $payments[0]['currency'] ) ? $payments[0]['currency'] : 'USD';
@@ -266,15 +271,21 @@ $lane_url    = home_url( '/book-a-lane/' );
 								<thead><tr>
 									<th><?php esc_html_e( 'Date', 'memberistic' ); ?></th>
 									<th><?php esc_html_e( 'Amount', 'memberistic' ); ?></th>
+									<th><?php esc_html_e( 'Method', 'memberistic' ); ?></th>
+									<th><?php esc_html_e( 'Reference', 'memberistic' ); ?></th>
 									<th><?php esc_html_e( 'Status', 'memberistic' ); ?></th>
 								</tr></thead>
 								<tbody>
 									<?php foreach ( $payments as $payment ) :
 										$pstatus = strtolower( (string) $payment['status'] );
+										$pref    = (string) ( $payment['gateway_transaction_id'] ?? '' );
+										$pmethod = $payment['payment_method'] ? ucwords( str_replace( '_', ' ', (string) $payment['payment_method'] ) ) : __( 'Card', 'memberistic' );
 										?>
 										<tr>
 											<td><?php echo esc_html( date_i18n( 'M j, Y', strtotime( $payment['paid_at'] ?: $payment['created_at'] ) ) ); ?></td>
 											<td><?php echo esc_html( memberistic_format_price( $payment['amount'], $payment['currency'] ) ); ?></td>
+											<td><?php echo esc_html( $pmethod ); ?></td>
+											<td><code class="memberistic-acct-ref"><?php echo esc_html( $pref ?: '—' ); ?></code></td>
 											<td><span class="memberistic-acct-pill memberistic-acct-pill--<?php echo esc_attr( in_array( $pstatus, array( 'completed', 'success', 'paid' ), true ) ? 'ok' : 'warn' ); ?>"><?php echo esc_html( ucfirst( $pstatus ) ); ?></span></td>
 										</tr>
 									<?php endforeach; ?>

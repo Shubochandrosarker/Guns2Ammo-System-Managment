@@ -139,6 +139,20 @@ final class Stripe_Service {
 	 * @param string $return_url  Where Stripe returns the member after they finish.
 	 * @return array<string,mixed>|\WP_Error
 	 */
+	/**
+	 * Retrieve a Stripe subscription object by id (read-only).
+	 *
+	 * @param string $subscription_id Stripe subscription id (sub_…).
+	 * @return array<string,mixed>|\WP_Error
+	 */
+	public static function get_subscription( $subscription_id ) {
+		$subscription_id = trim( (string) $subscription_id );
+		if ( '' === $subscription_id ) {
+			return new \WP_Error( 'memberistic_missing_subscription', __( 'No subscription id provided.', 'memberistic' ) );
+		}
+		return self::request( 'GET', '/subscriptions/' . rawurlencode( $subscription_id ) );
+	}
+
 	public static function create_billing_portal_session( $customer_id, $return_url ) {
 		return self::request(
 			'POST',
@@ -536,7 +550,28 @@ final class Stripe_Service {
 			)
 		);
 
+		// On renewals (every invoice after the first) send two distinct
+		// messages: a transactional charge receipt, then a renewal
+		// confirmation. The very first invoice fires on subscription create
+		// alongside checkout.session.completed, which already sends the
+		// initial receipt + activation email — so we skip it here to avoid a
+		// duplicate receipt for the same charge.
 		if ( ! $is_first_invoice ) {
+			$amount_paid = ! empty( $invoice['amount_paid'] ) ? ( (float) $invoice['amount_paid'] / 100 ) : 0;
+			$currency    = ! empty( $invoice['currency'] ) ? strtoupper( $invoice['currency'] ) : 'USD';
+			$txn         = isset( $invoice['payment_intent'] ) ? (string) $invoice['payment_intent'] : (string) ( $invoice['id'] ?? '' );
+
+			Email_Service::send_membership_email(
+				$membership_id,
+				'payment_receipt',
+				array(
+					'amount'         => \WordPressistic\Memberistic\memberistic_format_price( $amount_paid, $currency ),
+					'transaction_id' => $txn,
+					'payment_date'   => date_i18n( get_option( 'date_format' ) ),
+					'payment_method' => __( 'Card on file (Stripe)', 'memberistic' ),
+				)
+			);
+
 			Activity_Repository::log(
 				array(
 					'membership_id' => $membership_id,
@@ -545,6 +580,7 @@ final class Stripe_Service {
 				)
 			);
 
+			// Renewal confirmation — a second, distinct message from the receipt.
 			Email_Service::send_membership_email( $membership_id, 'membership_renewed' );
 		}
 
@@ -612,6 +648,25 @@ final class Stripe_Service {
 		);
 
 		Email_Service::send_membership_email( $membership_id, 'membership_activated' );
+
+		// Receipt for the initial charge (amount / reference) alongside the
+		// welcome/activation email.
+		$amount_total = ! empty( $session['amount_total'] ) ? ( (float) $session['amount_total'] / 100 ) : 0;
+		if ( $amount_total > 0 ) {
+			$currency = ! empty( $session['currency'] ) ? strtoupper( $session['currency'] ) : 'USD';
+			$txn      = isset( $session['payment_intent'] ) ? (string) $session['payment_intent'] : (string) ( $session['id'] ?? '' );
+			Email_Service::send_membership_email(
+				$membership_id,
+				'payment_receipt',
+				array(
+					'amount'         => \WordPressistic\Memberistic\memberistic_format_price( $amount_total, $currency ),
+					'transaction_id' => $txn,
+					'payment_date'   => date_i18n( get_option( 'date_format' ) ),
+					'payment_method' => __( 'Card on file (Stripe)', 'memberistic' ),
+				)
+			);
+		}
+
 		do_action( 'memberistic_membership_activated', $membership_id );
 
 		return true;

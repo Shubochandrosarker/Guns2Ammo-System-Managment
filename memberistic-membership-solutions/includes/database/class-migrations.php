@@ -50,7 +50,27 @@ final class Migrations {
 		return array(
 			'1.1.0' => array( self::class, 'migrate_1_1_0' ),
 			'1.2.0' => array( self::class, 'migrate_1_2_0' ),
+			'1.3.0' => array( self::class, 'migrate_1_3_0' ),
 		);
+	}
+
+	/**
+	 * 1.3.0 — Add the per-membership billing_amount column.
+	 *
+	 * Preserves the legacy/grandfathered price each member actually pays
+	 * (carried over from a PMPro import) so the account "Next charge" display
+	 * matches reality instead of falling back to the plan's standard price.
+	 */
+	public static function migrate_1_3_0() {
+		global $wpdb;
+
+		self::add_column_if_missing(
+			$wpdb->prefix . 'memberistic_memberships',
+			'billing_amount',
+			'DECIMAL(10,2) NULL AFTER payment_source'
+		);
+
+		return true;
 	}
 
 	/**
@@ -103,5 +123,34 @@ final class Migrations {
 		$column     = esc_sql( $column );
 
 		$wpdb->query( "ALTER TABLE `{$table}` ADD INDEX `{$index_name}` (`{$column}`)" ); // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+	}
+
+	/**
+	 * Add a column to a table if it does not already exist.
+	 *
+	 * @param string $table       Fully-qualified table name.
+	 * @param string $column      Column name.
+	 * @param string $definition  Column definition (type + modifiers).
+	 */
+	private static function add_column_if_missing( $table, $column, $definition ) {
+		global $wpdb;
+
+		$exists = (int) $wpdb->get_var(
+			$wpdb->prepare(
+				'SELECT COUNT(1) FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = %s AND column_name = %s',
+				$table,
+				$column
+			)
+		);
+
+		if ( $exists > 0 ) {
+			return;
+		}
+
+		$table      = esc_sql( $table );
+		$column     = esc_sql( $column );
+		$definition = esc_sql( $definition );
+
+		$wpdb->query( "ALTER TABLE `{$table}` ADD COLUMN `{$column}` {$definition}" ); // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
 	}
 }

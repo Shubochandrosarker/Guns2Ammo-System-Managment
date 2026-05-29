@@ -54,6 +54,7 @@ CREATE TABLE {$prefix}memberistic_memberships (
   end_date DATETIME NULL,
   cancelled_at DATETIME NULL,
   payment_source VARCHAR(50) NULL,
+  billing_amount DECIMAL(10,2) NULL,
   stripe_customer_id VARCHAR(191) NULL,
   stripe_subscription_id VARCHAR(191) NULL,
   woo_customer_id BIGINT UNSIGNED NULL,

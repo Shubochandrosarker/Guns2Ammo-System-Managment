@@ -149,7 +149,10 @@ final class Import_Page {
 			'level'        => array( 'legacy_level', 'level', 'membership', 'membership_level', 'level_name', 'membership level' ),
 			'plan'         => array( 'memberistic_plan', 'plan' ),
 			'billing_cycle'=> array( 'billing_cycle', 'cycle', 'billing' ),
+			'cycle_period' => array( 'cycle_period', 'cycle period', 'period' ),
+			'member_amount'=> array( 'billing_amount', 'initial_payment', 'recurring_amount' ),
 			'stripe_sub'   => array( 'stripe_subscription_id', 'subscription_transaction_id', 'subscription_id' ),
+			'stripe_cust'  => array( 'stripe_customer_id', 'customer_id' ),
 			'joined'       => array( 'joined', 'join_date', 'joindate' ),
 			'start_date'   => array( 'start_date', 'startdate', 'start date' ),
 			'renewal_date' => array( 'next_payment_date', 'renewal_date', 'next payment date', 'next_payment' ),
@@ -185,20 +188,32 @@ final class Import_Page {
 			self::render_result();
 			return;
 		}
+		if ( 'backfill' === $step && check_admin_referer( 'memberistic_import_backfill' ) ) {
+			self::render_backfill_result();
+			return;
+		}
+		if ( 'fix_renewals' === $step && check_admin_referer( 'memberistic_import_fixrenewals' ) ) {
+			self::render_renewal_fix_result();
+			return;
+		}
 		self::render_start();
 	}
 
 	/**
 	 * Step 1 — the upload form.
 	 *
-	 * @param string $error Optional error message to show.
+	 * @param string $error  Optional error message to show.
+	 * @param string $notice Optional success message to show.
 	 */
-	private static function render_start( $error = '' ) {
+	private static function render_start( $error = '', $notice = '' ) {
 		?>
 		<div class="wrap memberistic-wrap">
 			<h1><?php esc_html_e( 'Import Members &amp; Payments', 'memberistic' ); ?></h1>
 			<?php if ( $error ) : ?>
 				<div class="notice notice-error"><p><?php echo esc_html( $error ); ?></p></div>
+			<?php endif; ?>
+			<?php if ( $notice ) : ?>
+				<div class="notice notice-success"><p><?php echo esc_html( $notice ); ?></p></div>
 			<?php endif; ?>
 			<div class="memberistic-card">
 				<h2><?php esc_html_e( 'Import from Paid Memberships Pro (PMPro)', 'memberistic' ); ?></h2>
@@ -242,8 +257,153 @@ final class Import_Page {
 					</tbody>
 				</table>
 			</div>
+			<?php self::render_renewal_fix_card(); ?>
+			<?php self::render_backfill_card(); ?>
 		</div>
 		<?php
+	}
+
+	/**
+	 * "Set renewal dates from activation" maintenance tool.
+	 *
+	 * Active members imported (or created) without a renewal_date get one
+	 * computed from their start date: advance by the billing cycle until the
+	 * date lands in the future, so the renewal falls on the same day each
+	 * month/year as their activation. Batched.
+	 */
+	private static function render_renewal_fix_card() {
+		$pending = Memberships_Repository::count_active_missing_renewal();
+		?>
+		<div class="memberistic-card">
+			<h2><?php esc_html_e( 'Set renewal dates from activation', 'memberistic' ); ?></h2>
+			<p><?php esc_html_e( 'Active members with no renewal date get one calculated from their activation/start date and billing cycle — landing on the same day each month or year. Runs in batches; click until it reports zero remaining.', 'memberistic' ); ?></p>
+			<p><strong><?php
+				/* translators: %d: number of active memberships missing a renewal date */
+				printf( esc_html__( 'Active memberships missing a renewal date: %d', 'memberistic' ), (int) $pending );
+			?></strong></p>
+			<?php if ( $pending > 0 ) : ?>
+			<form method="post">
+				<?php wp_nonce_field( 'memberistic_import_fixrenewals' ); ?>
+				<input type="hidden" name="memberistic_import_step" value="fix_renewals">
+				<p><button type="submit" class="button button-secondary"><?php esc_html_e( 'Set next 200', 'memberistic' ); ?></button></p>
+			</form>
+			<?php endif; ?>
+		</div>
+		<?php
+	}
+
+	/**
+	 * Run one batch of the renewal-date backfill, then re-render start.
+	 */
+	private static function render_renewal_fix_result() {
+		$rows    = Memberships_Repository::get_active_missing_renewal( 200 );
+		$updated = 0;
+		$now_ts  = current_time( 'timestamp' );
+
+		foreach ( $rows as $row ) {
+			// Resolve a sane anchor timestamp. start_date / created_at can be a
+			// MySQL zero-datetime ('0000-00-00 00:00:00') on imported rows,
+			// which strtotime() turns into a negative/garbage value — guard
+			// against that and fall back to "now" so the computed renewal is
+			// always a real future date, never an ancient one.
+			$anchor_ts = ! empty( $row['start_date'] ) ? strtotime( (string) $row['start_date'] ) : false;
+			if ( ! $anchor_ts || $anchor_ts <= 0 ) {
+				$anchor_ts = ! empty( $row['created_at'] ) ? strtotime( (string) $row['created_at'] ) : false;
+			}
+			if ( ! $anchor_ts || $anchor_ts <= 0 ) {
+				$anchor_ts = $now_ts;
+			}
+
+			$cycle = ( 'annual' === $row['billing_cycle'] || 'yearly' === $row['billing_cycle'] ) ? 'annual' : 'monthly';
+
+			// Advance from the activation date by whole cycles until the
+			// renewal lands in the future, so it falls on the same day each
+			// month/year as activation. Cap iterations defensively.
+			$next  = wp_date( 'Y-m-d H:i:s', $anchor_ts );
+			$guard = 0;
+			do {
+				$candidate    = \WordPressistic\Memberistic\Integrations\WooCommerce_Bridge::compute_next_renewal( $cycle, $next );
+				$candidate_ts = strtotime( $candidate );
+				if ( ! $candidate_ts ) {
+					break; // Unparseable — keep the last good value rather than write garbage.
+				}
+				$next = $candidate;
+				$guard++;
+			} while ( $candidate_ts <= $now_ts && $guard < 600 );
+
+			// Only write a genuinely future renewal date.
+			if ( strtotime( $next ) > $now_ts ) {
+				Memberships_Repository::update( (int) $row['id'], array( 'renewal_date' => $next ) );
+				$updated++;
+			}
+		}
+
+		$notice = sprintf(
+			/* translators: %d: number of renewal dates set */
+			__( 'Renewal dates set for %d membership(s) from their activation date.', 'memberistic' ),
+			$updated
+		);
+		self::render_start( '', $notice );
+	}
+
+	/**
+	 * "Backfill Stripe customer IDs" tool.
+	 *
+	 * Imported members carry the Stripe subscription id (sub_...) but not the
+	 * customer id (cus_...) - PMPro exports don't include it. The self-serve
+	 * billing portal needs the customer id, so this looks each subscription
+	 * up against the Stripe API and stores its customer. Processed in small
+	 * batches so it stays within request/timeout limits on big lists.
+	 */
+	private static function render_backfill_card() {
+		if ( ! \WordPressistic\Memberistic\Payments\Stripe_Service::is_enabled() ) {
+			return;
+		}
+		$pending = Memberships_Repository::count_needing_customer_backfill();
+		?>
+		<div class="memberistic-card">
+			<h2><?php esc_html_e( 'Backfill Stripe customer IDs', 'memberistic' ); ?></h2>
+			<p><?php esc_html_e( 'Imported members have a Stripe subscription but no stored customer id, which the self-serve billing portal needs. This looks each subscription up in Stripe and saves its customer id. Runs in batches; click again until it reports zero remaining.', 'memberistic' ); ?></p>
+			<p><strong><?php
+				/* translators: %d: number of memberships still needing a customer id */
+				printf( esc_html__( 'Memberships still needing a customer id: %d', 'memberistic' ), (int) $pending );
+			?></strong></p>
+			<?php if ( $pending > 0 ) : ?>
+			<form method="post">
+				<?php wp_nonce_field( 'memberistic_import_backfill' ); ?>
+				<input type="hidden" name="memberistic_import_step" value="backfill">
+				<p><button type="submit" class="button button-secondary"><?php esc_html_e( 'Backfill next 50', 'memberistic' ); ?></button></p>
+			</form>
+			<?php endif; ?>
+		</div>
+		<?php
+	}
+
+	/**
+	 * Run one batch of the Stripe customer-id backfill, then re-render start.
+	 */
+	private static function render_backfill_result() {
+		$rows    = Memberships_Repository::get_needing_customer_backfill( 50 );
+		$updated = 0;
+		$failed  = 0;
+
+		foreach ( $rows as $row ) {
+			$sub = \WordPressistic\Memberistic\Payments\Stripe_Service::get_subscription( $row['stripe_subscription_id'] );
+			if ( is_wp_error( $sub ) || empty( $sub['customer'] ) ) {
+				$failed++;
+				continue;
+			}
+			Memberships_Repository::update( (int) $row['id'], array( 'stripe_customer_id' => (string) $sub['customer'] ) );
+			$updated++;
+		}
+
+		$notice = sprintf(
+			/* translators: 1: updated count, 2: failed count */
+			__( 'Backfill batch complete: %1$d updated, %2$d could not be matched (cancelled/deleted subscriptions).', 'memberistic' ),
+			$updated,
+			$failed
+		);
+		self::render_start( '', $notice );
 	}
 
 	/**
@@ -446,10 +606,27 @@ final class Import_Page {
 			? $plan_col
 			: self::plan_slug_for_level( $level );
 
+		// Billing cycle precedence: an explicit billing_cycle column wins;
+		// then PMPro's cycle_period (Month/Year) which is authoritative for
+		// recurring members; finally fall back to inferring from the level
+		// name ("Yearly"/"Annual" → annual, else monthly).
 		$cycle = strtolower( self::val( $row, 'billing_cycle' ) );
 		if ( ! in_array( $cycle, array( 'monthly', 'annual' ), true ) ) {
-			$cycle = ( false !== stripos( $level, 'year' ) || false !== stripos( $level, 'annual' ) ) ? 'annual' : 'monthly';
+			$period = strtolower( self::val( $row, 'cycle_period' ) );
+			if ( false !== strpos( $period, 'year' ) ) {
+				$cycle = 'annual';
+			} elseif ( false !== strpos( $period, 'month' ) ) {
+				$cycle = 'monthly';
+			} else {
+				$cycle = ( false !== stripos( $level, 'year' ) || false !== stripos( $level, 'annual' ) ) ? 'annual' : 'monthly';
+			}
 		}
+
+		// Legacy/grandfathered price the member actually pays (PMPro
+		// billing_amount). Preserved so the account page shows their real
+		// charge rather than the plan's standard price.
+		$amount_raw = preg_replace( '/[^0-9.]/', '', self::val( $row, 'member_amount' ) );
+		$amount     = ( '' !== $amount_raw ) ? round( (float) $amount_raw, 2 ) : 0.0;
 
 		$linked_flag = strtolower( self::val( $row, 'is_linked' ) );
 		$is_linked   = in_array( $linked_flag, array( 'yes', '1', 'true', 'y' ), true )
@@ -465,7 +642,9 @@ final class Import_Page {
 			'is_linked'  => $is_linked,
 			'level'      => $level,
 			'legacy_id'  => self::val( $row, 'legacy_id' ),
+			'amount'     => $amount,
 			'stripe_sub' => self::val( $row, 'stripe_sub' ),
+			'stripe_cust'=> self::val( $row, 'stripe_cust' ),
 			'start'      => self::val( $row, 'start_date' ) ?: self::val( $row, 'joined' ),
 			'renewal'    => self::val( $row, 'renewal_date' ),
 			'expires'    => self::val( $row, 'expires' ),
@@ -819,6 +998,8 @@ final class Import_Page {
 				'renewal_date'           => $renewal,
 				'end_date'               => $end,
 				'payment_source'         => ( 'no-plan' === $plan_slug ) ? 'instore' : 'import',
+				'billing_amount'         => ! empty( $m['amount'] ) ? $m['amount'] : null,
+				'stripe_customer_id'     => $m['stripe_cust'],
 				'stripe_subscription_id' => $m['stripe_sub'],
 				'primary_user_id'        => self::wp_user_id_for( $m['email'] ),
 				'notes'                  => $notes,

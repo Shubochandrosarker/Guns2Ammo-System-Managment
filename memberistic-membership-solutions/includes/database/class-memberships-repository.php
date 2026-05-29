@@ -333,6 +333,70 @@ final class Memberships_Repository {
 		return $row ?: null;
 	}
 
+	/**
+	 * Active memberships missing a renewal date.
+	 *
+	 * Used by the "set renewal dates from activation" maintenance tool so
+	 * imported members (and any row created without a renewal) get a correct
+	 * next-renewal anchored on their start date.
+	 *
+	 * @param int $limit Max rows.
+	 * @return array<int, array<string,mixed>>
+	 */
+	public static function get_active_missing_renewal( $limit = 200 ) {
+		global $wpdb;
+		$limit = max( 1, min( 500, (int) $limit ) );
+		return $wpdb->get_results(
+			$wpdb->prepare(
+				'SELECT id, billing_cycle, start_date, created_at FROM ' . self::table() . " WHERE status IN ( 'active', 'trial' ) AND ( renewal_date IS NULL OR renewal_date = '' OR renewal_date = '0000-00-00 00:00:00' ) ORDER BY id ASC LIMIT %d",
+				$limit
+			),
+			ARRAY_A
+		) ?: array();
+	}
+
+	/**
+	 * Count of active memberships missing a renewal date (for UI totals).
+	 */
+	public static function count_active_missing_renewal() {
+		global $wpdb;
+		return (int) $wpdb->get_var(
+			'SELECT COUNT(*) FROM ' . self::table() . " WHERE status IN ( 'active', 'trial' ) AND ( renewal_date IS NULL OR renewal_date = '' OR renewal_date = '0000-00-00 00:00:00' )"
+		);
+	}
+
+	/**
+	 * Count of memberships with a Stripe subscription id but no customer id.
+	 */
+	public static function count_needing_customer_backfill() {
+		global $wpdb;
+		return (int) $wpdb->get_var(
+			'SELECT COUNT(*) FROM ' . self::table() . " WHERE stripe_subscription_id <> '' AND stripe_subscription_id IS NOT NULL AND ( stripe_customer_id = '' OR stripe_customer_id IS NULL )"
+		);
+	}
+
+	/**
+	 * Memberships that have a Stripe subscription id but no Stripe customer id.
+	 *
+	 * Used by the customer-id backfill tool: imported (PMPro) members carry the
+	 * subscription id but not the cus_… id the billing portal needs, so we look
+	 * each up against Stripe and store it.
+	 *
+	 * @param int $limit Max rows to return.
+	 * @return array<int, array<string,mixed>>
+	 */
+	public static function get_needing_customer_backfill( $limit = 50 ) {
+		global $wpdb;
+		$limit = max( 1, min( 200, (int) $limit ) );
+		return $wpdb->get_results(
+			$wpdb->prepare(
+				'SELECT id, stripe_subscription_id FROM ' . self::table() . " WHERE stripe_subscription_id <> '' AND stripe_subscription_id IS NOT NULL AND ( stripe_customer_id = '' OR stripe_customer_id IS NULL ) ORDER BY id ASC LIMIT %d",
+				$limit
+			),
+			ARRAY_A
+		) ?: array();
+	}
+
 	public static function get_by_person_email( $email ) {
 		global $wpdb;
 		$email = sanitize_email( $email );
@@ -546,6 +610,12 @@ final class Memberships_Repository {
 			if ( isset( $data[ $field ] ) ) {
 				$clean[ $field ] = self::sanitize_datetime( $data[ $field ] );
 			}
+		}
+
+		if ( isset( $data['billing_amount'] ) ) {
+			$clean['billing_amount'] = '' === $data['billing_amount'] || null === $data['billing_amount']
+				? null
+				: round( (float) $data['billing_amount'], 2 );
 		}
 
 		$int_fields = array( 'woo_customer_id', 'woo_subscription_id', 'created_by' );

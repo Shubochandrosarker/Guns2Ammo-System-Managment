@@ -52,6 +52,11 @@ final class Email_Service {
 					'description' => __( 'Receipt sent after a successful renewal payment or staff renewal action.', 'memberistic' ),
 				),
 				array(
+					'id'          => 'payment_receipt',
+					'label'       => __( 'Payment Receipt', 'memberistic' ),
+					'description' => __( 'Transactional receipt sent every time a card is charged (amount, date, reference).', 'memberistic' ),
+				),
+				array(
 					'id'          => 'renewal_reminder',
 					'label'       => __( 'Renewal Reminder (Generic)', 'memberistic' ),
 					'description' => __( 'Generic renewal reminder used when no specific window template is configured.', 'memberistic' ),
@@ -241,6 +246,9 @@ final class Email_Service {
 			'{renewal_date}'       => ! empty( $membership['renewal_date'] ) ? date_i18n( get_option( 'date_format' ), strtotime( $membership['renewal_date'] ) ) : __( 'Not set', 'memberistic' ),
 			'{expiration_date}'    => ! empty( $membership['end_date'] ) ? date_i18n( get_option( 'date_format' ), strtotime( $membership['end_date'] ) ) : ( ! empty( $membership['renewal_date'] ) ? date_i18n( get_option( 'date_format' ), strtotime( $membership['renewal_date'] ) ) : __( 'Not set', 'memberistic' ) ),
 			'{amount}'             => isset( $extra_context['amount'] ) ? (string) $extra_context['amount'] : '',
+			'{transaction_id}'     => isset( $extra_context['transaction_id'] ) ? (string) $extra_context['transaction_id'] : '',
+			'{payment_date}'       => isset( $extra_context['payment_date'] ) ? (string) $extra_context['payment_date'] : date_i18n( get_option( 'date_format' ) ),
+			'{payment_method}'     => isset( $extra_context['payment_method'] ) ? (string) $extra_context['payment_method'] : __( 'Card on file', 'memberistic' ),
 			'{payment_link}'       => $renewal_url,
 			'{renewal_link}'       => $renewal_url,
 			'{account_url}'        => $account_url,
@@ -301,6 +309,10 @@ final class Email_Service {
 			'membership_renewed'   => array(
 				'subject' => __( 'Your {brand_label} membership was renewed', 'memberistic' ),
 				'body'    => __( "Hi {member_name},\n\nThanks for renewing your {plan_name} membership ({membership_id}).\nNext renewal: {renewal_date}\n\n{brand_label}\n{account_url}", 'memberistic' ),
+			),
+			'payment_receipt'      => array(
+				'subject' => __( 'Your {brand_label} payment receipt', 'memberistic' ),
+				'body'    => __( "Hi {member_name},\n\nThis confirms a payment was processed for your {plan_name} membership ({membership_id}).\n\nAmount: {amount}\nDate: {payment_date}\nPayment method: {payment_method}\nReference: {transaction_id}\n\nNext renewal: {renewal_date}\n\nView your billing history: {account_url}\n\n{brand_label}\n{business_phone}", 'memberistic' ),
 			),
 			'renewal_reminder'     => array(
 				'subject' => __( 'Your {brand_label} membership renewal is coming up', 'memberistic' ),
