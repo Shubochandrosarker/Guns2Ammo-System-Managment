@@ -500,6 +500,25 @@ final class Waiver_Public {
 	}
 
 	/**
+	 * Friendliest kiosk URL: the auto-created /check-in/ page permalink if it
+	 * exists, otherwise the zero-setup query URL.
+	 */
+	public static function best_kiosk_url() {
+		$page_id = (int) get_option( 'memberistic_checkin_page_id', 0 );
+		if ( $page_id && 'publish' === get_post_status( $page_id ) ) {
+			$url = get_permalink( $page_id );
+			if ( $url ) {
+				return $url;
+			}
+		}
+		$page = get_page_by_path( 'check-in' );
+		if ( $page && 'publish' === get_post_status( $page ) ) {
+			return get_permalink( $page );
+		}
+		return self::kiosk_url();
+	}
+
+	/**
 	 * Standalone, touch-friendly check-in hub. Two paths: guests sign the
 	 * waiver; members sign in to show their pass. Self-contained branded page
 	 * — works as a kiosk URL with no page setup.
@@ -906,14 +925,20 @@ final class Waiver_Admin_Page {
 		return wp_nonce_url( add_query_arg( 'memberistic_waiver_print', (int) $signature_id, home_url( '/' ) ), 'memberistic_waiver_export' );
 	}
 
+	/** Nonced URL that opens the printable check-in QR poster. */
+	public static function poster_url() {
+		return wp_nonce_url( add_query_arg( 'memberistic_waiver_poster', '1', home_url( '/' ) ), 'memberistic_waiver_export' );
+	}
+
 	/**
 	 * Handle the CSV export + printable single-signature view. Runs on init
 	 * (before output) and is gated by capability + nonce.
 	 */
 	public static function maybe_handle_export() {
-		$want_csv   = ! empty( $_GET['memberistic_waiver_export'] ); // phpcs:ignore WordPress.Security.NonceVerification.Recommended
-		$want_print = ! empty( $_GET['memberistic_waiver_print'] ); // phpcs:ignore WordPress.Security.NonceVerification.Recommended
-		if ( ! $want_csv && ! $want_print ) {
+		$want_csv    = ! empty( $_GET['memberistic_waiver_export'] ); // phpcs:ignore WordPress.Security.NonceVerification.Recommended
+		$want_print  = ! empty( $_GET['memberistic_waiver_print'] ); // phpcs:ignore WordPress.Security.NonceVerification.Recommended
+		$want_poster = ! empty( $_GET['memberistic_waiver_poster'] ); // phpcs:ignore WordPress.Security.NonceVerification.Recommended
+		if ( ! $want_csv && ! $want_print && ! $want_poster ) {
 			return;
 		}
 		if ( ! memberistic_current_user_can( self::CAP ) ) {
@@ -925,6 +950,11 @@ final class Waiver_Admin_Page {
 
 		if ( $want_print ) {
 			self::render_print( absint( $_GET['memberistic_waiver_print'] ) ); // phpcs:ignore WordPress.Security.NonceVerification.Recommended
+			exit;
+		}
+
+		if ( $want_poster ) {
+			self::render_poster();
 			exit;
 		}
 
@@ -994,6 +1024,38 @@ final class Waiver_Admin_Page {
 		exit;
 	}
 
+	/**
+	 * Printable check-in poster: a large QR pointing at the kiosk/check-in
+	 * page, for the desk to print and post. Browser → Print/Save PDF.
+	 */
+	private static function render_poster() {
+		$brand = memberistic_get_brand_label();
+		$url   = Waiver_Public::best_kiosk_url();
+		$qr    = class_exists( '\WordPressistic\Memberistic\Utilities\QR' )
+			? \WordPressistic\Memberistic\Utilities\QR::svg( $url, 320, '#ffffff', '#0F1115' )
+			: '';
+		nocache_headers();
+		header( 'Content-Type: text/html; charset=utf-8' );
+		echo '<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>' . esc_html( $brand ) . ' — ' . esc_html__( 'Check-In Poster', 'memberistic' ) . '</title>';
+		echo '<style>@page{size:portrait;margin:0.5in;}body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;text-align:center;color:#111;margin:0;padding:48px 24px;}'
+			. '.brand{font-size:22px;letter-spacing:.18em;text-transform:uppercase;color:#A8862F;font-weight:700;margin-bottom:8px;}'
+			. 'h1{font-size:40px;margin:8px 0 4px;}h2{font-size:20px;font-weight:400;color:#444;margin:0 0 28px;}'
+			. '.qr{display:inline-block;padding:20px;border:2px solid #111;border-radius:14px;}'
+			. '.qr svg{width:320px;height:320px;display:block;}'
+			. '.url{margin-top:22px;font-family:monospace;font-size:16px;word-break:break-all;}'
+			. '.steps{max-width:520px;margin:28px auto 0;text-align:left;font-size:17px;line-height:1.7;}'
+			. 'button{margin-top:28px;padding:10px 20px;font-size:15px;}@media print{button{display:none;}}</style></head><body>';
+		echo '<button onclick="window.print()">' . esc_html__( 'Print / Save PDF', 'memberistic' ) . '</button>';
+		echo '<div class="brand">' . esc_html( $brand ) . '</div>';
+		echo '<h1>' . esc_html__( 'Check In Here', 'memberistic' ) . '</h1>';
+		echo '<h2>' . esc_html__( 'Scan with your phone camera to sign your waiver & check in', 'memberistic' ) . '</h2>';
+		echo '<div class="qr">' . $qr . '</div>'; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- trusted SVG generator.
+		echo '<div class="url">' . esc_html( $url ) . '</div>';
+		echo '<div class="steps">1. ' . esc_html__( 'Point your phone camera at the code above.', 'memberistic' ) . '<br>2. ' . esc_html__( 'Tap the link, read and sign the waiver.', 'memberistic' ) . '<br>3. ' . esc_html__( 'Show your confirmation (or member QR) at the desk.', 'memberistic' ) . '</div>';
+		echo '</body></html>';
+		exit;
+	}
+
 	public static function render() {
 		if ( ! memberistic_current_user_can( self::CAP ) ) {
 			wp_die( esc_html__( 'You do not have permission to access this page.', 'memberistic' ) );
@@ -1049,7 +1111,8 @@ final class Waiver_Admin_Page {
 				</p>
 				<p>
 					<a class="button button-primary" href="<?php echo esc_url( self::export_url() ); ?>"><?php esc_html_e( 'Download all signed waivers (CSV)', 'memberistic' ); ?></a>
-					<a class="button" target="_blank" rel="noopener" href="<?php echo esc_url( Waiver_Public::guest_url() ); ?>"><?php esc_html_e( 'Open guest waiver page', 'memberistic' ); ?></a>
+					<a class="button" target="_blank" rel="noopener" href="<?php echo esc_url( Waiver_Public::best_kiosk_url() ); ?>"><?php esc_html_e( 'Open check-in kiosk', 'memberistic' ); ?></a>
+					<a class="button" target="_blank" rel="noopener" href="<?php echo esc_url( self::poster_url() ); ?>"><?php esc_html_e( 'Print check-in QR poster', 'memberistic' ); ?></a>
 				</p>
 				<p class="description"><?php esc_html_e( 'Guest/non-member signing page (no login): share the link above or embed the [memberistic_guest_waiver] shortcode on a public page or desk kiosk.', 'memberistic' ); ?></p>
 				<?php
