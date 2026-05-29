@@ -62,8 +62,59 @@ final class G2AB_Installer {
 		), false );
 
 		$this->run_migrations();
+		$this->dedupe_business_hours();
 		do_action( 'g2ab_after_install', $this->last_result );
 		return $this->last_result;
+	}
+
+	/**
+	 * Collapse duplicate ACTIVE business-hours rules so a stale duplicate can't
+	 * shadow the correct rule and make a day (e.g. Friday) read as closed.
+	 *
+	 * Only active rows are touched, grouped by (day_of_week, resource_id,
+	 * booking_type_id) so per-resource / per-type overrides are preserved. For
+	 * each group we keep exactly the row the front-end read would pick
+	 * (highest priority, then newest id) and delete the other ACTIVE duplicates.
+	 * Inactive rows and rows with a NULL weekday are never deleted. Idempotent.
+	 */
+	private function dedupe_business_hours() {
+		global $wpdb;
+		$tbl = $wpdb->prefix . 'g2ab_availability_rules';
+
+		$rows = $wpdb->get_results(
+			"SELECT id, day_of_week, resource_id, booking_type_id, priority
+			   FROM {$tbl}
+			  WHERE rule_type = 'business_hours' AND is_active = 1 AND day_of_week IS NOT NULL"
+		);
+		if ( empty( $rows ) ) {
+			return;
+		}
+
+		// Pick the read-order winner (priority DESC, id DESC) per group.
+		$winners = array();
+		foreach ( $rows as $r ) {
+			$key = $r->day_of_week . '|' . (string) $r->resource_id . '|' . (string) $r->booking_type_id;
+			if (
+				! isset( $winners[ $key ] )
+				|| (int) $r->priority > (int) $winners[ $key]->priority
+				|| ( (int) $r->priority === (int) $winners[ $key ]->priority && (int) $r->id > (int) $winners[ $key ]->id )
+			) {
+				$winners[ $key ] = $r;
+			}
+		}
+
+		$keep = array_map( static function ( $r ) { return (int) $r->id; }, array_values( $winners ) );
+		if ( empty( $keep ) ) {
+			return;
+		}
+		$in = implode( ',', $keep ); // ints only — safe to inline.
+		$wpdb->query(
+			"DELETE FROM {$tbl}
+			  WHERE rule_type = 'business_hours'
+			    AND is_active = 1
+			    AND day_of_week IS NOT NULL
+			    AND id NOT IN ( {$in} )"
+		);
 	}
 
 	public function force_install() {

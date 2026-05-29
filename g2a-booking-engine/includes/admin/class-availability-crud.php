@@ -53,7 +53,7 @@ final class G2AB_Admin_Availability_Crud {
 		$hours = array();
 		for ( $d = 0; $d <= 6; $d++ ) {
 			$row = $wpdb->get_row( $wpdb->prepare(
-				"SELECT * FROM {$tbl} WHERE rule_type = 'business_hours' AND day_of_week = %d AND is_active = 1 ORDER BY priority DESC LIMIT 1", $d
+				"SELECT * FROM {$tbl} WHERE rule_type = 'business_hours' AND day_of_week = %d AND is_active = 1 ORDER BY priority DESC, id DESC LIMIT 1", $d
 			) );
 			$hours[ $d ] = $row;
 		}
@@ -98,6 +98,8 @@ final class G2AB_Admin_Availability_Crud {
 					</div>
 				</div>
 			</form>
+
+			<?php $this->render_diagnostics( $tbl ); ?>
 
 			<div class="g2ab-av__panel">
 				<h3><?php esc_html_e( 'BLACKOUT DATES', 'g2a-booking' ); ?></h3>
@@ -149,6 +151,57 @@ final class G2AB_Admin_Availability_Crud {
 					<li><?php esc_html_e( 'Time zone follows site setting in WordPress → Settings → General.', 'g2a-booking' ); ?></li>
 				</ul>
 			</div>
+		</div>
+		<?php
+	}
+
+	/**
+	 * Diagnostics: show exactly what each weekday resolves to for the booking
+	 * engine (same query the front-end availability uses), plus any duplicate
+	 * rows. Makes a "Friday shows no times" data problem visible instead of
+	 * invisible — e.g. a missing Friday rule, an inactive one, or a stale
+	 * duplicate from an older day-of-week scheme.
+	 */
+	private function render_diagnostics( $tbl ) {
+		global $wpdb;
+		?>
+		<div class="g2ab-av__panel">
+			<h3><?php esc_html_e( 'BOOKING AVAILABILITY DIAGNOSTICS', 'g2a-booking' ); ?></h3>
+			<p class="g2ab-av__desc"><?php esc_html_e( 'What the booking calendar will actually use for each weekday. If a day shows “No active rule”, the booking form will report no times for that day — re-save your hours above to fix it.', 'g2a-booking' ); ?></p>
+			<table class="widefat striped" style="max-width:640px;">
+				<thead><tr>
+					<th><?php esc_html_e( 'Weekday', 'g2a-booking' ); ?></th>
+					<th><?php esc_html_e( 'Resolved hours', 'g2a-booking' ); ?></th>
+					<th><?php esc_html_e( 'Rules on file', 'g2a-booking' ); ?></th>
+				</tr></thead>
+				<tbody>
+				<?php for ( $d = 0; $d <= 6; $d++ ) :
+					$active = $wpdb->get_row( $wpdb->prepare(
+						"SELECT start_time, end_time FROM {$tbl} WHERE rule_type = 'business_hours' AND day_of_week = %d AND is_active = 1 ORDER BY priority DESC, id DESC LIMIT 1",
+						$d
+					) );
+					$total = (int) $wpdb->get_var( $wpdb->prepare(
+						"SELECT COUNT(*) FROM {$tbl} WHERE rule_type = 'business_hours' AND day_of_week = %d",
+						$d
+					) );
+					$ok = $active && $active->end_time > $active->start_time;
+					?>
+					<tr>
+						<td><strong><?php echo esc_html( self::DAYS[ $d ] ); ?></strong> <span style="color:#999;">(<?php echo (int) $d; ?>)</span></td>
+						<td>
+							<?php if ( $ok ) : ?>
+								<span style="color:#16794a;font-weight:600;"><?php echo esc_html( substr( (string) $active->start_time, 0, 5 ) . ' – ' . substr( (string) $active->end_time, 0, 5 ) ); ?></span>
+							<?php elseif ( $active ) : ?>
+								<span style="color:#b91c1c;font-weight:600;"><?php esc_html_e( 'Invalid (end ≤ start)', 'g2a-booking' ); ?></span>
+							<?php else : ?>
+								<span style="color:#b91c1c;font-weight:600;"><?php esc_html_e( 'No active rule — day reads as closed', 'g2a-booking' ); ?></span>
+							<?php endif; ?>
+						</td>
+						<td><?php echo (int) $total; ?><?php if ( $total > 1 ) : ?> <span style="color:#b45309;">(<?php esc_html_e( 'duplicates — will be cleaned on save/upgrade', 'g2a-booking' ); ?>)</span><?php endif; ?></td>
+					</tr>
+				<?php endfor; ?>
+				</tbody>
+			</table>
 		</div>
 		<?php
 	}

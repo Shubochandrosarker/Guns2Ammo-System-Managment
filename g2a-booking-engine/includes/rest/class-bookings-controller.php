@@ -198,7 +198,7 @@ final class G2AB_REST_Bookings_Controller {
 
 		$rules_table = $wpdb->prefix . 'g2ab_availability_rules';
 		$hours = $wpdb->get_row( $wpdb->prepare(
-			"SELECT start_time, end_time FROM {$rules_table} WHERE rule_type = 'business_hours' AND day_of_week = %d AND is_active = 1 ORDER BY priority DESC LIMIT 1",
+			"SELECT start_time, end_time FROM {$rules_table} WHERE rule_type = 'business_hours' AND day_of_week = %d AND is_active = 1 ORDER BY priority DESC, id DESC LIMIT 1",
 			$dow
 		) );
 		$blackout = $wpdb->get_var( $wpdb->prepare(
@@ -674,7 +674,7 @@ final class G2AB_REST_Bookings_Controller {
 		$rules_table = $wpdb->prefix . 'g2ab_availability_rules';
 		$dow         = (int) $start_dt->format( 'w' );
 		$hours       = $wpdb->get_row( $wpdb->prepare(
-			"SELECT start_time, end_time FROM {$rules_table} WHERE rule_type = 'business_hours' AND day_of_week = %d AND is_active = 1 ORDER BY priority DESC LIMIT 1",
+			"SELECT start_time, end_time FROM {$rules_table} WHERE rule_type = 'business_hours' AND day_of_week = %d AND is_active = 1 ORDER BY priority DESC, id DESC LIMIT 1",
 			$dow
 		) );
 		if ( ! $hours ) {
