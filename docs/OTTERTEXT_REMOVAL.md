@@ -33,8 +33,15 @@ local data-handling code to unwind.
 
 > Note: the plugin's `uninstall.php` is an empty stub — deleting the plugin
 > leaves the `otter_text_settings` option (your widget ID) orphaned in
-> `wp_options`. Harmless, but you can remove it for tidiness:
-> `delete_option('otter_text_settings');`
+> `wp_options`. The theme now **auto-purges** this option once the plugin files
+> are gone (admin load, admins only). A temporary *deactivation* is left alone
+> so reactivating keeps your widget ID. To remove it manually / immediately:
+>
+> ```bash
+> wp g2a ottertext-cleanup          # removes it when the plugin is deleted
+> wp g2a ottertext-cleanup --force  # removes it even if still installed
+> ```
+> …or in PHP: `delete_option('otter_text_settings');`
 
 ## 1. Remove the embed at the source
 

@@ -136,3 +136,66 @@ function g2a_ottertext_filter_html( $html ) {
 
 	return $html;
 }
+
+/* ---------------------------------------------------------------------------
+ * 3. Purge the orphaned `otter_text_settings` option.
+ *
+ * The Otter Text "Chat Widget" plugin ships an empty uninstall.php, so deleting
+ * the plugin leaves its `otter_text_settings` (your widget ID) behind in
+ * wp_options. We remove it automatically — but ONLY once the plugin files are
+ * actually gone, so a temporary *deactivation* keeps the saved widget ID intact
+ * (reactivating still works). A WP-CLI command is provided to force it.
+ * ------------------------------------------------------------------------- */
+
+/**
+ * @return bool True if the Otter Text plugin files are still installed.
+ */
+function g2a_ottertext_plugin_installed() {
+	if ( ! defined( 'WP_PLUGIN_DIR' ) ) {
+		return true; // can't tell — assume present and leave the option alone.
+	}
+	return file_exists( WP_PLUGIN_DIR . '/otter-text-chat-widget/otter-text-chat-widget.php' );
+}
+
+/**
+ * Delete the orphaned option when the plugin is gone.
+ *
+ * @param bool $force Remove even if the plugin is still installed.
+ * @return bool True when an option was actually deleted.
+ */
+function g2a_ottertext_purge_orphaned_option( $force = false ) {
+	// Cheap short-circuit (the option is autoloaded, so this hits cache).
+	if ( false === get_option( 'otter_text_settings', false ) ) {
+		return false;
+	}
+	if ( ! $force && g2a_ottertext_plugin_installed() ) {
+		return false; // plugin still present — not orphaned.
+	}
+	delete_option( 'otter_text_settings' );
+	return true;
+}
+
+// Auto-purge on admin load (admins only). Self-limiting: once the option is
+// gone the first check returns early on every subsequent request.
+add_action( 'admin_init', function () {
+	if ( ! g2a_ottertext_cleanup_enabled() || ! current_user_can( 'manage_options' ) ) {
+		return;
+	}
+	g2a_ottertext_purge_orphaned_option();
+} );
+
+// WP-CLI:  wp g2a ottertext-cleanup [--force]
+if ( defined( 'WP_CLI' ) && WP_CLI ) {
+	WP_CLI::add_command( 'g2a ottertext-cleanup', function ( $args, $assoc_args ) {
+		$force  = isset( $assoc_args['force'] );
+		$purged = g2a_ottertext_purge_orphaned_option( $force );
+		if ( $purged ) {
+			WP_CLI::success( 'Removed orphaned otter_text_settings option.' );
+		} elseif ( g2a_ottertext_plugin_installed() && ! $force ) {
+			WP_CLI::warning( 'Otter Text plugin is still installed — pass --force to remove the option anyway.' );
+		} else {
+			WP_CLI::log( 'Nothing to remove: otter_text_settings option not found.' );
+		}
+	} );
+}
+
