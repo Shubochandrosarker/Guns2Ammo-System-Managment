@@ -12,20 +12,50 @@ bundled plugin, so removing it is a configuration task, not a code change. The
 theme ships a safety-net scrubber (`guns2ammo/inc/ottertext-cleanup.php`) that
 strips any leftover Ottertext script/iframe while you complete the steps below.
 
+## What's actually installed (scanned 2026-05-29)
+
+The site uses the **"Otter Text - Chat Widget"** plugin
+(`otter-text-chat-widget`, v1.0.0, by Otter Text). It is a thin WordPress
+Plugin Boilerplate wrapper that does only two things when a Chat Widget ID is
+set under **Settings → Otter Text**:
+
+1. Enqueues the remote script `https://app.ottertext.com/js/chatwidget.js`.
+2. Prints `<div id="otterWebsiteChatWidget" data-client="…"></div>` in the
+   footer.
+
+**Everything else — the chatbot UI, the age-verification popup, the complaint
+layer, SMS, and the webhook data link — lives in that remote script on the
+Otter Text platform, keyed to your widget ID. None of it is in the plugin.**
+
+That means removal is clean: **deactivating or deleting the plugin stops the
+chatbot, the age popup, and the on-site data flow immediately.** There is no
+local data-handling code to unwind.
+
+> Note: the plugin's `uninstall.php` is an empty stub — deleting the plugin
+> leaves the `otter_text_settings` option (your widget ID) orphaned in
+> `wp_options`. Harmless, but you can remove it for tidiness:
+> `delete_option('otter_text_settings');`
+
 ## 1. Remove the embed at the source
 
-Check each of these (the snippet usually lives in exactly one):
+For this site the source is the plugin itself:
+
+- [ ] **Plugins → Installed Plugins → "Otter Text - Chat Widget" → Deactivate**
+      (then **Delete**). This is the real fix.
+- [ ] Optionally delete the orphaned `otter_text_settings` option (above).
+
+Also rule out a *second* copy of the embed added elsewhere (only if the widget
+still shows after deleting the plugin):
 
 - [ ] **Header/Footer scripts plugin** (WPCode, "Insert Headers & Footers",
-      Header Footer Code Manager) → delete the Ottertext snippet.
+      Header Footer Code Manager) → delete any Ottertext snippet.
 - [ ] **Google Tag Manager / GA4** → pause + delete any "Custom HTML" tag that
-      loads `ottertext`.
+      loads `app.ottertext.com` / `chatwidget.js`.
 - [ ] **Theme / page-builder custom-scripts box** (Customizer → Additional
       Scripts, or builder global settings).
-- [ ] **Companion plugin** → Plugins → search "Ottertext" → deactivate +
-      delete if present.
-- [ ] **Hard-coded snippet** pasted into `header.php` / `footer.php` of a child
-      theme (the parent `guns2ammo` theme contains none).
+- [ ] **Hard-coded snippet** pasted into a child theme's `footer.php` (the
+      parent `guns2ammo` theme contains none).
+
 
 ## 2. Cut the data link
 

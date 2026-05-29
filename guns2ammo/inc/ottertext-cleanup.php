@@ -125,6 +125,10 @@ function g2a_ottertext_filter_html( $html ) {
 	$html = preg_replace( '#<script\b[^>]*>(?:(?!</script>).)*?(?:' . $alt . ')(?:(?!</script>).)*?</script>#is', '', $html );
 	// <script src="...ottertext..."></script> self-referencing src only
 	$html = preg_replace( '#<script\b[^>]*\b(?:src|data-[a-z-]+)=["\'][^"\']*(?:' . $alt . ')[^"\']*["\'][^>]*>\s*</script>#is', '', $html );
+	// Otter Text "Chat Widget" plugin mount point — the remote chatwidget.js
+	// (app.ottertext.com) binds the chatbot + age popup to this empty div.
+	// Removing it neutralizes the widget even if the div slips through.
+	$html = preg_replace( '#<div\b[^>]*id=["\']otterWebsiteChatWidget["\'][^>]*>\s*</div>#is', '', $html );
 	// <iframe ...ottertext...></iframe>
 	$html = preg_replace( '#<iframe\b[^>]*(?:' . $alt . ')[^>]*>.*?</iframe>#is', '', $html );
 	// <link ...ottertext...>
