@@ -1,6 +1,12 @@
 # Memberistic Integrations toggles + membership-side Verifyistic
 
-_Memberistic 1.37.0 · 2026-05-29_
+_Memberistic 1.42.0 · 2026-05-29_
+
+> **Baseline note:** the repo's Memberistic was previously a stale 1.36/1.37
+> snapshot, while production had advanced to **1.41.0** (adding the waivers
+> module + schema/migrations). 1.42.0 re-bases the repo onto the live 1.41
+> source and layers these improvements + the QR encoder fix on top, so it is a
+> clean forward upgrade for the live site (no downgrade, waivers preserved).
 
 ## What's new
 

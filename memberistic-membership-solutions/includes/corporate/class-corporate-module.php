@@ -74,8 +74,13 @@ final class Corporate_Module {
 		add_shortcode( 'memberistic_group_portal', array( Corporate_Portal::class, 'shortcode' ) );
 		add_action( 'memberistic_account_dashboard_end', array( Corporate_Portal::class, 'render_for_user' ) );
 		add_action( 'init', array( Corporate_Portal::class, 'maybe_handle_owner_action' ) );
-		// Phase 4 — public waiver signing endpoint + waiver merge tag.
-		add_action( 'template_redirect', array( Corporate_Waiver::class, 'maybe_handle_public_waiver' ), 1 );
+		// Phase 4 — public waiver signing endpoint.
+		// NOTE: the public ?memberistic_waiver=TOKEN endpoint is now owned by
+		// the generalized all-member Waivers module
+		// (Waivers\Waiver_Public::register), which serves every member and
+		// still mirrors signatures onto corporate group_members. The legacy
+		// corporate-only handler below is intentionally left unregistered to
+		// avoid double-handling the same request.
 		// Payment separation — flag membership-payment WC orders so they
 		// are never counted as product sales; Memberistic is the single
 		// source of truth for membership revenue.
