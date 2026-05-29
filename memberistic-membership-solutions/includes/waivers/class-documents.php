@@ -234,6 +234,11 @@ final class Documents {
 		return $wpdb->get_results( $wpdb->prepare( 'SELECT * FROM ' . self::table() . ' WHERE membership_id = %d ORDER BY created_at DESC', (int) $membership_id ), ARRAY_A ) ?: array();
 	}
 
+	public static function get_for_person( $person_id ) {
+		global $wpdb;
+		return $wpdb->get_results( $wpdb->prepare( 'SELECT * FROM ' . self::table() . ' WHERE person_id = %d ORDER BY created_at DESC', (int) $person_id ), ARRAY_A ) ?: array();
+	}
+
 	public static function download_url( $id ) {
 		return wp_nonce_url( add_query_arg( self::QUERY, (int) $id, home_url( '/' ) ), self::QUERY . '_' . (int) $id, 'memberistic_doc_nonce' );
 	}

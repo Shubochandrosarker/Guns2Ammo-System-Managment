@@ -140,6 +140,20 @@ final class Verification {
 		$img_url = $img_id ? wp_get_attachment_image_url( $img_id, 'medium' ) : '';
 		$status_ok = in_array( $status, array( 'active', 'comped', 'trial' ), true );
 
+		// Resolve the member's waiver state so the desk clerk sees it at a
+		// glance when they scan the QR.
+		$waiver_state = 'missing';
+		$waiver_exp   = '';
+		if ( is_array( $membership ) && class_exists( '\WordPressistic\Memberistic\Waivers\Waiver_Service' ) ) {
+			$person = \WordPressistic\Memberistic\Database\People_Repository::get_primary_by_membership( (int) $membership['id'] );
+			if ( $person ) {
+				$waiver_ok    = \WordPressistic\Memberistic\Waivers\Waiver_Service::is_current( $person );
+				$waiver_state = $waiver_ok ? 'signed' : (string) ( $person['waiver_status'] ?: 'missing' );
+				$waiver_exp   = ! empty( $person['waiver_expires_at'] ) ? date_i18n( get_option( 'date_format' ), strtotime( (string) $person['waiver_expires_at'] ) ) : '';
+			}
+		}
+		$waiver_ok_badge = ( 'signed' === $waiver_state );
+
 		$brand   = function_exists( '\WordPressistic\Memberistic\memberistic_get_brand_label' )
 			? \WordPressistic\Memberistic\memberistic_get_brand_label()
 			: get_bloginfo( 'name' );
@@ -195,9 +209,19 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-
 	<?php else : ?>
 		<span class="status status--no"><?php echo esc_html( $status ? strtoupper( $status ) : 'INACTIVE' ); ?></span>
 	<?php endif; ?>
+	<div style="margin-top:12px;">
+		<span class="status <?php echo $waiver_ok_badge ? 'status--ok' : 'status--no'; ?>">
+			<?php
+			echo $waiver_ok_badge
+				? esc_html__( '✓ Waiver on file', 'memberistic' )
+				: esc_html( 'expired' === $waiver_state ? __( '⚠ Waiver expired', 'memberistic' ) : __( '⚠ Waiver not signed', 'memberistic' ) );
+			?>
+		</span>
+	</div>
 	<div class="meta">
 		<?php if ( $plan ) : ?><div><strong><?php esc_html_e( 'Plan', 'memberistic' ); ?>:</strong> <?php echo esc_html( $plan ); ?></div><?php endif; ?>
 		<?php if ( '—' !== $renew ) : ?><div><strong><?php esc_html_e( 'Renews', 'memberistic' ); ?>:</strong> <?php echo esc_html( $renew ); ?></div><?php endif; ?>
+		<?php if ( $waiver_ok_badge && $waiver_exp ) : ?><div><strong><?php esc_html_e( 'Waiver valid through', 'memberistic' ); ?>:</strong> <?php echo esc_html( $waiver_exp ); ?></div><?php endif; ?>
 	</div>
 	<div class="footer"><?php echo esc_html( wp_date( 'Y-m-d H:i' ) ); ?> · <?php esc_html_e( 'Live verification', 'memberistic' ); ?></div>
 </div>

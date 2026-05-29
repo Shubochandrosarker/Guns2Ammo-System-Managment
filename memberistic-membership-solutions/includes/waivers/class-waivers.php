@@ -729,6 +729,36 @@ final class Waiver_Admin_Page {
 					$notice = __( 'Waiver marked signed.', 'memberistic' );
 				}
 				break;
+			case 'staff_upload':
+				$pid = isset( $_POST['person_id'] ) ? absint( $_POST['person_id'] ) : 0;
+				$row = $pid ? People_Repository::get( $pid ) : null;
+				if ( $row && ! empty( $_FILES['memberistic_doc_file']['name'] ) ) {
+					$res = Documents::store_upload(
+						$_FILES['memberistic_doc_file'], // phpcs:ignore WordPress.Security.ValidatedSanitizedInput
+						array(
+							'user_id'       => (int) ( $row['wp_user_id'] ?? 0 ),
+							'person_id'     => $pid,
+							'membership_id' => (int) ( $row['membership_id'] ?? 0 ),
+							'label'         => isset( $_POST['doc_label'] ) ? sanitize_text_field( wp_unslash( $_POST['doc_label'] ) ) : '',
+							'doc_type'      => 'staff_upload',
+							'uploaded_by'   => get_current_user_id(),
+						)
+					);
+					$notice = is_wp_error( $res ) ? $res->get_error_message() : __( 'Document uploaded.', 'memberistic' );
+				} else {
+					$notice = __( 'No file selected.', 'memberistic' );
+				}
+				wp_safe_redirect(
+					add_query_arg(
+						array(
+							'page'               => 'memberistic-waivers',
+							'member'             => $pid,
+							'memberistic_notice' => rawurlencode( $notice ),
+						),
+						admin_url( 'admin.php' )
+					)
+				);
+				exit;
 		}
 
 		wp_safe_redirect(
@@ -741,6 +771,69 @@ final class Waiver_Admin_Page {
 			)
 		);
 		exit;
+	}
+
+	/**
+	 * Per-member detail panel: waiver status + signature history + documents,
+	 * with a staff upload form. Rendered when ?member=PERSON_ID is present.
+	 */
+	private static function render_member_detail( $person_id ) {
+		$person = People_Repository::get( $person_id );
+		if ( ! $person ) {
+			echo '<div class="notice notice-error"><p>' . esc_html__( 'Member not found.', 'memberistic' ) . '</p></div>';
+			return;
+		}
+		$docs = Documents::get_for_person( $person_id );
+		$back = admin_url( 'admin.php?page=memberistic-waivers' );
+		?>
+		<p><a href="<?php echo esc_url( $back ); ?>">&larr; <?php esc_html_e( 'Back to all members', 'memberistic' ); ?></a></p>
+		<div class="memberistic-card">
+			<h2><?php echo esc_html( $person['full_name'] ?: ( $person['email'] ?: __( 'Member', 'memberistic' ) ) ); ?></h2>
+			<p>
+				<strong><?php esc_html_e( 'Waiver', 'memberistic' ); ?>:</strong>
+				<?php echo esc_html( ucfirst( str_replace( '_', ' ', (string) $person['waiver_status'] ) ) ); ?>
+				<?php if ( ! empty( $person['waiver_expires_at'] ) ) : ?>
+					· <?php esc_html_e( 'valid through', 'memberistic' ); ?> <?php echo esc_html( date_i18n( get_option( 'date_format' ), strtotime( (string) $person['waiver_expires_at'] ) ) ); ?>
+				<?php endif; ?>
+			</p>
+			<?php if ( 'signed' !== (string) $person['waiver_status'] ) : ?>
+				<form method="post" style="display:inline-block;margin-right:8px;">
+					<?php wp_nonce_field( 'memberistic_waivers' ); ?>
+					<input type="hidden" name="memberistic_waiver_action" value="mark_one">
+					<input type="hidden" name="person_id" value="<?php echo (int) $person_id; ?>">
+					<button type="submit" class="button"><?php esc_html_e( 'Mark waiver signed', 'memberistic' ); ?></button>
+				</form>
+			<?php endif; ?>
+		</div>
+		<div class="memberistic-card">
+			<h2><?php esc_html_e( 'Documents', 'memberistic' ); ?></h2>
+			<form method="post" enctype="multipart/form-data" style="margin-bottom:14px;display:flex;gap:10px;flex-wrap:wrap;align-items:center;">
+				<?php wp_nonce_field( 'memberistic_waivers' ); ?>
+				<input type="hidden" name="memberistic_waiver_action" value="staff_upload">
+				<input type="hidden" name="person_id" value="<?php echo (int) $person_id; ?>">
+				<input type="text" name="doc_label" placeholder="<?php esc_attr_e( 'Label (e.g. Signed paper waiver)', 'memberistic' ); ?>" class="regular-text">
+				<input type="file" name="memberistic_doc_file" accept=".pdf,.jpg,.jpeg,.png,.webp" required>
+				<button type="submit" class="button button-primary"><?php esc_html_e( 'Upload document', 'memberistic' ); ?></button>
+			</form>
+			<?php if ( $docs ) : ?>
+				<table class="widefat striped">
+					<thead><tr><th><?php esc_html_e( 'Document', 'memberistic' ); ?></th><th><?php esc_html_e( 'Type', 'memberistic' ); ?></th><th><?php esc_html_e( 'Uploaded', 'memberistic' ); ?></th><th></th></tr></thead>
+					<tbody>
+					<?php foreach ( $docs as $d ) : ?>
+						<tr>
+							<td><?php echo esc_html( $d['label'] ?: $d['file_name'] ); ?></td>
+							<td><?php echo esc_html( ucfirst( str_replace( '_', ' ', (string) $d['doc_type'] ) ) ); ?></td>
+							<td><?php echo esc_html( date_i18n( get_option( 'date_format' ), strtotime( (string) $d['created_at'] ) ) ); ?></td>
+							<td><a class="button button-small" href="<?php echo esc_url( Documents::download_url( (int) $d['id'] ) ); ?>"><?php esc_html_e( 'Download', 'memberistic' ); ?></a></td>
+						</tr>
+					<?php endforeach; ?>
+					</tbody>
+				</table>
+			<?php else : ?>
+				<p><?php esc_html_e( 'No documents on file for this member yet.', 'memberistic' ); ?></p>
+			<?php endif; ?>
+		</div>
+		<?php
 	}
 
 	/**
@@ -874,6 +967,15 @@ final class Waiver_Admin_Page {
 				<div class="notice notice-success is-dismissible"><p><?php echo esc_html( $notice ); ?></p></div>
 			<?php endif; ?>
 
+			<?php
+			$member_id = isset( $_GET['member'] ) ? absint( $_GET['member'] ) : 0; // phpcs:ignore WordPress.Security.NonceVerification.Recommended
+			if ( $member_id ) {
+				self::render_member_detail( $member_id );
+				echo '</div>';
+				return;
+			}
+			?>
+
 			<div class="memberistic-card">
 				<h2><?php esc_html_e( 'Waiver status (active members)', 'memberistic' ); ?></h2>
 				<p style="font-size:15px;">
@@ -1000,6 +1102,7 @@ final class Waiver_Admin_Page {
 									<?php if ( ! empty( $r['wp_user_id'] ) ) : ?>
 										<a class="button button-small" target="_blank" rel="noopener" href="<?php echo esc_url( Waiver_Service::waiver_url( (int) $r['wp_user_id'] ) ); ?>"><?php esc_html_e( 'Sign link', 'memberistic' ); ?></a>
 									<?php endif; ?>
+									<a class="button button-small" href="<?php echo esc_url( admin_url( 'admin.php?page=memberistic-waivers&member=' . (int) $r['id'] ) ); ?>"><?php esc_html_e( 'Docs', 'memberistic' ); ?></a>
 								</td>
 							</tr>
 						<?php endforeach; endif; ?>
