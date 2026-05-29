@@ -491,6 +491,43 @@ final class Waiver_Public {
 	public static function register() {
 		add_action( 'template_redirect', array( __CLASS__, 'maybe_handle' ), 1 );
 		add_shortcode( 'memberistic_guest_waiver', array( __CLASS__, 'guest_button_shortcode' ) );
+		add_shortcode( 'memberistic_kiosk', array( __CLASS__, 'kiosk_shortcode' ) );
+	}
+
+	/** Public URL of the kiosk check-in hub (no setup / no login needed). */
+	public static function kiosk_url() {
+		return add_query_arg( 'memberistic_kiosk', '1', home_url( '/' ) );
+	}
+
+	/**
+	 * Standalone, touch-friendly check-in hub. Two paths: guests sign the
+	 * waiver; members sign in to show their pass. Self-contained branded page
+	 * — works as a kiosk URL with no page setup.
+	 */
+	public static function render_kiosk() {
+		$guest   = self::guest_url();
+		$account = home_url( '/account/' );
+		$big     = 'display:block;width:100%;box-sizing:border-box;margin:0 0 14px;padding:20px;border-radius:8px;font-weight:700;font-size:17px;letter-spacing:.04em;text-decoration:none;';
+		$html    = '<p style="color:#CBCAD2;margin:0 0 24px;font-size:15px;">' . esc_html__( 'Welcome to the range. Tap an option to check in.', 'memberistic' ) . '</p>';
+		$html   .= '<a href="' . esc_url( $guest ) . '" style="' . esc_attr( $big ) . 'background:#E8802F;color:#111;">' . esc_html__( 'Guest / First Visit — Sign Waiver', 'memberistic' ) . '</a>';
+		$html   .= '<a href="' . esc_url( $account ) . '" style="' . esc_attr( $big ) . 'background:#2A323D;color:#fff;border:1px solid #3A4453;">' . esc_html__( 'Member — Sign In to Show Your Pass', 'memberistic' ) . '</a>';
+		$html   .= '<p style="color:#5A6371;font-size:12px;margin-top:20px;">' . esc_html__( 'Already have your member QR on your phone? Just show it at the desk.', 'memberistic' ) . '</p>';
+		self::render( __( 'Range Check-In', 'memberistic' ), $html, 200 );
+	}
+
+	/**
+	 * [memberistic_kiosk] — embeddable check-in hub (guest waiver + member
+	 * sign-in) for placing on a /check-in/ page.
+	 */
+	public static function kiosk_shortcode( $atts = array() ) {
+		$guest   = self::guest_url();
+		$account = home_url( '/account/' );
+		ob_start();
+		echo '<div class="memberistic-frontend memberistic-kiosk" style="max-width:520px;margin:0 auto;text-align:center;">';
+		echo '<a class="memberistic-plan-button" style="display:block;margin-bottom:14px;" href="' . esc_url( $guest ) . '">' . esc_html__( 'Guest / First Visit — Sign Waiver', 'memberistic' ) . '</a>';
+		echo '<a class="memberistic-secondary-button" style="display:block;" href="' . esc_url( $account ) . '">' . esc_html__( 'Member — Sign In to Show Your Pass', 'memberistic' ) . '</a>';
+		echo '</div>';
+		return ob_get_clean();
 	}
 
 	/** Public URL of the guest (non-member) waiver page. */
@@ -548,7 +585,8 @@ final class Waiver_Public {
 			);
 			self::render(
 				__( 'Waiver complete', 'memberistic' ),
-				'<p>' . esc_html__( 'Thank you — your waiver is on file. Enjoy your visit.', 'memberistic' ) . '</p>',
+				'<p>' . esc_html__( 'Thank you — your waiver is on file. Enjoy your visit.', 'memberistic' ) . '</p>'
+				. '<p><a class="btn" href="' . esc_url( self::kiosk_url() ) . '">' . esc_html__( 'Next guest — back to check-in', 'memberistic' ) . '</a></p>',
 				200
 			);
 		}
@@ -575,6 +613,11 @@ final class Waiver_Public {
 	}
 
 	public static function maybe_handle() {
+		// Kiosk check-in hub (its own query var).
+		if ( ! empty( $_GET['memberistic_kiosk'] ) ) { // phpcs:ignore WordPress.Security.NonceVerification.Recommended
+			self::render_kiosk();
+			return;
+		}
 		if ( empty( $_GET[ Waiver_Service::QUERY ] ) ) { // phpcs:ignore WordPress.Security.NonceVerification.Recommended
 			return;
 		}
