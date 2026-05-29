@@ -348,7 +348,7 @@ final class Memberships_Repository {
 		$limit = max( 1, min( 500, (int) $limit ) );
 		return $wpdb->get_results(
 			$wpdb->prepare(
-				'SELECT id, billing_cycle, start_date, created_at FROM ' . self::table() . " WHERE status IN ( 'active', 'trial', 'comped' ) AND ( renewal_date IS NULL OR renewal_date = '' OR renewal_date = '0000-00-00 00:00:00' ) ORDER BY id ASC LIMIT %d",
+				'SELECT id, billing_cycle, start_date, created_at FROM ' . self::table() . " WHERE status IN ( 'active', 'trial' ) AND ( renewal_date IS NULL OR renewal_date = '' OR renewal_date = '0000-00-00 00:00:00' ) ORDER BY id ASC LIMIT %d",
 				$limit
 			),
 			ARRAY_A
@@ -361,7 +361,7 @@ final class Memberships_Repository {
 	public static function count_active_missing_renewal() {
 		global $wpdb;
 		return (int) $wpdb->get_var(
-			'SELECT COUNT(*) FROM ' . self::table() . " WHERE status IN ( 'active', 'trial', 'comped' ) AND ( renewal_date IS NULL OR renewal_date = '' OR renewal_date = '0000-00-00 00:00:00' )"
+			'SELECT COUNT(*) FROM ' . self::table() . " WHERE status IN ( 'active', 'trial' ) AND ( renewal_date IS NULL OR renewal_date = '' OR renewal_date = '0000-00-00 00:00:00' )"
 		);
 	}
 
