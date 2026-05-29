@@ -212,6 +212,12 @@ final class Scheduler {
 	 * missing — once per week per membership.
 	 */
 	public static function run_waiver_followup() {
+		// First, expire any signed waivers past their validity window so they
+		// re-enter the "missing/expired" pool and get re-nudged below.
+		if ( class_exists( '\WordPressistic\Memberistic\Waivers\Waiver_Service' ) ) {
+			\WordPressistic\Memberistic\Waivers\Waiver_Service::expire_due();
+		}
+
 		$rows = People_Repository::get_active_missing_waiver();
 
 		foreach ( $rows as $row ) {

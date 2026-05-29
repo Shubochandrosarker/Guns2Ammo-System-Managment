@@ -64,6 +64,49 @@ final class Installer {
 		if ( $is_first_install ) {
 			Plans_Repository::seed_default_plans();
 		}
+
+		self::ensure_check_in_page();
+	}
+
+	/**
+	 * Create the public /check-in/ kiosk page once, so the friendly URL
+	 * exists without manual setup. Idempotent: guarded by an option flag and
+	 * a slug check, and never recreated if the admin later deletes it.
+	 */
+	private static function ensure_check_in_page() {
+		if ( get_option( 'memberistic_checkin_page_id', false ) ) {
+			return;
+		}
+		if ( ! function_exists( 'wp_insert_post' ) ) {
+			return;
+		}
+		// Adopt an existing /check-in/ page in ANY non-trash status (a draft or
+		// private page won't be seen by get_page_by_path's publish default, so
+		// query directly) — never create a duplicate that WP would slug as
+		// "check-in-2".
+		global $wpdb;
+		$existing_id = (int) $wpdb->get_var(
+			$wpdb->prepare(
+				"SELECT ID FROM {$wpdb->posts} WHERE post_name = %s AND post_type = 'page' AND post_status NOT IN ( 'trash', 'auto-draft' ) ORDER BY ID ASC LIMIT 1",
+				'check-in'
+			)
+		);
+		if ( $existing_id ) {
+			update_option( 'memberistic_checkin_page_id', $existing_id, false );
+			return;
+		}
+		$page_id = wp_insert_post(
+			array(
+				'post_title'   => __( 'Check In', 'memberistic' ),
+				'post_name'    => 'check-in',
+				'post_content' => '[memberistic_kiosk]',
+				'post_status'  => 'publish',
+				'post_type'    => 'page',
+			)
+		);
+		if ( $page_id && ! is_wp_error( $page_id ) ) {
+			update_option( 'memberistic_checkin_page_id', (int) $page_id, false );
+		}
 	}
 
 	/**

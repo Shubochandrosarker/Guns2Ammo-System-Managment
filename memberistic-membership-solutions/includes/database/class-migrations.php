@@ -51,7 +51,19 @@ final class Migrations {
 			'1.1.0' => array( self::class, 'migrate_1_1_0' ),
 			'1.2.0' => array( self::class, 'migrate_1_2_0' ),
 			'1.3.0' => array( self::class, 'migrate_1_3_0' ),
+			'1.4.0' => array( self::class, 'migrate_1_4_0' ),
 		);
+	}
+
+	/**
+	 * 1.4.0 — Waiver signature audit log + member documents tables.
+	 *
+	 * Re-runs dbDelta() (the CREATE TABLE statements live in Schema) so
+	 * existing installs gain the two new tables idempotently.
+	 */
+	public static function migrate_1_4_0() {
+		Schema::create_tables();
+		return true;
 	}
 
 	/**

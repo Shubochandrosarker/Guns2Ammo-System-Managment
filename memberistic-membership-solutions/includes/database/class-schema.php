@@ -201,6 +201,45 @@ CREATE TABLE {$prefix}memberistic_integrations (
   PRIMARY KEY  (id),
   UNIQUE KEY provider (provider)
 ) {$charset_collate};
+CREATE TABLE {$prefix}memberistic_waiver_signatures (
+  id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  user_id BIGINT UNSIGNED NULL,
+  person_id BIGINT UNSIGNED NULL,
+  membership_id BIGINT UNSIGNED NULL,
+  signer_name VARCHAR(191) NULL,
+  signer_email VARCHAR(191) NULL,
+  source VARCHAR(20) NOT NULL DEFAULT 'self_serve',
+  signed_at DATETIME NOT NULL,
+  expires_at DATETIME NULL,
+  ip VARCHAR(64) NULL,
+  user_agent VARCHAR(255) NULL,
+  waiver_text LONGTEXT NULL,
+  text_hash CHAR(64) NULL,
+  attachment_id BIGINT UNSIGNED NULL,
+  created_at DATETIME NOT NULL,
+  PRIMARY KEY  (id),
+  KEY user_id (user_id),
+  KEY membership_id (membership_id),
+  KEY signed_at (signed_at)
+) {$charset_collate};
+CREATE TABLE {$prefix}memberistic_documents (
+  id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  user_id BIGINT UNSIGNED NULL,
+  person_id BIGINT UNSIGNED NULL,
+  membership_id BIGINT UNSIGNED NULL,
+  signature_id BIGINT UNSIGNED NULL,
+  file_path VARCHAR(255) NULL,
+  file_name VARCHAR(191) NULL,
+  mime VARCHAR(100) NULL,
+  file_size BIGINT UNSIGNED NULL,
+  label VARCHAR(191) NULL,
+  doc_type VARCHAR(40) NULL,
+  uploaded_by BIGINT UNSIGNED NULL,
+  created_at DATETIME NOT NULL,
+  PRIMARY KEY  (id),
+  KEY user_id (user_id),
+  KEY membership_id (membership_id)
+) {$charset_collate};
 ";
 
 		dbDelta( $sql );
