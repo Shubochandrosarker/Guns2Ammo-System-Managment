@@ -116,46 +116,56 @@ function memberistic_get_brand_label() {
  * @param string $fallback_url Final fallback URL.
  */
 function memberistic_get_page_url( $setting_key, $fallback_slug = '', $fallback_url = '' ) {
+	$clean   = memberistic_clean_page_slug( $setting_key );
 	$page_id = absint( memberistic_get_setting( $setting_key, 0 ) );
-	$url     = $page_id ? get_permalink( $page_id ) : '';
 
-	if ( $url && $fallback_slug ) {
-		$page = get_post( $page_id );
-
-		if ( $page && in_array( $page->post_name, memberistic_legacy_page_slugs(), true ) ) {
-			$url = '';
+	// 1) Honor an explicitly configured page — but ONLY if it's published, has
+	//    a pretty permalink, and isn't a legacy/branded slug. A page id that
+	//    resolves to ?page_id=… (unpublished or a stale page) is rejected so we
+	//    fall through to the clean slug instead of emitting an ugly URL.
+	if ( $page_id && 'publish' === get_post_status( $page_id ) ) {
+		$page    = get_post( $page_id );
+		$url     = (string) get_permalink( $page_id );
+		$legacy  = $page && in_array( $page->post_name, memberistic_legacy_page_slugs(), true );
+		$ugly    = ( false !== strpos( $url, 'page_id=' ) || false !== strpos( $url, '?p=' ) );
+		if ( '' !== $url && ! $legacy && ! $ugly ) {
+			return $url;
 		}
 	}
 
-	if ( ! $url ) {
-		// Resolve by page slug. Guns 2 Ammo uses CLEAN, unbranded slugs
-		// (/checkout/, /memberships/, /renewal/, /thank-you/, /payment-failed/,
-		// /account/), so try the clean slug for this setting FIRST, then the
-		// caller's slug, then a prefix-stripped variant. This makes the right
-		// page resolve even when the page IDs aren't configured in Settings.
-		$candidates = array();
-		$clean      = memberistic_clean_page_slug( $setting_key );
-		if ( $clean ) {
-			$candidates[] = $clean;
+	// 2) Resolve by page slug. Guns 2 Ammo uses CLEAN, unbranded slugs
+	//    (/checkout/, /memberships/, /renewal/, /thank-you/, /payment-failed/,
+	//    /account/), so try the clean slug for this setting FIRST, then the
+	//    caller's slug, then a prefix-stripped variant. Only published pages
+	//    with a pretty permalink qualify.
+	$candidates = array();
+	if ( $clean ) {
+		$candidates[] = $clean;
+	}
+	if ( $fallback_slug ) {
+		$candidates[] = sanitize_title( $fallback_slug );
+		$stripped     = preg_replace( '/^(memberistic|membership)-/', '', sanitize_title( $fallback_slug ) );
+		if ( $stripped && $stripped !== sanitize_title( $fallback_slug ) ) {
+			$candidates[] = $stripped;
 		}
-		if ( $fallback_slug ) {
-			$candidates[] = sanitize_title( $fallback_slug );
-			// Strip a "memberistic-" / "membership-" prefix as a last resort.
-			$stripped = preg_replace( '/^(memberistic|membership)-/', '', sanitize_title( $fallback_slug ) );
-			if ( $stripped && $stripped !== sanitize_title( $fallback_slug ) ) {
-				$candidates[] = $stripped;
-			}
-		}
-		foreach ( array_unique( array_filter( $candidates ) ) as $cand ) {
-			$page = get_page_by_path( $cand );
-			if ( $page && 'trash' !== get_post_status( $page ) ) {
-				$url = get_permalink( $page );
-				break;
+	}
+	foreach ( array_unique( array_filter( $candidates ) ) as $cand ) {
+		$page = get_page_by_path( $cand );
+		if ( $page && 'publish' === get_post_status( $page ) ) {
+			$url = (string) get_permalink( $page );
+			if ( '' !== $url && false === strpos( $url, 'page_id=' ) && false === strpos( $url, '?p=' ) ) {
+				return $url;
 			}
 		}
 	}
 
-	return $url ? $url : $fallback_url;
+	// 3) Guaranteed clean fallback for this site's known pages: even if the
+	//    page isn't found/published, the clean path is where it lives.
+	if ( $clean ) {
+		return home_url( '/' . $clean . '/' );
+	}
+
+	return $fallback_url;
 }
 
 /**
