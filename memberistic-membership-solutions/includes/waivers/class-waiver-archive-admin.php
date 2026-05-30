@@ -85,7 +85,10 @@ final class Waiver_Archive_Admin {
 							<?php if ( ! empty( $lookup['dob'] ) ) : ?> · DOB <?php echo esc_html( $lookup['dob'] ); ?><?php endif; ?>
 						</p>
 						<p style="margin:8px 0 0;">
-							<?php $pdf = ! empty( $lookup['local_path'] ) ? self::pdf_view_url( $lookup['id'] ) : Waivers_Archive::pdf_url( $lookup ); ?>
+							<?php
+							$has_local = ! empty( $lookup['local_path'] ) && false !== strpos( (string) $lookup['local_path'], Waiver_Import::SUBDIR );
+							$pdf       = $has_local ? self::pdf_view_url( $lookup['id'] ) : Waivers_Archive::pdf_url( $lookup );
+							?>
 							<?php if ( $pdf ) : ?><a class="button" href="<?php echo esc_url( $pdf ); ?>" target="_blank" rel="noopener"><?php esc_html_e( 'View signed PDF', 'memberistic' ); ?></a><?php endif; ?>
 						</p>
 					</div>
@@ -136,6 +139,9 @@ final class Waiver_Archive_Admin {
 			sanitize_text_field( $_FILES['waiver_csv']['tmp_name'] ),
 			array(
 				'download_pdfs' => ! empty( $_POST['download_pdfs'] ),
+				// Web upload: never download PDFs inline (it times out on ~1,900
+				// files). They mirror in the background via cron instead.
+				'defer_pdfs'    => true,
 				'match_members' => ! empty( $_POST['match_members'] ),
 				'fresh'         => ! empty( $_POST['fresh'] ),
 			)
@@ -144,10 +150,11 @@ final class Waiver_Archive_Admin {
 			wp_safe_redirect( add_query_arg( 'import_error', rawurlencode( $res->get_error_message() ), $back ) );
 			exit;
 		}
+		$queued = isset( $res['pdfs_queued'] ) ? (int) $res['pdfs_queued'] : 0;
 		$msg = sprintf(
 			/* translators: import stats */
-			__( 'Imported %1$d rows for %2$d people. PDFs: %3$d saved, %4$d failed. Members matched: %5$d.', 'memberistic' ),
-			$res['rows'], $res['people'], $res['pdfs'], $res['pdf_failed'], $res['members_matched']
+			__( 'Imported %1$d rows for %2$d people. Members matched: %3$d. %4$d PDFs are mirroring in the background — reload this page in a few minutes to watch the count rise.', 'memberistic' ),
+			$res['rows'], $res['people'], $res['members_matched'], $queued
 		);
 		wp_safe_redirect( add_query_arg( 'imported', rawurlencode( $msg ), $back ) );
 		exit;

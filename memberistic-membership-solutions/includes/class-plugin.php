@@ -108,6 +108,7 @@ final class Plugin {
 		Waivers\Documents::register();
 		Waivers\Waiver_Archive_Admin::register();
 		Waivers\Waiver_Import::register_cli();
+		Waivers\Waiver_Import::register();
 		Waivers\Waiver_Booking_Bridge::register();
 		add_action( 'admin_notices', __NAMESPACE__ . '\\memberistic_admin_notices' );
 		add_action( 'admin_enqueue_scripts', array( $this, 'enqueue_admin_assets' ) );

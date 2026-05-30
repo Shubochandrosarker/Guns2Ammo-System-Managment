@@ -106,10 +106,14 @@ final class Waiver_Import {
 		}
 		$opts = wp_parse_args( $opts, array(
 			'download_pdfs' => true,
+			'defer_pdfs'    => false,
 			'fresh'         => false,
 			'limit'         => 0,
 			'match_members' => true,
 		) );
+		if ( function_exists( 'set_time_limit' ) ) {
+			@set_time_limit( 0 ); // phpcs:ignore WordPress.PHP.NoSilencedErrors.Discouraged
+		}
 
 		global $wpdb;
 		$table = Waivers_Archive::table();
@@ -155,7 +159,7 @@ final class Waiver_Import {
 				// the one staff will view; older revisions keep the source URL.
 				$attachment_id = null;
 				$local_path    = '';
-				if ( $is_current && $opts['download_pdfs'] && $entry['external_url'] ) {
+				if ( $is_current && $opts['download_pdfs'] && empty( $opts['defer_pdfs'] ) && $entry['external_url'] ) {
 					$mirror = self::mirror_pdf( $entry['external_url'], $entry );
 					if ( is_wp_error( $mirror ) ) {
 						$stats['pdf_failed']++;
@@ -214,7 +218,68 @@ final class Waiver_Import {
 			}
 		}
 
+		// Deferred mode (admin web upload): mirror the PDFs in the background so
+		// the request can't time out downloading ~1,900 files. CLI runs them
+		// inline (no web timeout).
+		if ( $opts['download_pdfs'] && ! empty( $opts['defer_pdfs'] ) ) {
+			$stats['pdfs_queued'] = self::count_pending_pdfs();
+			self::schedule_mirror();
+		}
+
 		return $stats;
+	}
+
+	/* ------------------------------------------------------------------ */
+	/* Background PDF mirroring (cron-driven, batched)                    */
+	/* ------------------------------------------------------------------ */
+
+	const CRON_MIRROR = 'memberistic_mirror_waiver_pdfs';
+
+	/** Hook the cron worker. Called from the plugin bootstrap. */
+	public static function register() {
+		add_action( self::CRON_MIRROR, array( __CLASS__, 'mirror_pending' ) );
+	}
+
+	/** Current waivers that still need their PDF mirrored. */
+	public static function count_pending_pdfs() {
+		global $wpdb;
+		$table = Waivers_Archive::table();
+		// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+		return (int) $wpdb->get_var( "SELECT COUNT(*) FROM {$table} WHERE is_current = 1 AND ( local_path = '' OR local_path IS NULL ) AND external_url <> ''" );
+	}
+
+	/** Queue the background mirror worker if not already scheduled. */
+	public static function schedule_mirror() {
+		if ( ! wp_next_scheduled( self::CRON_MIRROR ) ) {
+			wp_schedule_single_event( time() + 20, self::CRON_MIRROR );
+		}
+	}
+
+	/**
+	 * Mirror a batch of pending PDFs, then reschedule until none remain.
+	 * Small batch keeps each cron run well under any time limit.
+	 */
+	public static function mirror_pending( $batch = 20 ) {
+		global $wpdb;
+		$table = Waivers_Archive::table();
+		$batch = max( 1, (int) $batch );
+		// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+		$rows = $wpdb->get_results( $wpdb->prepare( "SELECT id, first_name, last_name, external_url FROM {$table} WHERE is_current = 1 AND ( local_path = '' OR local_path IS NULL ) AND external_url <> '' LIMIT %d", $batch ), ARRAY_A );
+		if ( ! $rows ) {
+			return;
+		}
+		if ( function_exists( 'set_time_limit' ) ) {
+			@set_time_limit( 0 ); // phpcs:ignore WordPress.PHP.NoSilencedErrors.Discouraged
+		}
+		foreach ( $rows as $row ) {
+			$mirror = self::mirror_pdf( $row['external_url'], array( 'first_name' => $row['first_name'], 'last_name' => $row['last_name'] ) );
+			$local  = is_wp_error( $mirror ) ? 'FAILED' : $mirror; // mark failures so we don't loop forever
+			$wpdb->update( $table, array( 'local_path' => $local ), array( 'id' => (int) $row['id'] ) );
+		}
+		// More to go? Reschedule the next batch.
+		if ( self::count_pending_pdfs() > 0 ) {
+			wp_schedule_single_event( time() + 30, self::CRON_MIRROR );
+		}
 	}
 
 	/* ------------------------------------------------------------------ */
