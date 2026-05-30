@@ -202,6 +202,24 @@
 
 .vfy-form-input::placeholder { color: rgba(148,163,184,.5); }
 
+/* DOB Month / Day / Year dropdowns — mobile-friendly (no native date spinner) */
+.vfy-dob-row {
+  display: grid;
+  grid-template-columns: 1.2fr 0.8fr 1fr;
+  gap: 8px;
+}
+select.vfy-dob-part {
+  width: 100%;
+  cursor: pointer;
+  padding-right: 30px;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%2394a3b8' stroke-width='3'><path d='M6 9l6 6 6-6'/></svg>");
+  background-repeat: no-repeat;
+  background-position: right 11px center;
+  text-align: left;
+}
+select.vfy-dob-part:invalid { color: rgba(148,163,184,.6); } /* shows the placeholder option dimmed */
+select.vfy-dob-part option { color: #0f172a; }
+
 /* Date input fix */
 .vfy-form-input[type="date"]::-webkit-calendar-picker-indicator {
   filter: invert(1) opacity(.5);

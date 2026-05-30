@@ -52,7 +52,19 @@ final class Migrations {
 			'1.2.0' => array( self::class, 'migrate_1_2_0' ),
 			'1.3.0' => array( self::class, 'migrate_1_3_0' ),
 			'1.4.0' => array( self::class, 'migrate_1_4_0' ),
+			'1.5.0' => array( self::class, 'migrate_1_5_0' ),
 		);
+	}
+
+	/**
+	 * 1.5.0 — Imported waivers archive (Ottertext / range-waiver history).
+	 *
+	 * Re-runs dbDelta() so existing installs gain the new
+	 * memberistic_waivers_archive table idempotently.
+	 */
+	public static function migrate_1_5_0() {
+		Schema::create_tables();
+		return true;
 	}
 
 	/**

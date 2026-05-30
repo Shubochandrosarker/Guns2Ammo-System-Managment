@@ -206,17 +206,26 @@
             var $err = $form.find('.vfy-error');
 
             if (mode === 'dob') {
-                var dob = $form.find('[name="dob"]').val();
-                if (!dob) {
+                // Assemble the Month / Day / Year dropdowns into a YYYY-MM-DD
+                // value (mobile-friendly — no native date-spinner year scroll).
+                var m = $form.find('#vfy-dob-month').val();
+                var d = $form.find('#vfy-dob-day').val();
+                var y = $form.find('#vfy-dob-year').val();
+                if (!m || !d || !y) {
                     this.showError($err, this.data.strings.dobRequired);
                     return false;
                 }
-                // Age check client-side
-                var age = this.calculateAge(dob);
-                if (age < 0) {
+                m = parseInt(m, 10); d = parseInt(d, 10); y = parseInt(y, 10);
+                var dt = new Date(y, m - 1, d);
+                // Reject impossible dates (e.g. Feb 30) and future dates.
+                if (dt.getFullYear() !== y || dt.getMonth() !== m - 1 || dt.getDate() !== d || dt > new Date()) {
                     this.showError($err, this.data.strings.dobInvalid);
                     return false;
                 }
+                var dob = y + '-' + (m < 10 ? '0' + m : m) + '-' + (d < 10 ? '0' + d : d);
+                $form.find('#vfy-dob').val(dob);
+                // Age check client-side
+                var age = this.calculateAge(dob);
                 if (age < parseInt(this.data.minAge)) {
                     this.showError($err, this.data.strings.ageError);
                     return false;

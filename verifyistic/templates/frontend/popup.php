@@ -95,10 +95,32 @@ $age_label = $min_age . '+';
         </div>
 
         <div class="vfy-form-group">
-          <label class="vfy-form-label" for="vfy-dob">Date of Birth <span style="color:#f87171;">*</span></label>
-          <input type="date" class="vfy-form-input" id="vfy-dob" name="dob" required aria-required="true"
-            max="<?php echo date('Y-m-d'); ?>"
-            placeholder="MM/DD/YYYY">
+          <label class="vfy-form-label" for="vfy-dob-month">Date of Birth <span style="color:#f87171;">*</span></label>
+          <?php
+          $vfy_now_year = (int) date( 'Y' );
+          $vfy_months   = array( 'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec' );
+          ?>
+          <div class="vfy-dob-row">
+            <select class="vfy-form-input vfy-dob-part" id="vfy-dob-month" aria-label="Birth month" autocomplete="bday-month">
+              <option value="">Month</option>
+              <?php foreach ( $vfy_months as $vfy_i => $vfy_m ) : ?>
+                <option value="<?php echo esc_attr( $vfy_i + 1 ); ?>"><?php echo esc_html( $vfy_m ); ?></option>
+              <?php endforeach; ?>
+            </select>
+            <select class="vfy-form-input vfy-dob-part" id="vfy-dob-day" aria-label="Birth day" autocomplete="bday-day">
+              <option value="">Day</option>
+              <?php for ( $vfy_d = 1; $vfy_d <= 31; $vfy_d++ ) : ?>
+                <option value="<?php echo esc_attr( $vfy_d ); ?>"><?php echo esc_html( $vfy_d ); ?></option>
+              <?php endfor; ?>
+            </select>
+            <select class="vfy-form-input vfy-dob-part" id="vfy-dob-year" aria-label="Birth year" autocomplete="bday-year">
+              <option value="">Year</option>
+              <?php for ( $vfy_y = $vfy_now_year; $vfy_y >= $vfy_now_year - 100; $vfy_y-- ) : ?>
+                <option value="<?php echo esc_attr( $vfy_y ); ?>"><?php echo esc_html( $vfy_y ); ?></option>
+              <?php endfor; ?>
+            </select>
+          </div>
+          <input type="hidden" id="vfy-dob" name="dob" value="">
         </div>
 
         <?php if ( $remember_me ) : ?>
