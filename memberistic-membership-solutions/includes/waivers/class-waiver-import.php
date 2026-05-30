@@ -26,6 +26,73 @@ final class Waiver_Import {
 	const SUBDIR = 'memberistic-waivers';
 
 	/**
+	 * Dry-run match report — reads the CSV, de-dupes to one record per person,
+	 * and tallies how many already have a WordPress account / active member
+	 * record. Makes ZERO changes (no inserts, no PDF downloads, no stamping).
+	 * Run on the live site to see the overlap before importing.
+	 *
+	 * @param string $path Absolute path to the CSV.
+	 * @return array|\WP_Error
+	 */
+	public static function report( $path ) {
+		if ( ! is_readable( $path ) ) {
+			return new \WP_Error( 'memberistic_csv_unreadable', __( 'CSV file not found or unreadable.', 'memberistic' ) );
+		}
+		$rows = self::read_csv( $path );
+		if ( is_wp_error( $rows ) ) {
+			return $rows;
+		}
+
+		$groups = array();
+		foreach ( $rows as $r ) {
+			$norm = self::normalize_row( $r );
+			if ( null === $norm ) {
+				continue;
+			}
+			$groups[ $norm['dedupe_key'] ][] = $norm;
+		}
+
+		$stats = array(
+			'rows'           => count( $rows ),
+			'people'         => count( $groups ),
+			'with_email'     => 0,
+			'with_pdf_url'   => 0,
+			'matched_users'  => 0, // has a WP account
+			'matched_members'=> 0, // has a Memberistic person/member record
+			'unmatched'      => 0, // walk-ins / guests not in the system
+		);
+		$has_people_repo = class_exists( 'WordPressistic\\Memberistic\\Database\\People_Repository' );
+
+		foreach ( $groups as $entries ) {
+			$e = $entries[0];
+			if ( '' !== $e['email'] ) {
+				$stats['with_email']++;
+			}
+			if ( '' !== $e['external_url'] ) {
+				$stats['with_pdf_url']++;
+			}
+			$user = ( '' !== $e['email'] ) ? get_user_by( 'email', $e['email'] ) : false;
+			$member = false;
+			if ( '' !== $e['email'] && $has_people_repo ) {
+				$person = People_Repository::get_by_email( $e['email'] );
+				$member = ! empty( $person['id'] );
+			}
+			if ( $member ) {
+				$stats['matched_members']++;
+				$stats['matched_users']++;
+			} elseif ( $user ) {
+				$stats['matched_users']++;
+			} else {
+				$stats['unmatched']++;
+			}
+		}
+
+		$stats['match_rate_users']   = $stats['people'] ? round( 100 * $stats['matched_users'] / $stats['people'], 1 ) : 0;
+		$stats['match_rate_members'] = $stats['people'] ? round( 100 * $stats['matched_members'] / $stats['people'], 1 ) : 0;
+		return $stats;
+	}
+
+	/**
 	 * Import a CSV file.
 	 *
 	 * @param string $path    Absolute path to the CSV.
@@ -340,7 +407,27 @@ final class Waiver_Import {
 		\WP_CLI::add_command( 'memberistic import-waivers', function ( $args, $assoc ) {
 			$path = isset( $args[0] ) ? $args[0] : '';
 			if ( '' === $path ) {
-				\WP_CLI::error( 'Usage: wp memberistic import-waivers <file.csv> [--no-pdf] [--fresh] [--limit=N]' );
+				\WP_CLI::error( 'Usage: wp memberistic import-waivers <file.csv> [--dry-run] [--no-pdf] [--fresh] [--limit=N]' );
+			}
+			// --dry-run: read-only match report, no changes.
+			if ( ! empty( $assoc['dry-run'] ) ) {
+				$rep = self::report( $path );
+				if ( is_wp_error( $rep ) ) {
+					\WP_CLI::error( $rep->get_error_message() );
+				}
+				\WP_CLI::log( '' );
+				\WP_CLI::log( '  Waiver match-rate report (no changes made)' );
+				\WP_CLI::log( '  ─────────────────────────────────────────' );
+				\WP_CLI::log( sprintf( '  CSV rows ............ %d', $rep['rows'] ) );
+				\WP_CLI::log( sprintf( '  Unique people ....... %d', $rep['people'] ) );
+				\WP_CLI::log( sprintf( '  With email .......... %d', $rep['with_email'] ) );
+				\WP_CLI::log( sprintf( '  With PDF link ....... %d', $rep['with_pdf_url'] ) );
+				\WP_CLI::log( sprintf( '  Have a WP account ... %d  (%s%%)', $rep['matched_users'], $rep['match_rate_users'] ) );
+				\WP_CLI::log( sprintf( '  Are members ......... %d  (%s%%)', $rep['matched_members'], $rep['match_rate_members'] ) );
+				\WP_CLI::log( sprintf( '  Walk-ins / guests ... %d', $rep['unmatched'] ) );
+				\WP_CLI::log( '' );
+				\WP_CLI::success( 'Report complete. Re-run without --dry-run to import.' );
+				return;
 			}
 			$res = self::import_file( $path, array(
 				'download_pdfs' => empty( $assoc['no-pdf'] ),
