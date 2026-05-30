@@ -110,6 +110,46 @@ add_action( 'wp_enqueue_scripts', function () {
 	wp_add_inline_style( 'g2a-plugin-bridge', g2a_plugin_bridge_css() );
 }, 110 );
 
+/** True when the Verifyistic age-verification plugin is active. */
+function g2a_has_verifyistic() {
+	return class_exists( 'Verifyistic_Frontend' ) || defined( 'VERIFYISTIC_VERSION' );
+}
+
+/* ---------- Guns 2 Ammo skin for the Verifyistic age popup ---------- */
+add_action( 'wp_enqueue_scripts', function () {
+	if ( ! g2a_has_verifyistic() ) return;
+	// The popup enqueues 'verifyistic-frontend'; attach our skin after it so it
+	// wins. Falls back to a registered handle if the plugin didn't enqueue.
+	$handle = wp_style_is( 'verifyistic-frontend', 'enqueued' ) ? 'verifyistic-frontend' : 'g2a-tokens';
+	wp_add_inline_style( $handle, g2a_verifyistic_skin_css() );
+}, 120 );
+
+/**
+ * Re-skin the Verifyistic popup to the Guns 2 Ammo tactical dark/brass look
+ * (fonts, brass accents, sharp edges, ember CTA) so the age gate matches the
+ * site. Uses the theme design tokens with safe fallbacks.
+ */
+function g2a_verifyistic_skin_css() {
+	return '
+	#verifyistic-overlay{background:rgba(10,9,12,.92)!important;backdrop-filter:blur(6px);}
+	#verifyistic-popup{background:var(--color-gunmetal,#15141a)!important;border:1px solid var(--color-brass-dim,#6b5a23)!important;border-radius:2px!important;box-shadow:0 30px 80px rgba(0,0,0,.6)!important;}
+	#verifyistic-popup .vfy-shield-icon{color:var(--color-brass-bright,#e3c25a)!important;}
+	#verifyistic-popup .vfy-age-badge{background:rgba(201,168,76,.08)!important;border:1px solid var(--color-brass-dim,#6b5a23)!important;color:var(--color-brass-bright,#e3c25a)!important;font-family:var(--font-mono,monospace)!important;letter-spacing:.22em;text-transform:uppercase;border-radius:0!important;}
+	#verifyistic-popup .vfy-heading{font-family:var(--font-display,Bebas Neue,sans-serif)!important;font-weight:400;letter-spacing:.02em;color:var(--color-white,#fff)!important;text-transform:uppercase;}
+	#verifyistic-popup .vfy-message,#verifyistic-popup .vfy-form-label,#verifyistic-popup .vfy-remember-label,#verifyistic-popup .vfy-privacy{color:var(--color-fog,#b8b4ad)!important;}
+	#verifyistic-popup .vfy-form-label{font-family:var(--font-condensed,Barlow Condensed,sans-serif)!important;text-transform:uppercase;letter-spacing:.06em;}
+	#verifyistic-popup .vfy-divider{background:var(--color-hairline,rgba(255,255,255,.08))!important;}
+	#verifyistic-popup .vfy-form-input,#verifyistic-popup select.vfy-dob-part{background:rgba(0,0,0,.25)!important;border:1px solid var(--color-hairline-bright,rgba(255,255,255,.14))!important;border-radius:0!important;color:var(--color-white,#fff)!important;font-family:var(--font-body,Barlow,sans-serif)!important;}
+	#verifyistic-popup .vfy-form-input:focus,#verifyistic-popup select.vfy-dob-part:focus{border-color:var(--color-brass,#c9a84c)!important;box-shadow:0 0 0 2px rgba(201,168,76,.25)!important;background:rgba(201,168,76,.05)!important;}
+	#verifyistic-popup select.vfy-dob-part option{color:#15141a;}
+	#verifyistic-popup .vfy-btn-submit,#verifyistic-popup .vfy-btn-yes{background:var(--color-ember,#c2491f)!important;color:#fff!important;border:0!important;border-radius:0!important;font-family:var(--font-condensed,Barlow Condensed,sans-serif)!important;font-weight:600;text-transform:uppercase;letter-spacing:.06em;}
+	#verifyistic-popup .vfy-btn-submit:hover,#verifyistic-popup .vfy-btn-yes:hover{filter:brightness(1.08);}
+	#verifyistic-popup .vfy-btn-no{background:transparent!important;border:1px solid var(--color-hairline-bright,rgba(255,255,255,.18))!important;color:var(--color-silver,#9a958c)!important;border-radius:0!important;text-transform:uppercase;letter-spacing:.06em;font-family:var(--font-condensed,Barlow Condensed,sans-serif)!important;}
+	#verifyistic-popup .vfy-success-title{font-family:var(--font-display,Bebas Neue,sans-serif)!important;color:var(--color-white,#fff)!important;text-transform:uppercase;}
+	#verifyistic-popup .vfy-powered{color:var(--color-silver,#7a766e)!important;}
+	';
+}
+
 /**
  * Recolour Memberistic + G2A Booking Engine frontend output to the tactical
  * dark/brass theme so plugin forms match the website.

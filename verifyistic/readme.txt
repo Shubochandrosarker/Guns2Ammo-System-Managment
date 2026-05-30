@@ -102,6 +102,12 @@ No. All verification is handled locally. The webhook integration is optional and
 
 == Changelog ==
 
+= 1.2.0 =
+* NEW: Mobile-friendly Date of Birth picker — replaced the native date input
+  with fast Month / Day / Year dropdowns (no more endless year-scrolling on
+  phones). Validates real calendar dates client- and server-side.
+* Theme-skinnable popup (the host theme can restyle the .vfy-* elements).
+
 = 1.1.0 =
 * NEW: Multiple webhook connections — fan verification data out to unlimited
   platforms (Zapier, Make, n8n, CRM, Google Sheets, custom endpoints), each with
