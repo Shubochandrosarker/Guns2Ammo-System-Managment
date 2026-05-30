@@ -240,6 +240,36 @@ CREATE TABLE {$prefix}memberistic_documents (
   KEY user_id (user_id),
   KEY membership_id (membership_id)
 ) {$charset_collate};
+CREATE TABLE {$prefix}memberistic_waivers_archive (
+  id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  first_name VARCHAR(120) NULL,
+  last_name VARCHAR(120) NULL,
+  email VARCHAR(191) NULL,
+  phone VARCHAR(60) NULL,
+  dob DATE NULL,
+  signed_at DATETIME NULL,
+  source VARCHAR(40) NULL,
+  participant_type VARCHAR(40) NULL,
+  external_url TEXT NULL,
+  attachment_id BIGINT UNSIGNED NULL,
+  local_path VARCHAR(255) NULL,
+  minor_name VARCHAR(191) NULL,
+  minor_age VARCHAR(20) NULL,
+  emergency_name VARCHAR(191) NULL,
+  emergency_phone VARCHAR(60) NULL,
+  matched_user_id BIGINT UNSIGNED NULL,
+  is_current TINYINT(1) NOT NULL DEFAULT 1,
+  dedupe_key VARCHAR(191) NULL,
+  raw_json LONGTEXT NULL,
+  import_batch VARCHAR(40) NULL,
+  created_at DATETIME NOT NULL,
+  PRIMARY KEY  (id),
+  KEY email (email),
+  KEY last_name (last_name),
+  KEY dob (dob),
+  KEY matched_user_id (matched_user_id),
+  KEY dedupe_key (dedupe_key)
+) {$charset_collate};
 ";
 
 		dbDelta( $sql );

@@ -47,3 +47,22 @@ if ( ! function_exists( 'memberistic_mask_secret' ) ) {
 		return WordPressistic\Memberistic\memberistic_mask_secret( $value );
 	}
 }
+
+if ( ! function_exists( 'memberistic_waiver_on_file' ) ) {
+	/**
+	 * Public lookup: the current waiver-on-file for a person, by email (then
+	 * name + optional DOB). Returns the archive row array, or null. Safe to call
+	 * from other plugins (e.g. the booking engine) to auto-satisfy a waiver step.
+	 *
+	 * @param string $email
+	 * @param string $name "First Last"
+	 * @param string $dob  Y-m-d
+	 * @return array|null
+	 */
+	function memberistic_waiver_on_file( $email, $name = '', $dob = '' ) {
+		if ( ! class_exists( '\\WordPressistic\\Memberistic\\Waivers\\Waivers_Archive' ) ) {
+			return null;
+		}
+		return \WordPressistic\Memberistic\Waivers\Waivers_Archive::find_on_file( $email, $name, $dob );
+	}
+}

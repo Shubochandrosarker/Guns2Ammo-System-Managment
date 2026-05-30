@@ -38,6 +38,7 @@ final class Admin_Menu {
 		add_submenu_page( 'memberistic-dashboard', __( 'Payments', 'memberistic' ), __( 'Payments', 'memberistic' ), 'manage_memberistic_payments', 'memberistic-payments', array( Payments_Page::class, 'render' ) );
 		add_submenu_page( 'memberistic-dashboard', __( 'Check-Ins', 'memberistic' ), __( 'Check-Ins', 'memberistic' ), 'memberistic_checkin_members', 'memberistic-checkins', array( Checkins_Page::class, 'render' ) );
 		add_submenu_page( 'memberistic-dashboard', __( 'Waivers', 'memberistic' ), __( 'Waivers', 'memberistic' ), 'edit_memberistic_members', 'memberistic-waivers', array( \WordPressistic\Memberistic\Waivers\Waiver_Admin_Page::class, 'render' ) );
+		add_submenu_page( 'memberistic-dashboard', __( 'Waivers on File', 'memberistic' ), __( 'Waivers on File', 'memberistic' ), 'view_memberistic_dashboard', 'memberistic-waivers-archive', array( \WordPressistic\Memberistic\Waivers\Waiver_Archive_Admin::class, 'render' ) );
 		add_submenu_page( 'memberistic-dashboard', __( 'Activity', 'memberistic' ), __( 'Activity', 'memberistic' ), 'view_memberistic_dashboard', 'memberistic-activity', array( Activity_Page::class, 'render' ) );
 
 		add_submenu_page( 'memberistic-dashboard', __( 'Emails', 'memberistic' ), __( 'Emails', 'memberistic' ), 'view_memberistic_dashboard', 'memberistic-emails', array( self::class, 'render_emails' ) );

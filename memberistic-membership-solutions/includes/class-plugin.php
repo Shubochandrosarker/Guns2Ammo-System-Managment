@@ -78,6 +78,9 @@ final class Plugin {
 			'includes/corporate/class-corporate-module.php',
 			'includes/waivers/class-documents.php',
 			'includes/waivers/class-waivers.php',
+			'includes/waivers/class-waivers-archive.php',
+			'includes/waivers/class-waiver-import.php',
+			'includes/waivers/class-waiver-archive-admin.php',
 		);
 
 		foreach ( $files as $file ) {
@@ -102,6 +105,8 @@ final class Plugin {
 		add_action( 'init', array( Waivers\Waiver_Admin_Page::class, 'maybe_handle_export' ) );
 		Waivers\Waiver_Public::register();
 		Waivers\Documents::register();
+		Waivers\Waiver_Archive_Admin::register();
+		Waivers\Waiver_Import::register_cli();
 		add_action( 'admin_notices', __NAMESPACE__ . '\\memberistic_admin_notices' );
 		add_action( 'admin_enqueue_scripts', array( $this, 'enqueue_admin_assets' ) );
 		add_action( 'wp_enqueue_scripts', array( $this, 'enqueue_frontend_assets' ) );
