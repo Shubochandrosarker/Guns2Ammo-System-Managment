@@ -958,7 +958,20 @@ final class G2AB_REST_Bookings_Controller {
 		if ( '' === $customer_phone ) {
 			return new WP_Error( 'g2ab_missing_phone', __( 'Contact number is required.', 'g2a-booking' ), array( 'status' => 400 ) );
 		}
-		if ( (int) $booking_type->requires_waiver === 1 && empty( $fields['waiver_acceptance'] ) ) {
+		// Waiver acceptance — satisfied by the form checkbox OR by an existing
+		// signed waiver on file (Memberistic answers via this filter, matching
+		// the customer's email/name against the imported waiver archive so
+		// returning customers don't have to re-sign).
+		$waiver_ok = ! empty( $fields['waiver_acceptance'] );
+		/**
+		 * Filter: is the waiver requirement satisfied for this booking?
+		 *
+		 * @param bool   $waiver_ok    Whether the form checkbox was ticked.
+		 * @param array  $fields       Submitted fields (customer_email, customer_name, …).
+		 * @param object $booking_type The booking type row.
+		 */
+		$waiver_ok = (bool) apply_filters( 'g2ab_waiver_satisfied', $waiver_ok, $fields, $booking_type );
+		if ( (int) $booking_type->requires_waiver === 1 && ! $waiver_ok ) {
 			return new WP_Error( 'g2ab_waiver_required', __( 'Waiver acceptance is required.', 'g2a-booking' ), array( 'status' => 400 ) );
 		}
 		if ( $party_size > $capacity ) {
