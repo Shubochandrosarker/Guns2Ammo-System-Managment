@@ -158,7 +158,66 @@ final class G2AB_Installer {
 		$this->migrate_to_1_4_0( $current );
 		$this->migrate_to_1_5_0( $current );
 		$this->migrate_to_1_6_0( $current );
+		$this->migrate_to_1_6_1( $current );
 		do_action( 'g2ab_run_migrations', $current, G2AB_DB_VERSION );
+	}
+
+	/**
+	 * v1.6.1 — partial-unique on (resource_id, start_at) for active bookings.
+	 *
+	 * Adds a generated VIRTUAL column `slot_key` that is non-NULL only when
+	 * status is active ('pending','reserved','confirmed','paid','checked_in').
+	 * A UNIQUE KEY on that column treats NULLs as distinct (MySQL behavior),
+	 * so cancelled/expired/no_show rows never collide, but two simultaneous
+	 * active bookings at the same (resource, start_at) now fail at the
+	 * database layer — belt-and-suspenders against the FOR UPDATE lock
+	 * degrading on non-InnoDB engines.
+	 *
+	 * Capacity > 1 resources (CCW class blocks) are modeled as a single
+	 * row with party_size = N at the same slot, so this rule does NOT
+	 * conflict with multi-seat resources.
+	 *
+	 * SELF-HEALING: keyed on column existence, NOT the version option.
+	 * Earlier installs may have had `g2ab_db_version` bumped past 1.6.1
+	 * by an unrelated dev/staging deploy, which would otherwise skip
+	 * this migration entirely.
+	 *
+	 * Skipped silently if the MySQL version is too old for generated
+	 * columns (< 5.7) — the FOR UPDATE path stays as the only defense.
+	 */
+	private function migrate_to_1_6_1( $current ) {
+		global $wpdb;
+		$bookings = $wpdb->prefix . 'g2ab_bookings';
+
+		// Column-existence is the source of truth, not the version option.
+		$cols = (array) $wpdb->get_col( "SHOW COLUMNS FROM {$bookings}" );
+		if ( in_array( 'slot_key', $cols, true ) ) {
+			return;
+		}
+
+		// Require MySQL 5.7+ for generated columns.
+		$version = (string) $wpdb->get_var( 'SELECT VERSION()' );
+		if ( '' === $version || version_compare( preg_replace( '/[^0-9.].*$/', '', $version ), '5.7.0', '<' ) ) {
+			return;
+		}
+
+		// Defensive collapse: keep the most recently created active row per slot
+		// before we add the unique constraint, otherwise the ALTER fails.
+		$wpdb->query( "DELETE b1 FROM {$bookings} b1
+			INNER JOIN {$bookings} b2
+			ON b1.resource_id = b2.resource_id
+			AND b1.start_at = b2.start_at
+			AND b1.id < b2.id
+			WHERE b1.status IN ('pending','reserved','confirmed','paid','checked_in')
+			AND b2.status IN ('pending','reserved','confirmed','paid','checked_in')" );
+
+		$wpdb->query( "ALTER TABLE {$bookings}
+			ADD COLUMN slot_key VARCHAR(80) GENERATED ALWAYS AS (
+				CASE WHEN status IN ('pending','reserved','confirmed','paid','checked_in')
+					THEN CONCAT(resource_id, '|', DATE_FORMAT(start_at, '%Y-%m-%d %H:%i:%s'))
+				ELSE NULL END
+			) VIRTUAL,
+			ADD UNIQUE KEY uniq_active_slot (slot_key)" );
 	}
 
 	/**

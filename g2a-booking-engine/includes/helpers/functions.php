@@ -96,6 +96,28 @@ function g2ab_current_user_can( $cap ) {
 }
 
 /**
+ * Build a signed member-card QR payload for the staff console scanner.
+ *
+ * Format: g2ab:<person_id>:<exp_unix>:<hmac>
+ * The staff console verifies this server-side. Validity defaults to 7
+ * days so members can re-print their card monthly without expiring it
+ * between visits. Caller passes a Memberistic person id (NOT a WP user
+ * id) — that's what the staff lookup keys on.
+ *
+ * @param int $person_id    Memberistic persons.id
+ * @param int $ttl_seconds  Validity window. Default 7 days.
+ * @return string
+ */
+function g2ab_member_qr_payload( $person_id, $ttl_seconds = 0 ) {
+	$person_id = (int) $person_id;
+	if ( $person_id <= 0 ) return '';
+	$ttl = max( 60, (int) ( $ttl_seconds ?: 7 * DAY_IN_SECONDS ) );
+	$exp = time() + $ttl;
+	$sig = hash_hmac( 'sha256', 'card|' . $person_id . '|' . $exp, wp_salt( 'auth' ) );
+	return 'g2ab:' . $person_id . ':' . $exp . ':' . $sig;
+}
+
+/**
  * Get the IP of the current request.
  *
  * Forwarded headers (CF-Connecting-IP, X-Forwarded-For, X-Real-IP) are honored

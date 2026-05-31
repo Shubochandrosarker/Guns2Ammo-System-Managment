@@ -177,6 +177,13 @@ add_action( 'init', function () {
  * (the "Our Team" page is intentionally excluded per business request).
  */
 function g2a_sitemap_urls() {
+	// PERF: cache the assembled URL list for an hour. Before this, every
+	// crawl hit re-ran get_posts() twice (200 posts + 500 products) plus a
+	// large static-array assemble — measurable load under bot traffic.
+	$cached = get_transient( 'g2a_sitemap_urls' );
+	if ( is_array( $cached ) ) {
+		return $cached;
+	}
 	$h = untrailingslashit( home_url( '/' ) );
 
 	// path => [ priority, changefreq ]
@@ -256,8 +263,17 @@ function g2a_sitemap_urls() {
 		}
 	}
 
-	return apply_filters( 'g2a_sitemap_urls', $urls );
+	$urls = apply_filters( 'g2a_sitemap_urls', $urls );
+	set_transient( 'g2a_sitemap_urls', $urls, HOUR_IN_SECONDS );
+	return $urls;
 }
+
+/* Invalidate sitemap cache when posts/pages/products change. */
+add_action( 'save_post', function ( $post_id ) {
+	if ( wp_is_post_revision( $post_id ) ) return;
+	delete_transient( 'g2a_sitemap_urls' );
+} );
+add_action( 'deleted_post', function () { delete_transient( 'g2a_sitemap_urls' ); } );
 
 /* ---------- Serve /sitemap.xml ---------- */
 add_action( 'init', function () {

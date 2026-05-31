@@ -1,0 +1,588 @@
+/*
+ * G2A Staff Console — frontend dashboard CSS.
+ * Reuses theme tokens when available; falls back to safe defaults
+ * so the console still looks right when the booking engine is used
+ * with a non-guns2ammo theme.
+ */
+.g2ab-sc {
+  --sc-void: var(--color-void, #0F1115);
+  --sc-gunmetal: var(--color-gunmetal, #1A1F26);
+  --sc-hairline: var(--color-hairline, rgba(255,255,255,0.06));
+  --sc-hairline-bright: var(--color-hairline-bright, rgba(255,255,255,0.12));
+  --sc-fog: var(--color-fog, #C9CFD8);
+  --sc-silver: var(--color-silver, #8A95A5);
+  --sc-white: var(--color-white, #ffffff);
+  --sc-brass: var(--color-brass, #C9A84C);
+  --sc-brass-bright: var(--color-brass-bright, #E9C764);
+  --sc-brass-dim: var(--color-brass-dim, rgba(201,168,76,0.45));
+  --sc-ember: var(--color-ember, #FF4B1F);
+  --sc-active: var(--color-active, #3CA67B);
+  --sc-font-display: var(--font-display, "Bebas Neue", Impact, sans-serif);
+  --sc-font-condensed: var(--font-condensed, "Barlow Condensed", "Oswald", sans-serif);
+  --sc-font-mono: var(--font-mono, "Space Mono", "Roboto Mono", monospace);
+  --sc-font-body: var(--font-body, "DM Sans", "Inter", system-ui, sans-serif);
+
+  display: grid;
+  grid-template-columns: 240px 1fr;
+  min-height: 100vh;
+  background: var(--sc-void);
+  color: var(--sc-fog);
+  font-family: var(--sc-font-body);
+}
+@media (max-width: 900px) {
+  .g2ab-sc { grid-template-columns: 1fr; }
+}
+.g2ab-sc-gate {
+  padding: 60px 20px; text-align: center; color: var(--color-fog, #ccc);
+  font-family: var(--font-condensed, sans-serif); letter-spacing: .04em;
+}
+
+.g2ab-sc__side {
+  background: var(--sc-gunmetal); border-right: 1px solid var(--sc-hairline);
+  padding: 24px 0; position: sticky; top: 0; align-self: start; min-height: 100vh;
+}
+.g2ab-sc__who { padding: 0 22px 18px; border-bottom: 1px solid var(--sc-hairline); margin-bottom: 14px; }
+.g2ab-sc__role { font-family: var(--sc-font-mono); font-size: 10px; letter-spacing: 0.24em; color: var(--sc-ember); text-transform: uppercase; }
+.g2ab-sc__nm { font-family: var(--sc-font-display); font-size: 22px; color: var(--sc-white); letter-spacing: 0.04em; line-height: 1; margin-top: 6px; }
+.g2ab-sc__nav { display: flex; flex-direction: column; }
+.g2ab-sc__navi, .g2ab-sc__sign-out {
+  display: flex; align-items: center; gap: 12px;
+  padding: 12px 22px; color: var(--sc-fog); text-decoration: none;
+  font-family: var(--sc-font-condensed); font-weight: 600; font-size: 13px;
+  text-transform: uppercase; letter-spacing: 0.06em;
+  border-left: 3px solid transparent; transition: all 200ms ease;
+  cursor: pointer; background: none; border: 0;
+}
+.g2ab-sc__navi:hover, .g2ab-sc__sign-out:hover { color: var(--sc-white); background: rgba(201,168,76,0.04); }
+.g2ab-sc__navi.is-cur { color: var(--sc-brass-bright); border-left: 3px solid var(--sc-brass); background: rgba(201,168,76,0.06); }
+.g2ab-sc__navi-ic { width: 18px; display: inline-block; text-align: center; opacity: 0.85; font-family: var(--sc-font-mono); }
+
+.g2ab-sc__main { padding: 32px 36px 64px; }
+.g2ab-sc__h { display: flex; align-items: baseline; justify-content: space-between; flex-wrap: wrap; gap: 14px; margin-bottom: 28px; }
+.g2ab-sc__h h1 { font-family: var(--sc-font-display); font-size: clamp(32px, 4vw, 50px); color: var(--sc-white); letter-spacing: 0.04em; line-height: 1; margin: 6px 0 0; }
+.g2ab-sc__crumb { font-family: var(--sc-font-mono); font-size: 11px; letter-spacing: 0.18em; color: var(--sc-silver); text-transform: uppercase; }
+.g2ab-sc__crumb b { color: var(--sc-brass-bright); font-weight: 400; }
+.g2ab-sc__btn {
+  padding: 10px 18px; background: var(--sc-ember); color: #fff; border: 0;
+  font-family: var(--sc-font-condensed); font-weight: 600; font-size: 13px;
+  text-transform: uppercase; letter-spacing: 0.06em; cursor: pointer;
+  transition: filter 150ms ease;
+}
+.g2ab-sc__btn:hover { filter: brightness(1.1); }
+.g2ab-sc__btn--ghost { background: transparent; border: 1px solid var(--sc-hairline-bright); color: var(--sc-fog); }
+
+.g2ab-sc__pane[hidden] { display: none; }
+
+.g2ab-sc__kpis { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin-bottom: 24px; }
+@media (max-width: 900px) { .g2ab-sc__kpis { grid-template-columns: 1fr 1fr; } }
+.g2ab-sc__kpi { padding: 22px 24px; background: var(--sc-gunmetal); border: 1px solid var(--sc-hairline); }
+.g2ab-sc__kpi.brass { border-color: var(--sc-brass-dim); }
+.g2ab-sc__kpi-l { font-family: var(--sc-font-mono); font-size: 10px; letter-spacing: 0.22em; color: var(--sc-silver); text-transform: uppercase; }
+.g2ab-sc__kpi-v { font-family: var(--sc-font-display); font-size: 38px; color: var(--sc-white); letter-spacing: 0.04em; line-height: 1; margin-top: 8px; }
+
+.g2ab-sc__row { display: grid; grid-template-columns: 1.4fr 1fr; gap: 16px; margin-bottom: 16px; }
+@media (max-width: 1100px) { .g2ab-sc__row { grid-template-columns: 1fr; } }
+.g2ab-sc__panel { background: var(--sc-gunmetal); border: 1px solid var(--sc-hairline); padding: 24px; }
+.g2ab-sc__panel h3 { font-family: var(--sc-font-condensed); font-weight: 600; font-size: 16px; color: var(--sc-white); text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 18px; display: flex; gap: 10px; align-items: center; }
+.g2ab-sc__pill { font-family: var(--sc-font-mono); font-size: 10px; letter-spacing: 0.18em; color: var(--sc-active); padding: 3px 8px; border: 1px solid var(--sc-active); border-radius: 2px; }
+.g2ab-sc__hint { font-family: var(--sc-font-mono); font-size: 11px; letter-spacing: 0.1em; color: var(--sc-silver); margin: 10px 0 14px; }
+
+.g2ab-sc__lanes { display: grid; grid-template-columns: repeat(8, 1fr); gap: 6px; }
+@media (max-width: 700px) { .g2ab-sc__lanes { grid-template-columns: repeat(4, 1fr); } }
+.g2ab-sc__lane { aspect-ratio: 1; background: var(--sc-void); border: 1px solid var(--sc-hairline-bright); display: grid; place-items: center; position: relative; font-family: var(--sc-font-display); color: var(--sc-fog); font-size: 22px; }
+.g2ab-sc__lane.in_use { background: rgba(255,75,31,0.10); border-color: var(--sc-ember); color: var(--sc-ember); }
+.g2ab-sc__lane.reserved { background: rgba(201,168,76,0.08); border-color: var(--sc-brass); color: var(--sc-brass-bright); }
+.g2ab-sc__lane.open { background: rgba(60,166,123,0.06); border-color: var(--sc-active); color: var(--sc-active); }
+.g2ab-sc__lane .lbl { position: absolute; top: 4px; left: 6px; font-family: var(--sc-font-mono); font-size: 9px; letter-spacing: 0.16em; opacity: 0.75; }
+.g2ab-sc__legend { display: flex; gap: 14px; margin-top: 14px; font-family: var(--sc-font-mono); font-size: 10px; letter-spacing: 0.18em; color: var(--sc-silver); text-transform: uppercase; flex-wrap: wrap; }
+.g2ab-sc__sw { width: 10px; height: 10px; display: inline-block; margin-right: 6px; vertical-align: middle; }
+.g2ab-sc__sw.in_use { background: rgba(255,75,31,0.4); }
+.g2ab-sc__sw.reserved { background: rgba(201,168,76,0.4); }
+.g2ab-sc__sw.open { background: rgba(60,166,123,0.4); }
+
+.g2ab-sc__feed { display: flex; flex-direction: column; }
+.g2ab-sc__feed-row { padding: 14px 0; border-bottom: 1px solid var(--sc-hairline); display: flex; gap: 14px; align-items: flex-start; }
+.g2ab-sc__feed-row:last-child { border-bottom: 0; }
+.g2ab-sc__feed-row .t { font-family: var(--sc-font-mono); font-size: 10px; letter-spacing: 0.16em; color: var(--sc-silver); text-transform: uppercase; min-width: 90px; padding-top: 2px; }
+.g2ab-sc__feed-row .nm { font-family: var(--sc-font-condensed); font-weight: 600; font-size: 14px; color: var(--sc-white); text-transform: uppercase; letter-spacing: 0.04em; }
+.g2ab-sc__feed-row .d { font-size: 13px; color: var(--sc-fog); margin-top: 2px; }
+.g2ab-sc__feed-row .ic { width: 28px; height: 28px; border: 1px solid var(--sc-hairline-bright); display: grid; place-items: center; color: var(--sc-brass-bright); flex-shrink: 0; font-family: var(--sc-font-mono); }
+.g2ab-sc__feed-row.alert .ic { color: var(--sc-ember); border-color: rgba(255,75,31,0.4); }
+.g2ab-sc__feed-row.ok .ic { color: var(--sc-active); border-color: rgba(60,166,123,0.4); }
+
+.g2ab-sc__search { display: flex; gap: 10px; }
+.g2ab-sc__input {
+  flex: 1; padding: 12px 14px; background: var(--sc-void); border: 1px solid var(--sc-hairline-bright);
+  color: var(--sc-white); font-family: var(--sc-font-body); font-size: 14px;
+}
+.g2ab-sc__input:focus { outline: none; border-color: var(--sc-brass); }
+.g2ab-sc__results { display: grid; gap: 8px; margin-top: 14px; }
+.g2ab-sc__rcard {
+  padding: 14px 16px; background: rgba(0,0,0,0.25); border: 1px solid var(--sc-hairline);
+  display: grid; grid-template-columns: 1fr auto; gap: 10px;
+}
+.g2ab-sc__rcard .who { font-family: var(--sc-font-condensed); font-weight: 600; color: var(--sc-white); text-transform: uppercase; letter-spacing: 0.04em; font-size: 15px; }
+.g2ab-sc__rcard .meta { font-family: var(--sc-font-mono); font-size: 11px; color: var(--sc-silver); letter-spacing: 0.06em; margin-top: 4px; }
+.g2ab-sc__rcard .status { font-family: var(--sc-font-condensed); font-weight: 700; font-size: 12px; letter-spacing: 0.1em; text-transform: uppercase; padding: 6px 10px; align-self: start; }
+.g2ab-sc__rcard .status.current { color: var(--sc-active); border: 1px solid var(--sc-active); }
+.g2ab-sc__rcard .status.expired { color: var(--sc-ember); border: 1px solid var(--sc-ember); }
+.g2ab-sc__rcard .status.missing { color: var(--sc-silver); border: 1px solid var(--sc-silver); }
+.g2ab-sc__rcard .dates { font-family: var(--sc-font-mono); font-size: 10px; color: var(--sc-silver); margin-top: 6px; }
+.g2ab-sc__empty { padding: 24px; text-align: center; font-family: var(--sc-font-mono); color: var(--sc-silver); letter-spacing: 0.1em; }
+
+.g2ab-sc__scan-wrap { position: relative; max-width: 480px; aspect-ratio: 1; background: #000; }
+.g2ab-sc__scan-wrap video { width: 100%; height: 100%; object-fit: cover; display: block; }
+.g2ab-sc__scan-overlay { position: absolute; inset: 0; display: grid; place-items: center; pointer-events: none; }
+.g2ab-sc__scan-frame { width: 70%; height: 70%; border: 2px solid var(--sc-brass-bright); box-shadow: 0 0 0 9999px rgba(0,0,0,0.4); }
+.g2ab-sc__scan-actions { display: flex; align-items: center; gap: 14px; margin-top: 14px; }
+.g2ab-sc__scan-status { font-family: var(--sc-font-mono); font-size: 11px; color: var(--sc-silver); letter-spacing: 0.08em; }
+
+.g2ab-sc__roster { display: grid; gap: 8px; }
+.g2ab-sc__rrow { display: grid; grid-template-columns: 80px 1fr 100px 80px 120px auto; gap: 14px; padding: 12px 14px; background: rgba(0,0,0,0.2); border: 1px solid var(--sc-hairline); align-items: center; }
+.g2ab-sc__rrow .time { font-family: var(--sc-font-mono); color: var(--sc-brass-bright); letter-spacing: 0.08em; }
+.g2ab-sc__rrow .name { font-family: var(--sc-font-condensed); font-weight: 600; color: var(--sc-white); text-transform: uppercase; letter-spacing: 0.04em; }
+.g2ab-sc__rrow .resource { font-family: var(--sc-font-mono); font-size: 11px; color: var(--sc-silver); }
+.g2ab-sc__rrow .pill { font-family: var(--sc-font-mono); font-size: 10px; padding: 4px 8px; border: 1px solid var(--sc-hairline-bright); color: var(--sc-fog); text-align: center; }
+.g2ab-sc__rrow .actions { display: flex; gap: 6px; justify-content: flex-end; }
+.g2ab-sc__act-btn { width: 30px; height: 30px; background: transparent; border: 1px solid var(--sc-hairline-bright); color: var(--sc-fog); cursor: pointer; }
+.g2ab-sc__act-btn:hover { color: var(--sc-brass-bright); border-color: var(--sc-brass); }
+
+/* Toasts */
+.g2ab-sc__toasts { position: fixed; bottom: 24px; right: 24px; display: grid; gap: 8px; z-index: 99999; }
+.g2ab-sc__toast {
+  padding: 12px 18px; background: var(--sc-gunmetal); border-left: 4px solid var(--sc-brass);
+  color: var(--sc-white); font-family: var(--sc-font-condensed); font-weight: 600;
+  text-transform: uppercase; letter-spacing: 0.06em; font-size: 13px;
+  box-shadow: 0 8px 30px rgba(0,0,0,0.5); animation: g2absc-toast 250ms ease;
+}
+.g2ab-sc__toast.ok { border-color: var(--sc-active); }
+.g2ab-sc__toast.err { border-color: var(--sc-ember); }
+@keyframes g2absc-toast { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+
+/* Modal */
+.g2ab-sc__modal { position: fixed; inset: 0; z-index: 99998; display: grid; place-items: center; }
+.g2ab-sc__modal[hidden] { display: none; }
+.g2ab-sc__modal-back { position: absolute; inset: 0; background: rgba(0,0,0,0.6); backdrop-filter: blur(4px); }
+.g2ab-sc__modal-card { position: relative; max-width: 520px; width: calc(100% - 32px); background: var(--sc-gunmetal); border: 1px solid var(--sc-hairline-bright); padding: 28px; box-shadow: 0 24px 60px rgba(0,0,0,0.6); animation: g2absc-pop 200ms ease; }
+.g2ab-sc__modal-card header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 18px; }
+.g2ab-sc__modal-card h3 { font-family: var(--sc-font-display); font-size: 28px; color: var(--sc-white); letter-spacing: 0.04em; line-height: 1; }
+.g2ab-sc__x { background: transparent; color: var(--sc-fog); border: 0; font-size: 18px; cursor: pointer; }
+.g2ab-sc__modal-card label { display: block; font-family: var(--sc-font-mono); font-size: 11px; letter-spacing: 0.18em; color: var(--sc-silver); text-transform: uppercase; margin-bottom: 14px; }
+.g2ab-sc__modal-card label input, .g2ab-sc__modal-card label select {
+  display: block; width: 100%; padding: 10px 12px; background: var(--sc-void);
+  border: 1px solid var(--sc-hairline-bright); color: var(--sc-white);
+  font-family: var(--sc-font-body); font-size: 14px; margin-top: 6px;
+}
+.g2ab-sc__modal-card label input:focus, .g2ab-sc__modal-card label select:focus { outline: none; border-color: var(--sc-brass); }
+.g2ab-sc__grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.g2ab-sc__grid3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; }
+.g2ab-sc__modal-card footer { display: flex; gap: 10px; justify-content: flex-end; margin-top: 14px; }
+@keyframes g2absc-pop { from { transform: scale(0.94); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+
+.g2ab-sc__modal-card--finish { text-align: center; padding: 40px 32px; }
+.g2ab-sc__finish-ic { width: 70px; height: 70px; border-radius: 50%; margin: 0 auto 16px; display: grid; place-items: center; font-size: 36px; background: rgba(60,166,123,0.15); color: var(--sc-active); border: 2px solid var(--sc-active); animation: g2absc-bounce 400ms ease; }
+.g2ab-sc__finish-ic.err { background: rgba(255,75,31,0.15); color: var(--sc-ember); border-color: var(--sc-ember); }
+@keyframes g2absc-bounce { 0% { transform: scale(0); } 60% { transform: scale(1.15); } 100% { transform: scale(1); } }
+.g2ab-sc__modal-card--finish h3 { margin-bottom: 10px; }
+.g2ab-sc__modal-card--finish p { color: var(--sc-fog); margin-bottom: 22px; }
+
+/* ============================================================== */
+/* Light / clean theme — matches the cream + dark-green admin look */
+/* ============================================================== */
+.g2ab-sc.is-theme-light {
+  --sc-void:           #FBF8EE;            /* page bg (warm cream) */
+  --sc-gunmetal:       #FFFFFF;            /* panel bg */
+  --sc-hairline:       rgba(0,0,0,0.08);
+  --sc-hairline-bright:rgba(0,0,0,0.16);
+  --sc-fog:            #2A3F2D;            /* primary text — forest */
+  --sc-silver:         #6B7A6D;            /* secondary text */
+  --sc-white:          #16241A;            /* strong / headers — deeper forest */
+  --sc-brass:          #C9A84C;
+  --sc-brass-bright:   #8B6A1E;
+  --sc-brass-dim:      rgba(201,168,76,0.45);
+  --sc-ember:          #C4471A;            /* warmer red-orange for light bg */
+  --sc-active:         #2F8A5A;            /* green ok */
+}
+.g2ab-sc.is-theme-light .g2ab-sc__side { background: #FFFEF8; border-right: 1px solid var(--sc-hairline); }
+.g2ab-sc.is-theme-light .g2ab-sc__role { color: var(--sc-ember); }
+.g2ab-sc.is-theme-light .g2ab-sc__navi { color: var(--sc-fog); }
+.g2ab-sc.is-theme-light .g2ab-sc__navi.is-cur { background: rgba(201,168,76,0.10); border-left-color: var(--sc-brass); color: var(--sc-brass-bright); }
+.g2ab-sc.is-theme-light .g2ab-sc__panel { background: #FFFFFF; border: 1px solid var(--sc-hairline); box-shadow: 0 1px 0 rgba(0,0,0,0.02); }
+.g2ab-sc.is-theme-light .g2ab-sc__btn { background: var(--sc-ember); }
+.g2ab-sc.is-theme-light .g2ab-sc__btn--ghost { color: var(--sc-fog); background: transparent; border-color: var(--sc-hairline-bright); }
+.g2ab-sc.is-theme-light .g2ab-sc__input { background: #FFFEF8; color: var(--sc-fog); border-color: var(--sc-hairline-bright); }
+.g2ab-sc.is-theme-light .g2ab-sc__kpi { background: #FFFFFF; border-color: var(--sc-hairline); }
+.g2ab-sc.is-theme-light .g2ab-sc__lane { background: #F4F0E3; border-color: var(--sc-hairline-bright); color: var(--sc-fog); }
+.g2ab-sc.is-theme-light .g2ab-sc__lane.in_use { background: rgba(196,71,26,0.10); border-color: var(--sc-ember); color: var(--sc-ember); }
+.g2ab-sc.is-theme-light .g2ab-sc__lane.reserved { background: rgba(201,168,76,0.14); border-color: var(--sc-brass); color: var(--sc-brass-bright); }
+.g2ab-sc.is-theme-light .g2ab-sc__lane.open { background: rgba(47,138,90,0.10); border-color: var(--sc-active); color: var(--sc-active); }
+.g2ab-sc.is-theme-light .g2ab-sc__rcard { background: #FFFEF8; border-color: var(--sc-hairline); }
+.g2ab-sc.is-theme-light .g2ab-sc__rcard .meta,
+.g2ab-sc.is-theme-light .g2ab-sc__rcard .dates,
+.g2ab-sc.is-theme-light .g2ab-sc__feed-row .t,
+.g2ab-sc.is-theme-light .g2ab-sc__legend,
+.g2ab-sc.is-theme-light .g2ab-sc__hint,
+.g2ab-sc.is-theme-light .g2ab-sc__crumb,
+.g2ab-sc.is-theme-light .g2ab-sc__kpi-l { color: var(--sc-silver); }
+.g2ab-sc.is-theme-light .g2ab-sc__rrow { background: #FFFEF8; }
+.g2ab-sc.is-theme-light .g2ab-sc__modal-card { background: #FFFFFF; }
+.g2ab-sc.is-theme-light .g2ab-sc__modal-card label input,
+.g2ab-sc.is-theme-light .g2ab-sc__modal-card label select { background: #FFFEF8; color: var(--sc-fog); border-color: var(--sc-hairline-bright); }
+.g2ab-sc.is-theme-light .g2ab-sc__toast { background: #FFFFFF; color: var(--sc-fog); }
+
+/* "Auto" theme — light by default, dark if user has dark preference */
+@media (prefers-color-scheme: light) {
+  .g2ab-sc.is-theme-auto { /* inherits the .is-theme-light tokens via duplicated rule below */ }
+}
+.g2ab-sc.is-theme-auto {
+  --sc-void: #FBF8EE; --sc-gunmetal: #FFFFFF; --sc-hairline: rgba(0,0,0,0.08);
+  --sc-hairline-bright: rgba(0,0,0,0.16); --sc-fog: #2A3F2D; --sc-silver: #6B7A6D;
+  --sc-white: #16241A; --sc-brass: #C9A84C; --sc-brass-bright: #8B6A1E;
+  --sc-brass-dim: rgba(201,168,76,0.45); --sc-ember: #C4471A; --sc-active: #2F8A5A;
+}
+@media (prefers-color-scheme: dark) {
+  .g2ab-sc.is-theme-auto {
+    --sc-void: #0F1115; --sc-gunmetal: #1A1F26; --sc-hairline: rgba(255,255,255,0.06);
+    --sc-hairline-bright: rgba(255,255,255,0.12); --sc-fog: #C9CFD8; --sc-silver: #8A95A5;
+    --sc-white: #ffffff; --sc-brass-bright: #E9C764; --sc-ember: #FF4B1F; --sc-active: #3CA67B;
+  }
+}
+
+/* ============================================================== */
+/* Check-In Station pane — big QR + pending-request popup-ready    */
+/* ============================================================== */
+.g2ab-sc__station-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+@media (max-width: 1000px) { .g2ab-sc__station-grid { grid-template-columns: 1fr; } }
+.g2ab-sc__qr-card { display: flex; flex-direction: column; align-items: center; padding: 28px; }
+.g2ab-sc__qr-card h3 { align-self: stretch; }
+.g2ab-sc__qr {
+  width: 320px; height: 320px; max-width: 100%; background: #FFFFFF;
+  display: grid; place-items: center; padding: 18px; box-sizing: border-box;
+  border: 1px solid var(--sc-hairline-bright); margin: 18px 0;
+}
+.g2ab-sc__qr svg, .g2ab-sc__qr canvas { width: 100%; height: 100%; }
+.g2ab-sc__qr-url { font-family: var(--sc-font-mono); font-size: 12px; color: var(--sc-silver); word-break: break-all; text-align: center; max-width: 360px; }
+.g2ab-sc__qr-help {
+  font-family: var(--sc-font-condensed); font-weight: 600; font-size: 13px;
+  color: var(--sc-fog); text-transform: uppercase; letter-spacing: 0.04em;
+  text-align: center; margin-top: 14px;
+}
+.g2ab-sc__pending-list { display: flex; flex-direction: column; gap: 10px; min-height: 200px; }
+.g2ab-sc__pending-item {
+  padding: 18px 20px; background: rgba(201,168,76,0.10); border-left: 4px solid var(--sc-brass);
+  display: grid; grid-template-columns: 1fr auto; gap: 12px; align-items: center;
+  animation: g2absc-pulse 1.6s ease-in-out infinite;
+}
+@keyframes g2absc-pulse {
+  0%, 100% { background: rgba(201,168,76,0.10); }
+  50%      { background: rgba(201,168,76,0.22); }
+}
+.g2ab-sc__pending-item .who { font-family: var(--sc-font-condensed); font-weight: 700; color: var(--sc-white); text-transform: uppercase; letter-spacing: 0.04em; }
+.g2ab-sc__pending-item .meta { font-family: var(--sc-font-mono); font-size: 11px; color: var(--sc-silver); margin-top: 4px; letter-spacing: 0.06em; }
+
+/* Check-in confirmation modal (bigger than walk-in modal — has lane picker + status banner) */
+.g2ab-sc__checkin-status {
+  padding: 14px 18px; margin: 0 0 16px;
+  font-family: var(--sc-font-condensed); font-weight: 600;
+  text-transform: uppercase; letter-spacing: 0.06em;
+}
+.g2ab-sc__checkin-status.current { background: rgba(60,166,123,0.12); border-left: 4px solid var(--sc-active); color: var(--sc-active); }
+.g2ab-sc__checkin-status.expired { background: rgba(255,75,31,0.10); border-left: 4px solid var(--sc-ember); color: var(--sc-ember); }
+.g2ab-sc__checkin-status.missing { background: rgba(138,149,165,0.10); border-left: 4px solid var(--sc-silver); color: var(--sc-silver); }
+.g2ab-sc__checkin-details { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 18px; padding: 14px 0; margin-bottom: 14px; border-bottom: 1px solid var(--sc-hairline); }
+.g2ab-sc__checkin-details .k { font-family: var(--sc-font-mono); font-size: 10px; color: var(--sc-silver); text-transform: uppercase; letter-spacing: 0.2em; }
+.g2ab-sc__checkin-details .v { font-family: var(--sc-font-condensed); font-weight: 600; color: var(--sc-white); font-size: 14px; }
+
+/* =================================================================== */
+/* v1.12.1 — clean light theme overhaul                                 */
+/*                                                                      */
+/* The earlier light theme leaked: parent themes were winning on inner  */
+/* panels and the console sat in a narrow page column with a dark page  */
+/* header above it. This block:                                         */
+/*   1. Breaks the console out of the page wrapper to fill the viewport */
+/*   2. Hides the WP page H1 ("STAFF FRONTEND") + site chrome inside the*/
+/*      console viewport                                                */
+/*   3. Forces light-theme tokens with `!important` so the cascade is   */
+/*      no longer a guessing game                                       */
+/*   4. Tightens spacing, typography hierarchy, panel borders           */
+/*   5. Fixes the narrow "Pending at the desk" column wrap              */
+/* =================================================================== */
+
+/* (1) Break out of any centered/constrained page wrapper without using
+   fixed positioning (which would break sticky scroll). Negative left
+   margin + 100vw width pulls the console flush to the viewport edges. */
+.g2ab-sc.is-theme-light {
+  width: 100vw;
+  position: relative;
+  left: 50%;
+  margin-left: -50vw;
+  margin-right: -50vw;
+  margin-top: 0;
+  margin-bottom: 0;
+  padding: 0;
+  background: #F4EFDF !important;     /* warm cream, page-level */
+  min-height: 100vh;
+}
+
+/* (2) Hide WP page chrome behind the console — the giant "STAFF FRONTEND"
+   title, breadcrumbs, post meta, etc. — but only on the same document
+   where the console renders. Scoped via :has so we don't nuke titles on
+   unrelated pages. Falls back gracefully on browsers without :has. */
+body:has(.g2ab-sc) .entry-title,
+body:has(.g2ab-sc) .page-title,
+body:has(.g2ab-sc) .post-title,
+body:has(.g2ab-sc) header.entry-header,
+body:has(.g2ab-sc) .breadcrumb,
+body:has(.g2ab-sc) .rank-math-breadcrumb { display: none !important; }
+body:has(.g2ab-sc) .entry-content,
+body:has(.g2ab-sc) .site-main,
+body:has(.g2ab-sc) main { max-width: none !important; padding: 0 !important; margin: 0 !important; }
+
+/* (3) Hard light-theme tokens — wins over anything the parent theme
+   tries to inject. Applied with `!important` because some parent themes
+   set !important on background/color on .panel-like elements. */
+.g2ab-sc.is-theme-light {
+  --sc-void:           #F4EFDF;
+  --sc-gunmetal:       #FFFFFF;
+  --sc-hairline:       rgba(20, 36, 26, 0.08);
+  --sc-hairline-bright:rgba(20, 36, 26, 0.16);
+  --sc-fog:            #2A3F2D;
+  --sc-silver:         #6F7C71;
+  --sc-white:          #14241A;
+  --sc-brass:          #C9A84C;
+  --sc-brass-bright:   #8B6A1E;
+  --sc-brass-dim:      rgba(201,168,76,0.45);
+  --sc-ember:          #C4471A;
+  --sc-active:         #2F8A5A;
+}
+
+/* All panels — flat white cards with a soft hairline. No gradients,
+   no inner shadows, no dark-mode fallbacks bleeding through. */
+.g2ab-sc.is-theme-light .g2ab-sc__panel,
+.g2ab-sc.is-theme-light .g2ab-sc__kpi,
+.g2ab-sc.is-theme-light .g2ab-sc__rcard,
+.g2ab-sc.is-theme-light .g2ab-sc__rrow,
+.g2ab-sc.is-theme-light .g2ab-sc__toast,
+.g2ab-sc.is-theme-light .g2ab-sc__modal-card {
+  background: #FFFFFF !important;
+  border: 1px solid rgba(20, 36, 26, 0.08) !important;
+  box-shadow: 0 1px 0 rgba(20, 36, 26, 0.02) !important;
+  color: #2A3F2D;
+}
+
+/* Sidebar — a touch warmer than the page so it reads as a panel, not a
+   hole. Stronger right divider so it visually separates from the work
+   area without going dark. */
+.g2ab-sc.is-theme-light .g2ab-sc__side {
+  background: #FFFCF1 !important;
+  border-right: 1px solid rgba(20, 36, 26, 0.10) !important;
+  padding: 28px 0 24px;
+}
+.g2ab-sc.is-theme-light .g2ab-sc__who {
+  border-bottom: 1px solid rgba(20, 36, 26, 0.10);
+  padding: 0 24px 20px;
+  margin-bottom: 14px;
+}
+.g2ab-sc.is-theme-light .g2ab-sc__role { color: #8B6A1E !important; font-weight: 700; }
+.g2ab-sc.is-theme-light .g2ab-sc__nm   { color: #14241A !important; }
+
+/* Nav links — readable on cream, generous tap target, no muddy gray */
+.g2ab-sc.is-theme-light .g2ab-sc__navi,
+.g2ab-sc.is-theme-light .g2ab-sc__sign-out {
+  color: #2A3F2D !important;
+  padding: 13px 24px;
+  font-weight: 600;
+}
+.g2ab-sc.is-theme-light .g2ab-sc__navi:hover,
+.g2ab-sc.is-theme-light .g2ab-sc__sign-out:hover {
+  background: rgba(201,168,76,0.10) !important;
+  color: #14241A !important;
+}
+.g2ab-sc.is-theme-light .g2ab-sc__navi.is-cur {
+  background: rgba(201,168,76,0.16) !important;
+  border-left: 3px solid #C9A84C !important;
+  color: #8B6A1E !important;
+}
+.g2ab-sc.is-theme-light .g2ab-sc__navi-ic { color: #8B6A1E; opacity: 1; }
+
+/* Main content area — bring the cream all the way to the edge and add
+   comfortable breathing room without the empty-vh stretch. */
+.g2ab-sc.is-theme-light .g2ab-sc__main {
+  padding: 36px 44px 56px;
+  background: transparent;
+}
+.g2ab-sc.is-theme-light { min-height: auto; }   /* lose the empty 100vh */
+
+/* Pane title — the one that was invisible. Force the forest color on
+   the header H1 AND on the pane title <h1>. */
+.g2ab-sc.is-theme-light .g2ab-sc__h h1,
+.g2ab-sc.is-theme-light #g2ab-sc-pane-title {
+  color: #14241A !important;
+  text-shadow: none;
+}
+.g2ab-sc.is-theme-light .g2ab-sc__crumb { color: #6F7C71 !important; }
+.g2ab-sc.is-theme-light .g2ab-sc__crumb b { color: #8B6A1E !important; }
+
+/* KPI cards */
+.g2ab-sc.is-theme-light .g2ab-sc__kpi { padding: 22px 24px; }
+.g2ab-sc.is-theme-light .g2ab-sc__kpi.brass { border-left: 3px solid #C9A84C !important; }
+.g2ab-sc.is-theme-light .g2ab-sc__kpi-l { color: #6F7C71 !important; }
+.g2ab-sc.is-theme-light .g2ab-sc__kpi-v { color: #14241A !important; }
+
+/* Panel headers */
+.g2ab-sc.is-theme-light .g2ab-sc__panel h3 { color: #14241A !important; }
+.g2ab-sc.is-theme-light .g2ab-sc__pill {
+  color: #2F8A5A !important;
+  border-color: #2F8A5A !important;
+  background: rgba(47,138,90,0.08);
+}
+
+/* Lane tiles — cream squares with state-colored borders */
+.g2ab-sc.is-theme-light .g2ab-sc__lane {
+  background: #FBF6E5 !important;
+  border-color: rgba(20, 36, 26, 0.14) !important;
+  color: #14241A !important;
+}
+.g2ab-sc.is-theme-light .g2ab-sc__lane.in_use {
+  background: rgba(196,71,26,0.10) !important; border-color: #C4471A !important; color: #C4471A !important;
+}
+.g2ab-sc.is-theme-light .g2ab-sc__lane.reserved {
+  background: rgba(201,168,76,0.16) !important; border-color: #C9A84C !important; color: #8B6A1E !important;
+}
+.g2ab-sc.is-theme-light .g2ab-sc__lane.open {
+  background: rgba(47,138,90,0.10) !important; border-color: #2F8A5A !important; color: #2F8A5A !important;
+}
+.g2ab-sc.is-theme-light .g2ab-sc__legend { color: #6F7C71 !important; }
+.g2ab-sc.is-theme-light .g2ab-sc__hint { color: #6F7C71 !important; }
+.g2ab-sc.is-theme-light .g2ab-sc__empty { color: #6F7C71 !important; }
+
+/* Live feed rows */
+.g2ab-sc.is-theme-light .g2ab-sc__feed-row { border-bottom: 1px solid rgba(20,36,26,0.06); }
+.g2ab-sc.is-theme-light .g2ab-sc__feed-row .t  { color: #6F7C71 !important; }
+.g2ab-sc.is-theme-light .g2ab-sc__feed-row .nm { color: #14241A !important; }
+.g2ab-sc.is-theme-light .g2ab-sc__feed-row .d  { color: #2A3F2D !important; }
+.g2ab-sc.is-theme-light .g2ab-sc__feed-row .ic { color: #8B6A1E !important; border-color: rgba(20,36,26,0.14) !important; }
+
+/* Search input */
+.g2ab-sc.is-theme-light .g2ab-sc__input {
+  background: #FFFCF1 !important;
+  color: #14241A !important;
+  border-color: rgba(20,36,26,0.16) !important;
+}
+.g2ab-sc.is-theme-light .g2ab-sc__input::placeholder { color: rgba(20,36,26,0.40); }
+
+/* Waiver result cards */
+.g2ab-sc.is-theme-light .g2ab-sc__rcard .who   { color: #14241A !important; }
+.g2ab-sc.is-theme-light .g2ab-sc__rcard .meta  { color: #6F7C71 !important; }
+.g2ab-sc.is-theme-light .g2ab-sc__rcard .dates { color: #6F7C71 !important; }
+
+/* Roster rows */
+.g2ab-sc.is-theme-light .g2ab-sc__rrow .time  { color: #8B6A1E !important; }
+.g2ab-sc.is-theme-light .g2ab-sc__rrow .name  { color: #14241A !important; }
+.g2ab-sc.is-theme-light .g2ab-sc__rrow .resource { color: #6F7C71 !important; }
+.g2ab-sc.is-theme-light .g2ab-sc__rrow .pill { color: #2A3F2D !important; border-color: rgba(20,36,26,0.20) !important; }
+.g2ab-sc.is-theme-light .g2ab-sc__act-btn { color: #2A3F2D !important; border-color: rgba(20,36,26,0.16) !important; }
+.g2ab-sc.is-theme-light .g2ab-sc__act-btn:hover { color: #8B6A1E !important; border-color: #C9A84C !important; }
+
+/* (4) Check-in station — fix the cramped "Pending at the desk" column.
+   The grid was 1fr/1fr which squeezed text. Give the QR a fixed width
+   and let the pending column take the rest. */
+.g2ab-sc.is-theme-light .g2ab-sc__station-grid {
+  grid-template-columns: minmax(360px, 440px) 1fr;
+  align-items: start;
+}
+@media (max-width: 980px) {
+  .g2ab-sc.is-theme-light .g2ab-sc__station-grid { grid-template-columns: 1fr; }
+}
+.g2ab-sc.is-theme-light .g2ab-sc__qr-card { padding: 24px; }
+.g2ab-sc.is-theme-light .g2ab-sc__qr { width: 260px; height: 260px; padding: 12px; border-color: rgba(20,36,26,0.12) !important; }
+.g2ab-sc.is-theme-light .g2ab-sc__qr-url { color: #6F7C71 !important; font-size: 11px; max-width: 320px; }
+.g2ab-sc.is-theme-light .g2ab-sc__qr-help { color: #14241A !important; margin-top: 10px; }
+.g2ab-sc.is-theme-light .g2ab-sc__pending-item {
+  background: rgba(201,168,76,0.10) !important;
+  border-left: 4px solid #C9A84C !important;
+  padding: 16px 18px;
+}
+.g2ab-sc.is-theme-light .g2ab-sc__pending-item .who { color: #14241A !important; }
+.g2ab-sc.is-theme-light .g2ab-sc__pending-item .meta { color: #6F7C71 !important; }
+.g2ab-sc.is-theme-light .g2ab-sc__pending-list .g2ab-sc__empty { padding: 36px 16px; }
+
+/* Buttons — ember stays vivid, ghost reads on cream */
+.g2ab-sc.is-theme-light .g2ab-sc__btn { background: #C4471A !important; color: #FFFFFF !important; }
+.g2ab-sc.is-theme-light .g2ab-sc__btn:hover { background: #A93B14 !important; }
+.g2ab-sc.is-theme-light .g2ab-sc__btn--ghost {
+  background: transparent !important;
+  color: #2A3F2D !important;
+  border: 1px solid rgba(20,36,26,0.20) !important;
+}
+
+/* Modals — white card on dim backdrop */
+.g2ab-sc.is-theme-light .g2ab-sc__modal-back { background: rgba(20,36,26,0.55) !important; }
+.g2ab-sc.is-theme-light .g2ab-sc__modal-card h3 { color: #14241A !important; }
+.g2ab-sc.is-theme-light .g2ab-sc__modal-card label { color: #6F7C71 !important; }
+.g2ab-sc.is-theme-light .g2ab-sc__modal-card label input,
+.g2ab-sc.is-theme-light .g2ab-sc__modal-card label select {
+  background: #FFFCF1 !important;
+  color: #14241A !important;
+  border-color: rgba(20,36,26,0.16) !important;
+}
+.g2ab-sc.is-theme-light .g2ab-sc__x { color: #6F7C71 !important; }
+.g2ab-sc.is-theme-light .g2ab-sc__checkin-details .k { color: #6F7C71 !important; }
+.g2ab-sc.is-theme-light .g2ab-sc__checkin-details .v { color: #14241A !important; }
+
+/* Toasts — white card with brass/ok/err edge */
+.g2ab-sc.is-theme-light .g2ab-sc__toast { color: #14241A !important; box-shadow: 0 8px 30px rgba(20,36,26,0.18) !important; }
+
+/* =================================================================== */
+/* v1.12.2 — fix viewport breakout (sidebar was getting clipped)        */
+/*                                                                      */
+/* The 100vw + negative-margin trick from 1.12.1 only centers the       */
+/* breakout if the parent container is itself horizontally centered.    */
+/* This site's .entry-content is left-aligned, so the console got       */
+/* pulled past the left edge and the sidebar fell off-screen.           */
+/*                                                                      */
+/* New approach: reset the parent containers to full width, then let    */
+/* the console fill them normally. No more position tricks.             */
+/* =================================================================== */
+
+/* Reset the breakout overrides from 1.12.1 */
+.g2ab-sc.is-theme-light {
+  width: auto !important;
+  position: static !important;
+  left: auto !important;
+  margin: 0 !important;
+}
+
+/* Wipe horizontal constraints on every common WP / theme container that
+   could be wrapping the shortcode. Scoped via :has(.g2ab-sc) so other
+   pages are untouched. */
+body:has(.g2ab-sc) {
+  overflow-x: hidden;
+}
+body:has(.g2ab-sc) .site,
+body:has(.g2ab-sc) .site-content,
+body:has(.g2ab-sc) .site-main,
+body:has(.g2ab-sc) main,
+body:has(.g2ab-sc) main#main,
+body:has(.g2ab-sc) main#primary,
+body:has(.g2ab-sc) #primary,
+body:has(.g2ab-sc) #content,
+body:has(.g2ab-sc) .entry-content,
+body:has(.g2ab-sc) .post-content,
+body:has(.g2ab-sc) article,
+body:has(.g2ab-sc) .container,
+body:has(.g2ab-sc) .container-fluid,
+body:has(.g2ab-sc) .wrap,
+body:has(.g2ab-sc) .e-con,
+body:has(.g2ab-sc) .elementor-section,
+body:has(.g2ab-sc) .elementor-container,
+body:has(.g2ab-sc) .wp-block-group,
+body:has(.g2ab-sc) .wp-block-post-content {
+  max-width: none !important;
+  width: 100% !important;
+  margin-left: 0 !important;
+  margin-right: 0 !important;
+  padding-left: 0 !important;
+  padding-right: 0 !important;
+  background: transparent !important;
+}

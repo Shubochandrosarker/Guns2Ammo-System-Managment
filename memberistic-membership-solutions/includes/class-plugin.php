@@ -390,8 +390,25 @@ final class Plugin {
 			}
 		}
 
-		// Always load on non-singular contexts where the restriction overlay may fire.
-		if ( ! is_singular() || is_home() || is_archive() ) {
+		// PERF: only load on pages that actually need the restriction overlay.
+		// Previously this branch fired on every non-singular page (home,
+		// archives, search) — shipping ~3 globals + jQuery deps to every
+		// visitor regardless of whether any membership-gated content was
+		// present. The new rule: load if (a) a known shortcode is on the
+		// queried object, (b) the current page is configured as the member
+		// dashboard / verify / waiver pages, or (c) the global flag
+		// memberistic_force_frontend_assets is on (escape hatch).
+		if ( ! $needs_assets ) {
+			$post = is_singular() ? get_post() : null;
+			$shortcodes = array( 'memberistic_dashboard', 'memberistic_verify', 'memberistic_signup', 'memberistic_login_gate' );
+			foreach ( $shortcodes as $sc ) {
+				if ( $post && has_shortcode( (string) $post->post_content, $sc ) ) {
+					$needs_assets = true;
+					break;
+				}
+			}
+		}
+		if ( ! $needs_assets && 1 === (int) get_option( 'memberistic_force_frontend_assets', 0 ) ) {
 			$needs_assets = true;
 		}
 
@@ -401,13 +418,12 @@ final class Plugin {
 
 		wp_enqueue_style( 'memberistic-frontend', MEMBERISTIC_URL . 'assets/frontend.css', array(), MEMBERISTIC_VERSION );
 		wp_enqueue_script( 'memberistic-frontend', MEMBERISTIC_URL . 'assets/frontend.js', array(), MEMBERISTIC_VERSION, true );
-		// Expose the WP REST root + nonce as window.wpApiSettings so the
-		// account-dashboard photo-upload form can authenticate without
-		// requiring the wp-api script (the official one is heavy +
-		// unnecessary for one fetch).
+		// SECURITY: use a plugin-namespaced global instead of clobbering the
+		// global `wpApiSettings` (used by core's wp-api script and by other
+		// plugins). Front-end JS reads window.memberisticApi.
 		wp_localize_script(
 			'memberistic-frontend',
-			'wpApiSettings',
+			'memberisticApi',
 			array(
 				'root'  => esc_url_raw( rest_url() ),
 				'nonce' => wp_create_nonce( 'wp_rest' ),
