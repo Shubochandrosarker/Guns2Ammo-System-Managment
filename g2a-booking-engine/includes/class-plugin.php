@@ -58,10 +58,22 @@ final class G2AB_Plugin
 	public function maybe_upgrade()
 	{
 		$current = get_option('g2ab_db_version', '0.0.0');
+		// Forward upgrade: run the normal installer + migrations.
 		if (version_compare($current, G2AB_DB_VERSION, '<')) {
 			$this->get_installer()->install();
 			update_option('g2ab_db_version', G2AB_DB_VERSION);
 			do_action('g2ab_after_db_upgrade', $current, G2AB_DB_VERSION);
+			return;
+		}
+		// Reconciliation: when a previous staging deploy bumped the option
+		// past the code's version, normalize it down so the Build Status
+		// panel shows what's actually shipping. The column-existence
+		// migration (slot_key) still runs every install regardless, so
+		// no schema work is skipped.
+		if (version_compare($current, G2AB_DB_VERSION, '>')) {
+			update_option('g2ab_db_version', G2AB_DB_VERSION);
+			$this->get_installer()->install(); // ensure slot_key / engines / etc.
+			do_action('g2ab_after_db_normalize', $current, G2AB_DB_VERSION);
 		}
 	}
 

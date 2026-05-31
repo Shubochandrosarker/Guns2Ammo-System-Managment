@@ -31,6 +31,7 @@ final class G2AB_Activator {
 		self::apply_client_defaults_existing();
 		self::merge_default_active_modules();
 		self::schedule_events();
+		self::ensure_checkin_page();
 
 		set_transient( 'g2ab_activation_redirect', 1, 30 );
 		flush_rewrite_rules();
@@ -487,6 +488,33 @@ final class G2AB_Activator {
 			if ( ! $next ) {
 				wp_schedule_event( time() + MINUTE_IN_SECONDS, $recurrence, $hook );
 			}
+		}
+	}
+
+	/**
+	 * Create the member-facing /check-in/ landing page on first activation
+	 * so the staff dashboard's QR code points somewhere real. Idempotent:
+	 * if the option already names a page (and it exists), do nothing.
+	 */
+	private static function ensure_checkin_page() {
+		$slug = (string) get_option( 'g2ab_checkin_page_slug', 'check-in' );
+		// Bail if a page with our shortcode already exists.
+		$existing = get_page_by_path( $slug );
+		if ( $existing && false !== strpos( (string) $existing->post_content, '[g2ab_member_checkin' ) ) {
+			return;
+		}
+		$page_id = wp_insert_post( array(
+			'post_title'   => __( 'Check In', 'g2a-booking' ),
+			'post_name'    => $slug,
+			'post_status'  => 'publish',
+			'post_type'    => 'page',
+			'post_content' => '[g2ab_member_checkin]',
+			'comment_status'=> 'closed',
+			'ping_status'  => 'closed',
+			'post_author'  => 1,
+		), true );
+		if ( ! is_wp_error( $page_id ) ) {
+			update_option( 'g2ab_checkin_page_id', (int) $page_id );
 		}
 	}
 }
