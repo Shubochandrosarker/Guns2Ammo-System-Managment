@@ -848,8 +848,12 @@ final class G2AB_REST_Bookings_Controller {
 		//   - a flaky 502 mid-request triggering a client retry,
 		//   - rapid network hiccup that resends the same POST.
 		$idem_key = sanitize_text_field( (string) ( $request->get_header( 'idempotency-key' ) ?: $request->get_header( 'x-idempotency-key' ) ?: '' ) );
+		// SECURITY: scope the idempotency cache to the calling client so
+		// a key collision (intentional or accidental) can't surface
+		// another customer's confirmation. Combines IP + logged-in user id.
+		$idem_scope = ( function_exists( 'g2ab_get_client_ip' ) ? g2ab_get_client_ip() : '' ) . '|' . get_current_user_id();
 		if ( '' !== $idem_key && strlen( $idem_key ) <= 128 ) {
-			$idem_cache_key = 'g2ab_idem_' . md5( $idem_key );
+			$idem_cache_key = 'g2ab_idem_' . md5( $idem_scope . '|' . $idem_key );
 			$cached         = get_transient( $idem_cache_key );
 			if ( is_array( $cached ) && isset( $cached['booking_id'], $cached['response'] ) ) {
 				// Return the original successful response verbatim.

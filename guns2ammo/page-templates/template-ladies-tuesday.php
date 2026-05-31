@@ -23,7 +23,7 @@ $g2a_ladies_events_shortcode    = get_post_meta( $g2a_page_id, 'ladies_upcoming_
     content: ""; position: absolute; inset: 0;
     background-image:
       linear-gradient(180deg, rgba(26,25,30,0.7) 0%, rgba(26,25,30,0.95) 60%, var(--color-void) 100%),
-      url("https://guns2ammo.com/wp-content/uploads/2024/08/one-1-a.webp");
+      url("/wp-content/uploads/2024/08/one-1-a.webp");
     background-size: cover; background-position: center 30%;
     filter: saturate(0.85) contrast(1.05);
   }

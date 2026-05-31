@@ -18,7 +18,7 @@ $slug = '';
 $qo   = get_queried_object();
 if ( $qo && isset( $qo->post_name ) ) $slug = $qo->post_name;
 
-$img = 'https://guns2ammo.com/wp-content/uploads/';
+$img = '/wp-content/uploads/';
 
 $courses = [
 	'basic-handgun' => [

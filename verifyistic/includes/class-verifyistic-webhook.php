@@ -17,6 +17,33 @@ class Verifyistic_Webhook {
             return new WP_Error( 'invalid_url', __( 'Invalid webhook URL.', 'verifyistic' ) );
         }
 
+        // SECURITY: SSRF guard. Reject non-HTTPS in production, private/link-local
+        // IPs, localhost/loopback. Bypass with constant VERIFYISTIC_ALLOW_PRIVATE_WEBHOOKS=true.
+        $parts = wp_parse_url( $url );
+        if ( ! is_array( $parts ) || empty( $parts['host'] ) ) {
+            return new WP_Error( 'invalid_url', __( 'Invalid webhook URL.', 'verifyistic' ) );
+        }
+        $scheme = strtolower( $parts['scheme'] ?? '' );
+        if ( ! in_array( $scheme, array( 'http', 'https' ), true ) ) {
+            return new WP_Error( 'invalid_scheme', __( 'Webhook URL must be http or https.', 'verifyistic' ) );
+        }
+        $allow_private = ( defined( 'VERIFYISTIC_ALLOW_PRIVATE_WEBHOOKS' ) && VERIFYISTIC_ALLOW_PRIVATE_WEBHOOKS );
+        if ( ! $allow_private ) {
+            $host = $parts['host'];
+            $ip   = filter_var( $host, FILTER_VALIDATE_IP ) ? $host : gethostbyname( $host );
+            if ( $ip === $host && ! filter_var( $ip, FILTER_VALIDATE_IP ) ) {
+                // DNS failed; let wp_remote_post handle it but block obvious literals.
+            } elseif ( $ip ) {
+                // Reject private + reserved ranges.
+                if ( ! filter_var( $ip, FILTER_VALIDATE_IP, FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE ) ) {
+                    return new WP_Error( 'private_webhook', __( 'Webhook host resolves to a private or reserved IP.', 'verifyistic' ) );
+                }
+            }
+            if ( in_array( strtolower( $host ), array( 'localhost', '127.0.0.1', '::1', '0.0.0.0' ), true ) ) {
+                return new WP_Error( 'localhost_webhook', __( 'Localhost webhooks are not allowed.', 'verifyistic' ) );
+            }
+        }
+
         $body    = wp_json_encode( $payload );
         $secret  = ( null === $secret ) ? get_option( 'verifyistic_webhook_secret', '' ) : (string) $secret;
         $headers = array(

@@ -45,12 +45,12 @@ final class Memberships_Controller extends REST_Controller {
 				array(
 					'methods'             => \WP_REST_Server::CREATABLE,
 					'callback'            => array( $this, 'upload_profile_image' ),
-					'permission_callback' => 'is_user_logged_in',
+					'permission_callback' => array( $this, 'member_self_permissions_check' ),
 				),
 				array(
 					'methods'             => \WP_REST_Server::DELETABLE,
 					'callback'            => array( $this, 'delete_profile_image' ),
-					'permission_callback' => 'is_user_logged_in',
+					'permission_callback' => array( $this, 'member_self_permissions_check' ),
 				),
 			)
 		);
@@ -620,6 +620,39 @@ final class Memberships_Controller extends REST_Controller {
 				'callback'            => array( $this, 'woocommerce_webhook' ),
 				'permission_callback' => array( $this, 'public_permissions_check' ),
 			)
+		);
+	}
+
+	/**
+	 * Members may manage their OWN profile image only. We additionally require
+	 * the calling user to be linked to a Memberistic membership (or hold an
+	 * admin cap). Prevents random subscribers from blasting uploads into the
+	 * site's media library via this endpoint.
+	 */
+	public function member_self_permissions_check() {
+		if ( ! is_user_logged_in() ) {
+			return new \WP_Error(
+				'memberistic_rest_forbidden',
+				__( 'You must be logged in.', 'memberistic' ),
+				array( 'status' => rest_authorization_required_code() )
+			);
+		}
+		if ( current_user_can( 'manage_options' ) ) {
+			return true;
+		}
+		$user_id = get_current_user_id();
+		// Require an active Memberistic linkage. Fall back to a capability check
+		// if the helper isn't available so site admins can still opt in.
+		if ( function_exists( 'memberistic_user_has_membership' ) && memberistic_user_has_membership( $user_id ) ) {
+			return true;
+		}
+		if ( current_user_can( 'edit_user', $user_id ) ) {
+			return true;
+		}
+		return new \WP_Error(
+			'memberistic_rest_forbidden',
+			__( 'You do not have an active membership.', 'memberistic' ),
+			array( 'status' => rest_authorization_required_code() )
 		);
 	}
 

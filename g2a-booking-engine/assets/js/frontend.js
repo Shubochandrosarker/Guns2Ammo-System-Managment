@@ -60,6 +60,10 @@
 	function handlePaid() {
 		var uuid = qs('g2ab_paid');
 		if (!uuid) return;
+		// SECURITY: reject anything that isn't a v4 UUID before it reaches
+		// innerHTML / DOM concatenation. Prevents reflected XSS via
+		// ?g2ab_paid=<img/src/onerror=...>
+		if (!/^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i.test(uuid)) return;
 		checkBookingStatus(uuid).then(function (data) {
 			if (data && (data.status === 'paid' || data.status === 'confirmed')) {
 				showInlineNotice('<strong>Booking confirmed.</strong><br>Your payment was received. Confirmation: <code style="background:rgba(255,255,255,.1);padding:2px 6px;border-radius:4px;font-size:12px;">' + uuid + '</code>', 'success');

@@ -27,29 +27,41 @@ class Verifyistic_Security {
 	/* ------------------------------------------------------------------ */
 
 	public static function issue_form_token() {
-		$t = time();
-		return $t . '.' . hash_hmac( 'sha256', (string) $t, self::salt() );
+		$t   = time();
+		$jti = wp_generate_password( 12, false, false );
+		return $t . '.' . $jti . '.' . hash_hmac( 'sha256', $t . '|' . $jti, self::salt() );
 	}
 
 	/**
 	 * Validate the token: signature must match and elapsed time must sit in a
-	 * human-plausible window.
+	 * human-plausible window. Each token is one-time-use (jti is consumed by
+	 * burning a short-lived transient).
 	 */
 	public static function verify_form_token( $token ) {
 		$token = (string) $token;
-		if ( false === strpos( $token, '.' ) ) {
+		$parts = explode( '.', $token );
+		// Back-compat: also accept the 2-part legacy form for one release.
+		if ( 3 === count( $parts ) ) {
+			list( $t, $jti, $sig ) = $parts;
+			$expected = hash_hmac( 'sha256', $t . '|' . $jti, self::salt() );
+		} elseif ( 2 === count( $parts ) ) {
+			list( $t, $sig ) = $parts;
+			$jti = '';
+			$expected = hash_hmac( 'sha256', (string) $t, self::salt() );
+		} else {
 			return false;
 		}
-		list( $t, $sig ) = explode( '.', $token, 2 );
-		if ( ! ctype_digit( (string) $t ) ) {
-			return false;
-		}
-		$expected = hash_hmac( 'sha256', (string) $t, self::salt() );
-		if ( ! hash_equals( $expected, (string) $sig ) ) {
-			return false;
-		}
+		if ( ! ctype_digit( (string) $t ) ) return false;
+		if ( ! hash_equals( $expected, (string) $sig ) ) return false;
 		$elapsed = time() - (int) $t;
-		return ( $elapsed >= self::MIN_SECONDS && $elapsed <= self::MAX_SECONDS );
+		if ( $elapsed < self::MIN_SECONDS || $elapsed > self::MAX_SECONDS ) return false;
+		// One-shot: burn jti so the same token can't be replayed.
+		if ( $jti ) {
+			$burn_key = 'vfy_jti_' . md5( $jti );
+			if ( get_transient( $burn_key ) ) return false;
+			set_transient( $burn_key, 1, self::MAX_SECONDS );
+		}
+		return true;
 	}
 
 	private static function salt() {
@@ -88,18 +100,50 @@ class Verifyistic_Security {
 	/* ------------------------------------------------------------------ */
 
 	public static function client_ip() {
-		$ip_keys = array( 'HTTP_CF_CONNECTING_IP', 'HTTP_X_FORWARDED_FOR', 'HTTP_X_REAL_IP', 'REMOTE_ADDR' );
-		foreach ( $ip_keys as $key ) {
-			if ( ! empty( $_SERVER[ $key ] ) ) {
-				$ip = sanitize_text_field( wp_unslash( $_SERVER[ $key ] ) );
-				if ( strpos( $ip, ',' ) !== false ) {
-					$ip = trim( explode( ',', $ip )[0] );
-				}
-				if ( filter_var( $ip, FILTER_VALIDATE_IP ) ) {
-					return $ip;
-				}
-			}
+		$remote = isset( $_SERVER['REMOTE_ADDR'] ) ? sanitize_text_field( wp_unslash( $_SERVER['REMOTE_ADDR'] ) ) : '';
+		if ( ! filter_var( $remote, FILTER_VALIDATE_IP ) ) {
+			return '0.0.0.0';
 		}
-		return '0.0.0.0';
+		// SECURITY: trust forwarded headers only when REMOTE_ADDR is itself a
+		// known proxy. Configured via constant VERIFYISTIC_TRUSTED_PROXIES
+		// (comma-separated IPs / CIDRs) or option verifyistic_trusted_proxies.
+		if ( ! self::is_trusted_proxy( $remote ) ) {
+			return $remote;
+		}
+		foreach ( array( 'HTTP_CF_CONNECTING_IP', 'HTTP_X_REAL_IP', 'HTTP_X_FORWARDED_FOR' ) as $key ) {
+			if ( empty( $_SERVER[ $key ] ) ) continue;
+			$ip = sanitize_text_field( wp_unslash( $_SERVER[ $key ] ) );
+			if ( strpos( $ip, ',' ) !== false ) $ip = trim( explode( ',', $ip )[0] );
+			if ( filter_var( $ip, FILTER_VALIDATE_IP ) ) return $ip;
+		}
+		return $remote;
+	}
+
+	private static function is_trusted_proxy( $remote ) {
+		$list = array();
+		if ( defined( 'VERIFYISTIC_TRUSTED_PROXIES' ) && is_string( VERIFYISTIC_TRUSTED_PROXIES ) ) {
+			$list = array_merge( $list, array_filter( array_map( 'trim', explode( ',', VERIFYISTIC_TRUSTED_PROXIES ) ) ) );
+		}
+		$opt = (string) get_option( 'verifyistic_trusted_proxies', '' );
+		if ( '' !== $opt ) {
+			$list = array_merge( $list, array_filter( array_map( 'trim', explode( ',', $opt ) ) ) );
+		}
+		if ( empty( $list ) ) return false;
+		foreach ( $list as $range ) {
+			if ( self::ip_in_cidr( $remote, $range ) ) return true;
+		}
+		return false;
+	}
+
+	private static function ip_in_cidr( $ip, $range ) {
+		if ( false === strpos( $range, '/' ) ) return $ip === $range;
+		list( $subnet, $bits ) = explode( '/', $range, 2 );
+		$bits = (int) $bits;
+		if ( filter_var( $ip, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4 ) && filter_var( $subnet, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4 ) ) {
+			if ( $bits < 0 || $bits > 32 ) return false;
+			$mask = $bits === 0 ? 0 : ( ~0 << ( 32 - $bits ) );
+			return ( ip2long( $ip ) & $mask ) === ( ip2long( $subnet ) & $mask );
+		}
+		return false;
 	}
 }

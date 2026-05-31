@@ -209,7 +209,7 @@ class Verifyistic_DB {
         $logs = self::get_logs( array( 'limit' => 9999 ) );
         $output = "ID,Type,First Name,Last Name,Date of Birth,Age,Status,IP Address,Page URL,Verified At\n";
         foreach ( $logs as $log ) {
-            $output .= implode( ',', array(
+            $row = array(
                 $log->id,
                 $log->verify_type,
                 $log->first_name,
@@ -218,11 +218,28 @@ class Verifyistic_DB {
                 $log->age_at_verify,
                 $log->status,
                 $log->ip_address,
-                '"' . str_replace( '"', '""', $log->page_url ) . '"',
+                $log->page_url,
                 $log->verified_at,
-            ) ) . "\n";
+            );
+            // CSV-injection guard + RFC-4180 quoting.
+            $output .= implode( ',', array_map( array( __CLASS__, 'csv_cell' ), $row ) ) . "\n";
         }
         return $output;
+    }
+
+    /** Defuse CSV-injection and RFC-4180 quote a cell. */
+    public static function csv_cell( $v ) {
+        $s = (string) $v;
+        if ( '' !== $s ) {
+            $first = $s[0];
+            if ( '=' === $first || '+' === $first || '-' === $first || '@' === $first || "\t" === $first || "\r" === $first ) {
+                $s = "'" . $s;
+            }
+        }
+        if ( false !== strpos( $s, '"' ) || false !== strpos( $s, ',' ) || false !== strpos( $s, "\n" ) ) {
+            return '"' . str_replace( '"', '""', $s ) . '"';
+        }
+        return $s;
     }
 
     /**

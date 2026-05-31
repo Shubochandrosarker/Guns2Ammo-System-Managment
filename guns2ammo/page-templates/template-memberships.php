@@ -10,7 +10,7 @@ if ( ! defined( 'ABSPATH' ) ) exit;
 get_header();
 ?>
 <style>.gw-hero { padding: 140px 32px 40px; text-align:center; position:relative; overflow:hidden; }
-  .gw-hero::before { content:""; position:absolute; inset:0; pointer-events:none; background-image: linear-gradient(180deg, rgba(26,25,30,0.85), var(--color-void)), url("https://guns2ammo.com/wp-content/uploads/2026/04/2025-03-23.webp"); background-size:cover; background-position:center; }
+  .gw-hero::before { content:""; position:absolute; inset:0; pointer-events:none; background-image: linear-gradient(180deg, rgba(26,25,30,0.85), var(--color-void)), url("/wp-content/uploads/2026/04/2025-03-23.webp"); background-size:cover; background-position:center; }
   .gw-hero > * { position:relative; }
   .gw-hero h1 { font-family: var(--font-display); font-size: clamp(48px, 7vw, 80px); color: var(--color-white); letter-spacing: 0.02em; line-height: 0.95; max-width: 14ch; margin: 0 auto; }
   .gw-hero .sub { color: var(--color-fog); margin: 18px auto; max-width: 50ch; }

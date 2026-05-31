@@ -59,7 +59,7 @@ class G2AB_Email_Cron {
 		$end_24   = wp_date( 'Y-m-d H:i:s', $now_ts + ( 25 * HOUR_IN_SECONDS ) );
 
 		$rows_24 = $wpdb->get_results( $wpdb->prepare(
-			"SELECT * FROM {$bk} WHERE start_at BETWEEN %s AND %s AND status IN ({$active_statuses}) AND id NOT IN ( SELECT booking_id FROM {$lg} WHERE booking_id IS NOT NULL AND event_type = %s )",
+			"SELECT * FROM {$bk} WHERE start_at BETWEEN %s AND %s AND status IN ({$active_statuses}) AND id NOT IN ( SELECT booking_id FROM {$lg} WHERE booking_id IS NOT NULL AND event_type = %s ) ORDER BY start_at ASC LIMIT 50",
 			$start_24, $end_24, self::LOG_24H
 		) ); // phpcs:ignore
 
@@ -75,7 +75,7 @@ class G2AB_Email_Cron {
 		$end_2   = wp_date( 'Y-m-d H:i:s', $now_ts + ( 135 * MINUTE_IN_SECONDS ) );
 
 		$rows_2 = $wpdb->get_results( $wpdb->prepare(
-			"SELECT * FROM {$bk} WHERE start_at BETWEEN %s AND %s AND status IN ({$active_statuses}) AND id NOT IN ( SELECT booking_id FROM {$lg} WHERE booking_id IS NOT NULL AND event_type = %s )",
+			"SELECT * FROM {$bk} WHERE start_at BETWEEN %s AND %s AND status IN ({$active_statuses}) AND id NOT IN ( SELECT booking_id FROM {$lg} WHERE booking_id IS NOT NULL AND event_type = %s ) ORDER BY start_at ASC LIMIT 50",
 			$start_2, $end_2, self::LOG_2H
 		) ); // phpcs:ignore
 

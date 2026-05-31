@@ -258,12 +258,13 @@ final class G2AB_Admin_Bookings_List {
 		$allowed = array( 'pending','reserved','confirmed','paid','completed','cancelled','no_show','refunded' );
 		if ( ! in_array( $status, $allowed, true ) ) wp_die( esc_html__( 'Invalid status.', 'g2a-booking' ) );
 		global $wpdb;
+		$prev = (string) $wpdb->get_var( $wpdb->prepare( "SELECT status FROM {$wpdb->prefix}g2ab_bookings WHERE id = %d", $id ) );
 		$wpdb->update( $wpdb->prefix . 'g2ab_bookings', array( 'status' => $status, 'updated_at' => current_time( 'mysql' ) ), array( 'id' => $id ), array( '%s', '%s' ), array( '%d' ) );
 		$wpdb->insert( $wpdb->prefix . 'g2ab_logs', array(
 			'booking_id' => $id, 'user_id' => get_current_user_id(), 'event_type' => 'status_changed', 'severity' => 'info',
-			'message' => sprintf( 'Status set to %s by admin', $status ), 'context' => wp_json_encode( array() ), 'created_at' => current_time( 'mysql' ),
+			'message' => sprintf( 'Status set to %s by admin', $status ), 'context' => wp_json_encode( array( 'previous_status' => $prev ) ), 'created_at' => current_time( 'mysql' ),
 		) );
-		do_action( 'g2ab_booking_status_changed', $id, $status );
+		do_action( 'g2ab_booking_status_changed', $id, $status, $prev );
 		wp_safe_redirect( add_query_arg( array( 'page' => self::PAGE_SLUG, 'view' => 'detail', 'booking_id' => $id, 'updated' => '1' ), admin_url( 'admin.php' ) ) );
 		exit;
 	}
@@ -340,30 +341,34 @@ final class G2AB_Admin_Bookings_List {
 			fputcsv( $out, array( 'No bookings match the current filter' ) );
 		} else {
 			foreach ( $rows as $r ) {
-				fputcsv( $out, array(
-					$r['id'],
-					$r['uuid'],
-					$r['customer_name'],
-					$r['customer_email'],
-					$r['customer_phone'],
-					$r['start_at'],
-					$r['end_at'],
-					$r['duration_min'],
-					$r['party_size'],
-					$r['status'],
-					$r['payment_mode'],
-					$r['total_amount'],
-					$r['paid_amount'],
-					$r['currency'],
-					$r['created_at'],
-					$r['resource_name'],
+				$line = array(
+					$r['id'], $r['uuid'], $r['customer_name'], $r['customer_email'],
+					$r['customer_phone'], $r['start_at'], $r['end_at'], $r['duration_min'],
+					$r['party_size'], $r['status'], $r['payment_mode'], $r['total_amount'],
+					$r['paid_amount'], $r['currency'], $r['created_at'], $r['resource_name'],
 					$r['booking_type'],
-				) );
+				);
+				fputcsv( $out, array_map( array( __CLASS__, 'csv_escape' ), $line ) );
 			}
 		}
 
 		fclose( $out );
 		exit;
+	}
+
+	/**
+	 * Defuse CSV-injection. Cells starting with =, +, -, @, tab or CR are
+	 * prefixed with a leading apostrophe so spreadsheet apps don't treat
+	 * them as formulas. https://owasp.org/www-community/attacks/CSV_Injection
+	 */
+	public static function csv_escape( $val ) {
+		$s = (string) $val;
+		if ( '' === $s ) return $s;
+		$first = $s[0];
+		if ( '=' === $first || '+' === $first || '-' === $first || '@' === $first || "\t" === $first || "\r" === $first ) {
+			return "'" . $s;
+		}
+		return $s;
 	}
 
 	private function print_styles() {

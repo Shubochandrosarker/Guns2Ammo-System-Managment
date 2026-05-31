@@ -184,11 +184,12 @@ final class G2AB_Admin_Payments_List {
 			fputcsv( $out, array( 'No payments match the current filter' ) );
 		} else {
 			foreach ( $rows as $r ) {
-				fputcsv( $out, array(
+				$line = array(
 					$r['id'], $r['booking_id'], $r['booking_uuid'], $r['customer_name'], $r['customer_email'],
 					$r['gateway'], $r['transaction_id'], $r['amount'], $r['currency'], $r['status'],
 					$r['payment_method'], $r['refund_amount'], $r['processed_at'], $r['created_at'],
-				) );
+				);
+				fputcsv( $out, array_map( array( 'G2AB_Admin_Bookings_List', 'csv_escape' ), $line ) );
 			}
 		}
 

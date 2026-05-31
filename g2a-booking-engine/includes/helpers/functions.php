@@ -96,32 +96,143 @@ function g2ab_current_user_can( $cap ) {
 }
 
 /**
- * Get the IP of the current request, respecting common proxy headers.
+ * Get the IP of the current request.
+ *
+ * Forwarded headers (CF-Connecting-IP, X-Forwarded-For, X-Real-IP) are honored
+ * ONLY when REMOTE_ADDR is in a configured trusted-proxy list. This prevents
+ * rate-limit + audit-log spoofing by clients that fabricate the header.
+ *
+ * Trusted proxies are derived from:
+ *   - constant G2AB_TRUSTED_PROXIES (comma-separated CIDRs or IPs), OR
+ *   - option g2ab_trusted_proxies (same format), OR
+ *   - Cloudflare's published ranges when option g2ab_trust_cloudflare = 1.
  *
  * @return string
  */
 function g2ab_get_client_ip() {
-	$candidates = array(
-		'HTTP_CF_CONNECTING_IP',
-		'HTTP_X_FORWARDED_FOR',
-		'HTTP_X_REAL_IP',
-		'REMOTE_ADDR',
-	);
+	$remote = isset( $_SERVER['REMOTE_ADDR'] ) ? sanitize_text_field( wp_unslash( $_SERVER['REMOTE_ADDR'] ) ) : '';
+	if ( '' === $remote || ! filter_var( $remote, FILTER_VALIDATE_IP ) ) {
+		return '';
+	}
 
-	foreach ( $candidates as $key ) {
-		if ( ! empty( $_SERVER[ $key ] ) ) {
-			$ip = sanitize_text_field( wp_unslash( $_SERVER[ $key ] ) );
-			// X-Forwarded-For can be a comma-separated list. Take the first.
-			if ( false !== strpos( $ip, ',' ) ) {
-				$ip = trim( explode( ',', $ip )[0] );
-			}
-			if ( filter_var( $ip, FILTER_VALIDATE_IP ) ) {
-				return $ip;
-			}
+	if ( ! g2ab_request_is_from_trusted_proxy( $remote ) ) {
+		return $remote;
+	}
+
+	$forwarded_headers = array( 'HTTP_CF_CONNECTING_IP', 'HTTP_X_REAL_IP', 'HTTP_X_FORWARDED_FOR' );
+	foreach ( $forwarded_headers as $key ) {
+		if ( empty( $_SERVER[ $key ] ) ) {
+			continue;
+		}
+		$raw = sanitize_text_field( wp_unslash( $_SERVER[ $key ] ) );
+		if ( false !== strpos( $raw, ',' ) ) {
+			$raw = trim( explode( ',', $raw )[0] );
+		}
+		if ( filter_var( $raw, FILTER_VALIDATE_IP ) ) {
+			return $raw;
 		}
 	}
 
-	return '';
+	return $remote;
+}
+
+/**
+ * Whether REMOTE_ADDR belongs to a configured trusted-proxy range.
+ *
+ * @param string $remote REMOTE_ADDR.
+ * @return bool
+ */
+function g2ab_request_is_from_trusted_proxy( $remote ) {
+	$proxies = array();
+
+	if ( defined( 'G2AB_TRUSTED_PROXIES' ) && is_string( G2AB_TRUSTED_PROXIES ) ) {
+		$proxies = array_merge( $proxies, array_filter( array_map( 'trim', explode( ',', G2AB_TRUSTED_PROXIES ) ) ) );
+	}
+	$opt = (string) get_option( 'g2ab_trusted_proxies', '' );
+	if ( '' !== $opt ) {
+		$proxies = array_merge( $proxies, array_filter( array_map( 'trim', explode( ',', $opt ) ) ) );
+	}
+	if ( (int) get_option( 'g2ab_trust_cloudflare', 0 ) === 1 ) {
+		$proxies = array_merge( $proxies, g2ab_cloudflare_ranges() );
+	}
+
+	if ( empty( $proxies ) ) {
+		return false;
+	}
+
+	foreach ( $proxies as $range ) {
+		if ( g2ab_ip_in_cidr( $remote, $range ) ) {
+			return true;
+		}
+	}
+	return false;
+}
+
+/**
+ * IPv4/IPv6 CIDR membership test. Falls back to exact match if no /N.
+ *
+ * @param string $ip    IP to test.
+ * @param string $range CIDR or single IP.
+ * @return bool
+ */
+function g2ab_ip_in_cidr( $ip, $range ) {
+	if ( false === strpos( $range, '/' ) ) {
+		return $ip === $range;
+	}
+	list( $subnet, $bits ) = explode( '/', $range, 2 );
+	$bits = (int) $bits;
+	if ( filter_var( $ip, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4 ) && filter_var( $subnet, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4 ) ) {
+		$ip_l    = ip2long( $ip );
+		$net_l   = ip2long( $subnet );
+		if ( $bits < 0 || $bits > 32 ) return false;
+		$mask    = $bits === 0 ? 0 : ( ~0 << ( 32 - $bits ) );
+		return ( $ip_l & $mask ) === ( $net_l & $mask );
+	}
+	if ( filter_var( $ip, FILTER_VALIDATE_IP, FILTER_FLAG_IPV6 ) && filter_var( $subnet, FILTER_VALIDATE_IP, FILTER_FLAG_IPV6 ) ) {
+		$ip_bin  = inet_pton( $ip );
+		$net_bin = inet_pton( $subnet );
+		if ( false === $ip_bin || false === $net_bin ) return false;
+		if ( $bits < 0 || $bits > 128 ) return false;
+		$bytes_full = intdiv( $bits, 8 );
+		$bits_rem   = $bits % 8;
+		if ( $bytes_full > 0 && substr( $ip_bin, 0, $bytes_full ) !== substr( $net_bin, 0, $bytes_full ) ) {
+			return false;
+		}
+		if ( 0 === $bits_rem ) {
+			return true;
+		}
+		$mask = chr( 0xFF << ( 8 - $bits_rem ) & 0xFF );
+		return ( ord( $ip_bin[ $bytes_full ] ) & ord( $mask ) ) === ( ord( $net_bin[ $bytes_full ] ) & ord( $mask ) );
+	}
+	return false;
+}
+
+/**
+ * Cloudflare IP ranges (cached daily). Used only when g2ab_trust_cloudflare = 1.
+ *
+ * @return array
+ */
+function g2ab_cloudflare_ranges() {
+	$cached = get_transient( 'g2ab_cf_ranges' );
+	if ( is_array( $cached ) && ! empty( $cached ) ) {
+		return $cached;
+	}
+	$ranges = array();
+	foreach ( array( 'https://www.cloudflare.com/ips-v4', 'https://www.cloudflare.com/ips-v6' ) as $url ) {
+		$resp = wp_remote_get( $url, array( 'timeout' => 10 ) );
+		if ( is_wp_error( $resp ) || 200 !== (int) wp_remote_retrieve_response_code( $resp ) ) {
+			continue;
+		}
+		$body = (string) wp_remote_retrieve_body( $resp );
+		foreach ( preg_split( '/\r?\n/', $body ) as $line ) {
+			$line = trim( $line );
+			if ( '' !== $line ) $ranges[] = $line;
+		}
+	}
+	if ( ! empty( $ranges ) ) {
+		set_transient( 'g2ab_cf_ranges', $ranges, DAY_IN_SECONDS );
+	}
+	return $ranges;
 }
 
 /**

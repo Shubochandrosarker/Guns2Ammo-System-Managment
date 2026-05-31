@@ -17,7 +17,7 @@
 if ( ! defined( 'ABSPATH' ) ) exit;
 get_header();
 
-$img = 'https://guns2ammo.com/wp-content/uploads/';
+$img = '/wp-content/uploads/';
 
 $faq = [
 	[ 'q' => 'Is the Arizona CCW class really free with a machine gun package?', 'a' => 'Yes. Every Signature Experience package  Basic, Premium, and Elite  includes the Arizona CCW class at no extra cost, a $75 value.' ],

@@ -179,7 +179,7 @@ $g2a_mg4_desc           = get_post_meta( $g2a_page_id, 'mg_fourth_weapon_desc', 
     ?>
     <div class="col-grid">
       <a class="col-tile feat" href="<?php echo esc_url( home_url( "/collections/handguns/" ) ); ?>">
-        <div class="bg" style="background-image: linear-gradient(180deg, rgba(26,25,30,0.3), rgba(26,25,30,0.9)), url('https://guns2ammo.com/wp-content/uploads/2026/04/15.webp');"></div>
+        <div class="bg" style="background-image: linear-gradient(180deg, rgba(26,25,30,0.3), rgba(26,25,30,0.9)), url('<?php echo esc_url( content_url( '/uploads/2026/04/15.webp' ) ); ?>');"></div>
         <div class="scrim"></div>
         <div class="body">
           <div class="cat"><?php echo esc_html( trim( __( 'Featured Collection', 'guns2ammo' ) . '  ' . $g2a_cat_label( 'handguns' ) ) ); ?></div>
@@ -188,7 +188,7 @@ $g2a_mg4_desc           = get_post_meta( $g2a_page_id, 'mg_fourth_weapon_desc', 
         </div>
       </a>
       <a class="col-tile" href="<?php echo esc_url( home_url( "/collections/rifles/" ) ); ?>">
-        <div class="bg" style="background-image: linear-gradient(180deg, rgba(26,25,30,0.3), rgba(26,25,30,0.85)), url('https://guns2ammo.com/wp-content/uploads/2025/06/noveske-gen4-556-sbr-bazooka-green-guns2ammo-mesa-az.webp');"></div>
+        <div class="bg" style="background-image: linear-gradient(180deg, rgba(26,25,30,0.3), rgba(26,25,30,0.85)), url('<?php echo esc_url( content_url( '/uploads/2025/06/noveske-gen4-556-sbr-bazooka-green-guns2ammo-mesa-az.webp' ) ); ?>');"></div>
         <div class="scrim"></div>
         <div class="body">
           <div class="cat"><?php echo esc_html( $g2a_cat_label( 'rifles', __( 'Shop Rifles', 'guns2ammo' ) ) ); ?></div>
@@ -197,7 +197,7 @@ $g2a_mg4_desc           = get_post_meta( $g2a_page_id, 'mg_fourth_weapon_desc', 
         </div>
       </a>
       <a class="col-tile" href="<?php echo esc_url( home_url( "/collections/ammunition/" ) ); ?>">
-        <div class="bg" style="background-image: linear-gradient(180deg, rgba(26,25,30,0.3), rgba(26,25,30,0.85)), url('https://guns2ammo.com/wp-content/uploads/2026/04/Gun-Rental-Near-Me-What-to-Expect.webp');"></div>
+        <div class="bg" style="background-image: linear-gradient(180deg, rgba(26,25,30,0.3), rgba(26,25,30,0.85)), url('<?php echo esc_url( content_url( '/uploads/2026/04/Gun-Rental-Near-Me-What-to-Expect.webp' ) ); ?>');"></div>
         <div class="scrim"></div>
         <div class="body">
           <div class="cat"><?php echo esc_html( $g2a_cat_label( 'ammunition', __( 'Shop Ammo', 'guns2ammo' ) ) ); ?></div>
@@ -206,7 +206,7 @@ $g2a_mg4_desc           = get_post_meta( $g2a_page_id, 'mg_fourth_weapon_desc', 
         </div>
       </a>
       <a class="col-tile" href="<?php echo esc_url( home_url( "/collections/magazines/" ) ); ?>">
-        <div class="bg" style="background-image: linear-gradient(180deg, rgba(26,25,30,0.3), rgba(26,25,30,0.85)), url('https://guns2ammo.com/wp-content/uploads/2026/04/2025-03-23.webp');"></div>
+        <div class="bg" style="background-image: linear-gradient(180deg, rgba(26,25,30,0.3), rgba(26,25,30,0.85)), url('<?php echo esc_url( content_url( '/uploads/2026/04/2025-03-23.webp' ) ); ?>');"></div>
         <div class="scrim"></div>
         <div class="body">
           <div class="cat"><?php echo esc_html( $g2a_cat_label( 'magazines', __( 'Shop Magazines', 'guns2ammo' ) ) ); ?></div>
@@ -215,7 +215,7 @@ $g2a_mg4_desc           = get_post_meta( $g2a_page_id, 'mg_fourth_weapon_desc', 
         </div>
       </a>
       <a class="col-tile" href="<?php echo esc_url( home_url( "/ffl-services/" ) ); ?>">
-        <div class="bg" style="background-image: linear-gradient(180deg, rgba(26,25,30,0.3), rgba(26,25,30,0.85)), url('https://guns2ammo.com/wp-content/uploads/2024/08/one-1-a.webp');"></div>
+        <div class="bg" style="background-image: linear-gradient(180deg, rgba(26,25,30,0.3), rgba(26,25,30,0.85)), url('<?php echo esc_url( content_url( '/uploads/2024/08/one-1-a.webp' ) ); ?>');"></div>
         <div class="scrim"></div>
         <div class="body">
           <div class="cat">$25 Flat Fee</div>

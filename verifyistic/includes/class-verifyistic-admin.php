@@ -12,6 +12,77 @@ class Verifyistic_Admin {
         add_action( 'wp_ajax_verifyistic_clear_logs',    array( $this, 'ajax_clear_logs' ) );
         add_action( 'wp_ajax_verifyistic_export_csv',    array( $this, 'ajax_export_csv' ) );
         add_action( 'wp_ajax_verifyistic_test_webhook',  array( $this, 'ajax_test_webhook' ) );
+        add_action( 'wp_ajax_verifyistic_protected_file', array( $this, 'serve_protected_file' ) );
+    }
+
+    /**
+     * Build a one-shot signed URL that an admin can paste into an <img> / <a>
+     * to view a stored private ID/selfie. Bound to user, expires in 5 min.
+     *
+     * @param string $key The 'private:rel/path.jpg' value from the DB.
+     * @return string
+     */
+    public static function build_protected_url( $key ) {
+        $key = (string) $key;
+        if ( 0 !== strpos( $key, 'private:' ) ) {
+            return '';
+        }
+        $path  = substr( $key, 8 );
+        $exp   = time() + 5 * MINUTE_IN_SECONDS;
+        $uid   = get_current_user_id();
+        $sig   = hash_hmac( 'sha256', $path . '|' . $exp . '|' . $uid, wp_salt( 'auth' ) );
+        return add_query_arg(
+            array(
+                'action' => 'verifyistic_protected_file',
+                'k'      => rawurlencode( $path ),
+                'e'      => $exp,
+                's'      => $sig,
+            ),
+            admin_url( 'admin-ajax.php' )
+        );
+    }
+
+    /**
+     * Stream a private file to a signed, capability-gated admin request.
+     */
+    public function serve_protected_file() {
+        if ( ! is_user_logged_in() || ! current_user_can( 'manage_options' ) ) {
+            status_header( 403 );
+            exit;
+        }
+        $k   = isset( $_GET['k'] ) ? rawurldecode( wp_unslash( $_GET['k'] ) ) : '';
+        $exp = isset( $_GET['e'] ) ? (int) $_GET['e'] : 0;
+        $sig = isset( $_GET['s'] ) ? (string) wp_unslash( $_GET['s'] ) : '';
+
+        if ( '' === $k || $exp < time() || '' === $sig ) {
+            status_header( 403 ); exit;
+        }
+        // Path-traversal guard.
+        if ( false !== strpos( $k, '..' ) || 0 === strpos( $k, '/' ) ) {
+            status_header( 400 ); exit;
+        }
+        $expected = hash_hmac( 'sha256', $k . '|' . $exp . '|' . get_current_user_id(), wp_salt( 'auth' ) );
+        if ( ! hash_equals( $expected, $sig ) ) {
+            status_header( 403 ); exit;
+        }
+
+        $uploads = wp_upload_dir();
+        $abs     = realpath( trailingslashit( $uploads['basedir'] ) . $k );
+        $root    = realpath( trailingslashit( $uploads['basedir'] ) . 'private/verifyistic-ids' );
+        if ( ! $abs || ! $root || 0 !== strpos( $abs, $root ) || ! is_file( $abs ) ) {
+            status_header( 404 ); exit;
+        }
+
+        $check = function_exists( 'wp_check_filetype' ) ? wp_check_filetype( $abs ) : array( 'type' => 'application/octet-stream' );
+        $mime  = $check['type'] ?: 'application/octet-stream';
+
+        nocache_headers();
+        header( 'X-Content-Type-Options: nosniff' );
+        header( 'Content-Type: ' . $mime );
+        header( 'Content-Length: ' . filesize( $abs ) );
+        header( 'Content-Disposition: inline; filename="' . basename( $abs ) . '"' );
+        readfile( $abs );
+        exit;
     }
 
     // ─── Admin Menus ─────────────────────────────────────────────────────────

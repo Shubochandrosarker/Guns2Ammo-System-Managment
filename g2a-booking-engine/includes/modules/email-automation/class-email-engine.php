@@ -167,11 +167,23 @@ class G2AB_Email_Engine {
 
 	/**
 	 * Merge {tags} into a string.
+	 *
+	 * SECURITY: substitution values are HTML-escaped. Pass an array of
+	 * tag names through $raw_tags to allow markup (e.g. {body_html}).
+	 * URL-shaped tag names ending in `_url`/`_link` get esc_url().
 	 */
-	public function merge( $template, $tags ) {
+	public function merge( $template, $tags, $raw_tags = array() ) {
 		$out = $template;
 		foreach ( $tags as $k => $v ) {
-			$out = str_replace( '{' . $k . '}', (string) $v, $out );
+			$val = (string) $v;
+			if ( in_array( $k, (array) $raw_tags, true ) ) {
+				$escaped = $val;
+			} elseif ( preg_match( '/(_url|_link)$/', $k ) ) {
+				$escaped = esc_url( $val );
+			} else {
+				$escaped = esc_html( $val );
+			}
+			$out = str_replace( '{' . $k . '}', $escaped, $out );
 		}
 		return $out;
 	}
