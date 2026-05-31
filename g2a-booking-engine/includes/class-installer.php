@@ -177,25 +177,27 @@ final class G2AB_Installer {
 	 * row with party_size = N at the same slot, so this rule does NOT
 	 * conflict with multi-seat resources.
 	 *
+	 * SELF-HEALING: keyed on column existence, NOT the version option.
+	 * Earlier installs may have had `g2ab_db_version` bumped past 1.6.1
+	 * by an unrelated dev/staging deploy, which would otherwise skip
+	 * this migration entirely.
+	 *
 	 * Skipped silently if the MySQL version is too old for generated
 	 * columns (< 5.7) — the FOR UPDATE path stays as the only defense.
 	 */
 	private function migrate_to_1_6_1( $current ) {
-		if ( version_compare( $current, '1.6.1', '>=' ) ) {
-			return;
-		}
 		global $wpdb;
 		$bookings = $wpdb->prefix . 'g2ab_bookings';
+
+		// Column-existence is the source of truth, not the version option.
+		$cols = (array) $wpdb->get_col( "SHOW COLUMNS FROM {$bookings}" );
+		if ( in_array( 'slot_key', $cols, true ) ) {
+			return;
+		}
 
 		// Require MySQL 5.7+ for generated columns.
 		$version = (string) $wpdb->get_var( 'SELECT VERSION()' );
 		if ( '' === $version || version_compare( preg_replace( '/[^0-9.].*$/', '', $version ), '5.7.0', '<' ) ) {
-			return;
-		}
-
-		// Already present?
-		$cols = (array) $wpdb->get_col( "SHOW COLUMNS FROM {$bookings}" );
-		if ( in_array( 'slot_key', $cols, true ) ) {
 			return;
 		}
 
