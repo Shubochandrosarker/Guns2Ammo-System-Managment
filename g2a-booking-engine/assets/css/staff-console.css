@@ -292,3 +292,243 @@
 .g2ab-sc__checkin-details { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 18px; padding: 14px 0; margin-bottom: 14px; border-bottom: 1px solid var(--sc-hairline); }
 .g2ab-sc__checkin-details .k { font-family: var(--sc-font-mono); font-size: 10px; color: var(--sc-silver); text-transform: uppercase; letter-spacing: 0.2em; }
 .g2ab-sc__checkin-details .v { font-family: var(--sc-font-condensed); font-weight: 600; color: var(--sc-white); font-size: 14px; }
+
+/* =================================================================== */
+/* v1.12.1 — clean light theme overhaul                                 */
+/*                                                                      */
+/* The earlier light theme leaked: parent themes were winning on inner  */
+/* panels and the console sat in a narrow page column with a dark page  */
+/* header above it. This block:                                         */
+/*   1. Breaks the console out of the page wrapper to fill the viewport */
+/*   2. Hides the WP page H1 ("STAFF FRONTEND") + site chrome inside the*/
+/*      console viewport                                                */
+/*   3. Forces light-theme tokens with `!important` so the cascade is   */
+/*      no longer a guessing game                                       */
+/*   4. Tightens spacing, typography hierarchy, panel borders           */
+/*   5. Fixes the narrow "Pending at the desk" column wrap              */
+/* =================================================================== */
+
+/* (1) Break out of any centered/constrained page wrapper without using
+   fixed positioning (which would break sticky scroll). Negative left
+   margin + 100vw width pulls the console flush to the viewport edges. */
+.g2ab-sc.is-theme-light {
+  width: 100vw;
+  position: relative;
+  left: 50%;
+  margin-left: -50vw;
+  margin-right: -50vw;
+  margin-top: 0;
+  margin-bottom: 0;
+  padding: 0;
+  background: #F4EFDF !important;     /* warm cream, page-level */
+  min-height: 100vh;
+}
+
+/* (2) Hide WP page chrome behind the console — the giant "STAFF FRONTEND"
+   title, breadcrumbs, post meta, etc. — but only on the same document
+   where the console renders. Scoped via :has so we don't nuke titles on
+   unrelated pages. Falls back gracefully on browsers without :has. */
+body:has(.g2ab-sc) .entry-title,
+body:has(.g2ab-sc) .page-title,
+body:has(.g2ab-sc) .post-title,
+body:has(.g2ab-sc) header.entry-header,
+body:has(.g2ab-sc) .breadcrumb,
+body:has(.g2ab-sc) .rank-math-breadcrumb { display: none !important; }
+body:has(.g2ab-sc) .entry-content,
+body:has(.g2ab-sc) .site-main,
+body:has(.g2ab-sc) main { max-width: none !important; padding: 0 !important; margin: 0 !important; }
+
+/* (3) Hard light-theme tokens — wins over anything the parent theme
+   tries to inject. Applied with `!important` because some parent themes
+   set !important on background/color on .panel-like elements. */
+.g2ab-sc.is-theme-light {
+  --sc-void:           #F4EFDF;
+  --sc-gunmetal:       #FFFFFF;
+  --sc-hairline:       rgba(20, 36, 26, 0.08);
+  --sc-hairline-bright:rgba(20, 36, 26, 0.16);
+  --sc-fog:            #2A3F2D;
+  --sc-silver:         #6F7C71;
+  --sc-white:          #14241A;
+  --sc-brass:          #C9A84C;
+  --sc-brass-bright:   #8B6A1E;
+  --sc-brass-dim:      rgba(201,168,76,0.45);
+  --sc-ember:          #C4471A;
+  --sc-active:         #2F8A5A;
+}
+
+/* All panels — flat white cards with a soft hairline. No gradients,
+   no inner shadows, no dark-mode fallbacks bleeding through. */
+.g2ab-sc.is-theme-light .g2ab-sc__panel,
+.g2ab-sc.is-theme-light .g2ab-sc__kpi,
+.g2ab-sc.is-theme-light .g2ab-sc__rcard,
+.g2ab-sc.is-theme-light .g2ab-sc__rrow,
+.g2ab-sc.is-theme-light .g2ab-sc__toast,
+.g2ab-sc.is-theme-light .g2ab-sc__modal-card {
+  background: #FFFFFF !important;
+  border: 1px solid rgba(20, 36, 26, 0.08) !important;
+  box-shadow: 0 1px 0 rgba(20, 36, 26, 0.02) !important;
+  color: #2A3F2D;
+}
+
+/* Sidebar — a touch warmer than the page so it reads as a panel, not a
+   hole. Stronger right divider so it visually separates from the work
+   area without going dark. */
+.g2ab-sc.is-theme-light .g2ab-sc__side {
+  background: #FFFCF1 !important;
+  border-right: 1px solid rgba(20, 36, 26, 0.10) !important;
+  padding: 28px 0 24px;
+}
+.g2ab-sc.is-theme-light .g2ab-sc__who {
+  border-bottom: 1px solid rgba(20, 36, 26, 0.10);
+  padding: 0 24px 20px;
+  margin-bottom: 14px;
+}
+.g2ab-sc.is-theme-light .g2ab-sc__role { color: #8B6A1E !important; font-weight: 700; }
+.g2ab-sc.is-theme-light .g2ab-sc__nm   { color: #14241A !important; }
+
+/* Nav links — readable on cream, generous tap target, no muddy gray */
+.g2ab-sc.is-theme-light .g2ab-sc__navi,
+.g2ab-sc.is-theme-light .g2ab-sc__sign-out {
+  color: #2A3F2D !important;
+  padding: 13px 24px;
+  font-weight: 600;
+}
+.g2ab-sc.is-theme-light .g2ab-sc__navi:hover,
+.g2ab-sc.is-theme-light .g2ab-sc__sign-out:hover {
+  background: rgba(201,168,76,0.10) !important;
+  color: #14241A !important;
+}
+.g2ab-sc.is-theme-light .g2ab-sc__navi.is-cur {
+  background: rgba(201,168,76,0.16) !important;
+  border-left: 3px solid #C9A84C !important;
+  color: #8B6A1E !important;
+}
+.g2ab-sc.is-theme-light .g2ab-sc__navi-ic { color: #8B6A1E; opacity: 1; }
+
+/* Main content area — bring the cream all the way to the edge and add
+   comfortable breathing room without the empty-vh stretch. */
+.g2ab-sc.is-theme-light .g2ab-sc__main {
+  padding: 36px 44px 56px;
+  background: transparent;
+}
+.g2ab-sc.is-theme-light { min-height: auto; }   /* lose the empty 100vh */
+
+/* Pane title — the one that was invisible. Force the forest color on
+   the header H1 AND on the pane title <h1>. */
+.g2ab-sc.is-theme-light .g2ab-sc__h h1,
+.g2ab-sc.is-theme-light #g2ab-sc-pane-title {
+  color: #14241A !important;
+  text-shadow: none;
+}
+.g2ab-sc.is-theme-light .g2ab-sc__crumb { color: #6F7C71 !important; }
+.g2ab-sc.is-theme-light .g2ab-sc__crumb b { color: #8B6A1E !important; }
+
+/* KPI cards */
+.g2ab-sc.is-theme-light .g2ab-sc__kpi { padding: 22px 24px; }
+.g2ab-sc.is-theme-light .g2ab-sc__kpi.brass { border-left: 3px solid #C9A84C !important; }
+.g2ab-sc.is-theme-light .g2ab-sc__kpi-l { color: #6F7C71 !important; }
+.g2ab-sc.is-theme-light .g2ab-sc__kpi-v { color: #14241A !important; }
+
+/* Panel headers */
+.g2ab-sc.is-theme-light .g2ab-sc__panel h3 { color: #14241A !important; }
+.g2ab-sc.is-theme-light .g2ab-sc__pill {
+  color: #2F8A5A !important;
+  border-color: #2F8A5A !important;
+  background: rgba(47,138,90,0.08);
+}
+
+/* Lane tiles — cream squares with state-colored borders */
+.g2ab-sc.is-theme-light .g2ab-sc__lane {
+  background: #FBF6E5 !important;
+  border-color: rgba(20, 36, 26, 0.14) !important;
+  color: #14241A !important;
+}
+.g2ab-sc.is-theme-light .g2ab-sc__lane.in_use {
+  background: rgba(196,71,26,0.10) !important; border-color: #C4471A !important; color: #C4471A !important;
+}
+.g2ab-sc.is-theme-light .g2ab-sc__lane.reserved {
+  background: rgba(201,168,76,0.16) !important; border-color: #C9A84C !important; color: #8B6A1E !important;
+}
+.g2ab-sc.is-theme-light .g2ab-sc__lane.open {
+  background: rgba(47,138,90,0.10) !important; border-color: #2F8A5A !important; color: #2F8A5A !important;
+}
+.g2ab-sc.is-theme-light .g2ab-sc__legend { color: #6F7C71 !important; }
+.g2ab-sc.is-theme-light .g2ab-sc__hint { color: #6F7C71 !important; }
+.g2ab-sc.is-theme-light .g2ab-sc__empty { color: #6F7C71 !important; }
+
+/* Live feed rows */
+.g2ab-sc.is-theme-light .g2ab-sc__feed-row { border-bottom: 1px solid rgba(20,36,26,0.06); }
+.g2ab-sc.is-theme-light .g2ab-sc__feed-row .t  { color: #6F7C71 !important; }
+.g2ab-sc.is-theme-light .g2ab-sc__feed-row .nm { color: #14241A !important; }
+.g2ab-sc.is-theme-light .g2ab-sc__feed-row .d  { color: #2A3F2D !important; }
+.g2ab-sc.is-theme-light .g2ab-sc__feed-row .ic { color: #8B6A1E !important; border-color: rgba(20,36,26,0.14) !important; }
+
+/* Search input */
+.g2ab-sc.is-theme-light .g2ab-sc__input {
+  background: #FFFCF1 !important;
+  color: #14241A !important;
+  border-color: rgba(20,36,26,0.16) !important;
+}
+.g2ab-sc.is-theme-light .g2ab-sc__input::placeholder { color: rgba(20,36,26,0.40); }
+
+/* Waiver result cards */
+.g2ab-sc.is-theme-light .g2ab-sc__rcard .who   { color: #14241A !important; }
+.g2ab-sc.is-theme-light .g2ab-sc__rcard .meta  { color: #6F7C71 !important; }
+.g2ab-sc.is-theme-light .g2ab-sc__rcard .dates { color: #6F7C71 !important; }
+
+/* Roster rows */
+.g2ab-sc.is-theme-light .g2ab-sc__rrow .time  { color: #8B6A1E !important; }
+.g2ab-sc.is-theme-light .g2ab-sc__rrow .name  { color: #14241A !important; }
+.g2ab-sc.is-theme-light .g2ab-sc__rrow .resource { color: #6F7C71 !important; }
+.g2ab-sc.is-theme-light .g2ab-sc__rrow .pill { color: #2A3F2D !important; border-color: rgba(20,36,26,0.20) !important; }
+.g2ab-sc.is-theme-light .g2ab-sc__act-btn { color: #2A3F2D !important; border-color: rgba(20,36,26,0.16) !important; }
+.g2ab-sc.is-theme-light .g2ab-sc__act-btn:hover { color: #8B6A1E !important; border-color: #C9A84C !important; }
+
+/* (4) Check-in station — fix the cramped "Pending at the desk" column.
+   The grid was 1fr/1fr which squeezed text. Give the QR a fixed width
+   and let the pending column take the rest. */
+.g2ab-sc.is-theme-light .g2ab-sc__station-grid {
+  grid-template-columns: minmax(360px, 440px) 1fr;
+  align-items: start;
+}
+@media (max-width: 980px) {
+  .g2ab-sc.is-theme-light .g2ab-sc__station-grid { grid-template-columns: 1fr; }
+}
+.g2ab-sc.is-theme-light .g2ab-sc__qr-card { padding: 24px; }
+.g2ab-sc.is-theme-light .g2ab-sc__qr { width: 260px; height: 260px; padding: 12px; border-color: rgba(20,36,26,0.12) !important; }
+.g2ab-sc.is-theme-light .g2ab-sc__qr-url { color: #6F7C71 !important; font-size: 11px; max-width: 320px; }
+.g2ab-sc.is-theme-light .g2ab-sc__qr-help { color: #14241A !important; margin-top: 10px; }
+.g2ab-sc.is-theme-light .g2ab-sc__pending-item {
+  background: rgba(201,168,76,0.10) !important;
+  border-left: 4px solid #C9A84C !important;
+  padding: 16px 18px;
+}
+.g2ab-sc.is-theme-light .g2ab-sc__pending-item .who { color: #14241A !important; }
+.g2ab-sc.is-theme-light .g2ab-sc__pending-item .meta { color: #6F7C71 !important; }
+.g2ab-sc.is-theme-light .g2ab-sc__pending-list .g2ab-sc__empty { padding: 36px 16px; }
+
+/* Buttons — ember stays vivid, ghost reads on cream */
+.g2ab-sc.is-theme-light .g2ab-sc__btn { background: #C4471A !important; color: #FFFFFF !important; }
+.g2ab-sc.is-theme-light .g2ab-sc__btn:hover { background: #A93B14 !important; }
+.g2ab-sc.is-theme-light .g2ab-sc__btn--ghost {
+  background: transparent !important;
+  color: #2A3F2D !important;
+  border: 1px solid rgba(20,36,26,0.20) !important;
+}
+
+/* Modals — white card on dim backdrop */
+.g2ab-sc.is-theme-light .g2ab-sc__modal-back { background: rgba(20,36,26,0.55) !important; }
+.g2ab-sc.is-theme-light .g2ab-sc__modal-card h3 { color: #14241A !important; }
+.g2ab-sc.is-theme-light .g2ab-sc__modal-card label { color: #6F7C71 !important; }
+.g2ab-sc.is-theme-light .g2ab-sc__modal-card label input,
+.g2ab-sc.is-theme-light .g2ab-sc__modal-card label select {
+  background: #FFFCF1 !important;
+  color: #14241A !important;
+  border-color: rgba(20,36,26,0.16) !important;
+}
+.g2ab-sc.is-theme-light .g2ab-sc__x { color: #6F7C71 !important; }
+.g2ab-sc.is-theme-light .g2ab-sc__checkin-details .k { color: #6F7C71 !important; }
+.g2ab-sc.is-theme-light .g2ab-sc__checkin-details .v { color: #14241A !important; }
+
+/* Toasts — white card with brass/ok/err edge */
+.g2ab-sc.is-theme-light .g2ab-sc__toast { color: #14241A !important; box-shadow: 0 8px 30px rgba(20,36,26,0.18) !important; }
