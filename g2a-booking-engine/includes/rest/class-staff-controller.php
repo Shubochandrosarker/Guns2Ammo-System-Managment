@@ -191,9 +191,13 @@ final class G2AB_REST_Staff_Controller {
 	}
 
 	/**
-	 * Waiver lookup. Searches Memberistic's people table by email or name.
-	 * Returns a minimal summary — never the waiver text, signed-PDF URL,
-	 * DOB, or anything that would let staff exfiltrate PII.
+	 * Waiver lookup. Searches the two real sources of truth in Memberistic:
+	 *   1. wp_memberistic_people     — active member roster (full_name + waiver columns)
+	 *   2. wp_memberistic_waivers_archive — imported OtterText/historical waivers
+	 *      (first_name / last_name / email / signed_at)
+	 * Results are merged, deduped by lower-cased email, and trimmed to 25.
+	 *
+	 * NEVER returns: file URL, DOB, raw text, PDF link, raw IP.
 	 */
 	public function waiver_lookup( WP_REST_Request $request ) {
 		$q = trim( (string) $request->get_param( 'q' ) );
@@ -202,34 +206,100 @@ final class G2AB_REST_Staff_Controller {
 		}
 
 		global $wpdb;
-		$persons = $wpdb->prefix . 'memberistic_persons';
-		if ( $wpdb->get_var( $wpdb->prepare( 'SHOW TABLES LIKE %s', $persons ) ) !== $persons ) {
+		$people  = $wpdb->prefix . 'memberistic_people';
+		$archive = $wpdb->prefix . 'memberistic_waivers_archive';
+		$has_people  = ( $wpdb->get_var( $wpdb->prepare( 'SHOW TABLES LIKE %s', $people ) ) === $people );
+		$has_archive = ( $wpdb->get_var( $wpdb->prepare( 'SHOW TABLES LIKE %s', $archive ) ) === $archive );
+
+		if ( ! $has_people && ! $has_archive ) {
 			return rest_ensure_response( array( 'results' => array(), 'note' => 'memberistic_inactive' ) );
 		}
 
-		$like  = '%' . $wpdb->esc_like( $q ) . '%';
-		$rows  = (array) $wpdb->get_results( $wpdb->prepare(
-			"SELECT id, first_name, last_name, email, waiver_status, waiver_signed_at, waiver_expires_at, membership_id
-			 FROM {$persons}
-			 WHERE email LIKE %s OR CONCAT(first_name,' ',last_name) LIKE %s
-			 ORDER BY waiver_signed_at DESC
-			 LIMIT 25",
-			$like, $like
-		), ARRAY_A );
+		$like = '%' . $wpdb->esc_like( $q ) . '%';
+		$by_email = array();   // email lower => merged record
+		$ordered  = array();   // preserve search-relevance order
 
+		if ( $has_people ) {
+			$rows = (array) $wpdb->get_results( $wpdb->prepare(
+				"SELECT id, full_name, email, phone, waiver_status, waiver_signed_at, waiver_expires_at, membership_id
+				 FROM {$people}
+				 WHERE email LIKE %s OR full_name LIKE %s
+				 ORDER BY waiver_signed_at DESC
+				 LIMIT 25",
+				$like, $like
+			), ARRAY_A );
+			foreach ( $rows as $r ) {
+				$key = strtolower( trim( (string) $r['email'] ) );
+				if ( '' === $key ) $key = 'pid:' . $r['id'];
+				$status = self::resolve_waiver_status( array(
+					'waiver_status'      => $r['waiver_status'],
+					'waiver_expires_at'  => $r['waiver_expires_at'],
+				) );
+				$by_email[ $key ] = array(
+					'source'     => 'member',
+					'person_id'  => (int) $r['id'],
+					'name'       => wp_strip_all_tags( (string) $r['full_name'] ),
+					'email'      => (string) $r['email'],
+					'email_mask' => self::mask_email( (string) $r['email'] ),
+					'status'     => $status['label'],
+					'state'      => $status['state'],
+					'signed_at'  => $r['waiver_signed_at']  ? self::pretty_date( $r['waiver_signed_at'] )  : '',
+					'expires_at' => $r['waiver_expires_at'] ? self::pretty_date( $r['waiver_expires_at'] ) : '',
+					'tier'       => self::membership_tier_label( (int) $r['membership_id'] ),
+				);
+				$ordered[] = $key;
+			}
+		}
+
+		if ( $has_archive ) {
+			$rows = (array) $wpdb->get_results( $wpdb->prepare(
+				"SELECT id, first_name, last_name, email, signed_at, is_current, matched_user_id
+				 FROM {$archive}
+				 WHERE email LIKE %s OR CONCAT(IFNULL(first_name,''),' ',IFNULL(last_name,'')) LIKE %s
+				 ORDER BY is_current DESC, signed_at DESC
+				 LIMIT 25",
+				$like, $like
+			), ARRAY_A );
+			foreach ( $rows as $r ) {
+				$key = strtolower( trim( (string) $r['email'] ) );
+				if ( '' === $key ) $key = 'aid:' . $r['id'];
+				// If a member record already exists for this email, do not
+				// overwrite — that record carries the membership tier. But
+				// promote the archive's signed_at if newer.
+				if ( isset( $by_email[ $key ] ) ) {
+					$arch_state = (int) $r['is_current'] === 1 ? 'current' : 'expired';
+					if ( 'missing' === $by_email[ $key ]['state'] && 'current' === $arch_state ) {
+						$by_email[ $key ]['state']     = 'current';
+						$by_email[ $key ]['status']    = __( 'Current (archived)', 'g2a-booking' );
+						$by_email[ $key ]['signed_at'] = $r['signed_at'] ? self::pretty_date( $r['signed_at'] ) : $by_email[ $key ]['signed_at'];
+					}
+					continue;
+				}
+				$state = (int) $r['is_current'] === 1 ? 'current' : 'expired';
+				$by_email[ $key ] = array(
+					'source'     => 'archive',
+					'archive_id' => (int) $r['id'],
+					'name'       => self::pretty_name( $r['first_name'], $r['last_name'] ),
+					'email'      => (string) $r['email'],
+					'email_mask' => self::mask_email( (string) $r['email'] ),
+					'status'     => 'current' === $state ? __( 'Current (archived)', 'g2a-booking' ) : __( 'Expired (archived)', 'g2a-booking' ),
+					'state'      => $state,
+					'signed_at'  => $r['signed_at'] ? self::pretty_date( $r['signed_at'] ) : '',
+					'expires_at' => '',
+					'tier'       => '',
+				);
+				$ordered[] = $key;
+			}
+		}
+
+		// Preserve order; drop duplicates that snuck in
+		$seen = array();
 		$results = array();
-		foreach ( $rows as $r ) {
-			$status = self::resolve_waiver_status( $r );
-			$results[] = array(
-				'id'         => (int) $r['id'],
-				'name'       => self::pretty_name( $r['first_name'], $r['last_name'] ),
-				'email_mask' => self::mask_email( (string) $r['email'] ),
-				'status'     => $status['label'],
-				'state'      => $status['state'],
-				'signed_at'  => $r['waiver_signed_at'] ? self::pretty_date( $r['waiver_signed_at'] ) : '',
-				'expires_at' => $r['waiver_expires_at'] ? self::pretty_date( $r['waiver_expires_at'] ) : '',
-				'tier'       => self::membership_tier_label( (int) $r['membership_id'] ),
-			);
+		foreach ( $ordered as $k ) {
+			if ( isset( $seen[ $k ] ) || ! isset( $by_email[ $k ] ) ) continue;
+			$seen[ $k ] = true;
+			$results[] = $by_email[ $k ];
+			if ( count( $results ) >= 25 ) break;
 		}
 
 		return rest_ensure_response( array( 'results' => $results ) );
@@ -269,10 +339,10 @@ final class G2AB_REST_Staff_Controller {
 		}
 
 		global $wpdb;
-		$persons = $wpdb->prefix . 'memberistic_persons';
+		$people = $wpdb->prefix . 'memberistic_people';
 		$row = $wpdb->get_row( $wpdb->prepare(
-			"SELECT id, first_name, last_name, email, waiver_status, waiver_signed_at, waiver_expires_at, membership_id
-			 FROM {$persons} WHERE id = %d",
+			"SELECT id, full_name, email, waiver_status, waiver_signed_at, waiver_expires_at, membership_id
+			 FROM {$people} WHERE id = %d",
 			$pid
 		), ARRAY_A );
 		if ( ! $row ) {
@@ -280,12 +350,14 @@ final class G2AB_REST_Staff_Controller {
 		}
 		$status = self::resolve_waiver_status( $row );
 		return rest_ensure_response( array(
-			'id'         => (int) $row['id'],
-			'name'       => self::pretty_name( $row['first_name'], $row['last_name'] ),
+			'person_id'  => (int) $row['id'],
+			'source'     => 'member',
+			'name'       => wp_strip_all_tags( (string) $row['full_name'] ),
+			'email'      => (string) $row['email'],
 			'email_mask' => self::mask_email( (string) $row['email'] ),
 			'status'     => $status['label'],
 			'state'      => $status['state'],
-			'signed_at'  => $row['waiver_signed_at'] ? self::pretty_date( $row['waiver_signed_at'] ) : '',
+			'signed_at'  => $row['waiver_signed_at']  ? self::pretty_date( $row['waiver_signed_at'] )  : '',
 			'expires_at' => $row['waiver_expires_at'] ? self::pretty_date( $row['waiver_expires_at'] ) : '',
 			'tier'       => self::membership_tier_label( (int) $row['membership_id'] ),
 		) );
