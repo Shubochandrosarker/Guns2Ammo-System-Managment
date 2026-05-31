@@ -690,13 +690,69 @@ final class G2AB_Admin_Settings_Pro {
 		return defined( $const ) && '' !== (string) constant( $const );
 	}
 
+	/**
+	 * Allow-list of option keys writable by each tab. Returning null disables
+	 * the filter (legacy behavior — every g2ab_* key passes). Filter
+	 * `g2ab_settings_pro_writable_options` lets modules extend the list.
+	 *
+	 * @param string $tab Active tab key.
+	 * @return array|null
+	 */
+	public static function allowed_options_for_tab( $tab ) {
+		$map = array(
+			'general'         => array(
+				'g2ab_business_name', 'g2ab_business_phone', 'g2ab_business_address',
+				'g2ab_currency', 'g2ab_timezone', 'g2ab_allow_guest_booking',
+				'g2ab_booking_page_url', 'g2ab_reservation_hold_minutes',
+				'g2ab_default_min_age', 'g2ab_trusted_proxies', 'g2ab_trust_cloudflare',
+			),
+			'payments'        => array(
+				'g2ab_stripe_enabled', 'g2ab_stripe_test_mode', 'g2ab_stripe_publishable_key',
+				'g2ab_stripe_secret_key', 'g2ab_stripe_webhook_secret', 'g2ab_stripe_test_publishable_key',
+				'g2ab_stripe_test_secret_key', 'g2ab_stripe_test_webhook_secret',
+				'g2ab_paypal_enabled', 'g2ab_paypal_test_mode', 'g2ab_paypal_client_id',
+				'g2ab_paypal_client_secret', 'g2ab_paypal_webhook_id',
+				'g2ab_paypal_test_client_id', 'g2ab_paypal_test_client_secret', 'g2ab_paypal_test_webhook_id',
+				'g2ab_authnet_enabled', 'g2ab_authnet_test_mode', 'g2ab_authnet_login_id',
+				'g2ab_authnet_transaction_key', 'g2ab_authnet_signature_key', 'g2ab_authnet_public_client_key',
+				'g2ab_fortis_enabled', 'g2ab_fortis_test_mode', 'g2ab_fortis_user_id',
+				'g2ab_fortis_user_api_key', 'g2ab_fortis_developer_id', 'g2ab_fortis_location_id',
+				'g2ab_fortis_webhook_secret',
+				'g2ab_pay_in_store_enabled', 'g2ab_pay_in_store_label', 'g2ab_pay_in_store_instructions',
+			),
+			'notifications'   => array(
+				'g2ab_admin_notification_email', 'g2ab_email_from_name', 'g2ab_email_from_address',
+				'g2ab_send_confirmation_email', 'g2ab_send_reminder_email', 'g2ab_emails_disabled',
+				'g2ab_sms_enabled', 'g2ab_create_user_on_booking',
+				'g2ab_confirmation_subject', 'g2ab_confirmation_body',
+				'g2ab_reminder_subject', 'g2ab_reminder_body',
+			),
+			'form_customizer' => array(
+				'g2ab_form_animations', 'g2ab_form_primary_color', 'g2ab_form_features',
+			),
+			'danger'          => array(
+				'g2ab_remove_data_on_uninstall',
+			),
+		);
+		$list = isset( $map[ $tab ] ) ? $map[ $tab ] : null;
+		return apply_filters( 'g2ab_settings_pro_writable_options', $list, $tab );
+	}
+
 	public function handle_save() {
 		if ( ! current_user_can( 'manage_g2ab_settings' ) ) wp_die( 'No permission.' );
 		check_admin_referer( 'g2ab_save_settings_pro', '_g2ab_nonce' );
 		$tab = sanitize_key( $_POST['active_tab'] ?? 'general' );
 
-		// Generic key/value save based on POST keys starting with g2ab_.
-		foreach ( $_POST as $k => $v ) {
+		// SECURITY: only options that THIS tab is allowed to write may pass.
+		// Previously any g2ab_*-prefixed POST key would overwrite any option,
+		// which let an admin form submission on the "general" tab silently
+		// clobber payment secrets, invoice signing keys, etc.
+		$allowed_for_tab = self::allowed_options_for_tab( $tab );
+		$post_filtered   = is_array( $allowed_for_tab )
+			? array_intersect_key( (array) $_POST, array_flip( $allowed_for_tab ) )
+			: (array) $_POST;
+
+		foreach ( $post_filtered as $k => $v ) {
 			if ( 0 !== strpos( $k, 'g2ab_' ) ) continue;
 			if ( in_array( $k, array( 'g2ab_save_settings_pro', '_g2ab_nonce' ), true ) ) continue;
 			// Refuse to overwrite a gateway secret when the wp-config.php

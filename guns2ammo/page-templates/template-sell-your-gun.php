@@ -10,7 +10,7 @@
 if ( ! defined( 'ABSPATH' ) ) exit;
 get_header();
 
-$img  = 'https://guns2ammo.com/wp-content/uploads/';
+$img  = '/wp-content/uploads/';
 $sent = isset( $_GET['g2a_sent'] );
 
 $steps = [

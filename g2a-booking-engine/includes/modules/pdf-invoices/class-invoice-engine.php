@@ -84,10 +84,14 @@ class G2AB_Invoice_Engine {
 		}
 
 		// 2. wkhtmltopdf binary (some hosts have it).
+		// SECURITY: --enable-local-file-access was removed because admin-controlled
+		// logo URLs combined with that flag enabled SSRF + local-file read. The
+		// invoice HTML now refers to assets by absolute https:// URLs which
+		// wkhtmltopdf can still fetch over the network without the flag.
 		if ( function_exists( 'shell_exec' ) && trim( shell_exec( 'which wkhtmltopdf 2>/dev/null' ) ) ) {
 			$tmp_html = $this->upload_dir() . $this->invoice_filename( $booking, 'tmp.html' );
 			file_put_contents( $tmp_html, $html );
-			$cmd = 'wkhtmltopdf --enable-local-file-access ' . escapeshellarg( $tmp_html ) . ' ' . escapeshellarg( $path );
+			$cmd = 'wkhtmltopdf --disable-local-file-access --no-stop-slow-scripts ' . escapeshellarg( $tmp_html ) . ' ' . escapeshellarg( $path );
 			shell_exec( $cmd . ' 2>&1' );
 			@unlink( $tmp_html );
 			if ( file_exists( $path ) && filesize( $path ) > 1000 ) return $path;

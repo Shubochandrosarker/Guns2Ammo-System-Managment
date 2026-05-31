@@ -65,20 +65,11 @@ final class Verifyistic_Bridge {
 			return null;
 		}
 		$token = isset( $_COOKIE[ self::COOKIE_NAME ] ) ? sanitize_text_field( wp_unslash( $_COOKIE[ self::COOKIE_NAME ] ) ) : '';
-		if ( '' === $token ) {
+		// SECURITY (compliance): reject empty cookies and the legacy literal "1"
+		// sentinel. The previous code path treated cookie="1" as a passed
+		// verification with no DB lookup — trivially spoofable via DevTools.
+		if ( '' === $token || strlen( $token ) < 16 || ! preg_match( '/^[A-Za-z0-9_\-]+$/', $token ) ) {
 			return null;
-		}
-		if ( '1' === $token ) {
-			return (object) array(
-				'verify_token'  => '1',
-				'verify_type'   => 'cookie_only',
-				'first_name'    => '',
-				'last_name'     => '',
-				'dob'           => null,
-				'age_at_verify' => 0,
-				'status'        => 'passed',
-				'verified_at'   => current_time( 'mysql' ),
-			);
 		}
 
 		global $wpdb;

@@ -10,7 +10,7 @@
 if ( ! defined( 'ABSPATH' ) ) exit;
 get_header();
 
-$img = 'https://guns2ammo.com/wp-content/uploads/';
+$img = '/wp-content/uploads/';
 
 $faq = [
 	[ 'q' => 'How much does a private session cost?', 'a' => 'Private instruction is $140 per hour for up to two shooters. Members receive a discount  ask when you book. Range time, targets, and eye/ear are included.' ],

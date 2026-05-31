@@ -7,7 +7,7 @@
 
 if ( ! defined( 'ABSPATH' ) ) exit;
 
-define( 'G2A_VERSION', '1.8.9' );
+define( 'G2A_VERSION', '1.9.0' );
 define( 'G2A_DIR', get_stylesheet_directory() );
 define( 'G2A_URI', get_stylesheet_directory_uri() );
 
@@ -245,8 +245,13 @@ function g2a_handle_reservation() {
 
 	$to      = get_theme_mod( 'g2a_email', get_option( 'admin_email' ) );
 	$headers = [];
-	if ( ! empty( $fields['Email'] ) ) {
-		$headers[] = 'Reply-To: ' . $fields['Name'] . ' <' . $fields['Email'] . '>';
+	if ( ! empty( $fields['Email'] ) && is_email( $fields['Email'] ) ) {
+		// SECURITY: strip CRLF + any control chars from the display name to
+		// defeat header injection via a malicious "Name" field.
+		$safe_name = preg_replace( '/[\r\n\t]+/', ' ', (string) $fields['Name'] );
+		$safe_name = trim( wp_strip_all_tags( $safe_name ) );
+		$safe_name = substr( $safe_name, 0, 80 );
+		$headers[] = 'Reply-To: ' . ( $safe_name ? $safe_name . ' <' . $fields['Email'] . '>' : $fields['Email'] );
 	}
 	wp_mail( $to, 'Website Request: ' . $subject, implode( "\n", $lines ), $headers );
 
@@ -281,8 +286,10 @@ function g2a_handle_request() {
 	$reply   = '';
 	$fields  = [];
 
+	$_field_count = 0;
 	foreach ( $_POST as $key => $value ) {
 		if ( 0 !== strpos( $key, 'g2a_f_' ) ) continue;
+		if ( ++$_field_count > 40 ) break; // cap to deter unbounded-field abuse
 		$label = ucwords( str_replace( [ 'g2a_f_', '_', '-' ], [ '', ' ', ' ' ], $key ) );
 		// Array-valued fields (e.g. multi-checkbox)  flatten before sanitizing
 		// so sanitize_textarea_field() never receives an array.
@@ -298,7 +305,7 @@ function g2a_handle_request() {
 	}
 
 	$to      = get_theme_mod( 'g2a_email', get_option( 'admin_email' ) );
-	$headers = $reply ? [ 'Reply-To: ' . $reply ] : [];
+	$headers = ( $reply && is_email( $reply ) ) ? [ 'Reply-To: ' . $reply ] : [];
 	wp_mail( $to, 'Website Request: ' . $subject, implode( "\n", $lines ), $headers );
 
 	// Also log into the WPistic Contact Form dashboard for unified inbox.

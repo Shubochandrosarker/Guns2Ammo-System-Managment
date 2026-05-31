@@ -137,12 +137,26 @@ class WPISTIC_CF_Newsletter {
 		register_rest_route( 'wpcf/v1', '/newsletter', [
 			'methods'             => 'POST',
 			'callback'            => [ __CLASS__, 'rest_subscribe' ],
-			'permission_callback' => '__return_true',
+			// Public endpoint: gated by the wp REST nonce (X-WP-Nonce header
+			// or _wpnonce param) plus per-IP throttle in process().
+			'permission_callback' => [ __CLASS__, 'rest_permission' ],
 			'args'                => [
 				'email'  => [ 'type' => 'string', 'required' => true ],
 				'source' => [ 'type' => 'string', 'required' => false ],
 			],
 		] );
+	}
+
+	/**
+	 * Require a valid wp_rest nonce. Returning true for logged-out users is
+	 * fine — wp_verify_nonce checks the token regardless of auth state.
+	 */
+	public static function rest_permission( $request ) {
+		$nonce = $request->get_header( 'X-WP-Nonce' ) ?: $request->get_param( '_wpnonce' );
+		if ( ! $nonce || ! wp_verify_nonce( (string) $nonce, 'wp_rest' ) ) {
+			return new WP_Error( 'rest_forbidden', __( 'Invalid nonce.', 'wpistic-contact-form' ), [ 'status' => 403 ] );
+		}
+		return true;
 	}
 
 	/**

@@ -79,20 +79,11 @@ final class G2AB_Module_Verifyistic {
 		if ( ! $this->verifyistic_active() ) return null;
 
 		$cookie_token = isset( $_COOKIE[ self::COOKIE_NAME ] ) ? sanitize_text_field( wp_unslash( $_COOKIE[ self::COOKIE_NAME ] ) ) : '';
-		if ( '' === $cookie_token || '1' === $cookie_token ) {
-			// Cookie present but plugin stored "1" instead of token — accept as "verified" but no name/dob lookup.
-			if ( '1' === $cookie_token ) {
-				return (object) array(
-					'verify_token'  => '1',
-					'verify_type'   => 'cookie_only',
-					'first_name'    => '',
-					'last_name'     => '',
-					'dob'           => null,
-					'age_at_verify' => 0,
-					'status'        => 'passed',
-					'verified_at'   => current_time( 'mysql' ),
-				);
-			}
+		// SECURITY (compliance): reject empty cookies and the legacy literal "1"
+		// sentinel. Any real verification token has length >= 16 and is alnum-ish;
+		// a single digit is not a verification — accepting it allowed trivial
+		// DevTools bypass of the age gate for an FFL/firearms range.
+		if ( '' === $cookie_token || strlen( $cookie_token ) < 16 || ! preg_match( '/^[A-Za-z0-9_\-]+$/', $cookie_token ) ) {
 			return null;
 		}
 

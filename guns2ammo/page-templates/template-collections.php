@@ -9,7 +9,7 @@
 if ( ! defined( 'ABSPATH' ) ) exit;
 get_header();
 
-$img_base = 'https://guns2ammo.com/wp-content/uploads/';
+$img_base = '/wp-content/uploads/';
 
 $tiles = [
 	[ 'slug' => 'handguns',   'name' => 'HANDGUNS',   'href' => home_url( '/collections/handguns/' ),   'img' => $img_base . '2025/06/glock-19-gen5-9mm-guns2ammo-mesa-az.jpg.webp', 'desc' => 'Carry pistols, duty guns, and range favorites fitted to your hand.' ],

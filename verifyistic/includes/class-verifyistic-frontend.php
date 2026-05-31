@@ -35,10 +35,19 @@ class Verifyistic_Frontend {
     }
 
     /**
-     * Detect common search engine crawlers.
+     * Detect common search engine crawlers. UA-only by design so SEO crawlers
+     * see content without the popup. NOTE: a malicious user can spoof their
+     * UA to bypass the popup — the AJAX endpoint independently enforces the
+     * verification, so spoofing only hides the popup, not the gate. Disable
+     * via option verifyistic_skip_bot_detection = 1 if that tradeoff is not
+     * acceptable for your compliance posture.
      */
     private function is_bot() {
+        if ( 1 === (int) get_option( 'verifyistic_skip_bot_detection', 0 ) ) {
+            return false;
+        }
         $user_agent = isset( $_SERVER['HTTP_USER_AGENT'] ) ? strtolower( sanitize_text_field( wp_unslash( $_SERVER['HTTP_USER_AGENT'] ) ) ) : '';
+        if ( '' === $user_agent ) return false;
         $bots = array( 'googlebot', 'bingbot', 'slurp', 'duckduckbot', 'baiduspider', 'yandexbot', 'facebookexternalhit', 'twitterbot', 'linkedinbot', 'whatsapp', 'applebot', 'semrushbot', 'ahrefs', 'mj12bot' );
         foreach ( $bots as $bot ) {
             if ( strpos( $user_agent, $bot ) !== false ) return true;

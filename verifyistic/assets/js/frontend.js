@@ -170,22 +170,42 @@
                 vfy_token: $('#vfy-form-token').val() || ''
             }, function (res) {
                 self.setButtonLoading($btn, false);
-                if (res.success) {
+                if (res.success && res.data && res.data.token) {
                     self.onVerified(res.data, null);
+                } else {
+                    self.showYesNoError((res && res.data && res.data.message) || 'Verification failed. Please try again.');
                 }
             }).fail(function () {
                 self.setButtonLoading($btn, false);
-                // Optimistic — let through on network failure
-                self.onVerified({}, null);
+                // SECURITY: do NOT let through on network failure. Fail closed.
+                self.showYesNoError('Network error. Please try again.');
             });
+        },
+
+        // ── Yes/No error display (no DOB form available) ─────────
+        showYesNoError: function (msg) {
+            var $err = $('#vfy-yn-error');
+            if (!$err.length) {
+                $err = $('<div id="vfy-yn-error" class="vfy-error show" style="margin-top:12px;"><span class="vfy-error-text"></span></div>');
+                $('#vfy-yn-content').append($err);
+            }
+            $err.find('.vfy-error-text').text(msg);
+            $err.addClass('show');
         },
 
         // ── On Verified ──────────────────────────────────────────
         onVerified: function (data, $form) {
+            // SECURITY: refuse to set cookie unless server returned a real token.
+            // Previously fell back to the literal "1" which downstream consumers
+            // (Memberistic, G2A Booking Engine) treated as a passed verification.
+            if (!data || !data.token || String(data.token).length < 16) {
+                this.showYesNoError('Verification could not be completed.');
+                return;
+            }
             // Set cookie
             var remember = $form ? $form.find('.vfy-remember-checkbox').is(':checked') : true;
             var days     = remember ? (parseInt(this.data.cookieDays) || 30) : 0;
-            this.setCookie(this.cookieName, data.token || '1', days);
+            this.setCookie(this.cookieName, data.token, days);
 
             // Show success state
             if ($form) {

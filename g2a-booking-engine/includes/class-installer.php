@@ -337,7 +337,7 @@ KEY idx_start (start_at),
 KEY idx_type (booking_type_id),
 KEY idx_gateway_intent (gateway_intent_id),
 KEY idx_extref (external_ref)
-) {$collate};";
+) ENGINE=InnoDB {$collate};";
 
 		$schemas['checkins'] = "CREATE TABLE {$prefix}g2ab_checkins (
 id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
@@ -351,7 +351,7 @@ created_at DATETIME NOT NULL,
 PRIMARY KEY  (id),
 UNIQUE KEY uniq_booking (booking_id),
 KEY idx_checked_in_at (checked_in_at)
-) {$collate};";
+) ENGINE=InnoDB {$collate};";
 
 		$schemas['booking_activity'] = "CREATE TABLE {$prefix}g2ab_booking_activity (
 id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
@@ -366,7 +366,7 @@ PRIMARY KEY  (id),
 KEY idx_booking (booking_id),
 KEY idx_action (action),
 KEY idx_created (created_at)
-) {$collate};";
+) ENGINE=InnoDB {$collate};";
 
 		$schemas['resources'] = "CREATE TABLE {$prefix}g2ab_resources (
 id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
@@ -385,7 +385,7 @@ PRIMARY KEY  (id),
 UNIQUE KEY slug (slug),
 KEY idx_type_active (type, is_active),
 KEY idx_extref (external_ref)
-) {$collate};";
+) ENGINE=InnoDB {$collate};";
 
 		$schemas['booking_types'] = "CREATE TABLE {$prefix}g2ab_booking_types (
 id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
@@ -412,7 +412,7 @@ PRIMARY KEY  (id),
 UNIQUE KEY slug (slug),
 KEY idx_category_active (category, is_active),
 KEY idx_extref (external_ref)
-) {$collate};";
+) ENGINE=InnoDB {$collate};";
 
 		$schemas['forms'] = "CREATE TABLE {$prefix}g2ab_forms (
 id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
@@ -426,7 +426,7 @@ created_at DATETIME NOT NULL,
 updated_at DATETIME NOT NULL,
 PRIMARY KEY  (id),
 UNIQUE KEY slug (slug)
-) {$collate};";
+) ENGINE=InnoDB {$collate};";
 
 		$schemas['form_fields'] = "CREATE TABLE {$prefix}g2ab_form_fields (
 id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
@@ -444,7 +444,7 @@ is_required TINYINT(1) NOT NULL DEFAULT 0,
 PRIMARY KEY  (id),
 UNIQUE KEY uniq_form_key (form_id, field_key),
 KEY idx_form (form_id, sort_order)
-) {$collate};";
+) ENGINE=InnoDB {$collate};";
 
 		$schemas['availability_rules'] = "CREATE TABLE {$prefix}g2ab_availability_rules (
 id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
@@ -463,7 +463,7 @@ created_at DATETIME NOT NULL,
 PRIMARY KEY  (id),
 KEY idx_lookup (resource_id, rule_type, is_active),
 KEY idx_date_range (start_date, end_date)
-) {$collate};";
+) ENGINE=InnoDB {$collate};";
 
 		$schemas['payments'] = "CREATE TABLE {$prefix}g2ab_payments (
 id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
@@ -485,7 +485,7 @@ UNIQUE KEY uniq_gateway_tx (gateway, transaction_id),
 KEY idx_booking (booking_id),
 KEY idx_status (status),
 KEY idx_extref (external_ref)
-) {$collate};";
+) ENGINE=InnoDB {$collate};";
 
 		$schemas['logs'] = "CREATE TABLE {$prefix}g2ab_logs (
 id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
@@ -503,7 +503,7 @@ KEY idx_booking (booking_id),
 KEY idx_event (event_type),
 KEY idx_created (created_at),
 KEY idx_event_booking (event_type, booking_id)
-) {$collate};";
+) ENGINE=InnoDB {$collate};";
 
 		$schemas['migration_runs'] = "CREATE TABLE {$prefix}g2ab_migration_runs (
 id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
@@ -527,7 +527,7 @@ PRIMARY KEY  (id),
 KEY idx_status (status),
 KEY idx_adapter (adapter),
 KEY idx_started (started_at)
-) {$collate};";
+) ENGINE=InnoDB {$collate};";
 
 		return apply_filters( 'g2ab_install_schemas', $schemas );
 	}

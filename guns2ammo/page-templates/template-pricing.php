@@ -15,7 +15,7 @@ $g2a_pricing_additional_text    = get_post_meta( $g2a_page_id, 'pricing_addition
 $g2a_pricing_unlimited_text     = get_post_meta( $g2a_page_id, 'pricing_unlimited_text', true );
 ?>
 <style>.ph-hero { padding: 140px 32px 60px; position:relative; overflow:hidden; background: var(--color-void); }
-  .ph-hero .photo { position:absolute; inset:0; background-image: linear-gradient(180deg, rgba(26,25,30,0.7), rgba(26,25,30,0.95)), url("https://guns2ammo.com/wp-content/uploads/2026/01/ChatGPT-Image-Jan-30-2026-10_10_12-PM.webp"); background-size: cover; background-position: center; }
+  .ph-hero .photo { position:absolute; inset:0; background-image: linear-gradient(180deg, rgba(26,25,30,0.7), rgba(26,25,30,0.95)), url("/wp-content/uploads/2026/01/ChatGPT-Image-Jan-30-2026-10_10_12-PM.webp"); background-size: cover; background-position: center; }
   .ph-hero .inner { max-width: 1100px; margin:0 auto; position:relative; text-align:center; }
   .ph-hero h1 { font-family: var(--font-display); font-size: clamp(48px, 8vw, 96px); color: var(--color-white); letter-spacing: 0.02em; line-height: 0.92; }
   .ph-hero h1 em { font-style: normal; color: var(--color-brass-bright); }
@@ -34,7 +34,7 @@ $g2a_pricing_unlimited_text     = get_post_meta( $g2a_page_id, 'pricing_unlimite
 
   .ladies-card { max-width: 1100px; margin: 64px auto; padding: 32px; display:grid; grid-template-columns: 1fr 1fr; gap: 0; background: linear-gradient(135deg, rgba(201,168,76,0.08), rgba(201,168,76,0.02)); border-left: 3px solid var(--color-brass); }
   @media (max-width: 760px) { .ladies-card { grid-template-columns: 1fr; padding: 24px; } }
-  .ladies-card .photo { background-image: url("https://guns2ammo.com/wp-content/uploads/2024/08/one-1-a.webp"); background-size: cover; background-position: center; min-height: 240px; filter: saturate(0.9); }
+  .ladies-card .photo { background-image: url("/wp-content/uploads/2024/08/one-1-a.webp"); background-size: cover; background-position: center; min-height: 240px; filter: saturate(0.9); }
   .ladies-card .inner { padding: 32px; }
   .ladies-card h3 { font-family: var(--font-display); font-size: 56px; color: var(--color-white); line-height: 0.95; }
   .ladies-card .pill { display:inline-block; background: rgba(201,168,76,0.18); color: var(--color-brass-bright); padding: 4px 12px; font-family: var(--font-mono); font-size: 10px; letter-spacing: 0.24em; text-transform:uppercase; margin-bottom: 14px; }

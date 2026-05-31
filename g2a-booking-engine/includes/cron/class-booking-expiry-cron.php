@@ -36,8 +36,14 @@ final class G2AB_Booking_Expiry_Cron
 		$bookings_table = $wpdb->prefix . 'g2ab_bookings';
 		$logs_table     = $wpdb->prefix . 'g2ab_logs';
 
-		$cutoff = gmdate('Y-m-d H:i:s', current_time('timestamp') - $hold_minutes * MINUTE_IN_SECONDS); // phpcs:ignore WordPress.DateTime.CurrentTimeTimestamp.Requested
-		$now    = current_time('mysql');
+		// Bookings store created_at via current_time('mysql') — site-local.
+		// Build the cutoff in the SAME timezone (site-local) so the comparison
+		// is valid in non-UTC zones like Arizona/Phoenix (UTC-7 year-round).
+		// Previous code used gmdate() against a site-local timestamp, which on
+		// AZ produced a 7-hour skew.
+		$now_ts = (int) current_time( 'timestamp' ); // phpcs:ignore WordPress.DateTime.CurrentTimeTimestamp.Requested
+		$cutoff = date( 'Y-m-d H:i:s', $now_ts - $hold_minutes * MINUTE_IN_SECONDS );
+		$now    = current_time( 'mysql' );
 
 		$stale = $wpdb->get_results($wpdb->prepare(
 			"SELECT id, uuid, status, payment_mode, start_at FROM {$bookings_table}

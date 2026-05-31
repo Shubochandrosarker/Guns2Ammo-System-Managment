@@ -40,6 +40,17 @@ class Verifyistic_Ajax {
         $mode    = sanitize_text_field( $_POST['mode'] ?? 'dob' );
         $min_age = max( 18, (int) get_option( 'verifyistic_min_age', 21 ) ); // hard floor 18
 
+        // COMPLIANCE: when strict mode is enabled (option verifyistic_strict_mode = 1
+        // or constant VERIFYISTIC_STRICT_MODE), refuse the click-Yes/click-No path.
+        // Only DOB or ID+selfie carry any evidentiary weight for an FFL/firearms
+        // site. yes_no is documented as UX-only.
+        $strict = ( defined( 'VERIFYISTIC_STRICT_MODE' ) && VERIFYISTIC_STRICT_MODE )
+            || 1 === (int) get_option( 'verifyistic_strict_mode', 0 );
+        if ( $strict && 'yes_no' === $mode ) {
+            wp_send_json_error( array( 'message' => __( 'This site requires date-of-birth verification.', 'verifyistic' ) ) );
+            return;
+        }
+
         $log_data = array(
             'verify_type' => $mode,
             'status'      => 'passed',
@@ -101,8 +112,11 @@ class Verifyistic_Ajax {
         // under-age / opt-out event.
         $this->dispatch_webhook( 'declined', $log_data, $log_id );
 
-        $redirect = get_option( 'verifyistic_redirect_url', '' );
-        wp_send_json_success( array( 'redirect' => esc_url( $redirect ) ) );
+        $redirect = (string) get_option( 'verifyistic_redirect_url', '' );
+        // SECURITY: validate against site allow-list so a hostile option
+        // value can't drive an open redirect.
+        $safe = $redirect ? wp_validate_redirect( $redirect, '' ) : '';
+        wp_send_json_success( array( 'redirect' => esc_url( $safe ) ) );
     }
 
     // ─── DOB Verification ────────────────────────────────────────────────────
@@ -168,39 +182,93 @@ class Verifyistic_Ajax {
     }
 
     // ─── Handle File Upload ──────────────────────────────────────────────────
+    // SECURITY: PII files (driver licenses, selfies) are stored OUTSIDE the
+    // web-readable uploads tree (wp-content/uploads/private/verifyistic-ids/).
+    // We also drop a deny-all .htaccess as belt-and-suspenders. The DB stores
+    // an opaque file key; admins download via a signed admin-only endpoint
+    // (see Verifyistic_Admin::serve_protected_file()).
     private function handle_upload( $field ) {
-        if ( ! function_exists( 'wp_handle_upload' ) ) {
+        if ( ! function_exists( 'wp_handle_upload' ) && ! function_exists( 'wp_check_filetype_and_ext' ) ) {
             require_once ABSPATH . 'wp-admin/includes/file.php';
         }
 
-        $allowed = array( 'image/jpeg', 'image/png', 'image/gif', 'application/pdf' );
-        $mime    = $_FILES[ $field ]['type'] ?? '';
-
-        if ( ! in_array( $mime, $allowed, true ) ) {
-            return new WP_Error( 'invalid_type', __( 'Invalid file type. Please upload JPG, PNG, GIF, or PDF.', 'verifyistic' ) );
+        if ( empty( $_FILES[ $field ]['tmp_name'] ) || ! is_uploaded_file( $_FILES[ $field ]['tmp_name'] ) ) {
+            return new WP_Error( 'no_file', __( 'No file uploaded.', 'verifyistic' ) );
         }
 
-        // Override upload directory to keep uploads organized
-        add_filter( 'upload_dir', array( $this, 'custom_upload_dir' ) );
-        $upload = wp_handle_upload( $_FILES[ $field ], array( 'test_form' => false ) );
-        remove_filter( 'upload_dir', array( $this, 'custom_upload_dir' ) );
+        // Server-side MIME sniff (do NOT trust $_FILES['type'] from the browser).
+        $tmp_name = $_FILES[ $field ]['tmp_name'];
+        $orig_name = isset( $_FILES[ $field ]['name'] ) ? sanitize_file_name( $_FILES[ $field ]['name'] ) : 'upload.bin';
+        $size = (int) ( $_FILES[ $field ]['size'] ?? 0 );
 
-        if ( isset( $upload['error'] ) ) {
-            return new WP_Error( 'upload_error', $upload['error'] );
+        if ( $size <= 0 || $size > 10 * 1024 * 1024 ) { // 10 MB cap
+            return new WP_Error( 'file_too_big', __( 'File must be 10 MB or smaller.', 'verifyistic' ) );
         }
 
-        return $upload['url'] ?? '';
+        $check = wp_check_filetype_and_ext( $tmp_name, $orig_name );
+        $real_mime = $check['type'] ?? '';
+        // Compliance: image-only by default. PDFs disallowed because they can
+        // carry JS/font payloads that are awkward to render in the admin viewer
+        // and are not normal for ID/selfie uploads.
+        $allowed = array( 'image/jpeg', 'image/png', 'image/gif', 'image/webp' );
+        if ( ! in_array( $real_mime, $allowed, true ) ) {
+            return new WP_Error( 'invalid_type', __( 'Invalid file type. Please upload JPG, PNG, GIF, or WEBP.', 'verifyistic' ) );
+        }
+
+        $dir = self::private_upload_dir();
+        if ( is_wp_error( $dir ) ) {
+            return $dir;
+        }
+
+        // Opaque random filename — never expose the original name.
+        $ext      = pathinfo( $check['proper_filename'] ?: $orig_name, PATHINFO_EXTENSION );
+        $ext      = strtolower( preg_replace( '/[^a-z0-9]/i', '', (string) $ext ) ?: 'jpg' );
+        $basename = wp_generate_password( 32, false, false ) . '.' . $ext;
+        $dest     = trailingslashit( $dir['path'] ) . $basename;
+
+        if ( ! @move_uploaded_file( $tmp_name, $dest ) ) {
+            return new WP_Error( 'move_failed', __( 'Could not save file.', 'verifyistic' ) );
+        }
+        @chmod( $dest, 0640 );
+
+        // Return an opaque key — NOT a URL. Stored in DB. Admins resolve via
+        // Verifyistic_Admin::serve_protected_file() which validates capability
+        // + a signed nonce, sets X-Content-Type-Options nosniff, and streams.
+        $key = trailingslashit( $dir['rel'] ) . $basename;
+        return 'private:' . $key;
     }
 
     /**
-     * Custom upload directory for ID files.
+     * Resolve and prepare the private uploads directory.
+     * Creates an .htaccess deny rule + index.php stub on first run.
+     *
+     * @return array|WP_Error  { path: absolute path, url: '', rel: relative-to-uploads }
      */
-    public function custom_upload_dir( $dirs ) {
-        $subdir         = '/verifyistic-ids/' . date( 'Y/m' );
-        $dirs['subdir'] = $subdir;
-        $dirs['path']   = $dirs['basedir'] . $subdir;
-        $dirs['url']    = $dirs['baseurl'] . $subdir;
-        return $dirs;
+    public static function private_upload_dir() {
+        $uploads = wp_upload_dir();
+        if ( ! empty( $uploads['error'] ) ) {
+            return new WP_Error( 'upload_dir', $uploads['error'] );
+        }
+        $base = trailingslashit( $uploads['basedir'] ) . 'private/verifyistic-ids';
+        $rel  = 'private/verifyistic-ids/' . date( 'Y/m' );
+        $path = trailingslashit( $uploads['basedir'] ) . $rel;
+        if ( ! wp_mkdir_p( $path ) ) {
+            return new WP_Error( 'mkdir', __( 'Could not create private upload directory.', 'verifyistic' ) );
+        }
+
+        // Drop deny-all .htaccess (Apache) + empty index.php at the root of
+        // the private tree on first run. nginx hosts need a server-block rule
+        // (documented in the plugin readme).
+        $ht = trailingslashit( $base ) . '.htaccess';
+        if ( ! file_exists( $ht ) ) {
+            @file_put_contents( $ht, "Order Allow,Deny\nDeny from all\n<IfModule mod_authz_core.c>\nRequire all denied\n</IfModule>\n" );
+        }
+        $idx = trailingslashit( $base ) . 'index.php';
+        if ( ! file_exists( $idx ) ) {
+            @file_put_contents( $idx, "<?php // Silence is golden.\n" );
+        }
+
+        return array( 'path' => $path, 'url' => '', 'rel' => $rel );
     }
 
     // ─── Calculate Age ────────────────────────────────────────────────────────

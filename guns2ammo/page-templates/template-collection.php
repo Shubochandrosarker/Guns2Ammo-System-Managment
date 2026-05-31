@@ -15,7 +15,7 @@ $slug = '';
 $qo   = get_queried_object();
 if ( $qo && isset( $qo->post_name ) ) $slug = $qo->post_name;
 
-$img_base = 'https://guns2ammo.com/wp-content/uploads/';
+$img_base = '/wp-content/uploads/';
 
 $collections = [
 	'handguns' => [
