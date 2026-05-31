@@ -111,6 +111,7 @@ final class G2AB_Plugin
 				if (class_exists('G2AB_Frontend_Shortcode_Banner'))     G2AB_Frontend_Shortcode_Banner::instance();
 				if (class_exists('G2AB_Frontend_Shortcode_Reschedule')) G2AB_Frontend_Shortcode_Reschedule::instance();
 				if (class_exists('G2AB_Frontend_Shortcode_Frontdesk'))  G2AB_Frontend_Shortcode_Frontdesk::instance();
+				if (class_exists('G2AB_Frontend_Shortcode_Staff_Console')) G2AB_Frontend_Shortcode_Staff_Console::instance();
 			}
 
 			if (class_exists('G2AB_Gateway_Manager')) G2AB_Gateway_Manager::instance();
@@ -164,6 +165,7 @@ final class G2AB_Plugin
 			'G2AB_REST_Admin_Bookings_Controller',
 			'G2AB_REST_Calendar_Controller',
 			'G2AB_REST_Frontdesk_Controller',
+			'G2AB_REST_Staff_Controller',
 		);
 		foreach ($controllers as $c) {
 			if (class_exists($c)) {

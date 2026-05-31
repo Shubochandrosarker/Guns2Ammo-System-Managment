@@ -74,19 +74,41 @@ final class G2AB_REST_Calendar_Controller {
 		register_rest_route( G2AB_REST_NAMESPACE, '/bookings/(?P<uuid>[a-f0-9-]{36})/customer-reschedule', array(
 			'methods'             => WP_REST_Server::CREATABLE,
 			'callback'            => array( $this, 'customer_reschedule' ),
-			'permission_callback' => '__return_true', // gated by confirm_token
+			'permission_callback' => array( $this, 'permission_token_gated' ),
 		) );
 
 		register_rest_route( G2AB_REST_NAMESPACE, '/bookings/(?P<uuid>[a-f0-9-]{36})/customer-cancel', array(
 			'methods'             => WP_REST_Server::CREATABLE,
 			'callback'            => array( $this, 'customer_cancel' ),
-			'permission_callback' => '__return_true', // gated by confirm_token
+			'permission_callback' => array( $this, 'permission_token_gated' ),
 		) );
 	}
 
 	/* ---------------------------------------------------------------------
 	 * Permission helpers
 	 * ------------------------------------------------------------------- */
+
+	/**
+	 * Token-gated public routes (customer reschedule + cancel). The handler
+	 * itself validates confirm_token; this layer adds a cheap per-IP rate
+	 * limit so UUID enumeration is not free.
+	 */
+	public function permission_token_gated( WP_REST_Request $request ) {
+		list( $hits_cap, $window ) = (array) apply_filters( 'g2ab_token_gated_rate_limit', array( 60, 60 ) );
+		$ip   = function_exists( 'g2ab_get_client_ip' ) ? g2ab_get_client_ip() : (string) ( $_SERVER['REMOTE_ADDR'] ?? '' );
+		$key  = 'g2ab_rltkn_' . md5( $ip );
+		$hits = (int) get_transient( $key );
+		if ( $hits >= max( 1, (int) $hits_cap ) ) {
+			return new WP_Error( 'g2ab_rate_limited', __( 'Too many requests. Try again shortly.', 'g2a-booking' ), array( 'status' => 429 ) );
+		}
+		static $seen = array();
+		$rid = spl_object_id( $request );
+		if ( ! isset( $seen[ $rid ] ) ) {
+			$seen[ $rid ] = true;
+			set_transient( $key, $hits + 1, max( 5, (int) $window ) );
+		}
+		return true;
+	}
 
 	public function permission_admin_read( WP_REST_Request $request ) {
 		if ( ! current_user_can( 'manage_g2ab_bookings' ) ) {

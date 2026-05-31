@@ -67,13 +67,40 @@ final class G2AB_REST_Bookings_Controller {
 		register_rest_route( G2AB_REST_NAMESPACE, '/bookings/(?P<uuid>[a-f0-9-]{36})/status', array(
 			'methods' => WP_REST_Server::READABLE,
 			'callback' => array( $this, 'get_booking_status' ),
-			'permission_callback' => '__return_true',
+			'permission_callback' => array( $this, 'permission_token_gated' ),
 		) );
 		register_rest_route( G2AB_REST_NAMESPACE, '/bookings/(?P<uuid>[a-f0-9-]{36})/confirm-payment', array(
 			'methods' => WP_REST_Server::CREATABLE,
 			'callback' => array( $this, 'confirm_payment' ),
-			'permission_callback' => '__return_true',
+			'permission_callback' => array( $this, 'permission_token_gated' ),
 		) );
+	}
+
+	/**
+	 * Permission gate for token-authenticated public routes (status, confirm,
+	 * reschedule, cancel). The handler itself still validates the per-booking
+	 * confirm_token — this just adds a cheap per-IP rate limit so the route
+	 * can't be used to enumerate UUIDs or scrape confirmation pages.
+	 *
+	 * Window: 60 hits / 60 seconds / IP. Filterable.
+	 */
+	public function permission_token_gated( WP_REST_Request $request ) {
+		list( $hits_cap, $window ) = (array) apply_filters( 'g2ab_token_gated_rate_limit', array( 60, 60 ) );
+		$hits_cap = max( 1, (int) $hits_cap );
+		$window   = max( 5, (int) $window );
+		$ip       = function_exists( 'g2ab_get_client_ip' ) ? g2ab_get_client_ip() : (string) ( $_SERVER['REMOTE_ADDR'] ?? '' );
+		$key      = 'g2ab_rltkn_' . md5( $ip );
+		$hits     = (int) get_transient( $key );
+		if ( $hits >= $hits_cap ) {
+			return new WP_Error( 'g2ab_rate_limited', __( 'Too many requests. Try again shortly.', 'g2a-booking' ), array( 'status' => 429 ) );
+		}
+		static $seen = array();
+		$rid = spl_object_id( $request );
+		if ( ! isset( $seen[ $rid ] ) ) {
+			$seen[ $rid ] = true;
+			set_transient( $key, $hits + 1, $window );
+		}
+		return true;
 	}
 
 	/**
