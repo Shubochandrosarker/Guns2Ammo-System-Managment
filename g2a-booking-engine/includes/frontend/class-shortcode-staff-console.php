@@ -35,6 +35,12 @@ final class G2AB_Frontend_Shortcode_Staff_Console {
 			return '<div class="g2ab-sc-gate">' . esc_html__( 'You do not have permission to use the staff console.', 'g2a-booking' ) . '</div>';
 		}
 
+		$atts = shortcode_atts( array(
+			'theme'   => 'light',  // 'light' | 'dark' | 'auto'
+			'station' => '',       // optional staff-set station label
+		), (array) $atts, 'g2ab_staff_console' );
+		$theme_class = in_array( $atts['theme'], array( 'light', 'dark', 'auto' ), true ) ? 'is-theme-' . $atts['theme'] : 'is-theme-light';
+
 		$user = wp_get_current_user();
 		$role = '';
 		if ( current_user_can( 'manage_options' ) ) {
@@ -80,7 +86,7 @@ final class G2AB_Frontend_Shortcode_Staff_Console {
 
 		ob_start();
 		?>
-		<div class="g2ab-sc" id="g2ab-sc" data-current-time="<?php echo esc_attr( current_time( 'H:i' ) ); ?>">
+		<div class="g2ab-sc <?php echo esc_attr( $theme_class ); ?>" id="g2ab-sc" data-current-time="<?php echo esc_attr( current_time( 'H:i' ) ); ?>" data-station-label="<?php echo esc_attr( $atts['station'] ); ?>">
 			<aside class="g2ab-sc__side">
 				<div class="g2ab-sc__who">
 					<div class="g2ab-sc__role">◆ <?php echo esc_html( $role ); ?></div>
@@ -88,8 +94,8 @@ final class G2AB_Frontend_Shortcode_Staff_Console {
 				</div>
 				<nav class="g2ab-sc__nav">
 					<a class="g2ab-sc__navi is-cur" data-pane="dashboard" href="#"><span class="g2ab-sc__navi-ic">▭</span><?php esc_html_e( 'Dashboard', 'g2a-booking' ); ?></a>
+					<a class="g2ab-sc__navi" data-pane="station" href="#"><span class="g2ab-sc__navi-ic">◈</span><?php esc_html_e( 'Check-In Station', 'g2a-booking' ); ?></a>
 					<a class="g2ab-sc__navi" data-pane="waivers" href="#"><span class="g2ab-sc__navi-ic">✓</span><?php esc_html_e( 'Waivers', 'g2a-booking' ); ?></a>
-					<a class="g2ab-sc__navi" data-pane="scan" href="#"><span class="g2ab-sc__navi-ic">⌖</span><?php esc_html_e( 'QR Scan', 'g2a-booking' ); ?></a>
 					<a class="g2ab-sc__navi" data-pane="reservations" href="#"><span class="g2ab-sc__navi-ic">▤</span><?php esc_html_e( 'Reservations', 'g2a-booking' ); ?></a>
 					<a class="g2ab-sc__sign-out" href="<?php echo esc_url( wp_logout_url( get_permalink() ) ); ?>"><span class="g2ab-sc__navi-ic">⏏</span><?php esc_html_e( 'Sign out', 'g2a-booking' ); ?></a>
 				</nav>
@@ -139,21 +145,19 @@ final class G2AB_Frontend_Shortcode_Staff_Console {
 					</div>
 				</section>
 
-				<!-- SCAN pane -->
-				<section class="g2ab-sc__pane" data-pane="scan" hidden>
-					<div class="g2ab-sc__panel">
-						<h3><?php esc_html_e( 'Scan member card', 'g2a-booking' ); ?></h3>
-						<div class="g2ab-sc__scan-wrap">
-							<video id="g2ab-sc-video" playsinline muted autoplay></video>
-							<canvas id="g2ab-sc-canvas" hidden></canvas>
-							<div class="g2ab-sc__scan-overlay">
-								<div class="g2ab-sc__scan-frame"></div>
-							</div>
+				<!-- CHECK-IN STATION pane -->
+				<section class="g2ab-sc__pane" data-pane="station" hidden>
+					<div class="g2ab-sc__station-grid">
+						<div class="g2ab-sc__panel g2ab-sc__qr-card">
+							<h3><?php esc_html_e( 'Member self check-in', 'g2a-booking' ); ?></h3>
+							<div class="g2ab-sc__qr" id="g2ab-sc-qr" aria-label="<?php esc_attr_e( 'Member check-in QR code', 'g2a-booking' ); ?>"></div>
+							<div class="g2ab-sc__qr-url" id="g2ab-sc-qr-url"></div>
+							<div class="g2ab-sc__qr-help"><?php esc_html_e( 'Ask members to scan with their phone camera', 'g2a-booking' ); ?></div>
 						</div>
-						<div class="g2ab-sc__scan-actions">
-							<button class="g2ab-sc__btn" id="g2ab-sc-scan-start"><?php esc_html_e( 'Start camera', 'g2a-booking' ); ?></button>
-							<button class="g2ab-sc__btn g2ab-sc__btn--ghost" id="g2ab-sc-scan-stop" hidden><?php esc_html_e( 'Stop', 'g2a-booking' ); ?></button>
-							<span class="g2ab-sc__scan-status" id="g2ab-sc-scan-status"></span>
+						<div class="g2ab-sc__panel">
+							<h3><?php esc_html_e( 'Pending at the desk', 'g2a-booking' ); ?> <span class="g2ab-sc__pill"><?php esc_html_e( 'LIVE', 'g2a-booking' ); ?></span></h3>
+							<div class="g2ab-sc__pending-list" id="g2ab-sc-pending"></div>
+							<div class="g2ab-sc__hint"><?php esc_html_e( "Or type the member's email in the Waivers pane to look them up + check in.", 'g2a-booking' ); ?></div>
 						</div>
 					</div>
 				</section>
@@ -201,6 +205,37 @@ final class G2AB_Frontend_Shortcode_Staff_Console {
 						<footer>
 							<button type="button" class="g2ab-sc__btn g2ab-sc__btn--ghost" data-close><?php esc_html_e( 'Cancel', 'g2a-booking' ); ?></button>
 							<button type="submit" class="g2ab-sc__btn"><?php esc_html_e( 'Check in', 'g2a-booking' ); ?></button>
+						</footer>
+					</form>
+				</div>
+			</div>
+
+			<!-- Confirm check-in modal -->
+			<div class="g2ab-sc__modal" id="g2ab-sc-modal-confirm" hidden role="dialog" aria-labelledby="g2ab-sc-mc-title">
+				<div class="g2ab-sc__modal-back" data-close></div>
+				<div class="g2ab-sc__modal-card">
+					<header><h3 id="g2ab-sc-mc-title"><?php esc_html_e( 'Confirm check-in', 'g2a-booking' ); ?></h3><button class="g2ab-sc__x" data-close aria-label="<?php esc_attr_e( 'Close', 'g2a-booking' ); ?>">✕</button></header>
+					<div id="g2ab-sc-mc-status" class="g2ab-sc__checkin-status"></div>
+					<div id="g2ab-sc-mc-details" class="g2ab-sc__checkin-details"></div>
+					<form id="g2ab-sc-confirm-form" autocomplete="off">
+						<div class="g2ab-sc__grid3">
+							<label><?php esc_html_e( 'Lane', 'g2a-booking' ); ?>
+								<select name="lane_id" id="g2ab-sc-confirm-lane" required></select>
+							</label>
+							<label><?php esc_html_e( 'Minutes', 'g2a-booking' ); ?>
+								<input name="minutes" type="number" min="30" max="240" step="15" value="60" required>
+							</label>
+							<label><?php esc_html_e( 'Shooters', 'g2a-booking' ); ?>
+								<input name="party_size" type="number" min="1" max="8" value="1" required>
+							</label>
+						</div>
+						<label style="display:flex;align-items:center;gap:8px;letter-spacing:0;text-transform:none;font-size:13px;">
+							<input type="checkbox" name="send_email" checked style="width:auto;margin:0;">
+							<?php esc_html_e( 'Email a check-in receipt to the member', 'g2a-booking' ); ?>
+						</label>
+						<footer>
+							<button type="button" class="g2ab-sc__btn g2ab-sc__btn--ghost" id="g2ab-sc-confirm-decline"><?php esc_html_e( 'Decline', 'g2a-booking' ); ?></button>
+							<button type="submit" class="g2ab-sc__btn"><?php esc_html_e( 'Confirm check-in', 'g2a-booking' ); ?></button>
 						</footer>
 					</form>
 				</div>

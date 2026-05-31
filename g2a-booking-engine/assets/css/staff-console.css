@@ -185,3 +185,110 @@
 @keyframes g2absc-bounce { 0% { transform: scale(0); } 60% { transform: scale(1.15); } 100% { transform: scale(1); } }
 .g2ab-sc__modal-card--finish h3 { margin-bottom: 10px; }
 .g2ab-sc__modal-card--finish p { color: var(--sc-fog); margin-bottom: 22px; }
+
+/* ============================================================== */
+/* Light / clean theme — matches the cream + dark-green admin look */
+/* ============================================================== */
+.g2ab-sc.is-theme-light {
+  --sc-void:           #FBF8EE;            /* page bg (warm cream) */
+  --sc-gunmetal:       #FFFFFF;            /* panel bg */
+  --sc-hairline:       rgba(0,0,0,0.08);
+  --sc-hairline-bright:rgba(0,0,0,0.16);
+  --sc-fog:            #2A3F2D;            /* primary text — forest */
+  --sc-silver:         #6B7A6D;            /* secondary text */
+  --sc-white:          #16241A;            /* strong / headers — deeper forest */
+  --sc-brass:          #C9A84C;
+  --sc-brass-bright:   #8B6A1E;
+  --sc-brass-dim:      rgba(201,168,76,0.45);
+  --sc-ember:          #C4471A;            /* warmer red-orange for light bg */
+  --sc-active:         #2F8A5A;            /* green ok */
+}
+.g2ab-sc.is-theme-light .g2ab-sc__side { background: #FFFEF8; border-right: 1px solid var(--sc-hairline); }
+.g2ab-sc.is-theme-light .g2ab-sc__role { color: var(--sc-ember); }
+.g2ab-sc.is-theme-light .g2ab-sc__navi { color: var(--sc-fog); }
+.g2ab-sc.is-theme-light .g2ab-sc__navi.is-cur { background: rgba(201,168,76,0.10); border-left-color: var(--sc-brass); color: var(--sc-brass-bright); }
+.g2ab-sc.is-theme-light .g2ab-sc__panel { background: #FFFFFF; border: 1px solid var(--sc-hairline); box-shadow: 0 1px 0 rgba(0,0,0,0.02); }
+.g2ab-sc.is-theme-light .g2ab-sc__btn { background: var(--sc-ember); }
+.g2ab-sc.is-theme-light .g2ab-sc__btn--ghost { color: var(--sc-fog); background: transparent; border-color: var(--sc-hairline-bright); }
+.g2ab-sc.is-theme-light .g2ab-sc__input { background: #FFFEF8; color: var(--sc-fog); border-color: var(--sc-hairline-bright); }
+.g2ab-sc.is-theme-light .g2ab-sc__kpi { background: #FFFFFF; border-color: var(--sc-hairline); }
+.g2ab-sc.is-theme-light .g2ab-sc__lane { background: #F4F0E3; border-color: var(--sc-hairline-bright); color: var(--sc-fog); }
+.g2ab-sc.is-theme-light .g2ab-sc__lane.in_use { background: rgba(196,71,26,0.10); border-color: var(--sc-ember); color: var(--sc-ember); }
+.g2ab-sc.is-theme-light .g2ab-sc__lane.reserved { background: rgba(201,168,76,0.14); border-color: var(--sc-brass); color: var(--sc-brass-bright); }
+.g2ab-sc.is-theme-light .g2ab-sc__lane.open { background: rgba(47,138,90,0.10); border-color: var(--sc-active); color: var(--sc-active); }
+.g2ab-sc.is-theme-light .g2ab-sc__rcard { background: #FFFEF8; border-color: var(--sc-hairline); }
+.g2ab-sc.is-theme-light .g2ab-sc__rcard .meta,
+.g2ab-sc.is-theme-light .g2ab-sc__rcard .dates,
+.g2ab-sc.is-theme-light .g2ab-sc__feed-row .t,
+.g2ab-sc.is-theme-light .g2ab-sc__legend,
+.g2ab-sc.is-theme-light .g2ab-sc__hint,
+.g2ab-sc.is-theme-light .g2ab-sc__crumb,
+.g2ab-sc.is-theme-light .g2ab-sc__kpi-l { color: var(--sc-silver); }
+.g2ab-sc.is-theme-light .g2ab-sc__rrow { background: #FFFEF8; }
+.g2ab-sc.is-theme-light .g2ab-sc__modal-card { background: #FFFFFF; }
+.g2ab-sc.is-theme-light .g2ab-sc__modal-card label input,
+.g2ab-sc.is-theme-light .g2ab-sc__modal-card label select { background: #FFFEF8; color: var(--sc-fog); border-color: var(--sc-hairline-bright); }
+.g2ab-sc.is-theme-light .g2ab-sc__toast { background: #FFFFFF; color: var(--sc-fog); }
+
+/* "Auto" theme — light by default, dark if user has dark preference */
+@media (prefers-color-scheme: light) {
+  .g2ab-sc.is-theme-auto { /* inherits the .is-theme-light tokens via duplicated rule below */ }
+}
+.g2ab-sc.is-theme-auto {
+  --sc-void: #FBF8EE; --sc-gunmetal: #FFFFFF; --sc-hairline: rgba(0,0,0,0.08);
+  --sc-hairline-bright: rgba(0,0,0,0.16); --sc-fog: #2A3F2D; --sc-silver: #6B7A6D;
+  --sc-white: #16241A; --sc-brass: #C9A84C; --sc-brass-bright: #8B6A1E;
+  --sc-brass-dim: rgba(201,168,76,0.45); --sc-ember: #C4471A; --sc-active: #2F8A5A;
+}
+@media (prefers-color-scheme: dark) {
+  .g2ab-sc.is-theme-auto {
+    --sc-void: #0F1115; --sc-gunmetal: #1A1F26; --sc-hairline: rgba(255,255,255,0.06);
+    --sc-hairline-bright: rgba(255,255,255,0.12); --sc-fog: #C9CFD8; --sc-silver: #8A95A5;
+    --sc-white: #ffffff; --sc-brass-bright: #E9C764; --sc-ember: #FF4B1F; --sc-active: #3CA67B;
+  }
+}
+
+/* ============================================================== */
+/* Check-In Station pane — big QR + pending-request popup-ready    */
+/* ============================================================== */
+.g2ab-sc__station-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+@media (max-width: 1000px) { .g2ab-sc__station-grid { grid-template-columns: 1fr; } }
+.g2ab-sc__qr-card { display: flex; flex-direction: column; align-items: center; padding: 28px; }
+.g2ab-sc__qr-card h3 { align-self: stretch; }
+.g2ab-sc__qr {
+  width: 320px; height: 320px; max-width: 100%; background: #FFFFFF;
+  display: grid; place-items: center; padding: 18px; box-sizing: border-box;
+  border: 1px solid var(--sc-hairline-bright); margin: 18px 0;
+}
+.g2ab-sc__qr svg, .g2ab-sc__qr canvas { width: 100%; height: 100%; }
+.g2ab-sc__qr-url { font-family: var(--sc-font-mono); font-size: 12px; color: var(--sc-silver); word-break: break-all; text-align: center; max-width: 360px; }
+.g2ab-sc__qr-help {
+  font-family: var(--sc-font-condensed); font-weight: 600; font-size: 13px;
+  color: var(--sc-fog); text-transform: uppercase; letter-spacing: 0.04em;
+  text-align: center; margin-top: 14px;
+}
+.g2ab-sc__pending-list { display: flex; flex-direction: column; gap: 10px; min-height: 200px; }
+.g2ab-sc__pending-item {
+  padding: 18px 20px; background: rgba(201,168,76,0.10); border-left: 4px solid var(--sc-brass);
+  display: grid; grid-template-columns: 1fr auto; gap: 12px; align-items: center;
+  animation: g2absc-pulse 1.6s ease-in-out infinite;
+}
+@keyframes g2absc-pulse {
+  0%, 100% { background: rgba(201,168,76,0.10); }
+  50%      { background: rgba(201,168,76,0.22); }
+}
+.g2ab-sc__pending-item .who { font-family: var(--sc-font-condensed); font-weight: 700; color: var(--sc-white); text-transform: uppercase; letter-spacing: 0.04em; }
+.g2ab-sc__pending-item .meta { font-family: var(--sc-font-mono); font-size: 11px; color: var(--sc-silver); margin-top: 4px; letter-spacing: 0.06em; }
+
+/* Check-in confirmation modal (bigger than walk-in modal — has lane picker + status banner) */
+.g2ab-sc__checkin-status {
+  padding: 14px 18px; margin: 0 0 16px;
+  font-family: var(--sc-font-condensed); font-weight: 600;
+  text-transform: uppercase; letter-spacing: 0.06em;
+}
+.g2ab-sc__checkin-status.current { background: rgba(60,166,123,0.12); border-left: 4px solid var(--sc-active); color: var(--sc-active); }
+.g2ab-sc__checkin-status.expired { background: rgba(255,75,31,0.10); border-left: 4px solid var(--sc-ember); color: var(--sc-ember); }
+.g2ab-sc__checkin-status.missing { background: rgba(138,149,165,0.10); border-left: 4px solid var(--sc-silver); color: var(--sc-silver); }
+.g2ab-sc__checkin-details { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 18px; padding: 14px 0; margin-bottom: 14px; border-bottom: 1px solid var(--sc-hairline); }
+.g2ab-sc__checkin-details .k { font-family: var(--sc-font-mono); font-size: 10px; color: var(--sc-silver); text-transform: uppercase; letter-spacing: 0.2em; }
+.g2ab-sc__checkin-details .v { font-family: var(--sc-font-condensed); font-weight: 600; color: var(--sc-white); font-size: 14px; }
