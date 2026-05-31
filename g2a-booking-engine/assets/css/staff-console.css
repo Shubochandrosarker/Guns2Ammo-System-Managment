@@ -532,3 +532,57 @@ body:has(.g2ab-sc) main { max-width: none !important; padding: 0 !important; mar
 
 /* Toasts — white card with brass/ok/err edge */
 .g2ab-sc.is-theme-light .g2ab-sc__toast { color: #14241A !important; box-shadow: 0 8px 30px rgba(20,36,26,0.18) !important; }
+
+/* =================================================================== */
+/* v1.12.2 — fix viewport breakout (sidebar was getting clipped)        */
+/*                                                                      */
+/* The 100vw + negative-margin trick from 1.12.1 only centers the       */
+/* breakout if the parent container is itself horizontally centered.    */
+/* This site's .entry-content is left-aligned, so the console got       */
+/* pulled past the left edge and the sidebar fell off-screen.           */
+/*                                                                      */
+/* New approach: reset the parent containers to full width, then let    */
+/* the console fill them normally. No more position tricks.             */
+/* =================================================================== */
+
+/* Reset the breakout overrides from 1.12.1 */
+.g2ab-sc.is-theme-light {
+  width: auto !important;
+  position: static !important;
+  left: auto !important;
+  margin: 0 !important;
+}
+
+/* Wipe horizontal constraints on every common WP / theme container that
+   could be wrapping the shortcode. Scoped via :has(.g2ab-sc) so other
+   pages are untouched. */
+body:has(.g2ab-sc) {
+  overflow-x: hidden;
+}
+body:has(.g2ab-sc) .site,
+body:has(.g2ab-sc) .site-content,
+body:has(.g2ab-sc) .site-main,
+body:has(.g2ab-sc) main,
+body:has(.g2ab-sc) main#main,
+body:has(.g2ab-sc) main#primary,
+body:has(.g2ab-sc) #primary,
+body:has(.g2ab-sc) #content,
+body:has(.g2ab-sc) .entry-content,
+body:has(.g2ab-sc) .post-content,
+body:has(.g2ab-sc) article,
+body:has(.g2ab-sc) .container,
+body:has(.g2ab-sc) .container-fluid,
+body:has(.g2ab-sc) .wrap,
+body:has(.g2ab-sc) .e-con,
+body:has(.g2ab-sc) .elementor-section,
+body:has(.g2ab-sc) .elementor-container,
+body:has(.g2ab-sc) .wp-block-group,
+body:has(.g2ab-sc) .wp-block-post-content {
+  max-width: none !important;
+  width: 100% !important;
+  margin-left: 0 !important;
+  margin-right: 0 !important;
+  padding-left: 0 !important;
+  padding-right: 0 !important;
+  background: transparent !important;
+}
