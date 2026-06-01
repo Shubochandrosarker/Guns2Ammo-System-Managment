@@ -51,7 +51,7 @@
 .wpistic-ffl-widget__heading {
 	font-size: 20px;
 	font-weight: 700;
-	color: var(--wf-ink);
+	color: var(--wf-text);
 	margin: 0 0 6px;
 	display: flex;
 	align-items: center;
@@ -85,11 +85,11 @@
 	transition: all 0.15s ease;
 	font-family: inherit;
 }
-.wpistic-ffl-tab:hover { color: var(--wf-ink); background: rgba(255,255,255,0.5); }
+.wpistic-ffl-tab:hover { color: var(--wf-text); background: rgba(255,255,255,0.04); }
 .wpistic-ffl-tab.is-active {
-	background: var(--wf-ink);
-	color: #fff;
-	box-shadow: 0 2px 6px rgba(15,17,21,0.2);
+	background: var(--wf-primary);
+	color: var(--wf-ink);
+	box-shadow: 0 2px 6px rgba(220,180,95,0.35);
 }
 
 /* Filter panels */
@@ -151,7 +151,7 @@
 }
 .wpistic-ffl-btn--primary {
 	background: var(--wf-primary);
-	color: #fff;
+	color: var(--wf-ink);
 	box-shadow: 0 4px 12px -2px rgba(220,180,95,0.4);
 }
 .wpistic-ffl-btn--primary:hover {
@@ -164,7 +164,7 @@
 	color: var(--wf-text-muted);
 	border: 1.5px solid var(--wf-border-strong);
 }
-.wpistic-ffl-btn--ghost:hover { color: var(--wf-ink); border-color: var(--wf-ink); }
+.wpistic-ffl-btn--ghost:hover { color: var(--wf-text); border-color: var(--wf-text); }
 .wpistic-ffl-btn--small { padding: 7px 14px; font-size: 13px; min-height: 34px; }
 
 /* View toggle */
@@ -188,7 +188,7 @@
 }
 .wpistic-ffl-view-btn.is-active {
 	background: var(--wf-surface);
-	color: var(--wf-ink);
+	color: var(--wf-text);
 	box-shadow: var(--wf-shadow-sm);
 }
 
@@ -204,7 +204,7 @@
 	justify-content: space-between;
 	align-items: center;
 }
-.wpistic-ffl-resultsbar__count { font-weight: 600; color: var(--wf-ink); }
+.wpistic-ffl-resultsbar__count { font-weight: 600; color: var(--wf-text); }
 
 /* Map */
 .wpistic-ffl-map {
@@ -236,19 +236,25 @@
 	box-shadow: var(--wf-shadow-card);
 }
 .wpistic-ffl-card.is-recommended {
-	border-color: #FCD34D;
-	background: linear-gradient(180deg, #FFFBEB 0%, #FFFFFF 100%);
-	box-shadow: 0 4px 16px -4px rgba(252,211,77,0.4);
+	/* Brass-tinted card on the dark surface — keeps the "premium" feel without
+	   flipping to a white background that fights the surrounding theme. */
+	border-color: var(--wf-primary);
+	background: linear-gradient(180deg, rgba(220,180,95,0.18) 0%, var(--wf-surface) 100%);
+	box-shadow: 0 4px 16px -4px rgba(220,180,95,0.35);
 }
+.wpistic-ffl-card.is-recommended .wpistic-ffl-card__title,
+.wpistic-ffl-card.is-recommended .wpistic-ffl-card__address,
+.wpistic-ffl-card.is-recommended .wpistic-ffl-card__meta { color: var(--wf-text); }
 .wpistic-ffl-card.is-selected {
 	border-color: var(--wf-success);
-	background: #F0FDF4;
+	background: rgba(74,222,128,0.10);
 }
+.wpistic-ffl-card.is-selected .wpistic-ffl-card__title { color: var(--wf-text); }
 .wpistic-ffl-card__main { min-width: 0; }
 .wpistic-ffl-card__title {
 	font-size: 16px;
 	font-weight: 700;
-	color: var(--wf-ink);
+	color: var(--wf-text);
 	margin: 0 0 4px;
 	display: flex;
 	align-items: center;
@@ -286,7 +292,7 @@
 	gap: 12px;
 	margin-top: 4px;
 }
-.wpistic-ffl-card__meta strong { color: var(--wf-ink); font-weight: 600; }
+.wpistic-ffl-card__meta strong { color: var(--wf-text); font-weight: 600; }
 .wpistic-ffl-card__distance { color: var(--wf-primary); font-weight: 600; }
 
 .wpistic-ffl-card__actions {
@@ -348,7 +354,7 @@
 	line-height: 1.55;
 }
 .wpistic-ffl-selected__info strong {
-	color: var(--wf-ink);
+	color: var(--wf-text);
 	display: block;
 	font-size: 16px;
 	margin-bottom: 4px;
@@ -356,7 +362,7 @@
 
 /* InfoWindow */
 .wpistic-ffl-iw { font-family: var(--wf-font); max-width: 240px; padding: 6px 4px; }
-.wpistic-ffl-iw__name { font-weight: 700; color: var(--wf-ink); margin: 0 0 4px; font-size: 14px; }
+.wpistic-ffl-iw__name { font-weight: 700; color: var(--wf-text); margin: 0 0 4px; font-size: 14px; }
 .wpistic-ffl-iw__addr { color: var(--wf-text-muted); font-size: 12px; margin: 0 0 8px; line-height: 1.45; }
 .wpistic-ffl-iw__select {
 	display: inline-block;

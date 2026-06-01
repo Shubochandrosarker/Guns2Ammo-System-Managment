@@ -14,7 +14,7 @@ All zips are at the repo root and can be uploaded directly via **WP Admin → Pl
 | WPistic Contact Form plugin | `wpistic-contact-form-main.zip` | **1.5.0** (DB schema 1.2.0) |
 | G2A Theme Control plugin | `g2a-theme-control.zip` | **1.0.0** |
 | Verifyistic (age verification) plugin | `verifyistic.zip` | **1.1.0** |
-| Advanced FFL Checkout (G2A Edition) plugin | `advanced-ffl-checkout.zip` | **1.6.0** (DB schema 1.2.0) |
+| Advanced FFL Checkout (G2A Edition) plugin | `advanced-ffl-checkout.zip` | **1.7.0** (DB schema 1.2.0) |
 
 > The root `WPistic-Theme-For-G2A-Version-1.8.9.zip` filename is preserved so the WP "Replace existing theme" flow recognises the upgrade. The `style.css` header inside reads `Version: 1.13.0` so WP treats it as an update, not a downgrade.
 

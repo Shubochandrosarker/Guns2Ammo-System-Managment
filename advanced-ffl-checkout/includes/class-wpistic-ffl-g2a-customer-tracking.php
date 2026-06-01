@@ -25,6 +25,10 @@ class G2A_Customer_Tracking {
 		add_action( 'init',              [ $this, 'register_rewrites' ] );
 		add_filter( 'query_vars',         [ $this, 'add_query_vars' ] );
 		add_action( 'template_redirect', [ $this, 'handle_request' ] );
+
+		// "Request a different dealer" form on the tracking page.
+		add_action( 'admin_post_nopriv_wpistic_ffl_track_request_dealer', [ __CLASS__, 'handle_request_new_dealer' ] );
+		add_action( 'admin_post_wpistic_ffl_track_request_dealer',        [ __CLASS__, 'handle_request_new_dealer' ] );
 	}
 
 	public function register_rewrites(): void {
@@ -95,6 +99,34 @@ class G2A_Customer_Tracking {
 	}
 
 	/**
+	 * Lightweight per-string translation for the tracking page. Triggered by
+	 * appending ?lang=es to the tracking URL — keeps things simple without
+	 * full locale-switching across the whole site for one customer.
+	 */
+	public static function t( string $en ): string {
+		$lang = isset( $_GET['lang'] ) ? sanitize_key( wp_unslash( $_GET['lang'] ) ) : '';
+		if ( 'es' !== $lang ) {
+			return $en;
+		}
+		$es = [
+			'Secure FFL Transfer Tracking' => 'Seguimiento Seguro de Transferencia FFL',
+			'Your transfer status' => 'Estado de su transferencia',
+			'Updated %s' => 'Actualizado %s',
+			'Item' => 'Artículo',
+			'Dealer' => 'Distribuidor',
+			'Tracking' => 'Seguimiento',
+			'Shipped' => 'Enviado',
+			'Arrived' => 'Llegó',
+			'3-Day Rule' => 'Regla de 3 días',
+			'Window expires %s' => 'La ventana vence %s',
+			'Questions about your transfer? Email %s' => '¿Preguntas sobre su transferencia? Envíe correo a %s',
+			'Need to switch to a different FFL dealer?' => '¿Necesita cambiar a otro distribuidor FFL?',
+			'Submit dealer-change request' => 'Enviar solicitud de cambio',
+		];
+		return $es[ $en ] ?? $en;
+	}
+
+	/**
 	 * HMAC-SHA256 truncated to 16 hex chars. The ref already provides ~48 bits
 	 * of randomness via uniqid; the sig adds tamper-resistance and binds the
 	 * link to the site's token secret so deleting a transfer invalidates URLs.
@@ -153,7 +185,10 @@ h1{margin:0 0 8px;font-size:22px;}
 
 	<div class="brand">
 		<a href="<?php echo esc_url( home_url( '/' ) ); ?>"><?php echo esc_html( $theme['business_name'] ); ?></a>
-		<div class="meta"><?php esc_html_e( 'Secure FFL Transfer Tracking', 'advanced-ffl-checkout' ); ?></div>
+		<div class="meta"><?php echo esc_html( self::t( 'Secure FFL Transfer Tracking' ) ); ?>
+			<?php $lang = isset( $_GET['lang'] ) ? sanitize_key( wp_unslash( $_GET['lang'] ) ) : ''; ?>
+			· <a href="<?php echo esc_url( add_query_arg( 'lang', $lang === 'es' ? 'en' : 'es' ) ); ?>" style="color:<?php echo esc_attr( $theme['color_primary'] ); ?>;text-decoration:none;font-size:12px;"><?php echo $lang === 'es' ? 'English' : 'Español'; ?></a>
+		</div>
 	</div>
 
 	<div class="card">
@@ -232,6 +267,38 @@ h1{margin:0 0 8px;font-size:22px;}
 		</dl>
 	</div>
 
+	<?php // Show the "request a different dealer" form only when the transfer is
+	// still pre-arrival — once the gun is at the dealer, redirection is moot.
+	if ( in_array( $row->status, [ 'payment_confirmed', 'dealer_selected', 'shipped_to_dealer', 'shipped' ], true ) ) :
+		$req_done = isset( $_GET['req_done'] );
+		?>
+		<div class="card" style="text-align:left;">
+			<h2 style="margin:0 0 8px;font-size:16px;">
+				<?php esc_html_e( 'Need to switch to a different FFL dealer?', 'advanced-ffl-checkout' ); ?>
+			</h2>
+			<p class="meta" style="margin-top:0;">
+				<?php esc_html_e( 'If the dealer above can\'t or won\'t accept this shipment, request a change here. Our team will contact you to confirm a new dealer before redirecting the parcel.', 'advanced-ffl-checkout' ); ?>
+			</p>
+			<?php if ( $req_done ) : ?>
+				<p style="margin:12px 0 0;padding:12px 14px;background:rgba(74,222,128,0.12);border:1px solid <?php echo esc_attr( $theme['color_success'] ); ?>;border-radius:8px;color:<?php echo esc_attr( $theme['color_success'] ); ?>;">
+					<?php esc_html_e( '✓ Request received — we\'ll be in touch shortly.', 'advanced-ffl-checkout' ); ?>
+				</p>
+			<?php else : ?>
+				<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" style="margin-top:12px;display:grid;gap:10px;">
+					<?php wp_nonce_field( 'wpistic_ffl_track_request_dealer', 'wpistic_ffl_track_nonce' ); ?>
+					<input type="hidden" name="action" value="wpistic_ffl_track_request_dealer">
+					<input type="hidden" name="ref" value="<?php echo esc_attr( $row->transfer_ref ); ?>">
+					<input type="hidden" name="sig" value="<?php echo esc_attr( $_GET['sig'] ?? '' ); ?>">
+					<input type="text" name="contact_email" placeholder="<?php esc_attr_e( 'Your email (so we can reach you)', 'advanced-ffl-checkout' ); ?>" required style="padding:10px 12px;background:<?php echo esc_attr( $theme['color_bg'] ); ?>;color:<?php echo esc_attr( $theme['color_text'] ); ?>;border:1px solid <?php echo esc_attr( $theme['color_border'] ); ?>;border-radius:8px;font-family:inherit;">
+					<textarea name="reason" rows="3" placeholder="<?php esc_attr_e( 'Tell us briefly why (the dealer refused, moved, closed, etc.)', 'advanced-ffl-checkout' ); ?>" style="padding:10px 12px;background:<?php echo esc_attr( $theme['color_bg'] ); ?>;color:<?php echo esc_attr( $theme['color_text'] ); ?>;border:1px solid <?php echo esc_attr( $theme['color_border'] ); ?>;border-radius:8px;font-family:inherit;resize:vertical;"></textarea>
+					<input type="text" name="preferred_zip" placeholder="<?php esc_attr_e( 'New ZIP code (optional)', 'advanced-ffl-checkout' ); ?>" inputmode="numeric" maxlength="5" pattern="[0-9]{5}" style="padding:10px 12px;background:<?php echo esc_attr( $theme['color_bg'] ); ?>;color:<?php echo esc_attr( $theme['color_text'] ); ?>;border:1px solid <?php echo esc_attr( $theme['color_border'] ); ?>;border-radius:8px;font-family:inherit;">
+					<label style="position:absolute;left:-99999px;" aria-hidden="true"><input type="text" name="website" tabindex="-1" autocomplete="off"></label>
+					<button type="submit" class="btn" style="border:none;cursor:pointer;font-family:inherit;"><?php esc_html_e( 'Submit dealer-change request', 'advanced-ffl-checkout' ); ?></button>
+				</form>
+			<?php endif; ?>
+		</div>
+	<?php endif; ?>
+
 	<div class="card" style="text-align:center;">
 		<p class="meta" style="margin-top:0;">
 			<?php
@@ -248,6 +315,66 @@ h1{margin:0 0 8px;font-size:22px;}
 </body>
 </html>
 		<?php
+	}
+
+	/**
+	 * Handle a "request a different dealer" form submission. Verifies the
+	 * tracking signature (so only the email recipient can submit), records
+	 * an events-table row, emails the admin, and redirects with ?req_done=1.
+	 */
+	public static function handle_request_new_dealer(): void {
+		if ( ! isset( $_POST['wpistic_ffl_track_nonce'] )
+			|| ! wp_verify_nonce( (string) wp_unslash( $_POST['wpistic_ffl_track_nonce'] ), 'wpistic_ffl_track_request_dealer' ) ) {
+			wp_die( esc_html__( 'Security check failed.', 'advanced-ffl-checkout' ), 403 );
+		}
+		if ( ! empty( $_POST['website'] ) ) {
+			wp_safe_redirect( home_url( '/' ) );
+			exit;
+		}
+
+		$ref = sanitize_text_field( wp_unslash( $_POST['ref'] ?? '' ) );
+		$sig = sanitize_text_field( wp_unslash( $_POST['sig'] ?? '' ) );
+		if ( '' === $ref || ! hash_equals( self::sign( $ref ), $sig ) ) {
+			wp_die( esc_html__( 'This link is invalid or has expired.', 'advanced-ffl-checkout' ), 403 );
+		}
+
+		$email  = sanitize_email( wp_unslash( $_POST['contact_email'] ?? '' ) );
+		$reason = sanitize_textarea_field( wp_unslash( $_POST['reason'] ?? '' ) );
+		$zip    = preg_replace( '/[^0-9]/', '', (string) wp_unslash( $_POST['preferred_zip'] ?? '' ) );
+
+		global $wpdb;
+		$transfer_id = (int) $wpdb->get_var( $wpdb->prepare( // phpcs:ignore WordPress.DB
+			'SELECT id FROM ' . DB::table( 'transfers' ) . ' WHERE transfer_ref = %s LIMIT 1',
+			$ref
+		) );
+		if ( $transfer_id ) {
+			$wpdb->insert( DB::table( 'events' ), [ // phpcs:ignore WordPress.DB
+				'transfer_id' => $transfer_id,
+				'event_type'  => 'dealer_change_requested',
+				'notes'       => sprintf( "Customer requested a different dealer.\nContact: %s\nNew ZIP: %s\nReason: %s", $email, $zip ?: '—', $reason ),
+				'actor'       => 'customer-tracking',
+				'actor_ip'    => Token::client_ip(),
+			] );
+			Analytics::log( 'dealer_change_requested', [
+				'transfer_id' => $transfer_id,
+				'metadata'    => [ 'contact_email' => $email, 'preferred_zip' => $zip ],
+			] );
+
+			$admin_email = get_option( 'wpistic_ffl_settings', [] )['notification_email'] ?? get_option( 'admin_email' );
+			wp_mail(
+				$admin_email,
+				sprintf( '[G2A] Dealer change requested — Transfer #%s', $ref ),
+				'<p>The customer for transfer <strong>#' . esc_html( $ref ) . '</strong> has requested a different dealer.</p>'
+				. '<p><strong>Contact:</strong> ' . esc_html( $email ) . '<br>'
+				. '<strong>Preferred ZIP:</strong> ' . esc_html( $zip ?: '—' ) . '</p>'
+				. '<p><strong>Reason:</strong><br>' . nl2br( esc_html( $reason ) ) . '</p>'
+				. '<p><a href="' . esc_url( admin_url( 'admin.php?page=wpistic-ffl-transfers&id=' . $transfer_id ) ) . '">Open transfer</a></p>',
+				[ 'Content-Type: text/html; charset=UTF-8', 'Reply-To: ' . $email ]
+			);
+		}
+
+		wp_safe_redirect( add_query_arg( 'req_done', '1', self::url_for( $ref ) ) );
+		exit;
 	}
 
 	private static function render_error( string $message ): void {

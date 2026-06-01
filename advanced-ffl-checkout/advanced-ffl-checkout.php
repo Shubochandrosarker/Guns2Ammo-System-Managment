@@ -3,7 +3,7 @@
  * Plugin Name:       Advanced FFL Checkout Solutions — G2A Edition
  * Plugin URI:        https://wordpressistic.com/products/advanced-ffl-checkout
  * Description:       Federal Firearms License (FFL) dealer management, WooCommerce checkout integration, transfer tracking and one-click dealer confirmation portal — customized for the Guns2Ammo system (HPOS-safe order meta, brass/graphite branding, customer "My FFL Transfers" tab, NICS 3-day automation, SMS via Verifyistic, WC order ↔ transfer status bridge).
- * Version:           1.6.0
+ * Version:           1.7.0
  * Requires at least: 6.4
  * Requires PHP:      8.1
  * Author:            Wordpressistic
@@ -29,7 +29,7 @@ if ( version_compare( PHP_VERSION, '8.1', '<' ) ) {
 }
 
 // ── Constants ─────────────────────────────────────────────────────────────────
-define( 'WPISTIC_FFL_VERSION',   '1.6.0' );
+define( 'WPISTIC_FFL_VERSION',   '1.7.0' );
 define( 'WPISTIC_FFL_FILE',      __FILE__ );
 define( 'WPISTIC_FFL_PATH',      plugin_dir_path( __FILE__ ) );
 define( 'WPISTIC_FFL_URL',       plugin_dir_url( __FILE__ ) );
@@ -137,6 +137,12 @@ register_activation_hook( __FILE__, function (): void {
 	if ( class_exists( '\WpisticFFL\G2A_Customer_Tracking' ) ) {
 		( new \WpisticFFL\G2A_Customer_Tracking() )->register_rewrites();
 	}
+	if ( class_exists( '\WpisticFFL\G2A_Form_4473' ) ) {
+		( new \WpisticFFL\G2A_Form_4473() )->register_rewrites();
+	}
+	if ( class_exists( '\WpisticFFL\G2A_Scorecard' ) ) {
+		( new \WpisticFFL\G2A_Scorecard() )->register_rewrites();
+	}
 
 	flush_rewrite_rules();
 } );
@@ -150,6 +156,8 @@ register_deactivation_hook( __FILE__, function (): void {
 		'wpistic_ffl_daily_portal_runner',
 		'wpistic_ffl_carrier_poll',
 		'wpistic_ffl_async_issue_dealer_token',
+		'wpistic_ffl_dealer_health_check',
+		'wpistic_ffl_webhook_retry',
 	];
 	foreach ( $hooks as $hook ) {
 		wp_clear_scheduled_hook( $hook );
@@ -303,6 +311,28 @@ add_action( 'plugins_loaded', function (): void {
 
 	// G2A: per-customer saved-dealer registry — quick-pick at checkout + manage in My Account.
 	new \WpisticFFL\G2A_Saved_Dealers();
+
+	// G2A: generic outbound webhook dispatcher (Zapier/Make/n8n/custom CRM).
+	new \WpisticFFL\G2A_Webhooks_Out();
+
+	// G2A: ops tools — bulk dealer fees, customer LTV lookup, nightly health alerts.
+	new \WpisticFFL\G2A_Ops_Tools();
+
+	// G2A: admin TOTP 2FA (opt-in per user).
+	new \WpisticFFL\G2A_Admin_2FA();
+
+	// G2A: WP personal-data exporter / eraser for FFL transfers.
+	new \WpisticFFL\G2A_Gdpr();
+
+	// G2A: public [g2a_ffl_dealer_onboard] shortcode for FFLs to apply.
+	new \WpisticFFL\G2A_Dealer_Onboarding();
+
+	// G2A: 4473 worksheet draft generator + dealer scorecard PDFs (admin-only URLs).
+	new \WpisticFFL\G2A_Form_4473();
+	new \WpisticFFL\G2A_Scorecard();
+
+	// G2A: 50-state law engine top-up — ensures every state has a baseline rule.
+	new \WpisticFFL\G2A_State_Laws();
 
 }, 20 );
 

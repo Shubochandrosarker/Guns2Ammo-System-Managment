@@ -4,7 +4,7 @@ Tags: FFL, firearms, WooCommerce, dealer, checkout, ATF, transfer, NICS, guns2am
 Requires at least: 6.4
 Tested up to: 6.7
 Requires PHP: 8.1
-Stable tag: 1.6.0
+Stable tag: 1.7.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -127,6 +127,35 @@ Deactivation preserves all data. Data is only removed on plugin deletion IF you 
 Yes. The plugin is fully self-contained. The dashboard integration is optional.
 
 == Changelog ==
+
+= 1.7.0 — G2A Edition (Customer + Ops + Compliance roundup) =
+BRAND / UX
+* Critical contrast fix on the checkout widget — the dealer-list result count, card titles, and "Contact Dealer for Fee" were rendering with the brass-button contrast color on a dark surface, making them unreadable. Swapped every misuse of `--wf-ink` for `--wf-text`; recommended + selected dealer cards rebuilt with brass-tinted-on-dark backgrounds instead of light gradients.
+* Active tab now uses brass-on-dark for stronger brand alignment.
+
+CUSTOMER EXPERIENCE
+* "Request a different dealer" form on the public tracking page — visible only while the parcel is still pre-arrival; HMAC-signature-protected, honeypot, single click confirms.
+* .ics calendar invite auto-attached to the "your firearm is ready for pickup" email — next-business-day 12:00 local, 30 min window, 1-hour reminder, dealer name + address in LOCATION, pickup-checklist in DESCRIPTION.
+* Spanish (es_US) localization for the customer tracking page — `?lang=es` toggle, header link to flip.
+
+OPERATIONS / ANALYTICS
+* Generic outbound webhook dispatcher (G2A_Webhooks_Out) — POST every FFL event to Zapier / Make / n8n / custom CRM / Slack-relay endpoints. HMAC-signed via `X-Wpistic-Ffl-Signature`; failed deliveries retry with exponential backoff (1m / 5m / 30m / 2h / 12h). Per-endpoint event filter. Admin page at FFL → 🔌 Webhooks Out.
+* Operations Toolset (G2A_Ops_Tools) admin page at FFL → 🛠️ Ops Tools:
+  - **Bulk-set dealer transfer fee by state** (with "only if currently 0.00" safety toggle).
+  - **Customer LTV lookup** by email — total transfers, lifetime value (via WC), avg days from order → pickup, last dealer used, full recent-transfer list with one-click order links.
+  - **Dealer health alerts** — nightly cron flags dealers whose recent issue-reported rate exceeds 25% (min 5 transfers). Admin email fires when a new dealer joins the flagged list.
+
+SECURITY / COMPLIANCE
+* Admin TOTP 2FA (G2A_Admin_2FA) — opt-in per user from their Profile page. RFC 6238, Google Authenticator / Authy / 1Password compatible. Backup codes (8, single-use, SHA-256 hashed). Secret AES-256-CBC encrypted at rest with NONCE_SALT-derived key. Challenge interstitial blocks the admin UI until a valid code is entered. Validated against the RFC 4226 test vectors at smoke-test time.
+* WordPress personal-data exporter + eraser (G2A_Gdpr) — Tools → Export/Erase Personal Data now includes FFL transfers + saved dealers. Erasure anonymizes customer name/email/phone but retains the row for ATF compliance.
+* Form 4473 worksheet generator (G2A_Form_4473) at `/ffl-4473-draft/{transfer_id}/` — admin-only, browser-printable HTML page that pre-fills Section A/B/C/D field labels from the transfer record. Banner-stamped "DRAFT — NOT FOR ATF SUBMISSION" on every page.
+* State law engine expanded to all 50 states + DC (G2A_State_Laws) — top-up routine that adds a baseline rule for every previously-unseeded state. Hand-tuned states are never overwritten.
+
+REACH
+* Public dealer onboarding shortcode `[g2a_ffl_dealer_onboard]` — branded form FFLs can fill in to apply for inclusion. Honeypot + per-IP rate limit (3/hour). Submissions land in the events table + admin email.
+
+ADMIN ARTIFACTS
+* Per-dealer Scorecard PDF (G2A_Scorecard) at `/ffl-scorecard/{dealer_id}/` — admin-only, browser-printable 90-day report: total transfers, in-flight, completed, issues, avg ship→arrival days, portal-confirmation rate. Quarterly ATF-review-ready.
 
 = 1.6.0 — G2A Edition (OTP 2FA + Scheduler + Saved Dealers) =
 * G2A: **Email-OTP 2FA for the dealer portal** — when `two_factor_method = email_otp`, the portal auto-issues a 6-digit code to the dealer's email on first page load and renders an OTP input. Transient-backed (no schema migration), 10-minute expiry, hash-equals verification, 5-miss brute-force cap, throttled "Resend" link (1/min). Recipient address is shown masked (`j***@example.com`).

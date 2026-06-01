@@ -197,6 +197,12 @@ class Mailer {
 	}
 
 	private static function email_customer_dealer_received( object $transfer ): void {
+		// G2A: attach a tentative .ics pickup invite so the customer can one-tap
+		// block off time to visit the dealer. Tentative + has a 1-hour reminder.
+		$ics_path = null;
+		if ( class_exists( '\WpisticFFL\G2A_Ics' ) ) {
+			$ics_path = \WpisticFFL\G2A_Ics::build_temp_file( $transfer );
+		}
 		self::send(
 			$transfer->customer_email,
 			sprintf( __( 'Item Arrived at Dealer — FFL Transfer #%s', 'advanced-ffl-checkout' ), $transfer->transfer_ref ),
@@ -206,10 +212,16 @@ class Mailer {
 				sprintf(
 					__( 'Your firearm has been received by <strong>%s</strong>. The dealer will contact you to schedule your background check and pickup.', 'advanced-ffl-checkout' ),
 					esc_html( $transfer->dealer_name )
-				) . self::dealer_block( $transfer ),
+				) . self::dealer_block( $transfer )
+				. ( $ics_path ? '<p style="margin-top:14px;font-size:13px;opacity:.8;">📅 ' . esc_html__( 'A tentative calendar invite is attached — use it as a starting point for your pickup appointment.', 'advanced-ffl-checkout' ) . '</p>' : '' ),
 				'primary'
-			)
+			),
+			'', // legacy nonce arg unused
+			$ics_path ? [ $ics_path ] : []
 		);
+		if ( $ics_path && file_exists( $ics_path ) ) {
+			@unlink( $ics_path ); // phpcs:ignore WordPress.PHP.NoSilencedErrors
+		}
 	}
 
 	private static function email_customer_nics_pending( object $transfer ): void {
@@ -317,7 +329,7 @@ class Mailer {
 
 	// ── Email utilities ───────────────────────────────────────────────────────
 
-	private static function send( string $to, string $subject, string $body, string $nonce = '' ): bool {
+	private static function send( string $to, string $subject, string $body, string $nonce = '', array $attachments = [] ): bool {
 		// v1.1.4 — deliverability headers to reduce spam-folder routing
 		$site_host  = wp_parse_url( home_url(), PHP_URL_HOST );
 		$from_email = self::admin_email();
@@ -353,7 +365,7 @@ class Mailer {
 		};
 		add_action( 'wp_mail_failed', $capture );
 
-		$ok = wp_mail( $to, $subject, $body, $headers );
+		$ok = wp_mail( $to, $subject, $body, $headers, $attachments );
 
 		remove_action( 'wp_mail_failed', $capture );
 		remove_action( 'phpmailer_init', $plain_text_cb );
