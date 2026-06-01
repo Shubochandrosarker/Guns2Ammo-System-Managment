@@ -4,7 +4,7 @@ Tags: FFL, firearms, WooCommerce, dealer, checkout, ATF, transfer, NICS, guns2am
 Requires at least: 6.4
 Tested up to: 6.7
 Requires PHP: 8.1
-Stable tag: 1.5.0
+Stable tag: 1.6.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -127,6 +127,15 @@ Deactivation preserves all data. Data is only removed on plugin deletion IF you 
 Yes. The plugin is fully self-contained. The dashboard integration is optional.
 
 == Changelog ==
+
+= 1.6.0 — G2A Edition (OTP 2FA + Scheduler + Saved Dealers) =
+* G2A: **Email-OTP 2FA for the dealer portal** — when `two_factor_method = email_otp`, the portal auto-issues a 6-digit code to the dealer's email on first page load and renders an OTP input. Transient-backed (no schema migration), 10-minute expiry, hash-equals verification, 5-miss brute-force cap, throttled "Resend" link (1/min). Recipient address is shown masked (`j***@example.com`).
+* G2A: **New brand-aligned OTP email template** — short, clear, 32-pt monospace code, brass-on-graphite frame, 10-min expiry warning.
+* G2A: **G2A_Scheduler abstraction** — single class wrapping Action Scheduler (bundled with WC) with a graceful WP-Cron fallback. Gives us idempotent enqueue, retry policy, per-action logging at Tools → Scheduled Actions. Every existing async + recurring job migrated: dealer-token async, carrier daily poll. Async dealer email no longer stacks duplicate cron events under load.
+* G2A: **Deactivation cleanup hardened** — cancels every plugin hook from both engines (AS + WP-Cron) to prevent leaked schedules after plugin removal.
+* G2A: **Saved dealers / "quick pick" for repeat customers** — auto-populated after every successful FFL order (cap 5, most-recent first). Surfaced as a one-tap strip above the dealer search at checkout. Customer can pin a default or remove entries from the My Account → My FFL Transfers tab. REST endpoints `GET|POST|DELETE /me/saved-dealers` for the dashboard app.
+* G2A: **wpistic_ffl_checkout_localize filter** — feature classes can extend the localized JS payload without touching the Checkout class.
+* G2A: **Mailer::resolve_dealer_email_public** — public wrapper around the dealer-email resolver so the Portal can render a masked recipient on the OTP form without duplicating the fallback chain.
 
 = 1.5.0 — G2A Edition (Carrier API integration) =
 * G2A: **Live carrier status sync** — new G2A_Carrier_Providers class adds three ingestion paths so delivered parcels auto-advance the transfer to `received_by_dealer` without a manual dealer-portal click.

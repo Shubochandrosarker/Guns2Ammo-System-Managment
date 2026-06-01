@@ -383,3 +383,39 @@
 	.wpistic-ffl-input-group--narrow { flex: 1 1 100%; }
 	.wpistic-ffl-map { height: 280px; }
 }
+
+/* G2A — Saved dealers "quick pick" strip (v1.6) */
+.wpistic-ffl-saved {
+	margin: 0 0 18px;
+	padding: 14px 16px;
+	background: var(--wf-surface-alt);
+	border: 1px solid var(--wf-border);
+	border-left: 4px solid var(--wf-primary);
+	border-radius: var(--wf-radius-sm);
+}
+.wpistic-ffl-saved__header {
+	display: flex; align-items: center; gap: 8px;
+	font-size: 12px; letter-spacing: 0.06em; text-transform: uppercase;
+	color: var(--wf-text-muted); margin: 0 0 10px;
+}
+.wpistic-ffl-saved__header svg { color: var(--wf-primary); flex-shrink: 0; }
+.wpistic-ffl-saved__header strong { color: var(--wf-text); font-weight: 700; }
+.wpistic-ffl-saved__grid {
+	display: grid;
+	grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+	gap: 10px;
+}
+.wpistic-ffl-saved__card {
+	padding: 12px 14px; background: var(--wf-surface);
+	border: 1px solid var(--wf-border); border-radius: var(--wf-radius-sm);
+	display: flex; flex-direction: column; gap: 6px;
+}
+.wpistic-ffl-saved__title { font-weight: 700; color: var(--wf-text); font-size: 14px; }
+.wpistic-ffl-saved__meta  { font-size: 12px; color: var(--wf-text-muted); }
+.wpistic-ffl-saved__pin {
+	display: inline-block; margin-left: 6px; padding: 2px 8px;
+	background: var(--wf-primary-soft); color: var(--wf-primary);
+	font-size: 10px; font-weight: 700; border-radius: 999px;
+	letter-spacing: 0.06em; text-transform: uppercase;
+}
+.wpistic-ffl-saved__use { align-self: flex-start; }

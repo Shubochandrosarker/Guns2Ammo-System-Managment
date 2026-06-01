@@ -669,6 +669,73 @@ class Mailer {
 	}
 
 	/**
+	 * Public wrapper for the dealer-email resolver — used by the Portal
+	 * class to display the masked recipient on the OTP form. Same fallback
+	 * chain as the private method but without the audit-log side effect.
+	 */
+	public static function resolve_dealer_email_public( object $transfer ): string {
+		return (string) self::dealer_email_for( $transfer );
+	}
+
+	/**
+	 * Send a one-time passcode to the dealer's email for portal 2FA.
+	 * Brand-aligned, 10-minute expiry shown, manual paste-in fallback if
+	 * the dealer's email client mangles the magic-link.
+	 */
+	public static function send_dealer_otp_email( int $transfer_id, string $code ): bool {
+		$transfer = self::fetch_transfer_for_portal( $transfer_id );
+		if ( ! $transfer ) {
+			return false;
+		}
+		$to = self::dealer_email_for( $transfer );
+		if ( ! $to ) {
+			return false;
+		}
+		$theme   = \WpisticFFL\Theming::settings();
+		$accent  = $theme['color_primary'];
+		$bg      = $theme['color_bg'];
+		$surface = $theme['color_surface'];
+		$text    = $theme['color_text'];
+		$muted   = $theme['color_text_muted'];
+		$border  = $theme['color_border'];
+		$store   = $theme['business_name'] ?: get_bloginfo( 'name' );
+
+		$subject = sprintf(
+			/* translators: 1: store, 2: transfer ref */
+			__( '%1$s — Your FFL Portal Verification Code (#%2$s)', 'advanced-ffl-checkout' ),
+			$store,
+			$transfer->transfer_ref
+		);
+
+		$body = '<!DOCTYPE html><html><head><meta charset="UTF-8"></head>
+<body style="margin:0;padding:0;background:' . esc_attr( $bg ) . ';font-family:-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,sans-serif;color:' . esc_attr( $text ) . ';">
+<table width="100%" cellpadding="0" cellspacing="0" style="padding:32px 0;background:' . esc_attr( $bg ) . ';">
+<tr><td align="center">
+<table width="520" cellpadding="0" cellspacing="0" style="background:' . esc_attr( $surface ) . ';border:1px solid ' . esc_attr( $border ) . ';border-radius:14px;overflow:hidden;">
+  <tr><td style="background:' . esc_attr( $accent ) . ';padding:22px 28px;text-align:center;">
+    <span style="color:#0F0E12;font-size:20px;font-weight:800;letter-spacing:-.01em;">' . esc_html( $store ) . '</span><br>
+    <span style="color:#0F0E12;font-size:11px;letter-spacing:.16em;text-transform:uppercase;opacity:.8;">Secure FFL Portal · Verification Code</span>
+  </td></tr>
+  <tr><td style="padding:30px 32px 6px;text-align:center;">
+    <p style="margin:0;font-size:14px;color:' . esc_attr( $muted ) . ';">' . esc_html__( 'Use this code to confirm receipt of FFL transfer', 'advanced-ffl-checkout' ) . '</p>
+    <p style="margin:6px 0 18px;font-size:13px;color:' . esc_attr( $text ) . ';font-family:ui-monospace,SFMono-Regular,monospace;">#' . esc_html( $transfer->transfer_ref ) . '</p>
+    <div style="display:inline-block;padding:16px 28px;background:' . esc_attr( $bg ) . ';border:1.5px solid ' . esc_attr( $accent ) . ';border-radius:10px;">
+      <span style="font-family:ui-monospace,SFMono-Regular,monospace;font-size:32px;font-weight:800;letter-spacing:.4em;color:' . esc_attr( $accent ) . ';">' . esc_html( $code ) . '</span>
+    </div>
+    <p style="margin:18px 0 0;font-size:12px;color:' . esc_attr( $muted ) . ';">' . esc_html__( 'This code expires in 10 minutes and can only be used once.', 'advanced-ffl-checkout' ) . '</p>
+  </td></tr>
+  <tr><td style="padding:18px 32px 28px;text-align:center;">
+    <p style="margin:0;font-size:12px;color:' . esc_attr( $muted ) . ';line-height:1.5;">' . esc_html__( "If you didn't request this code, you can safely ignore this email — no action will be taken on your FFL.", 'advanced-ffl-checkout' ) . '</p>
+  </td></tr>
+</table>
+</td></tr>
+</table>
+</body></html>';
+
+		return self::send( $to, $subject, $body );
+	}
+
+	/**
 	 * Figure out the dealer email address.
 	 *
 	 * Resolution order (v1.2.0):

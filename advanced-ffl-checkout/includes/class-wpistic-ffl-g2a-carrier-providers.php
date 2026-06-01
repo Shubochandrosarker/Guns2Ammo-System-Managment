@@ -229,9 +229,9 @@ class G2A_Carrier_Providers {
 
 		// Re-sync the polling cron based on the new toggle.
 		if ( empty( $next['poll_enabled'] ) ) {
-			wp_clear_scheduled_hook( self::CRON_HOOK_POLL );
-		} elseif ( ! wp_next_scheduled( self::CRON_HOOK_POLL ) ) {
-			wp_schedule_event( strtotime( 'tomorrow 04:00' ), 'daily', self::CRON_HOOK_POLL );
+			G2A_Scheduler::unschedule_all( self::CRON_HOOK_POLL );
+		} else {
+			G2A_Scheduler::recurring( DAY_IN_SECONDS, self::CRON_HOOK_POLL, [], strtotime( 'tomorrow 04:00' ) );
 		}
 
 		wp_send_json_success( [ 'message' => 'Saved' ] );
@@ -261,9 +261,7 @@ class G2A_Carrier_Providers {
 				'auto_advance_on_delivered' => 1,
 			] );
 		}
-		if ( ! wp_next_scheduled( self::CRON_HOOK_POLL ) ) {
-			wp_schedule_event( strtotime( 'tomorrow 04:00' ), 'daily', self::CRON_HOOK_POLL );
-		}
+		G2A_Scheduler::recurring( DAY_IN_SECONDS, self::CRON_HOOK_POLL, [], strtotime( 'tomorrow 04:00' ) );
 	}
 
 	// ── Provider registry ───────────────────────────────────────────────────

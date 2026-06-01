@@ -3,7 +3,7 @@
  * Plugin Name:       Advanced FFL Checkout Solutions — G2A Edition
  * Plugin URI:        https://wordpressistic.com/products/advanced-ffl-checkout
  * Description:       Federal Firearms License (FFL) dealer management, WooCommerce checkout integration, transfer tracking and one-click dealer confirmation portal — customized for the Guns2Ammo system (HPOS-safe order meta, brass/graphite branding, customer "My FFL Transfers" tab, NICS 3-day automation, SMS via Verifyistic, WC order ↔ transfer status bridge).
- * Version:           1.5.0
+ * Version:           1.6.0
  * Requires at least: 6.4
  * Requires PHP:      8.1
  * Author:            Wordpressistic
@@ -29,7 +29,7 @@ if ( version_compare( PHP_VERSION, '8.1', '<' ) ) {
 }
 
 // ── Constants ─────────────────────────────────────────────────────────────────
-define( 'WPISTIC_FFL_VERSION',   '1.5.0' );
+define( 'WPISTIC_FFL_VERSION',   '1.6.0' );
 define( 'WPISTIC_FFL_FILE',      __FILE__ );
 define( 'WPISTIC_FFL_PATH',      plugin_dir_path( __FILE__ ) );
 define( 'WPISTIC_FFL_URL',       plugin_dir_url( __FILE__ ) );
@@ -142,11 +142,21 @@ register_activation_hook( __FILE__, function (): void {
 } );
 
 register_deactivation_hook( __FILE__, function (): void {
-	wp_clear_scheduled_hook( 'wpistic_ffl_process_zip_import' );
-	wp_clear_scheduled_hook( 'wpistic_ffl_process_atf_sync' );
-	wp_clear_scheduled_hook( 'wpistic_ffl_monthly_sync' );
-	wp_clear_scheduled_hook( 'wpistic_ffl_daily_portal_runner' );
-	wp_clear_scheduled_hook( 'wpistic_ffl_carrier_poll' );
+	// Cancel from both engines (Action Scheduler + WP-Cron) — defensive.
+	$hooks = [
+		'wpistic_ffl_process_zip_import',
+		'wpistic_ffl_process_atf_sync',
+		'wpistic_ffl_monthly_sync',
+		'wpistic_ffl_daily_portal_runner',
+		'wpistic_ffl_carrier_poll',
+		'wpistic_ffl_async_issue_dealer_token',
+	];
+	foreach ( $hooks as $hook ) {
+		wp_clear_scheduled_hook( $hook );
+		if ( function_exists( 'as_unschedule_all_actions' ) ) {
+			\as_unschedule_all_actions( $hook, [], 'wpistic-ffl' );
+		}
+	}
 	flush_rewrite_rules();
 } );
 
@@ -254,9 +264,7 @@ add_action( 'plugins_loaded', function (): void {
 			return;
 		}
 		if ( 'shipped_to_dealer' === $new_status ) {
-			if ( ! wp_next_scheduled( 'wpistic_ffl_async_issue_dealer_token', [ (int) $transfer_id ] ) ) {
-				wp_schedule_single_event( time() + 5, 'wpistic_ffl_async_issue_dealer_token', [ (int) $transfer_id ] );
-			}
+			\WpisticFFL\G2A_Scheduler::async( 'wpistic_ffl_async_issue_dealer_token', [ (int) $transfer_id ] );
 		}
 	}, 10, 3 );
 
@@ -292,6 +300,9 @@ add_action( 'plugins_loaded', function (): void {
 
 	// G2A: live carrier providers (EasyPost pull + webhook receiver for Shippo/EasyPost/AfterShip/ShipStation).
 	new \WpisticFFL\G2A_Carrier_Providers();
+
+	// G2A: per-customer saved-dealer registry — quick-pick at checkout + manage in My Account.
+	new \WpisticFFL\G2A_Saved_Dealers();
 
 }, 20 );
 

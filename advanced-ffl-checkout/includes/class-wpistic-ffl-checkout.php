@@ -121,6 +121,9 @@ class Checkout {
 				<p class="wpistic-ffl-widget__lede"><?php esc_html_e( 'This order contains firearms that must transfer through a licensed FFL dealer. Search by ZIP, name, license number, or phone — recommended dealers shown first.', 'advanced-ffl-checkout' ); ?></p>
 			</div>
 
+			<!-- Saved-dealer Quick Pick (hydrated by JS when the user has any). -->
+			<div id="wpistic-ffl-saved" class="wpistic-ffl-saved" style="display:none;"></div>
+
 			<!-- Filter tabs -->
 			<div class="wpistic-ffl-tabs" role="tablist">
 				<button type="button" class="wpistic-ffl-tab is-active" data-tab="zip" role="tab" aria-selected="true"><?php esc_html_e( '📍 By ZIP', 'advanced-ffl-checkout' ); ?></button>
@@ -397,10 +400,9 @@ class Checkout {
 			$can_notify_dealer = $order->is_paid() && ! empty( $portal_settings['enabled'] ) && ! empty( $portal_settings['notify_dealer_on_order'] );
 			$can_notify_dealer = (bool) apply_filters( 'wpistic_ffl_can_notify_dealer_on_order', $can_notify_dealer, $order, $transfer_id );
 			if ( $can_notify_dealer ) {
-				// Async — never block checkout on SMTP.
-				if ( ! wp_next_scheduled( 'wpistic_ffl_async_issue_dealer_token', [ $transfer_id ] ) ) {
-					wp_schedule_single_event( time() + 5, 'wpistic_ffl_async_issue_dealer_token', [ $transfer_id ] );
-				}
+				// Async — never block checkout on SMTP. Routes through
+				// Action Scheduler when available, WP-Cron otherwise.
+				G2A_Scheduler::async( 'wpistic_ffl_async_issue_dealer_token', [ $transfer_id ] );
 			}
 
 			do_action( 'wpistic_ffl_transfer_created', $transfer_id, $order_id );
@@ -501,7 +503,9 @@ class Checkout {
 			);
 		}
 
-		wp_localize_script( 'wpistic-ffl-checkout', 'wpistic_ffl', [
+		// Filter-able payload so feature classes (e.g. saved dealers) can
+		// extend the localized data without touching Checkout.
+		$localized = apply_filters( 'wpistic_ffl_checkout_localize', [
 			'api_url'   => rest_url( WPISTIC_FFL_REST_NS . '/dealers/search' ),
 			'nonce'     => wp_create_nonce( 'wp_rest' ),
 			'radius'    => (int) ( $settings['default_radius'] ?? 50 ),
@@ -524,6 +528,7 @@ class Checkout {
 				'no_geo'       => __( 'Address only — not yet on the map', 'advanced-ffl-checkout' ),
 			],
 		] );
+		wp_localize_script( 'wpistic-ffl-checkout', 'wpistic_ffl', $localized );
 	}
 
 	// ── Helpers ───────────────────────────────────────────────────────────────
