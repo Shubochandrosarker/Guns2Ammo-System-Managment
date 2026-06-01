@@ -4,7 +4,7 @@ Tags: FFL, firearms, WooCommerce, dealer, checkout, ATF, transfer, NICS, guns2am
 Requires at least: 6.4
 Tested up to: 6.7
 Requires PHP: 8.1
-Stable tag: 1.3.0
+Stable tag: 1.4.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -127,6 +127,26 @@ Deactivation preserves all data. Data is only removed on plugin deletion IF you 
 Yes. The plugin is fully self-contained. The dashboard integration is optional.
 
 == Changelog ==
+
+= 1.4.0 — G2A Edition (Improvements pack) =
+* G2A: **Public customer tracking page** at `/track-transfer/{ref}/{sig}/` — HMAC-protected. Every customer email now includes a "View Transfer Status" CTA pointing here. Visual 5-step timeline (Order Placed → Shipped → Arrived → Background Check → Complete) plus dealer card with click-to-call and Maps directions.
+* G2A: **Activity Log admin page** at Advanced FFL → 📋 Activity Log. Surfaces a unified feed of the `events` and `analytics_events` tables — status changes, dealer portal actions, NICS 3-day flags, email sends, customer track-page views. One-click links to each transfer.
+* G2A: **Compliance & Security audit page** at Advanced FFL → 🛡️ Compliance. 15 real-time checks (WC active, HPOS declared, token secret in wp-config, trusted-proxy filter, JWT Auth, Verifyistic, cron health, ZIP/ATF data sizes, store FFL license, state rules, NICS attention queue, dealer-email coverage, active tokens, Memberistic).
+* G2A: **Regenerate HMAC token secret** admin action — rotates `wpistic_ffl_token_secret`, revokes every active dealer-portal token in one shot, audit-logged.
+* G2A: **Admin nag notice** if `WPISTIC_FFL_TOKEN_SECRET` is not defined in wp-config.php (dismissible, scoped to FFL pages).
+* G2A: **Carrier auto-advance** (G2A_Carrier) — when admin enters a tracking number on a pre-shipment transfer, status auto-flips to `shipped_to_dealer` and `shipped_date` defaults to today. Public carrier-track URLs generated for UPS, USPS, FedEx, DHL.
+* G2A: **Honeypot on the checkout dealer-selector widget** — silent reject for bots; real users never see the trap field.
+* G2A: **Google Maps "Directions" link** on the selected-dealer card so mobile shoppers can tap to navigate to the pickup point. Click-to-call phone link too.
+* G2A: **`wpistic_ffl_transfer_updated` action** fired from the central API status-update path. Plugins (and G2A_Carrier) can react to arbitrary column changes, not just status flips.
+* G2A: **`{tracking_url}` merge tag** added to `Theming::replace_tags()` and auto-derived from `{transfer_ref}` so email templates can drop the customer-tracking link inline.
+* G2A: **REST endpoints for the dashboard app**:
+  - `GET /wpistic-ffl/v1/activity` — paginated cross-table feed
+  - `GET /wpistic-ffl/v1/activity/summary` — daily counts, status breakdown, funnel
+  - `GET /wpistic-ffl/v1/transfers/{id}/details` — transfer + dealer + activity timeline + customer tracking URL
+  - `GET /wpistic-ffl/v1/compliance/audit` — full audit JSON
+* BRAND: full admin + checkout asset rebrand — admin.css purple variables remapped to brass tokens, menu icon switched to the FFL shield in brass, settings header SVG re-skinned, checkout widget CSS variables remapped to graphite + brass (mirrors `guns2ammo/assets/css/tokens.css`), Google Maps marker fill recolored.
+* SECURITY: Honeypot on the checkout widget closes the second-to-last attack surface (portal already had one).
+* DOCS: `Compliance & Security` page is self-documenting — points admins at exactly the line of wp-config / functions.php they need to touch.
 
 = 1.3.0 — G2A Edition =
 * G2A: **HPOS-safe order meta** — Dealer ID, name and ZIP now route through `$order->update_meta_data()` / `get_meta()` instead of `update_post_meta()`. Fixes silent failures on stores running HPOS-only mode.

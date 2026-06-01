@@ -217,6 +217,12 @@ class Checkout {
 				<button type="button" id="wpistic-ffl-change-btn" class="wpistic-ffl-btn wpistic-ffl-btn--ghost"><?php esc_html_e( 'Change Dealer', 'advanced-ffl-checkout' ); ?></button>
 			</div>
 
+			<!-- Honeypot — real users never see/fill this; bots do. -->
+			<label class="wpistic-ffl-hp" aria-hidden="true" style="position:absolute;left:-99999px;width:1px;height:1px;overflow:hidden;">
+				<?php esc_html_e( 'Dealer URL (leave blank)', 'advanced-ffl-checkout' ); ?>
+				<input type="text" name="wpistic_ffl_hp" value="" tabindex="-1" autocomplete="off">
+			</label>
+
 			<!-- Hidden fields -->
 			<input type="hidden" id="wpistic_ffl_dealer_id"   name="wpistic_ffl_dealer_id"   value="">
 			<input type="hidden" id="wpistic_ffl_dealer_name" name="wpistic_ffl_dealer_name" value="">
@@ -231,7 +237,18 @@ class Checkout {
 			return;
 		}
 
-		$dealer_id = (int) ( $_POST['wpistic_ffl_dealer_id'] ?? 0 ); // phpcs:ignore WordPress.Security.NonceVerification
+		// phpcs:disable WordPress.Security.NonceVerification
+		// Honeypot — bots fill any visible-looking text input. Silent reject.
+		if ( ! empty( $_POST['wpistic_ffl_hp'] ) ) {
+			wc_add_notice(
+				__( 'Your submission was flagged by our spam filter. Please reload and try again.', 'advanced-ffl-checkout' ),
+				'error'
+			);
+			return;
+		}
+
+		$dealer_id = (int) ( $_POST['wpistic_ffl_dealer_id'] ?? 0 );
+		// phpcs:enable
 		if ( ! $dealer_id ) {
 			wc_add_notice(
 				__( 'Please select an FFL dealer before placing your order.', 'advanced-ffl-checkout' ),

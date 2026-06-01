@@ -3,7 +3,7 @@
  * Plugin Name:       Advanced FFL Checkout Solutions — G2A Edition
  * Plugin URI:        https://wordpressistic.com/products/advanced-ffl-checkout
  * Description:       Federal Firearms License (FFL) dealer management, WooCommerce checkout integration, transfer tracking and one-click dealer confirmation portal — customized for the Guns2Ammo system (HPOS-safe order meta, brass/graphite branding, customer "My FFL Transfers" tab, NICS 3-day automation, SMS via Verifyistic, WC order ↔ transfer status bridge).
- * Version:           1.3.0
+ * Version:           1.4.0
  * Requires at least: 6.4
  * Requires PHP:      8.1
  * Author:            Wordpressistic
@@ -29,7 +29,7 @@ if ( version_compare( PHP_VERSION, '8.1', '<' ) ) {
 }
 
 // ── Constants ─────────────────────────────────────────────────────────────────
-define( 'WPISTIC_FFL_VERSION',   '1.3.0' );
+define( 'WPISTIC_FFL_VERSION',   '1.4.0' );
 define( 'WPISTIC_FFL_FILE',      __FILE__ );
 define( 'WPISTIC_FFL_PATH',      plugin_dir_path( __FILE__ ) );
 define( 'WPISTIC_FFL_URL',       plugin_dir_url( __FILE__ ) );
@@ -128,14 +128,14 @@ register_activation_hook( __FILE__, function (): void {
 	update_option( 'wpistic_ffl_zip_import_status', 'pending' );
 	update_option( 'wpistic_ffl_zip_import_offset', 0 );
 
-	// G2A: register the My Account endpoint before flushing so the rewrite
-	// rule lands in the same activation request.
+	// G2A: register every front-facing rewrite once so it survives activation.
 	if ( class_exists( '\WpisticFFL\G2A_Account' ) ) {
 		( new \WpisticFFL\G2A_Account() )->register_endpoint();
 	} else {
-		// Class not yet autoloaded during activation — add_rewrite_endpoint
-		// will be re-registered on next page load by the bootstrap.
 		add_rewrite_endpoint( 'ffl-transfers', EP_ROOT | EP_PAGES );
+	}
+	if ( class_exists( '\WpisticFFL\G2A_Customer_Tracking' ) ) {
+		( new \WpisticFFL\G2A_Customer_Tracking() )->register_rewrites();
 	}
 
 	flush_rewrite_rules();
@@ -275,6 +275,19 @@ add_action( 'plugins_loaded', function (): void {
 
 	// G2A: theme bridge — capture Transfer Request form posts as draft transfers.
 	new \WpisticFFL\G2A_Bridge();
+
+	// G2A: public per-transfer tracking page (HMAC-protected, no login).
+	new \WpisticFFL\G2A_Customer_Tracking();
+
+	// G2A: admin Activity Log page + JSON endpoints for the dashboard.
+	new \WpisticFFL\G2A_Activity();
+
+	// G2A: compliance + security audit page + token-secret nag + regen handler.
+	new \WpisticFFL\G2A_Compliance_Check();
+	add_action( 'admin_init', [ '\WpisticFFL\G2A_Compliance_Check', 'maybe_regenerate_secret' ] );
+
+	// G2A: carrier tracking auto-advance on shipment_tracking entry.
+	new \WpisticFFL\G2A_Carrier();
 
 }, 20 );
 

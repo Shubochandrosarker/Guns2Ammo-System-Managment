@@ -1169,7 +1169,10 @@ class API {
 		// Send email notification
 		Mailer::send_status_update( $id, $new_status );
 
+		// G2A: fire both actions — _status_changed for email/SMS/bridge, _updated
+		// for side-effects keyed off arbitrary column changes (e.g. carrier auto-advance).
 		do_action( 'wpistic_ffl_transfer_status_changed', $id, $transfer->status, $new_status );
+		do_action( 'wpistic_ffl_transfer_updated', $id, $update );
 
 		return rest_ensure_response( [ 'success' => true, 'status' => $new_status ] );
 	}

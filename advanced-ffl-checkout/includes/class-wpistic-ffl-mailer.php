@@ -400,6 +400,10 @@ class Mailer {
 		$year        = date( 'Y' );
 		$ffl_license = $theme['ffl_license'] ?? '';
 
+		// G2A: every customer email gets a "view your transfer" CTA pointing at
+		// the public tracking page so users always have a one-click status check.
+		$track_url   = \WpisticFFL\G2A_Customer_Tracking::url_for( (string) $transfer->transfer_ref );
+
 		$accent_map = [
 			'primary' => $theme['color_primary'],
 			'success' => $theme['color_success'],
@@ -445,6 +449,15 @@ class Mailer {
       <p style="margin:0;font-size:11px;color:' . esc_attr( $text_muted ) . ';text-transform:uppercase;letter-spacing:.08em;">Transfer Reference</p>
       <p style="margin:4px 0 0;font-size:20px;font-weight:700;color:' . esc_attr( $accent ) . ';letter-spacing:1px;font-family:ui-monospace,SFMono-Regular,monospace;">' . esc_html( $transfer->transfer_ref ) . '</p>
     </div>
+
+    <!-- View status CTA -->
+    <table width="100%" cellpadding="0" cellspacing="0" style="margin:8px 0 4px;">
+      <tr><td align="center">
+        <a href="' . esc_url( $track_url ) . '" style="display:inline-block;background:' . esc_attr( $accent ) . ';color:#0F0E12;padding:12px 28px;border-radius:10px;font-size:14px;font-weight:800;text-decoration:none;letter-spacing:.02em;">' .
+        esc_html__( 'View Transfer Status', 'advanced-ffl-checkout' ) .
+        '</a>
+      </td></tr>
+    </table>
   </td></tr>
 
   <!-- Footer -->

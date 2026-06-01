@@ -2,7 +2,7 @@
 /**
  * WP Admin panel controller.
  *
- * Registers the top-level admin menu under the WordPressistic purple W icon,
+ * Registers the top-level admin menu under the G2A brass shield icon,
  * handles AJAX actions, and dispatches to view files.
  *
  * Menu structure:
@@ -950,9 +950,9 @@ class Admin {
 	// ── SVG icon ──────────────────────────────────────────────────────────────
 
 	private static function menu_icon_svg(): string {
-		// Purple W mark — WordPressistic brand icon
-		return '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" fill="#a78bf8">
-			<path d="M10 20 L28 80 L50 35 L72 80 L90 20 H78 L64 62 L50 20 L36 62 L22 20 Z"/>
+		// G2A brass shield — matches the FFL-required iconography used on checkout.
+		return '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="#DCB45F">
+			<path d="M12 1l9 4v6c0 5.55-3.84 10.74-9 12-5.16-1.26-9-6.45-9-12V5l9-4z"/>
 		</svg>';
 	}
 }

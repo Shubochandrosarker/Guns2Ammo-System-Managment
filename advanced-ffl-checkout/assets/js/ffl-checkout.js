@@ -262,11 +262,14 @@
 
 		const addr = [ dealer.premise_street, dealer.premise_city, dealer.premise_state, dealer.premise_zip ].filter( Boolean ).join( ', ' );
 		const info = el( 'wpistic-ffl-selected-info' );
+		// G2A: Maps deep-link so a mobile shopper can tap to drive to the pickup point.
+		const mapsHref = addr ? 'https://www.google.com/maps/dir/?api=1&destination=' + encodeURIComponent( addr ) : '';
 		if ( info ) {
 			info.innerHTML =
 				'<strong>' + escapeHtml( dealer.business_name || '' ) + ( dealer.is_preferred ? ' ' + recommendedBadge() : '' ) + '</strong>' +
 				escapeHtml( addr ) +
-				( dealer.phone ? '<br>📞 ' + escapeHtml( dealer.phone ) : '' ) +
+				( mapsHref ? ' <a href="' + mapsHref + '" target="_blank" rel="noopener" style="margin-left:6px;color:inherit;text-decoration:underline;">🧭 Directions</a>' : '' ) +
+				( dealer.phone ? '<br>📞 <a href="tel:' + encodeURIComponent( dealer.phone ) + '" style="color:inherit;">' + escapeHtml( dealer.phone ) + '</a>' : '' ) +
 				'<br>FFL: ' + escapeHtml( dealer.license_number || '—' );
 		}
 
@@ -387,9 +390,9 @@
 	function pinIcon() {
 		return {
 			path: 'M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z',
-			fillColor: '#C8102E',
+			fillColor: '#DCB45F',
 			fillOpacity: 1,
-			strokeColor: '#7F0A1D',
+			strokeColor: '#8B6914',
 			strokeWeight: 1.5,
 			scale: 1.6,
 			anchor: new google.maps.Point( 12, 22 ),

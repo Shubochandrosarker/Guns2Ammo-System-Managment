@@ -242,7 +242,7 @@
 	function setProgressColor( color ) {
 		const bar = document.querySelector( '.wpistic-ffl-csv-progress-bar' );
 		if ( bar ) {
-			bar.style.background = color === 'green' ? '#059669' : '#7c5cf6';
+			bar.style.background = color === 'green' ? '#16A34A' : '#DCB45F';
 		}
 	}
 

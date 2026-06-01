@@ -1,23 +1,24 @@
 /*!
- * Advanced FFL Checkout — WC Checkout Widget Stylesheet (v1.1.1)
- * G2A brand: tactical red #C8102E + black #0F1115 + clean white surface
+ * Advanced FFL Checkout — WC Checkout Widget Stylesheet (v1.3.0 G2A Edition)
+ * G2A brand: tactical brass #DCB45F + graphite #1A191E + gunmetal surface
+ * Mirrors guns2ammo/assets/css/tokens.css so the widget feels native.
  * Scoped under .wpistic-ffl-widget so theme styles can't bleed in.
  */
 
 .wpistic-ffl-widget {
-	--wf-primary:        #C8102E;
-	--wf-primary-hover:  #A00C24;
-	--wf-primary-soft:   rgba(200, 16, 46, 0.1);
-	--wf-ink:            #0F1115;
-	--wf-ink-soft:       #1A1D24;
-	--wf-text:           #1F2937;
-	--wf-text-muted:     #6B7280;
-	--wf-surface:        #FFFFFF;
-	--wf-surface-alt:    #F9FAFB;
-	--wf-border:         #E5E7EB;
-	--wf-border-strong:  #D1D5DB;
-	--wf-success:        #16A34A;
-	--wf-warning:        #F59E0B;
+	--wf-primary:        #DCB45F;
+	--wf-primary-hover:  #C9A84C;
+	--wf-primary-soft:   rgba(220, 180, 95, 0.12);
+	--wf-ink:            #0F0E12;
+	--wf-ink-soft:       #1A191E;
+	--wf-text:           #F7F7F9;
+	--wf-text-muted:     #A7A6AE;
+	--wf-surface:        #26252C;
+	--wf-surface-alt:    #211F26;
+	--wf-border:         #38363F;
+	--wf-border-strong:  rgba(255,255,255,0.16);
+	--wf-success:        #4ADE80;
+	--wf-warning:        #C9A84C;
 	--wf-radius:         12px;
 	--wf-radius-sm:      8px;
 	--wf-shadow-sm:      0 1px 3px rgba(0,0,0,0.08);
@@ -151,12 +152,12 @@
 .wpistic-ffl-btn--primary {
 	background: var(--wf-primary);
 	color: #fff;
-	box-shadow: 0 4px 12px -2px rgba(200,16,46,0.4);
+	box-shadow: 0 4px 12px -2px rgba(220,180,95,0.4);
 }
 .wpistic-ffl-btn--primary:hover {
 	background: var(--wf-primary-hover);
 	transform: translateY(-1px);
-	box-shadow: 0 6px 16px -2px rgba(200,16,46,0.5);
+	box-shadow: 0 6px 16px -2px rgba(220,180,95,0.5);
 }
 .wpistic-ffl-btn--ghost {
 	background: transparent;
