@@ -1,0 +1,377 @@
+/*!
+ * Advanced FFL Checkout — Dealer Portal Stylesheet
+ * Scoped under .wpistic-ffl-portal so it cannot leak into the parent theme.
+ * Reads CSS custom properties set by the Theming class.
+ */
+
+/* Reset within portal scope */
+.wpistic-ffl-portal-body {
+	margin: 0;
+	padding: 0;
+	min-height: 100vh;
+	background: var(--ffl-bg, #0F1115);
+	color: var(--ffl-text, #F4F4F5);
+	font-family: var(--ffl-font, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif);
+	font-size: var(--ffl-body-size, 16px);
+	line-height: 1.6;
+	-webkit-font-smoothing: antialiased;
+	-moz-osx-font-smoothing: grayscale;
+}
+
+.wpistic-ffl-portal *,
+.wpistic-ffl-portal *::before,
+.wpistic-ffl-portal *::after {
+	box-sizing: border-box;
+}
+
+.wpistic-ffl-portal {
+	max-width: var(--ffl-max-width, 640px);
+	margin: 0 auto;
+	padding: clamp(20px, 5vw, 48px) clamp(16px, 4vw, 32px);
+	display: flex;
+	flex-direction: column;
+	min-height: 100vh;
+}
+
+/* Header */
+.wpistic-ffl-portal__header {
+	text-align: center;
+	margin-bottom: 24px;
+}
+
+.wpistic-ffl-portal__logo {
+	max-width: 200px;
+	max-height: 60px;
+	height: auto;
+	display: inline-block;
+}
+
+.wpistic-ffl-portal__brandname {
+	margin: 0;
+	font-size: 24px;
+	font-weight: var(--ffl-heading-weight, 700);
+	letter-spacing: -0.01em;
+	color: var(--ffl-text);
+}
+
+.wpistic-ffl-portal__tagline {
+	margin: 8px 0 0;
+	font-size: 13px;
+	color: var(--ffl-text-muted);
+	letter-spacing: 0.05em;
+	text-transform: uppercase;
+}
+
+/* Card */
+.wpistic-ffl-portal__card {
+	background: var(--ffl-surface);
+	border-radius: var(--ffl-radius, 10px);
+	border: var(--ffl-card-border, none);
+	box-shadow: var(--ffl-shadow, none);
+	padding: clamp(24px, 5vw, 40px);
+	margin-bottom: 24px;
+	flex: 1;
+}
+
+.wpistic-ffl-portal__heading {
+	margin: 0 0 12px;
+	font-size: clamp(22px, 4vw, 28px);
+	font-weight: var(--ffl-heading-weight, 700);
+	letter-spacing: -0.02em;
+	line-height: 1.25;
+	color: var(--ffl-text);
+}
+
+.wpistic-ffl-portal__lede {
+	margin: 0 0 16px;
+	font-size: 16px;
+	line-height: 1.6;
+	color: var(--ffl-text);
+}
+
+.wpistic-ffl-portal__lede.wpistic-ffl-portal__muted,
+.wpistic-ffl-portal__muted {
+	color: var(--ffl-text-muted);
+}
+
+.wpistic-ffl-portal__center {
+	text-align: center;
+}
+
+/* Status icon */
+.wpistic-ffl-portal__icon {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	width: 72px;
+	height: 72px;
+	border-radius: 50%;
+	margin: 0 auto 24px;
+}
+
+.wpistic-ffl-portal__icon--error {
+	background: rgba(220, 38, 38, 0.12);
+	color: var(--ffl-danger, #DC2626);
+}
+
+.wpistic-ffl-portal__icon--success {
+	background: rgba(22, 163, 74, 0.12);
+	color: var(--ffl-success, #16A34A);
+}
+
+/* Transfer summary */
+.wpistic-ffl-portal__summary {
+	background: rgba(255, 255, 255, 0.03);
+	border: 1px solid var(--ffl-border);
+	border-radius: 10px;
+	padding: 18px 20px;
+	margin: 24px 0;
+	display: grid;
+	gap: 12px;
+}
+
+.wpistic-ffl-portal__summary-row {
+	display: grid;
+	grid-template-columns: minmax(120px, 35%) 1fr;
+	gap: 12px;
+	align-items: baseline;
+	font-size: 14px;
+}
+
+.wpistic-ffl-portal__summary-key {
+	color: var(--ffl-text-muted);
+	font-weight: 500;
+	text-transform: uppercase;
+	letter-spacing: 0.04em;
+	font-size: 12px;
+}
+
+.wpistic-ffl-portal__summary-val {
+	color: var(--ffl-text);
+	font-weight: 600;
+	word-break: break-word;
+}
+
+.wpistic-ffl-portal__muted-inline {
+	color: var(--ffl-text-muted);
+	font-weight: 400;
+	margin-left: 4px;
+}
+
+/* Form */
+.wpistic-ffl-portal__form {
+	margin-top: 24px;
+}
+
+.wpistic-ffl-portal__field {
+	margin-bottom: 18px;
+}
+
+.wpistic-ffl-portal__label {
+	display: block;
+	font-size: 14px;
+	font-weight: 600;
+	margin-bottom: 6px;
+	color: var(--ffl-text);
+}
+
+.wpistic-ffl-portal__required {
+	color: var(--ffl-danger);
+	margin-left: 2px;
+}
+
+.wpistic-ffl-portal__input,
+.wpistic-ffl-portal__textarea {
+	width: 100%;
+	padding: 12px 14px;
+	background: rgba(255, 255, 255, 0.04);
+	border: 1px solid var(--ffl-border);
+	border-radius: 8px;
+	color: var(--ffl-text);
+	font-size: 16px;
+	font-family: inherit;
+	transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+.wpistic-ffl-portal__input:focus,
+.wpistic-ffl-portal__textarea:focus {
+	outline: none;
+	border-color: var(--ffl-primary);
+	background: rgba(255, 255, 255, 0.07);
+}
+
+.wpistic-ffl-portal__input--otp {
+	font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, monospace;
+	font-size: 24px;
+	letter-spacing: 0.5em;
+	text-align: center;
+	font-weight: 700;
+	max-width: 200px;
+}
+
+.wpistic-ffl-portal__textarea {
+	resize: vertical;
+	min-height: 70px;
+}
+
+.wpistic-ffl-portal__hint {
+	margin: 6px 0 0;
+	font-size: 12px;
+	color: var(--ffl-text-muted);
+}
+
+.wpistic-ffl-portal__honeypot {
+	position: absolute;
+	left: -10000px;
+	width: 1px;
+	height: 1px;
+	overflow: hidden;
+}
+
+/* Action buttons */
+.wpistic-ffl-portal__actions {
+	display: grid;
+	gap: 10px;
+	margin: 24px 0 16px;
+}
+
+.wpistic-ffl-portal__btn {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	padding: 14px 22px;
+	font-size: 16px;
+	font-weight: 600;
+	border-radius: var(--ffl-radius, 10px);
+	border: none;
+	cursor: pointer;
+	transition: transform 0.05s ease, background 0.15s ease, box-shadow 0.15s ease;
+	font-family: inherit;
+	width: 100%;
+	min-height: 52px;
+}
+
+.wpistic-ffl-portal__btn:active {
+	transform: translateY(1px);
+}
+
+.wpistic-ffl-portal__btn:focus-visible {
+	outline: 3px solid var(--ffl-primary);
+	outline-offset: 2px;
+}
+
+.wpistic-ffl-portal__btn--primary {
+	background: var(--ffl-primary);
+	color: #fff;
+	box-shadow: 0 4px 12px -2px rgba(0, 0, 0, 0.3);
+}
+
+.wpistic-ffl-portal__btn--primary:hover {
+	background: var(--ffl-primary-hover);
+}
+
+.wpistic-ffl-portal__btn--warning {
+	background: rgba(245, 158, 11, 0.15);
+	color: var(--ffl-warning, #F59E0B);
+	border: 1px solid rgba(245, 158, 11, 0.3);
+}
+
+.wpistic-ffl-portal__btn--warning:hover {
+	background: rgba(245, 158, 11, 0.25);
+}
+
+.wpistic-ffl-portal__btn--ghost {
+	background: transparent;
+	color: var(--ffl-text-muted);
+	border: 1px solid var(--ffl-border);
+}
+
+.wpistic-ffl-portal__btn--ghost:hover {
+	background: rgba(255, 255, 255, 0.04);
+	color: var(--ffl-text);
+}
+
+.wpistic-ffl-portal__btn--loading {
+	opacity: 0.7;
+	pointer-events: none;
+}
+
+/* Alerts */
+.wpistic-ffl-portal__alert {
+	padding: 12px 16px;
+	border-radius: 8px;
+	margin-bottom: 16px;
+	font-size: 14px;
+}
+
+.wpistic-ffl-portal__alert--error {
+	background: rgba(220, 38, 38, 0.12);
+	color: var(--ffl-danger);
+	border: 1px solid rgba(220, 38, 38, 0.25);
+}
+
+/* Compliance text */
+.wpistic-ffl-portal__compliance {
+	margin: 16px 0 0;
+	padding: 12px 14px;
+	background: rgba(255, 255, 255, 0.03);
+	border-radius: 8px;
+	font-size: 12px;
+	color: var(--ffl-text-muted);
+	line-height: 1.5;
+}
+
+/* Footer */
+.wpistic-ffl-portal__footer {
+	text-align: center;
+	font-size: 13px;
+	color: var(--ffl-text-muted);
+	padding: 16px 0 0;
+}
+
+.wpistic-ffl-portal__footer p {
+	margin: 0 0 8px;
+}
+
+.wpistic-ffl-portal__footer a {
+	color: var(--ffl-primary);
+	text-decoration: none;
+}
+
+.wpistic-ffl-portal__footer a:hover {
+	text-decoration: underline;
+}
+
+.wpistic-ffl-portal__legal {
+	font-size: 12px;
+}
+
+.wpistic-ffl-portal__powered {
+	margin-top: 16px;
+	font-size: 11px;
+	letter-spacing: 0.05em;
+	text-transform: uppercase;
+	opacity: 0.7;
+}
+
+/* Mobile tuning */
+@media (max-width: 480px) {
+	.wpistic-ffl-portal__summary-row {
+		grid-template-columns: 1fr;
+		gap: 4px;
+	}
+
+	.wpistic-ffl-portal__btn {
+		font-size: 15px;
+		padding: 14px 18px;
+	}
+}
+
+/* Reduced motion */
+@media (prefers-reduced-motion: reduce) {
+	.wpistic-ffl-portal__btn,
+	.wpistic-ffl-portal__input,
+	.wpistic-ffl-portal__textarea {
+		transition: none;
+	}
+}

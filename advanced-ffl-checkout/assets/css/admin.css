@@ -1,0 +1,865 @@
+/**
+ * Advanced FFL Checkout — Admin Panel Styles
+ * WordPressistic brand: Purple #7c5cf6
+ */
+
+/* ── Variables ────────────────────────────────────────────────────────────── */
+:root {
+	--wp-ffl-purple: #c46a2d;
+	--wp-ffl-purple-d: #22c55e;
+	--wp-ffl-purple-l: #ede9fe;
+	--wp-ffl-green: #059669;
+	--wp-ffl-orange: #f59e0b;
+	--wp-ffl-red: #dc2626;
+	--wp-ffl-blue: #2563eb;
+	--wp-ffl-gray-50: #f9fafb;
+	--wp-ffl-gray-100: #f3f4f6;
+	--wp-ffl-gray-200: #e5e7eb;
+	--wp-ffl-gray-400: #9ca3af;
+	--wp-ffl-gray-500: #6b7280;
+	--wp-ffl-gray-700: #374151;
+	--wp-ffl-gray-900: #111827;
+	--wp-ffl-radius: 10px;
+}
+
+/* ── Layout ───────────────────────────────────────────────────────────────── */
+.wpistic-ffl-admin {
+	max-width: 1400px;
+}
+
+.wpistic-ffl-page-header {
+	display: flex;
+	align-items: center;
+	gap: 16px;
+	margin: 16px 0 24px;
+	padding: 20px 24px;
+	background: #ffffff;
+	border: 1px solid var(--wp-ffl-gray-200);
+	border-left: 4px solid var(--wp-ffl-purple);
+	border-radius: 0 var(--wp-ffl-radius) var(--wp-ffl-radius) 0;
+}
+
+.wpistic-ffl-logo-wrap {
+	flex-shrink: 0;
+	
+}
+
+.wpistic-ffl-wordmark {
+	height: 28px;
+	display: block;
+	width: 216px;
+
+}
+
+.wpistic-ffl-page-title {
+	font-size: 22px !important;
+	font-weight: 700 !important;
+	color: var(--wp-ffl-gray-900) !important;
+	margin: 0 !important;
+	padding: 0 !important;
+}
+
+.wpistic-ffl-page-title-wrap {
+	display: flex;
+	align-items: center;
+	gap: 10px;
+}
+
+.wpistic-ffl-version {
+	font-size: 12px;
+	font-weight: 600;
+	color: var(--wp-ffl-purple);
+	background: var(--wp-ffl-purple-l);
+	padding: 2px 8px;
+	border-radius: 20px;
+}
+
+.wpistic-ffl-subtitle {
+	font-size: 13px;
+	color: var(--wp-ffl-gray-500);
+	margin-left: auto;
+}
+
+/* ── KPI grid ─────────────────────────────────────────────────────────────── */
+.wpistic-ffl-kpi-grid {
+	display: grid;
+	grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+	gap: 14px;
+	margin-bottom: 24px;
+}
+
+.wpistic-kpi-card {
+	display: flex;
+	align-items: center;
+	gap: 14px;
+	background: #ffffff;
+	border: 1px solid var(--wp-ffl-gray-200);
+	border-radius: var(--wp-ffl-radius);
+	padding: 16px 18px;
+	transition: box-shadow .15s, border-color .15s;
+}
+
+.wpistic-kpi-card:hover {
+	box-shadow: 0 3px 10px rgba(0, 0, 0, .07);
+	border-color: var(--wp-ffl-purple);
+}
+
+.wpistic-kpi-card--warning {
+	border-color: var(--wp-ffl-orange);
+	background: #fffbeb;
+}
+
+.wpistic-kpi-icon {
+	font-size: 26px;
+	width: 44px;
+	height: 44px;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	border-radius: 10px;
+	flex-shrink: 0;
+}
+
+.wpistic-kpi-icon--purple {
+	background: var(--wp-ffl-purple-l);
+}
+
+.wpistic-kpi-icon--blue {
+	background: #dbeafe;
+}
+
+.wpistic-kpi-icon--green {
+	background: #dcfce7;
+}
+
+.wpistic-kpi-icon--orange {
+	background: #fef3c7;
+}
+
+.wpistic-kpi-icon--red {
+	background: #fee2e2;
+}
+
+.wpistic-kpi-value {
+	font-size: 24px;
+	font-weight: 800;
+	color: var(--wp-ffl-gray-900);
+	line-height: 1;
+}
+
+.wpistic-kpi-label {
+	font-size: 12px;
+	color: var(--wp-ffl-gray-500);
+	margin-top: 3px;
+}
+
+/* ── Cards ────────────────────────────────────────────────────────────────── */
+.wpistic-ffl-card {
+	background: #ffffff;
+	border: 1px solid var(--wp-ffl-gray-200);
+	border-radius: var(--wp-ffl-radius);
+	overflow: hidden;
+	margin-bottom: 20px;
+	padding-left: 30px;
+}
+
+.wpistic-ffl-card--info {
+	border-top: 3px solid var(--wp-ffl-purple);
+}
+
+.wpistic-ffl-card-header {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	padding: 14px 20px;
+	border-bottom: 1px solid var(--wp-ffl-gray-100);
+	background: var(--wp-ffl-gray-50);
+}
+
+.wpistic-ffl-card-header h2 {
+	font-size: 14px !important;
+	font-weight: 700 !important;
+	color: var(--wp-ffl-gray-900) !important;
+	margin: 0 !important;
+	padding: 0 !important;
+}
+
+.wpistic-ffl-mt {
+	margin-top: 0;
+}
+
+/* ── Columns ──────────────────────────────────────────────────────────────── */
+.wpistic-ffl-cols {
+	display: grid;
+	grid-template-columns: 2fr 1fr;
+	gap: 20px;
+	align-items: start;
+}
+
+.wpistic-ffl-col-2 {
+	grid-column: 1;
+}
+
+@media (max-width: 1200px) {
+	.wpistic-ffl-cols {
+		grid-template-columns: 1fr;
+	}
+}
+
+/* ── Table ────────────────────────────────────────────────────────────────── */
+.wpistic-ffl-table {
+	width: 100%;
+	border-collapse: collapse;
+	font-size: 13px;
+}
+
+.wpistic-ffl-table th {
+	padding: 10px 14px;
+	text-align: left;
+	font-weight: 600;
+	font-size: 11px;
+	text-transform: uppercase;
+	letter-spacing: .6px;
+	color: var(--wp-ffl-gray-500);
+	background: var(--wp-ffl-gray-50);
+	border-bottom: 1px solid var(--wp-ffl-gray-200);
+}
+
+.wpistic-ffl-table td {
+	padding: 10px 14px;
+	border-bottom: 1px solid var(--wp-ffl-gray-100);
+	color: var(--wp-ffl-gray-700);
+	vertical-align: middle;
+}
+
+.wpistic-ffl-table tr:last-child td {
+	border-bottom: none;
+}
+
+.wpistic-ffl-table tr:hover td {
+	background: var(--wp-ffl-gray-50);
+}
+
+.wpistic-ffl-preferred-row td {
+	background: #faf5ff !important;
+}
+
+.wpistic-ffl-empty {
+	text-align: center;
+	color: var(--wp-ffl-gray-400) !important;
+	padding: 28px !important;
+}
+
+.wpistic-ffl-table-meta {
+	padding: 8px 16px;
+	font-size: 12px;
+	color: var(--wp-ffl-gray-500);
+	border-bottom: 1px solid var(--wp-ffl-gray-100);
+	background: var(--wp-ffl-gray-50);
+}
+
+/* ── Status badges ────────────────────────────────────────────────────────── */
+.wpistic-ffl-status {
+	display: inline-block;
+	font-size: 11px;
+	font-weight: 600;
+	padding: 3px 9px;
+	border-radius: 20px;
+	white-space: nowrap;
+}
+
+.status-new {
+	background: #dbeafe;
+	color: var(--wp-ffl-blue);
+}
+
+.status-processing {
+	background: #ede9fe;
+	color: var(--wp-ffl-purple);
+}
+
+.status-shipped {
+	background: #cffafe;
+	color: #0891b2;
+}
+
+.status-at-dealer {
+	background: #fef3c7;
+	color: #b45309;
+}
+
+.status-pending {
+	background: #fef9c3;
+	color: #854d0e;
+}
+
+.status-delayed {
+	background: #ffedd5;
+	color: #c2410c;
+}
+
+.status-approved {
+	background: #dcfce7;
+	color: var(--wp-ffl-green);
+}
+
+.status-denied {
+	background: #fee2e2;
+	color: var(--wp-ffl-red);
+}
+
+.status-complete {
+	background: #dcfce7;
+	color: var(--wp-ffl-green);
+}
+
+.status-cancelled {
+	background: var(--wp-ffl-gray-100);
+	color: var(--wp-ffl-gray-500);
+}
+
+/* ── Import progress blocks ───────────────────────────────────────────────── */
+.wpistic-ffl-import-block {
+	padding: 16px 20px;
+	border-bottom: 1px solid var(--wp-ffl-gray-100);
+}
+
+.wpistic-ffl-import-block:last-of-type {
+	border-bottom: none;
+}
+
+.wpistic-ffl-import-header {
+	display: flex;
+	justify-content: space-between;
+	align-items: center;
+	margin-bottom: 8px;
+	font-size: 13px;
+	font-weight: 600;
+	color: var(--wp-ffl-gray-700);
+}
+
+.wpistic-ffl-progress {
+	height: 8px;
+	background: var(--wp-ffl-gray-100);
+	border-radius: 4px;
+	overflow: hidden;
+	margin-bottom: 6px;
+}
+
+.wpistic-ffl-progress-bar {
+	height: 100%;
+	background: var(--wp-ffl-purple);
+	border-radius: 4px;
+	transition: width .5s ease;
+}
+
+.wpistic-ffl-progress-bar--blue {
+	background: var(--wp-ffl-blue);
+}
+
+.wpistic-ffl-import-meta {
+	font-size: 12px;
+	color: var(--wp-ffl-gray-500);
+	margin-bottom: 8px;
+}
+
+.wpistic-ffl-error-msg {
+	font-size: 12px;
+	color: var(--wp-ffl-red);
+	margin: 6px 0 0;
+}
+
+.wpistic-ffl-last-sync {
+	font-size: 12px;
+	color: var(--wp-ffl-gray-400);
+	padding: 8px 20px;
+	margin: 0;
+}
+
+/* ── Action buttons ───────────────────────────────────────────────────────── */
+.wpistic-ffl-action-btn {
+	background: var(--wp-ffl-purple) !important;
+	color: #ffffff !important;
+	border: none !important;
+	border-radius: 6px !important;
+	font-weight: 600 !important;
+	padding: 5px 14px !important;
+	cursor: pointer !important;
+	transition: background .15s !important;
+}
+
+.wpistic-ffl-action-btn:hover {
+	background: var(--wp-ffl-purple-d) !important;
+}
+
+.wpistic-ffl-export-btn {
+	margin-left: auto !important;
+}
+
+.wpistic-ffl-save-btn {
+	background: var(--wp-ffl-purple) !important;
+	border-color: var(--wp-ffl-purple-d) !important;
+	padding: 8px 24px !important;
+	font-size: 14px !important;
+	font-weight: 600 !important;
+	border-radius: 8px !important;
+}
+
+.wpistic-ffl-link {
+	font-size: 12px;
+	color: var(--wp-ffl-purple);
+	text-decoration: none;
+}
+
+.wpistic-ffl-link:hover {
+	text-decoration: underline;
+}
+
+/* ── Filter form ──────────────────────────────────────────────────────────── */
+.wpistic-ffl-filter-form {
+	margin-bottom: 16px;
+}
+
+.wpistic-ffl-filter-row {
+	display: flex;
+	gap: 10px;
+	align-items: center;
+	flex-wrap: wrap;
+}
+
+.wpistic-ffl-search-input {
+	width: 240px !important;
+}
+
+.wpistic-ffl-state-input {
+	width: 80px !important;
+	text-transform: uppercase;
+}
+
+.wpistic-ffl-select {
+	min-width: 160px;
+}
+
+.wpistic-ffl-filter-btn {
+	background: var(--wp-ffl-purple) !important;
+	color: #ffffff !important;
+	border-color: var(--wp-ffl-purple) !important;
+	border-radius: 6px !important;
+}
+
+/* ── Dealer table extras ──────────────────────────────────────────────────── */
+.wpistic-ffl-star {
+	color: #f59e0b;
+}
+
+.wpistic-ffl-type-badge {
+	display: inline-block;
+	font-size: 11px;
+	background: var(--wp-ffl-gray-100);
+	color: var(--wp-ffl-gray-700);
+	padding: 2px 7px;
+	border-radius: 4px;
+}
+
+.wpistic-ffl-fee-badge {
+	font-size: 12px;
+	font-weight: 700;
+	color: var(--wp-ffl-gray-700);
+}
+
+.wpistic-ffl-fee-free {
+	font-size: 12px;
+	font-weight: 600;
+	color: var(--wp-ffl-green);
+}
+
+.wpistic-ffl-expiry-warn {
+	color: var(--wp-ffl-red) !important;
+	font-weight: 600;
+}
+
+.wpistic-ffl-ref {
+	font-family: monospace;
+	font-size: 13px;
+	color: var(--wp-ffl-purple) !important;
+	font-weight: 600;
+	text-decoration: none;
+}
+
+.wpistic-ffl-ref:hover {
+	text-decoration: underline;
+}
+
+/* ── Settings ─────────────────────────────────────────────────────────────── */
+.wpistic-ffl-settings-grid {
+	display: grid;
+	grid-template-columns: 1fr 1fr;
+	gap: 20px;
+}
+
+@media (max-width: 1100px) {
+	.wpistic-ffl-settings-grid {
+		grid-template-columns: 1fr;
+	}
+}
+
+.wpistic-ffl-settings-table {
+	width: 100%;
+	border-collapse: collapse;
+}
+
+.wpistic-ffl-settings-table th {
+	width: 220px;
+	padding: 12px 20px;
+	text-align: left;
+	font-size: 13px;
+	font-weight: 600;
+	color: var(--wp-ffl-gray-700);
+	vertical-align: top;
+	padding-top: 16px;
+}
+
+.wpistic-ffl-settings-table td {
+	padding: 12px 20px;
+	border-bottom: 1px solid var(--wp-ffl-gray-100);
+}
+
+.wpistic-ffl-settings-footer {
+	margin-top: 8px;
+	padding: 16px 0;
+}
+
+.wpistic-ffl-save-notice {
+	margin-bottom: 16px;
+}
+
+/* Plugin info block */
+.wpistic-ffl-plugin-info {
+	padding: 20px;
+}
+
+.wpistic-ffl-brand-block {
+	margin-bottom: 16px;
+}
+
+.wpistic-ffl-brand-logo {
+	height: 36px;
+	margin-bottom: 8px;
+}
+
+.wpistic-ffl-brand-block p {
+	font-size: 13px;
+	color: var(--wp-ffl-gray-500);
+	margin: 4px 0;
+}
+
+.wpistic-ffl-info-grid {
+	display: grid;
+	grid-template-columns: 1fr 1fr;
+	gap: 10px;
+}
+
+.wpistic-ffl-info-grid>div {
+	background: var(--wp-ffl-gray-50);
+	border: 1px solid var(--wp-ffl-gray-200);
+	border-radius: 6px;
+	padding: 10px 12px;
+}
+
+.wpistic-ffl-info-grid strong {
+	display: block;
+	font-size: 11px;
+	font-weight: 600;
+	color: var(--wp-ffl-gray-500);
+	text-transform: uppercase;
+	letter-spacing: .5px;
+	margin-bottom: 4px;
+}
+
+.wpistic-ffl-info-grid code {
+	font-size: 12px;
+	color: var(--wp-ffl-purple);
+	background: transparent;
+	padding: 0;
+}
+
+/* ── Pagination ───────────────────────────────────────────────────────────── */
+.wpistic-ffl-pagination {
+	padding: 14px 16px;
+	border-top: 1px solid var(--wp-ffl-gray-100);
+}
+
+.wpistic-ffl-pagination .page-numbers {
+	display: inline-block;
+	padding: 4px 10px;
+	margin: 0 2px;
+	border: 1px solid var(--wp-ffl-gray-200);
+	border-radius: 5px;
+	font-size: 13px;
+	color: var(--wp-ffl-gray-700);
+	text-decoration: none;
+}
+
+.wpistic-ffl-pagination .page-numbers.current {
+	background: var(--wp-ffl-purple);
+	border-color: var(--wp-ffl-purple);
+	color: #ffffff;
+}
+
+.wpistic-ffl-pagination .page-numbers:hover:not(.current) {
+	border-color: var(--wp-ffl-purple);
+	color: var(--wp-ffl-purple);
+}
+
+/* WP admin menu highlight */
+#adminmenu .toplevel_page_wpistic-ffl .wp-menu-name {
+	font-weight: 600;
+}
+
+/* ── Card body + spacing ──────────────────────────────────────────────────── */
+.wpistic-ffl-card-body {
+	padding: 16px 20px;
+}
+
+.wpistic-ffl-mb {
+	margin-bottom: 20px;
+}
+
+/* ── Upload zone ──────────────────────────────────────────────────────────── */
+.wpistic-ffl-upload-zone {
+	border: 2px dashed var(--wp-ffl-gray-200);
+	border-radius: 10px;
+	padding: 28px 20px;
+	text-align: center;
+	cursor: pointer;
+	transition: border-color .2s, background .2s;
+	background: var(--wp-ffl-gray-50);
+}
+
+.wpistic-ffl-upload-zone:hover,
+.wpistic-ffl-drag-over {
+	border-color: var(--wp-ffl-purple);
+	background: var(--wp-ffl-purple-l);
+}
+
+.wpistic-ffl-upload-icon {
+	font-size: 32px;
+	margin-bottom: 8px;
+}
+
+.wpistic-ffl-upload-text {
+	font-size: 15px;
+	font-weight: 600;
+	color: var(--wp-ffl-gray-700);
+	margin: 0 0 4px;
+}
+
+.wpistic-ffl-upload-hint {
+	font-size: 12px;
+	color: var(--wp-ffl-gray-400);
+	margin: 0 0 14px;
+}
+
+/* ── CSV progress bar ─────────────────────────────────────────────────────── */
+.wpistic-ffl-csv-progress {
+	margin-top: 16px;
+}
+
+.wpistic-ffl-progress-bar-wrap {
+	height: 10px;
+	background: var(--wp-ffl-gray-100);
+	border-radius: 5px;
+	overflow: hidden;
+	margin-bottom: 6px;
+}
+
+.wpistic-ffl-csv-progress-bar {
+	height: 100%;
+	background: var(--wp-ffl-purple);
+	border-radius: 5px;
+	transition: width .3s ease;
+}
+
+.wpistic-ffl-csv-progress-label {
+	font-size: 13px;
+	color: var(--wp-ffl-gray-500);
+}
+
+/* ── Import done notice ───────────────────────────────────────────────────── */
+.wpistic-ffl-import-done {
+	margin-top: 14px;
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	background: #dcfce7;
+	border: 1px solid #86efac;
+	border-radius: 8px;
+	padding: 10px 14px;
+	font-size: 14px;
+	font-weight: 600;
+	color: #166534;
+}
+
+/* ── DB Status grid ───────────────────────────────────────────────────────── */
+.wpistic-ffl-db-status-grid {
+	display: grid;
+	grid-template-columns: repeat(3, 1fr);
+	gap: 12px;
+	margin-bottom: 12px;
+}
+
+.wpistic-ffl-db-stat {
+	text-align: center;
+	padding: 12px;
+	background: var(--wp-ffl-gray-50);
+	border: 1px solid var(--wp-ffl-gray-200);
+	border-radius: 8px;
+}
+
+.wpistic-ffl-db-stat-value {
+	font-size: 22px;
+	font-weight: 800;
+	color: var(--wp-ffl-purple);
+}
+
+.wpistic-ffl-db-stat-label {
+	font-size: 11px;
+	color: var(--wp-ffl-gray-500);
+	margin-top: 2px;
+}
+
+.wpistic-ffl-db-note {
+	font-size: 12px;
+	color: var(--wp-ffl-gray-500);
+	margin: 0;
+}
+
+/* ── Setup notice ─────────────────────────────────────────────────────────── */
+.wpistic-ffl-setup-notice {
+	display: flex;
+	align-items: flex-start;
+	gap: 16px;
+	background: #faf5ff;
+	border: 2px solid var(--wp-ffl-purple);
+	border-radius: 10px;
+	padding: 18px 20px;
+	margin-bottom: 20px;
+}
+
+.wpistic-ffl-setup-icon {
+	font-size: 32px;
+	flex-shrink: 0;
+}
+
+.wpistic-ffl-setup-body h3 {
+	margin: 0 0 6px;
+	font-size: 16px;
+	color: var(--wp-ffl-gray-900);
+}
+
+.wpistic-ffl-setup-body p,
+.wpistic-ffl-setup-body ol {
+	font-size: 13px;
+	color: var(--wp-ffl-gray-700);
+	margin: 0 0 6px;
+	padding-left: 18px;
+}
+
+.wpistic-ffl-setup-body a {
+	color: var(--wp-ffl-purple);
+}
+
+/* ── Guide steps ──────────────────────────────────────────────────────────── */
+.wpistic-ffl-guide-steps {
+	font-size: 13px;
+	color: var(--wp-ffl-gray-700);
+	line-height: 1.7;
+	padding-left: 20px;
+	margin: 0 0 12px;
+}
+
+.wpistic-ffl-guide-steps li {
+	margin-bottom: 8px;
+}
+
+.wpistic-ffl-guide-steps a {
+	color: var(--wp-ffl-purple);
+}
+
+/* ── Warning / success boxes ─────────────────────────────────────────────── */
+.wpistic-ffl-warning-box {
+	background: #fffbeb;
+	border: 1px solid #fde68a;
+	border-radius: 6px;
+	padding: 10px 14px;
+	font-size: 13px;
+	color: #92400e;
+}
+
+.wpistic-ffl-success-box {
+	background: #dcfce7;
+	border: 1px solid #86efac;
+	border-radius: 6px;
+	padding: 10px 14px;
+	font-size: 13px;
+	color: #166534;
+}
+
+/* ── Transfer Detail Grid ─────────────────────────────────────────────────── */
+.wpistic-ffl-grid {
+	display: grid;
+	grid-template-columns: 1fr 1fr;
+	gap: 20px;
+	margin-bottom: 20px;
+}
+
+@media (max-width: 1200px) {
+	.wpistic-ffl-grid {
+		grid-template-columns: 1fr;
+	}
+}
+
+.wpistic-ffl-details-table {
+	width: 100%;
+	border-collapse: collapse;
+	font-size: 13px;
+}
+
+.wpistic-ffl-details-table th {
+	width: 140px;
+	padding: 8px 12px;
+	text-align: left;
+	font-weight: 600;
+	font-size: 12px;
+	color: var(--wp-ffl-gray-500);
+	background: var(--wp-ffl-gray-50);
+	border-bottom: 1px solid var(--wp-ffl-gray-200);
+}
+
+.wpistic-ffl-details-table td {
+	padding: 8px 12px;
+	border-bottom: 1px solid var(--wp-ffl-gray-100);
+	color: var(--wp-ffl-gray-700);
+}
+
+.wpistic-ffl-details-table tr:last-child td {
+	border-bottom: none;
+}
+
+.wpistic-ffl-transfer-ref {
+	font-size: 16px;
+	font-weight: 600;
+	color: var(--wp-ffl-purple);
+	margin-left: 10px;
+}
+
+/* ── Import description ───────────────────────────────────────────────────── */
+.wpistic-ffl-import-desc {
+	font-size: 13px;
+	color: var(--wp-ffl-gray-500);
+	margin: 0 0 14px;
+}
+
+.wpistic-ffl-import-desc a {
+	color: var(--wp-ffl-purple);
+}
