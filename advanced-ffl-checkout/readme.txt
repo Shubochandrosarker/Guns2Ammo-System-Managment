@@ -4,7 +4,7 @@ Tags: FFL, firearms, WooCommerce, dealer, checkout, ATF, transfer, NICS, guns2am
 Requires at least: 6.4
 Tested up to: 6.7
 Requires PHP: 8.1
-Stable tag: 1.7.0
+Stable tag: 1.7.1
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -127,6 +127,10 @@ Deactivation preserves all data. Data is only removed on plugin deletion IF you 
 Yes. The plugin is fully self-contained. The dashboard integration is optional.
 
 == Changelog ==
+
+= 1.7.1 — G2A Edition (Compliance audit accuracy patch) =
+* FIX: **Compliance audit no longer flags `wpistic_ffl_process_zip_import` as WARN when the ZIP import has legitimately completed.** The cron correctly self-cancels once `wpistic_ffl_zip_import_status` is `complete` — that's expected behavior, not a problem. Audit now reports PASS with "Work complete — cron correctly unscheduled".
+* FIX: Cron-check block also looks for **Action Scheduler-pending actions** (`as_next_scheduled_action`), not just WP-Cron. Async paths migrated to AS in v1.6 are now visible to the audit.
 
 = 1.7.0 — G2A Edition (Customer + Ops + Compliance roundup) =
 BRAND / UX

@@ -159,19 +159,48 @@ class G2A_Compliance_Check {
 			'action'      => '',
 		];
 
-		// 7. Cron events all scheduled
+		// 7. Cron events all scheduled.
+		// Each entry: [ hook, label, done_check ] where done_check is an optional
+		// closure that returns true when this cron has legitimately finished its
+		// work — in which case "not scheduled" is correct behavior, not a problem.
 		$expected_crons = [
-			'wpistic_ffl_process_zip_import',
-			'wpistic_ffl_monthly_sync',
-			'wpistic_ffl_daily_portal_runner',
+			[
+				'wpistic_ffl_process_zip_import',
+				function () {
+					$status = (string) get_option( 'wpistic_ffl_zip_import_status', '' );
+					return in_array( $status, [ 'complete', 'completed', 'done', 'finished' ], true );
+				},
+			],
+			[ 'wpistic_ffl_monthly_sync', null ],
+			[ 'wpistic_ffl_daily_portal_runner', null ],
 		];
-		foreach ( $expected_crons as $hook ) {
-			$next = wp_next_scheduled( $hook );
+		foreach ( $expected_crons as $entry ) {
+			[ $hook, $done_check ] = $entry;
+			$next      = wp_next_scheduled( $hook );
+			// Also check Action Scheduler — v1.6 migrated async paths to it,
+			// and AS-scheduled actions don't appear in wp_next_scheduled().
+			$as_pending = function_exists( 'as_next_scheduled_action' )
+				&& \as_next_scheduled_action( $hook, [], 'wpistic-ffl' );
+			$is_done   = is_callable( $done_check ) ? (bool) $done_check() : false;
+
+			if ( $next || $as_pending ) {
+				$status = 'pass';
+				$detail = $next
+					? 'Next run: ' . esc_html( date_i18n( 'Y-m-d H:i', $next ) )
+					: 'Pending via Action Scheduler';
+			} elseif ( $is_done ) {
+				$status = 'pass';
+				$detail = 'Work complete — cron correctly unscheduled';
+			} else {
+				$status = 'warn';
+				$detail = 'Not scheduled — deactivate/reactivate the plugin to fix';
+			}
+
 			$checks[] = [
 				'name'        => 'Cron: ' . $hook,
 				'description' => 'Scheduled task that drives background processing.',
-				'status'      => $next ? 'pass' : 'warn',
-				'detail'      => $next ? 'Next run: ' . esc_html( date_i18n( 'Y-m-d H:i', $next ) ) : 'Not scheduled — deactivate/reactivate the plugin to fix',
+				'status'      => $status,
+				'detail'      => $detail,
 				'action'      => '',
 			];
 		}
