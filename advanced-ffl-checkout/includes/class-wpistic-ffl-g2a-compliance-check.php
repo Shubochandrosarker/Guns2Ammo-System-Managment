@@ -258,7 +258,36 @@ class G2A_Compliance_Check {
 			'action'      => '',
 		];
 
-		// 15. Memberistic JWT secret sharing (informational)
+		// 15. Carrier provider configured
+		if ( class_exists( '\WpisticFFL\G2A_Carrier_Providers' ) ) {
+			$carrier = G2A_Carrier_Providers::settings();
+			$provider_set = ! empty( $carrier['provider'] ) && 'none' !== $carrier['provider'];
+			$has_key      = 'easypost' === $carrier['provider'] && ! empty( $carrier['easypost_api_key'] );
+			$webhook_set  = ! empty( $carrier['webhook_secret'] );
+			$status = 'info';
+			$detail = 'Manual + webhook only';
+			$action = '';
+			if ( $has_key ) {
+				$status = 'pass';
+				$detail = 'EasyPost configured — daily pull active';
+			} elseif ( $provider_set && ! $has_key ) {
+				$status = 'warn';
+				$detail = 'Provider selected but API key missing';
+				$action = '<a href="' . esc_url( admin_url( 'admin.php?page=wpistic-ffl-carriers' ) ) . '">Add key</a>';
+			} elseif ( $webhook_set ) {
+				$status = 'pass';
+				$detail = 'Webhook receiver ready';
+			}
+			$checks[] = [
+				'name'        => 'Carrier auto-advance',
+				'description' => 'Live tracking source so delivered parcels auto-advance to received_by_dealer without manual portal confirmation.',
+				'status'      => $status,
+				'detail'      => $detail,
+				'action'      => $action,
+			];
+		}
+
+		// 16. Memberistic JWT secret sharing (informational)
 		$mem_loaded = class_exists( 'Memberistic_Membership_Solutions' ) || defined( 'MEMBERISTIC_VERSION' );
 		$checks[] = [
 			'name'        => 'Memberistic detected',

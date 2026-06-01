@@ -4,7 +4,7 @@ Tags: FFL, firearms, WooCommerce, dealer, checkout, ATF, transfer, NICS, guns2am
 Requires at least: 6.4
 Tested up to: 6.7
 Requires PHP: 8.1
-Stable tag: 1.4.0
+Stable tag: 1.5.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -127,6 +127,16 @@ Deactivation preserves all data. Data is only removed on plugin deletion IF you 
 Yes. The plugin is fully self-contained. The dashboard integration is optional.
 
 == Changelog ==
+
+= 1.5.0 — G2A Edition (Carrier API integration) =
+* G2A: **Live carrier status sync** — new G2A_Carrier_Providers class adds three ingestion paths so delivered parcels auto-advance the transfer to `received_by_dealer` without a manual dealer-portal click.
+* G2A: **Pull path** — daily WP-Cron (`wpistic_ffl_carrier_poll`) checks every in-flight transfer (status `shipped_to_dealer`, has tracking number) against EasyPost. One key covers UPS / USPS / FedEx / DHL / OnTrac.
+* G2A: **Push path** — REST endpoint `/wpistic-ffl/v1/carrier/webhook` accepts HMAC-signed events from EasyPost, Shippo, AfterShip, ShipStation (auto-detected by payload shape). Generic `X-Wpistic-Ffl-Signature` header also supported for custom integrations. Verification gate: `hash_equals( hash_hmac('sha256', body, secret), header )`.
+* G2A: **Manual "Check now"** AJAX action (`wpistic_ffl_carrier_check_now`) so any admin can on-demand poll the provider per transfer.
+* G2A: **📦 Carriers admin page** at Advanced FFL → 📦 Carriers — provider dropdown, EasyPost API key field, webhook URL display, HMAC secret with one-click rotate, toggle for auto-advance.
+* G2A: **Carrier check added to Compliance audit** — surfaces whether the integration is configured (pass/warn/info).
+* G2A: **wpistic_ffl_carrier_providers filter** — third-party providers can register themselves; `wpistic_ffl_carrier_webhook_verify` filter lets custom signature schemes override the default HMAC check.
+* G2A: **Audit-logged** — every carrier status reception (pull, push, manual) creates an `events` row + `analytics_events` row so the activity log shows the carrier event even when no status advance happens.
 
 = 1.4.0 — G2A Edition (Improvements pack) =
 * G2A: **Public customer tracking page** at `/track-transfer/{ref}/{sig}/` — HMAC-protected. Every customer email now includes a "View Transfer Status" CTA pointing here. Visual 5-step timeline (Order Placed → Shipped → Arrived → Background Check → Complete) plus dealer card with click-to-call and Maps directions.
