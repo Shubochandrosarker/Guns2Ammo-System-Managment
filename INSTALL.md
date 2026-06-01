@@ -14,6 +14,7 @@ All zips are at the repo root and can be uploaded directly via **WP Admin → Pl
 | WPistic Contact Form plugin | `wpistic-contact-form-main.zip` | **1.5.0** (DB schema 1.2.0) |
 | G2A Theme Control plugin | `g2a-theme-control.zip` | **1.0.0** |
 | Verifyistic (age verification) plugin | `verifyistic.zip` | **1.1.0** |
+| Advanced FFL Checkout (G2A Edition) plugin | `advanced-ffl-checkout.zip` | **1.3.0** (DB schema 1.2.0) |
 
 > The root `WPistic-Theme-For-G2A-Version-1.8.9.zip` filename is preserved so the WP "Replace existing theme" flow recognises the upgrade. The `style.css` header inside reads `Version: 1.13.0` so WP treats it as an update, not a downgrade.
 
@@ -26,7 +27,8 @@ Plugins first, theme last, so the theme activation can see the plugins.
 3. **Memberistic Membership Solutions** — plans, member portal, content restriction. Upload, activate. Visit `Memberistic → Settings → Pages` to wire the linked pages.
 4. **WPistic Contact Form** — contact form + auto-responder. Upload, activate.
 5. **Verifyistic** — age verification popup + multi-webhook delivery. Upload, activate. Then `Verifyistic → Settings` (see `docs/VERIFYISTIC_SETUP_G2A.md`). Replaces Ottertext — see `docs/OTTERTEXT_REMOVAL.md`.
-6. **WPistic Theme (guns2ammo)** — upload as theme, activate.
+6. **Advanced FFL Checkout (G2A Edition)** — FFL dealer search at checkout, transfer lifecycle, dealer confirmation portal, customer "My FFL Transfers" tab, NICS 3-day automation, WC↔transfer status bridge, SMS via Verifyistic. Upload `advanced-ffl-checkout.zip`, activate. Watch `Advanced FFL → Dashboard` for the auto-started ZIP centroid + ATF dealer sync. Mark firearm products **FFL Transfer Required** in their general product data. Optional: define `WPISTIC_FFL_TOKEN_SECRET` in `wp-config.php` for the strongest portal token security. Optional: define `wpistic_ffl_trusted_proxies` filter for accurate IPs behind Cloudflare/LB.
+7. **WPistic Theme (guns2ammo)** — upload as theme, activate.
 
 ## Upgrade in place (existing site)
 

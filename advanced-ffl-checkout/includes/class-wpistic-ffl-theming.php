@@ -29,25 +29,35 @@ class Theming {
 	 * Currently set to the Guns2Ammo brand palette.
 	 */
 	public static function default_theme_settings(): array {
+		// G2A: prefer values entered in the Guns2Ammo theme Customizer if present.
+		$g2a_name    = function_exists( 'get_theme_mod' ) ? trim( (string) get_theme_mod( 'g2a_business_name', '' ) ) : '';
+		$g2a_email   = function_exists( 'get_theme_mod' ) ? trim( (string) get_theme_mod( 'g2a_business_email', '' ) ) : '';
+		$g2a_phone   = function_exists( 'get_theme_mod' ) ? trim( (string) get_theme_mod( 'g2a_business_phone', '' ) ) : '';
+		$g2a_license = function_exists( 'get_theme_mod' ) ? trim( (string) get_theme_mod( 'g2a_ffl_license', '' ) ) : '';
+
 		return [
 			'preset'              => 'guns2ammo',
-			'business_name'       => get_bloginfo( 'name' ),
+			'business_name'       => $g2a_name ?: get_bloginfo( 'name' ),
 			'logo_url'            => '',
 			'favicon_url'         => '',
-			'support_email'       => get_option( 'admin_email' ),
-			'support_phone'       => '',
+			'support_email'       => $g2a_email ?: get_option( 'admin_email' ),
+			'support_phone'       => $g2a_phone,
+			// G2A: receiving FFL license number — shown to dealers so they can
+			// reach the right desk and to customers in confirmation emails.
+			'ffl_license'         => $g2a_license,
 
-			// Colors — Guns2Ammo tactical red/black palette
-			'color_primary'       => '#C8102E',  // brand red
-			'color_primary_hover' => '#A00C24',
-			'color_success'       => '#16A34A',
-			'color_danger'        => '#DC2626',
-			'color_warning'       => '#F59E0B',
-			'color_bg'            => '#0F1115',
-			'color_surface'       => '#1A1D24',
-			'color_text'          => '#F4F4F5',
-			'color_text_muted'    => '#A1A1AA',
-			'color_border'        => '#2A2F3A',
+			// Colors — Guns2Ammo "Tactical Luxury" brass + graphite palette.
+			// Matches guns2ammo/assets/css/tokens.css so emails + portal share the look.
+			'color_primary'       => '#DCB45F',  // brass-bright
+			'color_primary_hover' => '#C9A84C',  // brass
+			'color_success'       => '#4ADE80',  // tokens.css --color-active
+			'color_danger'        => '#E8802F',  // tokens.css --color-ember
+			'color_warning'       => '#C9A84C',  // brass
+			'color_bg'            => '#1A191E',  // --color-void
+			'color_surface'       => '#26252C',  // --color-gunmetal
+			'color_text'          => '#F7F7F9',  // --color-white
+			'color_text_muted'    => '#A7A6AE',  // --color-silver
+			'color_border'        => '#38363F',  // --color-steel
 
 			// Typography
 			'font_family'         => 'system-ui, -apple-system, "Segoe UI", Roboto, sans-serif',
@@ -70,7 +80,9 @@ class Theming {
 			'privacy_url'         => '',
 			'terms_url'           => '',
 			'custom_css'          => '',
-			'show_branding'       => 1,
+			// G2A: white-label by default — flip to 1 if you want the
+			// "Powered by Wordpressistic" credit shown in emails + portal.
+			'show_branding'       => 0,
 		];
 	}
 
@@ -115,13 +127,13 @@ class Theming {
 				'color_border'        => '#E5E7EB',
 			],
 			'guns2ammo' => [
-				'color_primary'       => '#C8102E',
-				'color_primary_hover' => '#A00C24',
-				'color_bg'            => '#0F1115',
-				'color_surface'       => '#1A1D24',
-				'color_text'          => '#F4F4F5',
-				'color_text_muted'    => '#A1A1AA',
-				'color_border'        => '#2A2F3A',
+				'color_primary'       => '#DCB45F',
+				'color_primary_hover' => '#C9A84C',
+				'color_bg'            => '#1A191E',
+				'color_surface'       => '#26252C',
+				'color_text'          => '#F7F7F9',
+				'color_text_muted'    => '#A7A6AE',
+				'color_border'        => '#38363F',
 			],
 		];
 		return $presets[ $name ] ?? $presets['guns2ammo'];
@@ -198,6 +210,7 @@ class Theming {
 			'{store_logo_url}'      => $theme['logo_url'],
 			'{store_support_email}' => $theme['support_email'],
 			'{store_phone}'         => $theme['support_phone'],
+			'{store_ffl_license}'   => $theme['ffl_license'] ?? '',
 		];
 
 		$out = strtr( $template, $store + $context );

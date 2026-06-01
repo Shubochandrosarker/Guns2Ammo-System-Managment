@@ -171,7 +171,7 @@ class Mailer {
 					__( 'Your firearm purchase has been confirmed and will be transferred through <strong>%s</strong>. We will contact you at each step of the transfer process.', 'advanced-ffl-checkout' ),
 					esc_html( $transfer->dealer_name )
 				) . self::dealer_block( $transfer ),
-				'#059669'
+				'success'
 			)
 		);
 	}
@@ -191,7 +191,7 @@ class Mailer {
 					? '<p>Tracking: <strong>' . esc_html( $transfer->shipment_carrier . ' ' . $transfer->shipment_tracking ) . '</strong></p>'
 					: ''
 				) . self::dealer_block( $transfer ),
-				'#7c5cf6'
+				'primary'
 			)
 		);
 	}
@@ -207,7 +207,7 @@ class Mailer {
 					__( 'Your firearm has been received by <strong>%s</strong>. The dealer will contact you to schedule your background check and pickup.', 'advanced-ffl-checkout' ),
 					esc_html( $transfer->dealer_name )
 				) . self::dealer_block( $transfer ),
-				'#7c5cf6'
+				'primary'
 			)
 		);
 	}
@@ -220,7 +220,7 @@ class Mailer {
 				$transfer,
 				__( 'Background check in progress', 'advanced-ffl-checkout' ),
 				__( 'Your NICS background check has been initiated. Most checks are completed instantly or within a few minutes. We will update you as soon as a decision is made.', 'advanced-ffl-checkout' ),
-				'#f59e0b'
+				'warning'
 			)
 		);
 	}
@@ -233,7 +233,7 @@ class Mailer {
 				$transfer,
 				__( 'Your background check has been delayed', 'advanced-ffl-checkout' ),
 				__( 'The FBI has requested additional time to process your NICS background check. This is a standard delay and does not indicate a denial. Under federal law, if no response is received within 3 business days, the dealer may proceed with the transfer at their discretion. We will keep you updated.', 'advanced-ffl-checkout' ),
-				'#f59e0b'
+				'warning'
 			)
 		);
 	}
@@ -246,7 +246,7 @@ class Mailer {
 				$transfer,
 				__( 'Background check result: Denied', 'advanced-ffl-checkout' ),
 				__( 'We regret to inform you that your NICS background check was denied. Your firearm cannot be transferred. You may appeal this decision through the FBI NICS E-Check program. Please contact us to arrange a refund.', 'advanced-ffl-checkout' ),
-				'#dc2626'
+				'danger'
 			)
 		);
 	}
@@ -262,7 +262,7 @@ class Mailer {
 					__( 'Your firearm transfer has been completed at <strong>%s</strong>. Thank you for your purchase. Please store your firearm safely and responsibly.', 'advanced-ffl-checkout' ),
 					esc_html( $transfer->dealer_name )
 				),
-				'#059669'
+				'success'
 			)
 		);
 	}
@@ -275,7 +275,7 @@ class Mailer {
 				$transfer,
 				__( 'Your transfer has been cancelled', 'advanced-ffl-checkout' ),
 				__( 'Your FFL transfer has been cancelled. If you believe this is an error, please contact us. If applicable, a refund will be processed.', 'advanced-ffl-checkout' ),
-				'#6b7280'
+				'primary'
 			)
 		);
 	}
@@ -385,39 +385,71 @@ class Mailer {
 		return trim( (string) $text );
 	}
 
-	private static function wrap( object $transfer, string $heading, string $body, string $accent = '#7c5cf6' ): string {
-		$site  = get_bloginfo( 'name' );
-		$logo  = get_option( 'wpistic_ffl_settings', [] )['email_logo'] ?? '';
-		$year  = date( 'Y' );
+	/**
+	 * Build the customer-facing email frame using the Theming engine so brand
+	 * colors, store name, logo and footer copy all reflect site settings
+	 * (Guns2Ammo brass/graphite by default).
+	 *
+	 * The optional $accent_key argument selects a semantic color from theme
+	 * settings (success / danger / warning) instead of taking a hardcoded hex.
+	 */
+	private static function wrap( object $transfer, string $heading, string $body, string $accent_key = 'primary' ): string {
+		$theme       = \WpisticFFL\Theming::settings();
+		$site        = $theme['business_name'] ?: get_bloginfo( 'name' );
+		$logo        = $theme['logo_url'] ?: ( get_option( 'wpistic_ffl_settings', [] )['email_logo'] ?? '' );
+		$year        = date( 'Y' );
+		$ffl_license = $theme['ffl_license'] ?? '';
+
+		$accent_map = [
+			'primary' => $theme['color_primary'],
+			'success' => $theme['color_success'],
+			'danger'  => $theme['color_danger'],
+			'warning' => $theme['color_warning'],
+		];
+		$accent     = $accent_map[ $accent_key ] ?? $theme['color_primary'];
+		$surface    = $theme['color_surface'];
+		$bg         = $theme['color_bg'];
+		$text       = $theme['color_text'];
+		$text_muted = $theme['color_text_muted'];
+		$border     = $theme['color_border'];
+
+		$show_branding = \WpisticFFL\License::show_branding();
+		$footer_brand  = $show_branding
+			? '<br>Powered by <a href="https://wordpressistic.com" style="color:' . esc_attr( $accent ) . ';text-decoration:none;">Wordpressistic</a>'
+			: '';
+
+		$ffl_block = $ffl_license
+			? '<br><span style="font-size:11px;letter-spacing:.08em;text-transform:uppercase;">FFL #' . esc_html( $ffl_license ) . '</span>'
+			: '';
 
 		return '<!DOCTYPE html>
 <html lang="en">
 <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
-<body style="margin:0;padding:0;background:#f3f4f6;font-family:-apple-system,BlinkMacSystemFont,\'Segoe UI\',sans-serif;">
-<table width="100%" cellpadding="0" cellspacing="0" style="background:#f3f4f6;padding:32px 0;">
+<body style="margin:0;padding:0;background:' . esc_attr( $bg ) . ';font-family:-apple-system,BlinkMacSystemFont,\'Segoe UI\',Roboto,sans-serif;color:' . esc_attr( $text ) . ';">
+<table width="100%" cellpadding="0" cellspacing="0" style="background:' . esc_attr( $bg ) . ';padding:32px 0;">
 <tr><td align="center">
-<table width="600" cellpadding="0" cellspacing="0" style="background:#ffffff;border-radius:12px;overflow:hidden;box-shadow:0 2px 12px rgba(0,0,0,.08);">
+<table width="600" cellpadding="0" cellspacing="0" style="background:' . esc_attr( $surface ) . ';border-radius:12px;overflow:hidden;box-shadow:0 12px 48px -12px rgba(0,0,0,.45);border:1px solid ' . esc_attr( $border ) . ';">
 
   <!-- Header -->
-  <tr><td style="background:' . esc_attr( $accent ) . ';padding:24px 32px;">
-    ' . ( $logo ? '<img src="' . esc_url( $logo ) . '" height="40" alt="' . esc_attr( $site ) . '">' : '<span style="color:#fff;font-size:22px;font-weight:700;">' . esc_html( $site ) . '</span>' ) . '
+  <tr><td style="background:' . esc_attr( $accent ) . ';padding:24px 32px;text-align:center;">
+    ' . ( $logo ? '<img src="' . esc_url( $logo ) . '" height="40" alt="' . esc_attr( $site ) . '">' : '<span style="color:#0F0E12;font-size:22px;font-weight:800;letter-spacing:-.01em;">' . esc_html( $site ) . '</span>' ) . '
   </td></tr>
 
   <!-- Body -->
   <tr><td style="padding:32px;">
-    <h1 style="margin:0 0 16px;font-size:22px;color:#1a1a2e;">' . wp_kses_post( $heading ) . '</h1>
-    <div style="font-size:15px;line-height:1.7;color:#374151;">' . wp_kses_post( $body ) . '</div>
+    <h1 style="margin:0 0 16px;font-size:22px;color:' . esc_attr( $text ) . ';letter-spacing:-.01em;">' . wp_kses_post( $heading ) . '</h1>
+    <div style="font-size:15px;line-height:1.7;color:' . esc_attr( $text ) . ';">' . wp_kses_post( $body ) . '</div>
 
     <!-- Transfer ref box -->
-    <div style="margin:24px 0;padding:16px;background:#f9fafb;border-left:4px solid ' . esc_attr( $accent ) . ';border-radius:0 8px 8px 0;">
-      <p style="margin:0;font-size:13px;color:#6b7280;">Transfer Reference</p>
-      <p style="margin:4px 0 0;font-size:20px;font-weight:700;color:' . esc_attr( $accent ) . ';letter-spacing:1px;">' . esc_html( $transfer->transfer_ref ) . '</p>
+    <div style="margin:24px 0;padding:16px;background:' . esc_attr( $bg ) . ';border-left:4px solid ' . esc_attr( $accent ) . ';border-radius:0 8px 8px 0;">
+      <p style="margin:0;font-size:11px;color:' . esc_attr( $text_muted ) . ';text-transform:uppercase;letter-spacing:.08em;">Transfer Reference</p>
+      <p style="margin:4px 0 0;font-size:20px;font-weight:700;color:' . esc_attr( $accent ) . ';letter-spacing:1px;font-family:ui-monospace,SFMono-Regular,monospace;">' . esc_html( $transfer->transfer_ref ) . '</p>
     </div>
   </td></tr>
 
   <!-- Footer -->
-  <tr><td style="padding:16px 32px;background:#f9fafb;border-top:1px solid #e5e7eb;">
-    <p style="margin:0;font-size:12px;color:#9ca3af;text-align:center;line-height:1.6;">&copy; ' . esc_html( (string) $year ) . ' ' . esc_html( $site ) . '<br>Powered by <a href="https://wordpressistic.com" style="color:#7c5cf6;text-decoration:none;">Wordpressistic</a> · Advanced FFL Checkout Solutions</p>
+  <tr><td style="padding:16px 32px;background:' . esc_attr( $bg ) . ';border-top:1px solid ' . esc_attr( $border ) . ';">
+    <p style="margin:0;font-size:12px;color:' . esc_attr( $text_muted ) . ';text-align:center;line-height:1.6;">&copy; ' . esc_html( (string) $year ) . ' ' . esc_html( $site ) . $ffl_block . $footer_brand . '</p>
   </td></tr>
 
 </table>
@@ -430,11 +462,17 @@ class Mailer {
 		if ( ! $transfer->dealer_name ) {
 			return '';
 		}
-		return '<div style="margin-top:16px;padding:12px 16px;background:#faf5ff;border-radius:8px;border:1px solid #e9d5ff;">
-			<p style="margin:0 0 4px;font-size:12px;font-weight:700;color:#7c5cf6;text-transform:uppercase;letter-spacing:.5px;">Your FFL Dealer</p>
-			<p style="margin:0;font-weight:700;color:#1f2937;">' . esc_html( $transfer->dealer_name ) . '</p>
-			<p style="margin:2px 0 0;font-size:13px;color:#4b5563;">' . esc_html( $transfer->dealer_street . ', ' . $transfer->dealer_city . ', ' . $transfer->dealer_state . ' ' . $transfer->dealer_zip ) . '</p>'
-			. ( $transfer->dealer_phone ? '<p style="margin:2px 0 0;font-size:13px;color:#4b5563;">📞 ' . esc_html( $transfer->dealer_phone ) . '</p>' : '' ) .
+		$theme  = \WpisticFFL\Theming::settings();
+		$accent = $theme['color_primary'];
+		$bg     = $theme['color_bg'];
+		$border = $theme['color_border'];
+		$text   = $theme['color_text'];
+		$muted  = $theme['color_text_muted'];
+		return '<div style="margin-top:16px;padding:12px 16px;background:' . esc_attr( $bg ) . ';border-radius:8px;border:1px solid ' . esc_attr( $border ) . ';">
+			<p style="margin:0 0 4px;font-size:12px;font-weight:700;color:' . esc_attr( $accent ) . ';text-transform:uppercase;letter-spacing:.5px;">Your FFL Dealer</p>
+			<p style="margin:0;font-weight:700;color:' . esc_attr( $text ) . ';">' . esc_html( $transfer->dealer_name ) . '</p>
+			<p style="margin:2px 0 0;font-size:13px;color:' . esc_attr( $muted ) . ';">' . esc_html( $transfer->dealer_street . ', ' . $transfer->dealer_city . ', ' . $transfer->dealer_state . ' ' . $transfer->dealer_zip ) . '</p>'
+			. ( $transfer->dealer_phone ? '<p style="margin:2px 0 0;font-size:13px;color:' . esc_attr( $muted ) . ';">📞 ' . esc_html( $transfer->dealer_phone ) . '</p>' : '' ) .
 		'</div>';
 	}
 
@@ -673,7 +711,7 @@ class Mailer {
 		$intro       = $ctx['intro'];
 		$cta_label   = $ctx['cta_label'];
 
-		$accent      = $theme['color_primary'] ?: '#C8102E';
+		$accent      = $theme['color_primary'] ?: '#DCB45F';
 		$logo_url    = $theme['logo_url'];
 		$store_name  = $theme['business_name'] ?: get_bloginfo( 'name' );
 		$year        = date( 'Y' );

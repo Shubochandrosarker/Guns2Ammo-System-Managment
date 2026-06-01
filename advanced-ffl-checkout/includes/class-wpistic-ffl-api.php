@@ -693,6 +693,18 @@ class API {
 	public function search_dealers( \WP_REST_Request $req ): \WP_REST_Response|\WP_Error {
 		global $wpdb;
 
+		// G2A: rate-limit the public endpoint to stop bulk scraping of the
+		// 80k-row ATF database. 30 searches per minute per IP is plenty for a
+		// real shopper picking a dealer at checkout.
+		$ip    = Token::client_ip();
+		$rl_key = 'wpistic_ffl_search_rl_' . wp_hash( $ip );
+		$hits   = (int) get_transient( $rl_key );
+		$limit_per_min = (int) apply_filters( 'wpistic_ffl_search_rate_limit', 30 );
+		if ( $hits >= $limit_per_min ) {
+			return new \WP_Error( 'rate_limited', 'Too many searches. Please wait a moment.', [ 'status' => 429 ] );
+		}
+		set_transient( $rl_key, $hits + 1, MINUTE_IN_SECONDS );
+
 		$zip      = preg_replace( '/[^0-9]/', '', (string) $req->get_param( 'zip' ) );
 		$name     = trim( (string) $req->get_param( 'name' ) );
 		$license  = trim( (string) $req->get_param( 'license' ) );

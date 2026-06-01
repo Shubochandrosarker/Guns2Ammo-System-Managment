@@ -66,7 +66,15 @@ class Portal {
 		// Useful for previewing theme changes without sending a real dealer email.
 		if ( 'PREVIEW' === $token || 'preview' === strtolower( $token ) ) {
 			if ( ! current_user_can( 'manage_options' ) ) {
-				wp_safe_redirect( wp_login_url( $_SERVER['REQUEST_URI'] ?? home_url() ) );
+				$redir_to = home_url( '/' );
+				if ( isset( $_SERVER['REQUEST_URI'] ) ) {
+					$candidate = esc_url_raw( wp_unslash( $_SERVER['REQUEST_URI'] ) );
+					$validated = wp_validate_redirect( home_url( $candidate ), home_url( '/' ) );
+					if ( $validated ) {
+						$redir_to = $validated;
+					}
+				}
+				wp_safe_redirect( wp_login_url( $redir_to ) );
 				exit;
 			}
 			self::render_preview();

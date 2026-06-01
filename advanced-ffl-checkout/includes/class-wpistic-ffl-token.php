@@ -268,20 +268,82 @@ class Token {
 		return base64_decode( $data, true );
 	}
 
+	/**
+	 * Resolve the client IP, but only honor X-Forwarded-For / CF-Connecting-IP
+	 * when the immediate REMOTE_ADDR is a trusted proxy. Defaults to "none
+	 * trusted" so an attacker cannot spoof rate-limit or audit-log entries.
+	 * Sites behind Cloudflare / a load balancer can extend the trust list via
+	 * the wpistic_ffl_trusted_proxies filter (CIDR array, or '*' to trust all).
+	 */
 	public static function client_ip(): string {
-		foreach ( [ 'HTTP_CF_CONNECTING_IP', 'HTTP_X_FORWARDED_FOR', 'REMOTE_ADDR' ] as $key ) {
-			if ( ! empty( $_SERVER[ $key ] ) ) {
-				$ip = sanitize_text_field( wp_unslash( $_SERVER[ $key ] ) );
-				// X-Forwarded-For may contain a list — take the first.
-				if ( false !== strpos( $ip, ',' ) ) {
-					$ip = trim( explode( ',', $ip )[0] );
-				}
-				if ( filter_var( $ip, FILTER_VALIDATE_IP ) ) {
-					return $ip;
+		$remote = isset( $_SERVER['REMOTE_ADDR'] )
+			? sanitize_text_field( wp_unslash( $_SERVER['REMOTE_ADDR'] ) )
+			: '';
+
+		$trusted     = (array) apply_filters( 'wpistic_ffl_trusted_proxies', [] );
+		$trust_proxy = in_array( '*', $trusted, true ) || self::ip_in_cidr_list( $remote, $trusted );
+
+		if ( $trust_proxy ) {
+			foreach ( [ 'HTTP_CF_CONNECTING_IP', 'HTTP_X_FORWARDED_FOR' ] as $key ) {
+				if ( ! empty( $_SERVER[ $key ] ) ) {
+					$ip = sanitize_text_field( wp_unslash( $_SERVER[ $key ] ) );
+					if ( false !== strpos( $ip, ',' ) ) {
+						$ip = trim( explode( ',', $ip )[0] );
+					}
+					if ( filter_var( $ip, FILTER_VALIDATE_IP ) ) {
+						return $ip;
+					}
 				}
 			}
 		}
+
+		if ( $remote && filter_var( $remote, FILTER_VALIDATE_IP ) ) {
+			return $remote;
+		}
 		return '0.0.0.0';
+	}
+
+	/**
+	 * Test whether $ip belongs to any of the given CIDR strings (IPv4 or IPv6).
+	 */
+	private static function ip_in_cidr_list( string $ip, array $cidrs ): bool {
+		if ( ! $ip || empty( $cidrs ) ) {
+			return false;
+		}
+		$packed = @inet_pton( $ip );
+		if ( false === $packed ) {
+			return false;
+		}
+		foreach ( $cidrs as $cidr ) {
+			if ( '*' === $cidr ) {
+				return true;
+			}
+			if ( false === strpos( $cidr, '/' ) ) {
+				if ( $packed === @inet_pton( $cidr ) ) {
+					return true;
+				}
+				continue;
+			}
+			[ $subnet, $bits ] = explode( '/', $cidr, 2 );
+			$subnet_packed     = @inet_pton( $subnet );
+			if ( false === $subnet_packed ) {
+				continue;
+			}
+			$bits       = (int) $bits;
+			$byte_count = intdiv( $bits, 8 );
+			$remaining  = $bits % 8;
+			if ( substr( $packed, 0, $byte_count ) !== substr( $subnet_packed, 0, $byte_count ) ) {
+				continue;
+			}
+			if ( 0 === $remaining ) {
+				return true;
+			}
+			$mask = chr( 0xFF << ( 8 - $remaining ) & 0xFF );
+			if ( ( $packed[ $byte_count ] & $mask ) === ( $subnet_packed[ $byte_count ] & $mask ) ) {
+				return true;
+			}
+		}
+		return false;
 	}
 
 	private static function ip_to_binary( string $ip ): ?string {

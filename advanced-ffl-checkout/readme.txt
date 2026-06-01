@@ -1,10 +1,10 @@
-=== Advanced FFL Checkout Solutions ===
+=== Advanced FFL Checkout Solutions — G2A Edition ===
 Contributors: wordpressistic
-Tags: FFL, firearms, WooCommerce, dealer, checkout, ATF, transfer, NICS
+Tags: FFL, firearms, WooCommerce, dealer, checkout, ATF, transfer, NICS, guns2ammo
 Requires at least: 6.4
 Tested up to: 6.7
 Requires PHP: 8.1
-Stable tag: 1.2.0
+Stable tag: 1.3.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -127,6 +127,24 @@ Deactivation preserves all data. Data is only removed on plugin deletion IF you 
 Yes. The plugin is fully self-contained. The dashboard integration is optional.
 
 == Changelog ==
+
+= 1.3.0 — G2A Edition =
+* G2A: **HPOS-safe order meta** — Dealer ID, name and ZIP now route through `$order->update_meta_data()` / `get_meta()` instead of `update_post_meta()`. Fixes silent failures on stores running HPOS-only mode.
+* G2A: **Dealer ID validation on save** — the dealer ID submitted from checkout is verified against the dealers table before being written to order meta. Stops forged-ID attacks.
+* G2A: **Payment-gated dealer notification** — the dealer portal email only fires when `$order->is_paid()` is true. COD / failed-payment orders no longer leak portal links to dealers. Filterable via `wpistic_ffl_can_notify_dealer_on_order`.
+* G2A: **Async dealer email** — token issuance moved to `wp_schedule_single_event` so checkout never blocks on SMTP latency. Same hook reused for the auto-send-on-ship path.
+* G2A: **Guns2Ammo brand palette is the default** — Theming engine now defaults to brass `#DCB45F` on graphite `#1A191E` (matching `guns2ammo/assets/css/tokens.css`). Customer emails + dealer portal + dealer block all share the same tokens.
+* G2A: **Theming-aware customer email frame** — `Mailer::wrap()` rebuilt to pull surface, text, border and accent colors from `Theming::settings()`. Per-status hex literals replaced with semantic keys (`primary`, `success`, `warning`, `danger`).
+* G2A: **"My FFL Transfers" My Account tab** — customers can view every transfer linked to their account at `/my-account/ffl-transfers/`. Shows status badge, dealer card, tracking number, NICS 3-day countdown.
+* G2A: **WC order ↔ transfer status bridge** — `processing` → payment_confirmed, `completed` → transferred, `refunded` / `cancelled` → cancelled. Never moves a transfer backwards or overwrites a terminal status.
+* G2A: **NICS 3-day rule automation** — `nics_delay_expires` is set automatically when a transfer enters the `delayed` bucket (Mon-Fri counted). A nightly admin alert email fires the day the window elapses (one-shot, idempotent).
+* G2A: **SMS notifications via Verifyistic** — fires `ffl_transfer_status` webhook events on `shipped_to_dealer`, `received_by_dealer`, `delayed`, `approved`, `transferred` when the customer phone is present. Filterable copy via `wpistic_ffl_sms_message`.
+* G2A: **Theme transfer-request bridge** — submissions to `admin_post_g2a_request` (the Guns2Ammo theme's `/transfer-request/` form) now create a placeholder transfer in the FFL DB so the staff dashboard has one inbox.
+* G2A: **Theme Customizer wiring** — `g2a_business_name`, `g2a_business_email`, `g2a_business_phone` and `g2a_ffl_license` theme mods are read as defaults for Theming settings. New `{store_ffl_license}` merge tag.
+* SECURITY: `Token::client_ip()` only honors X-Forwarded-For / CF-Connecting-IP when REMOTE_ADDR is in the `wpistic_ffl_trusted_proxies` filter list (defaults to none). Stops audit-log + rate-limit spoofing.
+* SECURITY: `/dealers/search` REST endpoint is now rate-limited (30 req/min/IP, filterable). Stops bulk scraping of the ATF dataset.
+* SECURITY: Portal preview path uses `wp_validate_redirect()` on the return URL — closes the open-redirect-shaped login bounce.
+* SECURITY: `License::show_branding()` is now respected by the customer email footer (was previously hard-coded "Powered by Wordpressistic").
 
 = 1.2.0 =
 * NEW: **Email dealer immediately on order placed** — when a customer completes checkout for an FFL product, the receiving dealer now gets the secure portal link right away. They no longer have to wait until the admin marks the transfer "shipped to dealer." Toggle: Settings → Portal → "Email dealer immediately when an order is placed."

@@ -1,9 +1,9 @@
 <?php
 /**
- * Plugin Name:       Advanced FFL Checkout Solutions
+ * Plugin Name:       Advanced FFL Checkout Solutions — G2A Edition
  * Plugin URI:        https://wordpressistic.com/products/advanced-ffl-checkout
- * Description:       Complete Federal Firearms License (FFL) dealer management, WooCommerce checkout integration, transfer tracking and one-click dealer confirmation portal. Built for licensed firearms retailers. By Wordpressistic.
- * Version:           1.2.0
+ * Description:       Federal Firearms License (FFL) dealer management, WooCommerce checkout integration, transfer tracking and one-click dealer confirmation portal — customized for the Guns2Ammo system (HPOS-safe order meta, brass/graphite branding, customer "My FFL Transfers" tab, NICS 3-day automation, SMS via Verifyistic, WC order ↔ transfer status bridge).
+ * Version:           1.3.0
  * Requires at least: 6.4
  * Requires PHP:      8.1
  * Author:            Wordpressistic
@@ -29,7 +29,7 @@ if ( version_compare( PHP_VERSION, '8.1', '<' ) ) {
 }
 
 // ── Constants ─────────────────────────────────────────────────────────────────
-define( 'WPISTIC_FFL_VERSION',   '1.2.0' );
+define( 'WPISTIC_FFL_VERSION',   '1.3.0' );
 define( 'WPISTIC_FFL_FILE',      __FILE__ );
 define( 'WPISTIC_FFL_PATH',      plugin_dir_path( __FILE__ ) );
 define( 'WPISTIC_FFL_URL',       plugin_dir_url( __FILE__ ) );
@@ -127,6 +127,16 @@ register_activation_hook( __FILE__, function (): void {
 	// Kick off initial ZIP import
 	update_option( 'wpistic_ffl_zip_import_status', 'pending' );
 	update_option( 'wpistic_ffl_zip_import_offset', 0 );
+
+	// G2A: register the My Account endpoint before flushing so the rewrite
+	// rule lands in the same activation request.
+	if ( class_exists( '\WpisticFFL\G2A_Account' ) ) {
+		( new \WpisticFFL\G2A_Account() )->register_endpoint();
+	} else {
+		// Class not yet autoloaded during activation — add_rewrite_endpoint
+		// will be re-registered on next page load by the bootstrap.
+		add_rewrite_endpoint( 'ffl-transfers', EP_ROOT | EP_PAGES );
+	}
 
 	flush_rewrite_rules();
 } );
@@ -230,6 +240,12 @@ add_action( 'plugins_loaded', function (): void {
 	add_action( 'wpistic_ffl_monthly_sync',        [ '\WpisticFFL\Sync',       'start_full_sync' ] );
 	add_action( 'wpistic_ffl_daily_portal_runner', [ '\WpisticFFL\Portal',     'cron_runner' ] );
 
+	// G2A: async dealer token issuance — invoked via wp_schedule_single_event so
+	// a slow SMTP server never stalls WooCommerce checkout.
+	add_action( 'wpistic_ffl_async_issue_dealer_token', function ( $transfer_id ): void {
+		\WpisticFFL\Portal::issue_and_send( (int) $transfer_id );
+	}, 10, 1 );
+
 	// Auto-issue + email a dealer confirmation token when admin marks a transfer shipped.
 	add_action( 'wpistic_ffl_transfer_status_changed', function ( $transfer_id, $old_status, $new_status ): void {
 		$portal = get_option( 'wpistic_ffl_portal_settings', [] );
@@ -237,9 +253,28 @@ add_action( 'plugins_loaded', function (): void {
 			return;
 		}
 		if ( 'shipped_to_dealer' === $new_status ) {
-			\WpisticFFL\Portal::issue_and_send( (int) $transfer_id );
+			if ( ! wp_next_scheduled( 'wpistic_ffl_async_issue_dealer_token', [ (int) $transfer_id ] ) ) {
+				wp_schedule_single_event( time() + 5, 'wpistic_ffl_async_issue_dealer_token', [ (int) $transfer_id ] );
+			}
 		}
 	}, 10, 3 );
+
+	// G2A: WC order status → transfer status bridge (boots its own hooks).
+	new \WpisticFFL\G2A_Status_Bridge();
+
+	// G2A: NICS 3-day rule helper — auto-fills expiry + nightly admin alerts.
+	new \WpisticFFL\G2A_NICS();
+	add_action( 'wpistic_ffl_daily_portal_runner', [ '\WpisticFFL\G2A_NICS', 'maybe_flag_delays' ], 20 );
+
+	// G2A: SMS notifications via Verifyistic (if installed) — sends customer SMS
+	// on key status changes. Silently no-ops when Verifyistic is absent or no phone.
+	new \WpisticFFL\G2A_SMS();
+
+	// G2A: customer "My FFL Transfers" WC account tab.
+	new \WpisticFFL\G2A_Account();
+
+	// G2A: theme bridge — capture Transfer Request form posts as draft transfers.
+	new \WpisticFFL\G2A_Bridge();
 
 }, 20 );
 

@@ -242,23 +242,17 @@ class Checkout {
 
 	/**
 	 * Save FFL meta — WooCommerce < 8 (legacy hook, passes order_id int).
+	 * Routes through the WC order API so HPOS-only stores keep working.
 	 */
 	public function save_order_ffl_meta( int $order_id ): void {
 		if ( ! $this->cart_has_ffl_items() ) {
 			return;
 		}
-
-		// phpcs:disable WordPress.Security.NonceVerification
-		$dealer_id   = (int) ( $_POST['wpistic_ffl_dealer_id'] ?? 0 );
-		$dealer_name = sanitize_text_field( $_POST['wpistic_ffl_dealer_name'] ?? '' );
-		$dealer_zip  = sanitize_text_field( $_POST['wpistic_ffl_dealer_zip'] ?? '' );
-		// phpcs:enable
-
-		if ( $dealer_id ) {
-			update_post_meta( $order_id, self::META_DEALER_ID,   $dealer_id );
-			update_post_meta( $order_id, self::META_DEALER_NAME, $dealer_name );
-			update_post_meta( $order_id, self::META_DEALER_ZIP,  $dealer_zip );
+		$order = wc_get_order( $order_id );
+		if ( ! $order ) {
+			return;
 		}
+		$this->persist_dealer_meta_on_order( $order );
 	}
 
 	/**
@@ -270,40 +264,58 @@ class Checkout {
 		if ( ! ( $order instanceof \WC_Order ) ) {
 			return;
 		}
-
 		if ( ! $this->cart_has_ffl_items() ) {
 			return;
 		}
+		$this->persist_dealer_meta_on_order( $order );
+	}
 
+	/**
+	 * Shared persistence path — HPOS-safe via $order->update_meta_data().
+	 * Also validates the submitted dealer_id exists in the dealers table to
+	 * prevent attackers from poisoning order meta with a forged ID.
+	 */
+	private function persist_dealer_meta_on_order( \WC_Order $order ): void {
 		// phpcs:disable WordPress.Security.NonceVerification
 		$dealer_id   = (int) ( $_POST['wpistic_ffl_dealer_id'] ?? 0 );
-		$dealer_name = sanitize_text_field( $_POST['wpistic_ffl_dealer_name'] ?? '' );
-		$dealer_zip  = sanitize_text_field( $_POST['wpistic_ffl_dealer_zip'] ?? '' );
+		$dealer_name = sanitize_text_field( wp_unslash( $_POST['wpistic_ffl_dealer_name'] ?? '' ) );
+		$dealer_zip  = sanitize_text_field( wp_unslash( $_POST['wpistic_ffl_dealer_zip'] ?? '' ) );
 		// phpcs:enable
 
-		if ( $dealer_id ) {
-			$order_id = $order->get_id();
-			update_post_meta( $order_id, self::META_DEALER_ID,   $dealer_id );
-			update_post_meta( $order_id, self::META_DEALER_NAME, $dealer_name );
-			update_post_meta( $order_id, self::META_DEALER_ZIP,  $dealer_zip );
+		if ( ! $dealer_id ) {
+			return;
 		}
+
+		global $wpdb;
+		$exists = (int) $wpdb->get_var( $wpdb->prepare( // phpcs:ignore WordPress.DB
+			'SELECT id FROM ' . DB::table( 'dealers' ) . ' WHERE id = %d AND is_active = 1 LIMIT 1',
+			$dealer_id
+		) );
+		if ( ! $exists ) {
+			return;
+		}
+
+		$order->update_meta_data( self::META_DEALER_ID,   $dealer_id );
+		$order->update_meta_data( self::META_DEALER_NAME, $dealer_name );
+		$order->update_meta_data( self::META_DEALER_ZIP,  $dealer_zip );
+		$order->save();
 	}
 
 	// ── Transfer record creation ──────────────────────────────────────────────
 
 	public function create_transfer_on_payment( int $order_id ): void {
-		// Only create once
-		if ( get_post_meta( $order_id, self::META_TRANSFER_ID, true ) ) {
-			return;
-		}
-
-		$dealer_id = (int) get_post_meta( $order_id, self::META_DEALER_ID, true );
-		if ( ! $dealer_id ) {
-			return;
-		}
-
-		$order    = wc_get_order( $order_id );
+		$order = wc_get_order( $order_id );
 		if ( ! $order ) {
+			return;
+		}
+
+		// Only create once
+		if ( $order->get_meta( self::META_TRANSFER_ID ) ) {
+			return;
+		}
+
+		$dealer_id = (int) $order->get_meta( self::META_DEALER_ID );
+		if ( ! $dealer_id ) {
 			return;
 		}
 
@@ -346,7 +358,8 @@ class Checkout {
 		$transfer_id = $wpdb->insert_id;
 
 		if ( $transfer_id ) {
-			update_post_meta( $order_id, self::META_TRANSFER_ID, $transfer_id );
+			$order->update_meta_data( self::META_TRANSFER_ID, $transfer_id );
+			$order->save();
 
 			// Audit event
 			$wpdb->insert( DB::table( 'events' ), [ // phpcs:ignore WordPress.DB.DirectDatabaseQuery
@@ -360,13 +373,17 @@ class Checkout {
 
 			Mailer::send_status_update( $transfer_id, 'payment_confirmed' );
 
-			// v1.2.0 — notify the dealer immediately when the order is placed so
-			// they receive the secure portal link without waiting for an admin to
-			// mark the transfer "shipped_to_dealer". Gated by the portal setting
-			// so admins who only want post-shipment confirmation can opt out.
+			// G2A: dealer notification is gated on actual payment (avoids COD /
+			// failed-payment leakage), and async-scheduled so a slow SMTP doesn't
+			// stall checkout. Filterable for special-case integrations.
 			$portal_settings = get_option( 'wpistic_ffl_portal_settings', [] );
-			if ( ! empty( $portal_settings['enabled'] ) && ! empty( $portal_settings['notify_dealer_on_order'] ) ) {
-				Portal::issue_and_send( $transfer_id );
+			$can_notify_dealer = $order->is_paid() && ! empty( $portal_settings['enabled'] ) && ! empty( $portal_settings['notify_dealer_on_order'] );
+			$can_notify_dealer = (bool) apply_filters( 'wpistic_ffl_can_notify_dealer_on_order', $can_notify_dealer, $order, $transfer_id );
+			if ( $can_notify_dealer ) {
+				// Async — never block checkout on SMTP.
+				if ( ! wp_next_scheduled( 'wpistic_ffl_async_issue_dealer_token', [ $transfer_id ] ) ) {
+					wp_schedule_single_event( time() + 5, 'wpistic_ffl_async_issue_dealer_token', [ $transfer_id ] );
+				}
 			}
 
 			do_action( 'wpistic_ffl_transfer_created', $transfer_id, $order_id );
@@ -382,12 +399,11 @@ class Checkout {
 	 * @param mixed $order WC_Order object passed by WooCommerce.
 	 */
 	public function display_dealer_in_admin( $order ): void {
-		if ( ! is_object( $order ) || ! method_exists( $order, 'get_id' ) ) {
+		if ( ! is_object( $order ) || ! method_exists( $order, 'get_meta' ) ) {
 			return;
 		}
-		$order_id    = $order->get_id();
-		$dealer_name = get_post_meta( $order_id, self::META_DEALER_NAME, true );
-		$transfer_id = get_post_meta( $order_id, self::META_TRANSFER_ID, true );
+		$dealer_name = $order->get_meta( self::META_DEALER_NAME );
+		$transfer_id = $order->get_meta( self::META_TRANSFER_ID );
 
 		if ( ! $dealer_name ) {
 			return;
@@ -409,18 +425,23 @@ class Checkout {
 	 * @param mixed $order WC_Order object passed by WooCommerce.
 	 */
 	public function display_dealer_in_customer_email( $order ): void {
-		if ( ! is_object( $order ) || ! method_exists( $order, 'get_id' ) ) {
+		if ( ! is_object( $order ) || ! method_exists( $order, 'get_meta' ) ) {
 			return;
 		}
-		$dealer_name = get_post_meta( $order->get_id(), self::META_DEALER_NAME, true );
+		$dealer_name = $order->get_meta( self::META_DEALER_NAME );
 		if ( ! $dealer_name ) {
 			return;
 		}
+		// G2A: pull colors from the Theming engine so the order-details block
+		// matches the rest of the FFL emails + dealer portal.
+		$theme  = Theming::settings();
+		$accent = $theme['color_primary'];
+		$muted  = $theme['color_text_muted'];
 
-		echo '<section class="wpistic-ffl-email-section">';
-		echo '<h2>' . esc_html__( 'FFL Dealer Selected', 'advanced-ffl-checkout' ) . '</h2>';
-		echo '<p>' . esc_html__( 'Your firearm will be transferred through:', 'advanced-ffl-checkout' ) . ' <strong>' . esc_html( $dealer_name ) . '</strong></p>';
-		echo '<p style="font-size:12px;color:#666;">' . esc_html__( 'You will be notified when your item arrives at the dealer and is ready for pickup.', 'advanced-ffl-checkout' ) . '</p>';
+		echo '<section class="wpistic-ffl-email-section" style="margin-top:24px;padding:16px;border-left:4px solid ' . esc_attr( $accent ) . ';background:rgba(0,0,0,.03);">';
+		echo '<h2 style="margin:0 0 8px;font-size:16px;">' . esc_html__( 'FFL Dealer Selected', 'advanced-ffl-checkout' ) . '</h2>';
+		echo '<p style="margin:0 0 4px;">' . esc_html__( 'Your firearm will be transferred through:', 'advanced-ffl-checkout' ) . ' <strong>' . esc_html( $dealer_name ) . '</strong></p>';
+		echo '<p style="margin:0;font-size:12px;color:' . esc_attr( $muted ) . ';">' . esc_html__( 'You will be notified when your item arrives at the dealer and is ready for pickup.', 'advanced-ffl-checkout' ) . '</p>';
 		echo '</section>';
 	}
 
