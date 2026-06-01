@@ -1,0 +1,1170 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Advanced FFL Checkout for Guns 2 Ammo — Solution Overview</title>
+<style>
+@page {
+  size: A4;
+  margin: 22mm 18mm 22mm 18mm;
+  @bottom-right {
+    content: "Page " counter(page) " of " counter(pages);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    font-size: 9pt;
+    color: #A7A6AE;
+  }
+  @bottom-left {
+    content: "Guns 2 Ammo · Advanced FFL Checkout v1.4.0";
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    font-size: 9pt;
+    color: #A7A6AE;
+  }
+}
+@page :first {
+  margin: 0;
+  @bottom-right { content: none; }
+  @bottom-left { content: none; }
+}
+
+* { box-sizing: border-box; }
+html, body {
+  margin: 0;
+  padding: 0;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  color: #1A191E;
+  line-height: 1.55;
+  font-size: 10.5pt;
+}
+
+/* ---------------------- Cover ---------------------- */
+.cover {
+  page: cover;
+  page-break-after: always;
+  width: 100%;
+  height: 297mm;
+  background: linear-gradient(160deg, #1A191E 0%, #26252C 55%, #38363F 100%);
+  color: #F7F7F9;
+  padding: 80px 60px;
+  position: relative;
+}
+.cover::before {
+  content: "";
+  position: absolute;
+  top: 0; right: 0; bottom: 0; left: 0;
+  background:
+    radial-gradient(ellipse at 80% 10%, rgba(220,180,95,0.18), transparent 50%),
+    radial-gradient(ellipse at 10% 90%, rgba(220,180,95,0.08), transparent 55%);
+  pointer-events: none;
+}
+.cover-wrap { position: relative; z-index: 1; }
+.cover .eyebrow {
+  font-family: ui-monospace, SFMono-Regular, monospace;
+  font-size: 10pt;
+  letter-spacing: 0.3em;
+  color: #DCB45F;
+  text-transform: uppercase;
+  margin-bottom: 16px;
+}
+.cover h1 {
+  font-size: 52pt;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  margin: 0 0 12px;
+  line-height: 1.02;
+}
+.cover h1 .accent { color: #DCB45F; }
+.cover .lede {
+  font-size: 14pt;
+  color: #D8D7DD;
+  max-width: 560px;
+  margin: 20px 0 32px;
+  line-height: 1.5;
+}
+.cover .meta {
+  position: absolute;
+  bottom: 60px;
+  left: 60px;
+  right: 60px;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  font-family: ui-monospace, monospace;
+  font-size: 9pt;
+  color: #A7A6AE;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  z-index: 1;
+}
+.cover .meta strong { color: #DCB45F; }
+.cover .badges { margin-top: 28px; display: flex; gap: 12px; flex-wrap: wrap; }
+.cover .badge {
+  display: inline-block;
+  padding: 7px 14px;
+  border: 1px solid rgba(220,180,95,0.55);
+  border-radius: 999px;
+  font-size: 10pt;
+  letter-spacing: 0.06em;
+  color: #DCB45F;
+  background: rgba(220,180,95,0.08);
+}
+.cover .shield {
+  position: absolute;
+  top: 60px;
+  right: 60px;
+  width: 80px;
+  height: 80px;
+  z-index: 1;
+}
+
+/* ---------------------- TOC ---------------------- */
+.toc {
+  page-break-after: always;
+  padding-top: 8mm;
+}
+.toc h2 {
+  font-size: 28pt;
+  letter-spacing: -0.02em;
+  margin: 0 0 24px;
+  color: #1A191E;
+  border-bottom: 3px solid #DCB45F;
+  padding-bottom: 8px;
+}
+.toc ol {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  counter-reset: toc;
+}
+.toc li {
+  counter-increment: toc;
+  display: flex;
+  justify-content: space-between;
+  padding: 8px 0;
+  border-bottom: 1px dotted #D8D7DD;
+  font-size: 11.5pt;
+}
+.toc li::before {
+  content: "0" counter(toc) ".";
+  color: #DCB45F;
+  font-family: ui-monospace, monospace;
+  font-weight: 700;
+  margin-right: 14px;
+  letter-spacing: 0.06em;
+}
+.toc li span:first-of-type { flex: 1; }
+.toc li span:last-of-type { color: #A7A6AE; font-family: ui-monospace, monospace; font-size: 9pt; }
+
+/* ---------------------- Section ---------------------- */
+section { page-break-before: always; }
+section.no-break { page-break-before: auto; }
+.section-header {
+  margin-bottom: 18px;
+  border-bottom: 3px solid #DCB45F;
+  padding-bottom: 10px;
+}
+.section-header .num {
+  font-family: ui-monospace, monospace;
+  color: #DCB45F;
+  font-size: 11pt;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  font-weight: 700;
+  display: block;
+}
+.section-header h2 {
+  font-size: 24pt;
+  margin: 4px 0 0;
+  letter-spacing: -0.01em;
+  color: #1A191E;
+}
+
+h3 {
+  font-size: 14pt;
+  margin: 22px 0 8px;
+  color: #1A191E;
+  letter-spacing: -0.005em;
+}
+h4 {
+  font-size: 11pt;
+  margin: 14px 0 6px;
+  color: #38363F;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+p { margin: 8px 0; }
+ul, ol { margin: 8px 0 12px 22px; padding: 0; }
+li { margin: 4px 0; }
+
+code {
+  font-family: ui-monospace, SFMono-Regular, monospace;
+  font-size: 9.5pt;
+  background: #F4F3F0;
+  color: #8B6914;
+  padding: 1px 6px;
+  border-radius: 4px;
+}
+pre {
+  background: #1A191E;
+  color: #F7F7F9;
+  padding: 14px 18px;
+  border-radius: 8px;
+  font-family: ui-monospace, monospace;
+  font-size: 9pt;
+  line-height: 1.5;
+  overflow-x: auto;
+  margin: 12px 0;
+}
+pre code { background: transparent; color: #DCB45F; padding: 0; }
+
+/* Tables */
+table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 12px 0 16px;
+  font-size: 10pt;
+}
+th, td {
+  padding: 8px 10px;
+  text-align: left;
+  border-bottom: 1px solid #E5E4DE;
+  vertical-align: top;
+}
+th {
+  background: #1A191E;
+  color: #DCB45F;
+  font-size: 9pt;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  font-weight: 700;
+}
+tr:nth-child(even) td { background: #FAF8F4; }
+
+/* Callout / pill */
+.pill {
+  display: inline-block;
+  padding: 2px 9px;
+  border-radius: 999px;
+  font-size: 8.5pt;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  margin-right: 6px;
+  vertical-align: middle;
+}
+.pill.done   { background: #D9F2E1; color: #166534; }
+.pill.new    { background: #FDF1D1; color: #8B6914; }
+.pill.future { background: #E0E7FF; color: #3730A3; }
+.pill.warn   { background: #FFEAD5; color: #9A3412; }
+.pill.crit   { background: #FFD9D9; color: #991B1B; }
+
+.callout {
+  border-left: 4px solid #DCB45F;
+  background: #FAF6EC;
+  padding: 14px 18px;
+  margin: 16px 0;
+  border-radius: 0 8px 8px 0;
+}
+.callout strong { color: #8B6914; }
+.callout.tactical {
+  background: #1A191E;
+  color: #F7F7F9;
+  border-left-color: #DCB45F;
+}
+.callout.tactical strong { color: #DCB45F; }
+
+/* Diagrams */
+.flow {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 8px;
+  margin: 18px 0 20px;
+}
+.flow .step {
+  padding: 14px 10px;
+  background: #FAF6EC;
+  border: 1.5px solid #DCB45F;
+  border-radius: 10px;
+  text-align: center;
+  font-size: 9pt;
+  position: relative;
+}
+.flow .step .n {
+  display: inline-block;
+  width: 20px; height: 20px; line-height: 20px;
+  background: #1A191E;
+  color: #DCB45F;
+  border-radius: 50%;
+  font-family: ui-monospace, monospace;
+  font-size: 9pt;
+  font-weight: 700;
+  margin-bottom: 6px;
+}
+.flow .step h5 { margin: 0 0 4px; font-size: 10pt; color: #1A191E; }
+.flow .step p { margin: 0; color: #38363F; font-size: 8.5pt; line-height: 1.4; }
+
+.timeline {
+  border-left: 3px solid #DCB45F;
+  padding-left: 22px;
+  margin: 18px 0;
+}
+.timeline .tl-item { margin-bottom: 16px; position: relative; }
+.timeline .tl-item::before {
+  content: "";
+  position: absolute;
+  left: -28px;
+  top: 6px;
+  width: 12px;
+  height: 12px;
+  background: #DCB45F;
+  border: 2px solid #1A191E;
+  border-radius: 50%;
+}
+.timeline h4 { margin: 0 0 4px; color: #1A191E; text-transform: none; letter-spacing: 0; font-size: 11.5pt; }
+.timeline .meta {
+  font-family: ui-monospace, monospace;
+  font-size: 8.5pt;
+  color: #DCB45F;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.timeline p { margin: 4px 0 0; color: #38363F; font-size: 10pt; }
+
+.kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 10px;
+  margin: 16px 0;
+}
+.kpi {
+  padding: 14px;
+  background: #1A191E;
+  color: #F7F7F9;
+  border-radius: 10px;
+  text-align: center;
+}
+.kpi .v {
+  font-size: 22pt;
+  font-weight: 800;
+  color: #DCB45F;
+  letter-spacing: -0.02em;
+}
+.kpi .l {
+  font-size: 8.5pt;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #A7A6AE;
+  margin-top: 4px;
+}
+
+.two-col {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+}
+.card {
+  padding: 14px 16px;
+  background: #FAF8F4;
+  border: 1px solid #E5E4DE;
+  border-radius: 10px;
+}
+.card h4 { margin: 0 0 6px; }
+.card p { margin: 0; font-size: 9.5pt; color: #38363F; }
+
+/* Avoid orphan headings */
+h2, h3, h4 { page-break-after: avoid; }
+table, pre, .flow, .timeline { page-break-inside: avoid; }
+</style>
+</head>
+<body>
+
+<!-- =========================== COVER =========================== -->
+<div class="cover">
+  <svg class="shield" viewBox="0 0 24 24" fill="#DCB45F"><path d="M12 1l9 4v6c0 5.55-3.84 10.74-9 12-5.16-1.26-9-6.45-9-12V5l9-4z"/></svg>
+  <div class="cover-wrap">
+    <div class="eyebrow">Solution Overview · v1.4.0</div>
+    <h1>Advanced FFL <span class="accent">Checkout</span><br>for Guns 2 Ammo</h1>
+    <p class="lede">
+      End-to-end Federal Firearms License dealer search, transfer lifecycle tracking,
+      dealer confirmation portal, and customer notifications — wired natively into the
+      Guns 2 Ammo WooCommerce stack with full HPOS support, NICS compliance automation,
+      and a hardened security layer.
+    </p>
+    <div class="badges">
+      <span class="badge">~80,000 ATF Dealers</span>
+      <span class="badge">43,000 ZIP Centroids</span>
+      <span class="badge">11-Stage Pipeline</span>
+      <span class="badge">HPOS-Safe</span>
+      <span class="badge">HMAC-SHA256 Tokens</span>
+    </div>
+  </div>
+  <div class="meta">
+    <div><strong>Prepared for</strong><br>Guns 2 Ammo</div>
+    <div style="text-align:right;"><strong>Document version</strong><br>v1.4.0 · 2026-06-01</div>
+  </div>
+</div>
+
+<!-- =========================== TOC =========================== -->
+<div class="toc">
+  <h2>Table of Contents</h2>
+  <ol>
+    <li><span>Executive Summary</span><span>p. 3</span></li>
+    <li><span>System Architecture</span><span>p. 4</span></li>
+    <li><span>Customer Workflow — Buy → Pickup</span><span>p. 6</span></li>
+    <li><span>Dealer Workflow — Receive → Confirm</span><span>p. 8</span></li>
+    <li><span>Admin Workflow — Monitor → Act</span><span>p. 9</span></li>
+    <li><span>Feature Catalog</span><span>p. 10</span></li>
+    <li><span>Email Notifications &amp; SMS</span><span>p. 13</span></li>
+    <li><span>FFL Compliance &amp; Security Layer</span><span>p. 14</span></li>
+    <li><span>Admin Surfaces &amp; Activity Log</span><span>p. 16</span></li>
+    <li><span>REST API for the Dashboard</span><span>p. 17</span></li>
+    <li><span>Integration with the Guns 2 Ammo Stack</span><span>p. 18</span></li>
+    <li><span>Future Improvement Roadmap</span><span>p. 19</span></li>
+    <li><span>Operational Reference</span><span>p. 21</span></li>
+  </ol>
+</div>
+
+<!-- =========================== 01 EXEC SUMMARY =========================== -->
+<section>
+  <div class="section-header">
+    <span class="num">Section 01</span>
+    <h2>Executive Summary</h2>
+  </div>
+
+  <p>
+    The Advanced FFL Checkout plugin handles every step a Guns 2 Ammo customer goes
+    through when they buy a firearm online: choose the receiving FFL dealer at checkout,
+    track the shipment, watch the NICS background check progress, and pick up the gun.
+    Behind the scenes the plugin also runs the FFL workflow for the operations team —
+    every status change is logged, every dealer touch is signed with a single-use HMAC
+    token, and every regulatory checkpoint (HPOS, ATF, NICS 3-day rule) is enforced or
+    automated.
+  </p>
+
+  <div class="kpi-grid">
+    <div class="kpi"><div class="v">25</div><div class="l">PHP classes</div></div>
+    <div class="kpi"><div class="v">9</div><div class="l">G2A extensions</div></div>
+    <div class="kpi"><div class="v">7</div><div class="l">DB tables</div></div>
+    <div class="kpi"><div class="v">30+</div><div class="l">REST endpoints</div></div>
+  </div>
+
+  <h3>What ships in v1.4.0</h3>
+  <ul>
+    <li><strong>FFL dealer search at WooCommerce checkout</strong> — ZIP / name / license / phone filters, distance via Haversine, optional Google Maps view, no required API keys.</li>
+    <li><strong>11-stage transfer pipeline</strong> with append-only audit log, NICS NTN + ATF Form 4473 reference fields, multi-carrier shipment tracking.</li>
+    <li><strong>HMAC-signed dealer confirmation portal</strong> — magic-link email, single-use token, configurable 2FA (last-4 of FFL), honeypot, rate-limit, full audit IP trail.</li>
+    <li><strong>Customer-facing tracking page</strong> at <code>/track-transfer/{ref}/</code> with a 5-step timeline, Maps directions, click-to-call.</li>
+    <li><strong>"My FFL Transfers"</strong> tab in WooCommerce My Account.</li>
+    <li><strong>NICS 3-day rule automation</strong> — auto-expiry date set Mon–Fri, nightly admin alert when the window elapses.</li>
+    <li><strong>SMS notifications via Verifyistic</strong> — fires <code>ffl_transfer_status</code> webhooks at every customer-facing milestone.</li>
+    <li><strong>WC ↔ FFL status bridge</strong> — completed orders auto-mark transfers complete, refunded orders cancel transfers, etc.</li>
+    <li><strong>Admin Activity Log + Compliance Audit</strong> pages, plus matching JSON endpoints for the standalone G2A dashboard.</li>
+    <li><strong>Full Guns 2 Ammo branding</strong> — brass on graphite, native to <code>tokens.css</code>, white-label by default.</li>
+  </ul>
+
+  <div class="callout tactical">
+    <strong>Why this matters for revenue:</strong> Customers buy firearms online much more readily when they trust the transfer process. Every email shows the dealer card, every status change reaches the customer's inbox + SMS, and every dealer touch is one click. That converts shoppers and removes the manual "where's my gun?" support load.
+  </div>
+</section>
+
+<!-- =========================== 02 ARCHITECTURE =========================== -->
+<section>
+  <div class="section-header">
+    <span class="num">Section 02</span>
+    <h2>System Architecture</h2>
+  </div>
+
+  <h3>High-level layout</h3>
+  <p>
+    The plugin lives at <code>/wp-content/plugins/advanced-ffl-checkout/</code> and
+    boots on <code>plugins_loaded</code> priority 20 — late enough that WooCommerce
+    and the G2A theme are both ready, early enough to register REST routes and
+    cron handlers.
+  </p>
+
+  <h4>Module breakdown</h4>
+  <table>
+    <thead><tr><th>Module</th><th>File</th><th>Purpose</th></tr></thead>
+    <tbody>
+      <tr><td>DB</td><td><code>class-wpistic-ffl-db.php</code></td><td>Schema v1.2.0 — 7 tables, dbDelta-safe</td></tr>
+      <tr><td>Checkout</td><td><code>class-wpistic-ffl-checkout.php</code></td><td>WC integration, dealer widget, order meta, transfer creation</td></tr>
+      <tr><td>API</td><td><code>class-wpistic-ffl-api.php</code></td><td>30+ REST endpoints, public + auth</td></tr>
+      <tr><td>Portal</td><td><code>class-wpistic-ffl-portal.php</code></td><td>Dealer magic-link page, 2FA, rate limit</td></tr>
+      <tr><td>Token</td><td><code>class-wpistic-ffl-token.php</code></td><td>HMAC-SHA256 generation + verification</td></tr>
+      <tr><td>Mailer</td><td><code>class-wpistic-ffl-mailer.php</code></td><td>Customer + dealer + admin transactional email</td></tr>
+      <tr><td>Theming</td><td><code>class-wpistic-ffl-theming.php</code></td><td>Brand tokens, presets, merge tags</td></tr>
+      <tr><td>Sync</td><td><code>class-wpistic-ffl-sync.php</code></td><td>ATF monthly licensee CSV import</td></tr>
+      <tr><td>Zip_Import</td><td><code>class-wpistic-ffl-zip-import.php</code></td><td>GeoNames ZIP centroid import</td></tr>
+      <tr><td>JWT_Bridge</td><td><code>class-wpistic-ffl-jwt-bridge.php</code></td><td>Inject G2A claims into JWT for the dashboard</td></tr>
+      <tr><td>G2A_Status_Bridge</td><td><code>class-wpistic-ffl-g2a-status-bridge.php</code></td><td>WC order status → transfer status</td></tr>
+      <tr><td>G2A_NICS</td><td><code>class-wpistic-ffl-g2a-nics.php</code></td><td>3-day rule auto-flag + nightly alert</td></tr>
+      <tr><td>G2A_SMS</td><td><code>class-wpistic-ffl-g2a-sms.php</code></td><td>Verifyistic webhook dispatch</td></tr>
+      <tr><td>G2A_Account</td><td><code>class-wpistic-ffl-g2a-account.php</code></td><td>"My FFL Transfers" WC tab</td></tr>
+      <tr><td>G2A_Bridge</td><td><code>class-wpistic-ffl-g2a-bridge.php</code></td><td>Theme transfer-request form → FFL DB</td></tr>
+      <tr><td>G2A_Customer_Tracking</td><td><code>class-wpistic-ffl-g2a-customer-tracking.php</code></td><td>Public per-transfer tracking page</td></tr>
+      <tr><td>G2A_Activity</td><td><code>class-wpistic-ffl-g2a-activity.php</code></td><td>Admin activity log + JSON feeds</td></tr>
+      <tr><td>G2A_Compliance_Check</td><td><code>class-wpistic-ffl-g2a-compliance-check.php</code></td><td>15-point security/compliance audit</td></tr>
+      <tr><td>G2A_Carrier</td><td><code>class-wpistic-ffl-g2a-carrier.php</code></td><td>Tracking auto-advance + carrier URLs</td></tr>
+    </tbody>
+  </table>
+
+  <h3>Database schema (7 tables, prefix <code>wp_wpistic_ffl_*</code>)</h3>
+  <table>
+    <thead><tr><th>Table</th><th>Rows</th><th>Purpose</th></tr></thead>
+    <tbody>
+      <tr><td><code>dealers</code></td><td>~80,000</td><td>Full ATF licensee registry, synced monthly</td></tr>
+      <tr><td><code>transfers</code></td><td>1 per FFL order</td><td>11-stage pipeline + NICS + 4473 fields</td></tr>
+      <tr><td><code>events</code></td><td>append-only</td><td>Audit trail with actor + IP</td></tr>
+      <tr><td><code>analytics_events</code></td><td>append-only</td><td>Portal funnel: issued → opened → confirmed</td></tr>
+      <tr><td><code>dealer_tokens</code></td><td>1 per outstanding</td><td>SHA-256 hash of HMAC token; raw never persists</td></tr>
+      <tr><td><code>zip_coords</code></td><td>~43,000</td><td>GeoNames centroids for Haversine distance</td></tr>
+      <tr><td><code>state_rules</code></td><td>12+ seeded</td><td>State-specific compliance notices at checkout</td></tr>
+    </tbody>
+  </table>
+
+  <h3>Background jobs (WP Cron)</h3>
+  <table>
+    <thead><tr><th>Hook</th><th>Schedule</th><th>Handler</th></tr></thead>
+    <tbody>
+      <tr><td><code>wpistic_ffl_process_zip_import</code></td><td>Every minute</td><td>Resumable 500-row ZIP centroid import</td></tr>
+      <tr><td><code>wpistic_ffl_process_atf_sync</code></td><td>Every minute</td><td>Resumable 200-row ATF dealer import</td></tr>
+      <tr><td><code>wpistic_ffl_monthly_sync</code></td><td>Monthly</td><td>Re-download fresh ATF CSV</td></tr>
+      <tr><td><code>wpistic_ffl_daily_portal_runner</code></td><td>Daily 09:00</td><td>Reminders + token cleanup + NICS 3-day sweep</td></tr>
+      <tr><td><code>wpistic_ffl_async_issue_dealer_token</code></td><td>Single-event</td><td>Non-blocking dealer email after checkout</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<!-- =========================== 03 CUSTOMER WORKFLOW =========================== -->
+<section>
+  <div class="section-header">
+    <span class="num">Section 03</span>
+    <h2>Customer Workflow — Buy → Pickup</h2>
+  </div>
+
+  <p>
+    From the customer's point of view, the FFL workflow is "I bought a gun and the
+    store keeps me in the loop until I pick it up." Behind the scenes there are five
+    distinct phases. Each phase emits an email (always) and an SMS (when Verifyistic
+    is configured) and is reflected on the public tracking page.
+  </p>
+
+  <div class="flow">
+    <div class="step"><div class="n">1</div><h5>Order Placed</h5><p>Customer selects FFL dealer at checkout, pays, gets order confirmation + transfer ref</p></div>
+    <div class="step"><div class="n">2</div><h5>Shipped to Dealer</h5><p>Admin enters tracking number — status auto-advances, customer notified</p></div>
+    <div class="step"><div class="n">3</div><h5>Arrived at Dealer</h5><p>Dealer confirms receipt via secure magic-link portal</p></div>
+    <div class="step"><div class="n">4</div><h5>Background Check</h5><p>NICS in progress; if delayed, 3-day rule clock starts</p></div>
+    <div class="step"><div class="n">5</div><h5>Transfer Complete</h5><p>4473 signed, NICS approved, customer takes possession</p></div>
+  </div>
+
+  <h3>Step-by-step timeline</h3>
+  <div class="timeline">
+
+    <div class="tl-item">
+      <div class="meta">Stage 1 · At Checkout</div>
+      <h4>Dealer selection</h4>
+      <p>
+        When the cart contains a product marked "FFL Transfer Required", the FFL widget
+        renders below the billing form. The customer searches by ZIP / name / license /
+        phone, picks a dealer, and sees the transfer fee, dealer phone, and a Google Maps
+        directions link. Honeypot + nonce keep bots out. The dealer ID is validated
+        against the dealers table before being stored on the order (HPOS-safe).
+      </p>
+    </div>
+
+    <div class="tl-item">
+      <div class="meta">Stage 2 · Payment confirmed</div>
+      <h4>Transfer record created &amp; first email sent</h4>
+      <p>
+        On <code>woocommerce_payment_complete</code> the plugin creates a row in the
+        <code>transfers</code> table with a <code>G2A-XXXXXXXX</code> reference,
+        sends the customer the "Order Confirmed" email (brass-themed, "View Transfer
+        Status" CTA included), and schedules an asynchronous dealer-portal email so
+        checkout never blocks on SMTP.
+      </p>
+    </div>
+
+    <div class="tl-item">
+      <div class="meta">Stage 3 · Shipping</div>
+      <h4>Carrier auto-advance</h4>
+      <p>
+        When the admin enters a tracking number, <code>G2A_Carrier</code> auto-advances
+        the status to <code>shipped_to_dealer</code>, fills in <code>shipped_date</code>,
+        generates the public carrier URL (UPS/USPS/FedEx/DHL), and triggers the
+        "Item Shipped" email + SMS.
+      </p>
+    </div>
+
+    <div class="tl-item">
+      <div class="meta">Stage 4 · Arrival</div>
+      <h4>Dealer confirms receipt</h4>
+      <p>
+        The dealer clicks the one-time link in their email. The portal page verifies the
+        HMAC, asks for the last 4 of their FFL license, and on confirmation flips the
+        transfer to <code>received_by_dealer</code>. The customer immediately gets the
+        "Your gun is ready" email + SMS — historically the highest-value customer SMS
+        on the platform.
+      </p>
+    </div>
+
+    <div class="tl-item">
+      <div class="meta">Stage 5 · NICS</div>
+      <h4>Background check + 3-day rule</h4>
+      <p>
+        When status flips to <code>delayed</code>, <code>G2A_NICS</code> automatically
+        computes the federal 3-business-day expiry (Mon–Fri) and stores it on the row.
+        The nightly cron job emails the admin the day the window elapses (one-shot,
+        idempotent).
+      </p>
+    </div>
+
+    <div class="tl-item">
+      <div class="meta">Stage 6 · Pickup</div>
+      <h4>Transfer complete</h4>
+      <p>
+        On <code>transferred</code>, the customer gets the celebration email, the
+        WooCommerce order auto-marks "completed" via the status bridge, and the
+        customer-facing tracking page shows all five timeline pips lit brass.
+      </p>
+    </div>
+
+  </div>
+</section>
+
+<!-- =========================== 04 DEALER WORKFLOW =========================== -->
+<section>
+  <div class="section-header">
+    <span class="num">Section 04</span>
+    <h2>Dealer Workflow — Receive → Confirm</h2>
+  </div>
+
+  <p>
+    A receiving FFL never logs in. They just open an email, click one button, type the
+    last 4 digits of their FFL license, and the receipt is recorded — fully ATF-audit
+    traceable.
+  </p>
+
+  <div class="flow">
+    <div class="step"><div class="n">1</div><h5>Email Arrives</h5><p>Branded "Confirm FFL Transfer Receipt" message with item, customer (masked), tracking, expiry</p></div>
+    <div class="step"><div class="n">2</div><h5>Click CTA</h5><p>One-click button opens the portal page; HTTPS-only optional</p></div>
+    <div class="step"><div class="n">3</div><h5>Verify FFL</h5><p>Type the last 4 chars of the dealer's own FFL number (2FA)</p></div>
+    <div class="step"><div class="n">4</div><h5>Confirm Action</h5><p>Item Received, Report Issue, or Not My Shipment</p></div>
+    <div class="step"><div class="n">5</div><h5>Done</h5><p>Token consumed, transfer advances, admin notified, customer messaged</p></div>
+  </div>
+
+  <h3>Security in this path</h3>
+  <table>
+    <thead><tr><th>Layer</th><th>What it does</th></tr></thead>
+    <tbody>
+      <tr><td>HMAC-SHA256 signature</td><td>Token signed with site secret — tamper-evident</td></tr>
+      <tr><td>SHA-256 DB hash</td><td>Only the hash is persisted; raw token never written</td></tr>
+      <tr><td><code>hash_equals()</code></td><td>Constant-time signature comparison — timing-attack resistant</td></tr>
+      <tr><td>Single-use enforcement</td><td><code>used_at</code> column closes the link after first action</td></tr>
+      <tr><td>DB-enforced expiry</td><td>Default 30 days, configurable 7–180</td></tr>
+      <tr><td>Per-IP rate limit</td><td>5 attempts/minute via transient</td></tr>
+      <tr><td>Honeypot field</td><td>Silent reject for bots</td></tr>
+      <tr><td>Last-4 FFL 2FA</td><td>Verifies the link reached a real dealer, not a forwarded email</td></tr>
+      <tr><td>Full IP + UA audit log</td><td>ATF-grade provenance on every confirmation</td></tr>
+      <tr><td>Re-issue invalidates old</td><td>New tokens for the same transfer revoke prior active tokens</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<!-- =========================== 05 ADMIN WORKFLOW =========================== -->
+<section>
+  <div class="section-header">
+    <span class="num">Section 05</span>
+    <h2>Admin Workflow — Monitor → Act</h2>
+  </div>
+
+  <p>
+    The Guns 2 Ammo team works out of <strong>Advanced FFL</strong> in the WordPress
+    admin menu. Six pages cover everything from health monitoring to per-transfer
+    intervention.
+  </p>
+
+  <table>
+    <thead><tr><th>Page</th><th>What it shows / does</th></tr></thead>
+    <tbody>
+      <tr><td>📊 Dashboard</td><td>KPIs (transfers today / this week / pending NICS), import progress bars, recent events</td></tr>
+      <tr><td>📋 Transfers</td><td>Paginated list, status filter, full detail view with audit log, manual status change</td></tr>
+      <tr><td>🏪 Dealers</td><td>Browse/search the 80k ATF registry, mark dealers as "Recommended", set per-dealer fees + email</td></tr>
+      <tr><td>🚪 Dealer Portal</td><td>Funnel: tokens issued → emails sent → portal viewed → confirmed; slowest-confirming dealers</td></tr>
+      <tr><td>📋 Activity Log</td><td><strong>NEW</strong> · unified cross-table feed; click any row to jump to its transfer</td></tr>
+      <tr><td>🛡️ Compliance</td><td><strong>NEW</strong> · 15-point real-time audit; one-click HMAC secret rotation</td></tr>
+      <tr><td>🩺 Diagnostics</td><td>Plugin version, DB schema status, mail log (last 100 sends), SMTP plugin detection</td></tr>
+      <tr><td>⚙️ Settings</td><td>Portal, Theme, Email Templates, Compliance rules, Integrations, License</td></tr>
+    </tbody>
+  </table>
+
+  <h3>Typical day in the operations chair</h3>
+  <ol>
+    <li>Glance at the Dashboard for the green/amber count.</li>
+    <li>Open the Activity Log — anything red gets a click-through.</li>
+    <li>For each new "shipped" order, paste in the carrier + tracking number — carrier auto-advance handles the rest.</li>
+    <li>If the dealer doesn't confirm within 3 days, the reminder cron sends an email automatically.</li>
+    <li>If NICS comes back delayed, the 3-day rule cron emails when the window elapses.</li>
+    <li>Compliance page checked monthly — confirms data is fresh and secrets are healthy.</li>
+  </ol>
+</section>
+
+<!-- =========================== 06 FEATURE CATALOG =========================== -->
+<section>
+  <div class="section-header">
+    <span class="num">Section 06</span>
+    <h2>Feature Catalog</h2>
+  </div>
+
+  <h3>Customer-facing</h3>
+  <table>
+    <thead><tr><th>Feature</th><th>Status</th><th>Notes</th></tr></thead>
+    <tbody>
+      <tr><td>FFL dealer search at checkout</td><td><span class="pill done">Shipped</span></td><td>ZIP / name / license / phone; Haversine distance; no required API keys</td></tr>
+      <tr><td>Google Maps view (optional)</td><td><span class="pill done">Shipped</span></td><td>Pin map with brass markers when a Maps key is configured</td></tr>
+      <tr><td>"Recommended" dealer ribbon</td><td><span class="pill done">Shipped</span></td><td>Admin marks any dealer recommended; gold star + sorted to top</td></tr>
+      <tr><td>State compliance notices at checkout</td><td><span class="pill done">Shipped</span></td><td>CA, NY, NJ, MA, MD, IL, HI, CO, WA seeded</td></tr>
+      <tr><td>"View Transfer Status" CTA in every email</td><td><span class="pill new">v1.4</span></td><td>Public HMAC-signed tracking link</td></tr>
+      <tr><td>Public tracking page (no login)</td><td><span class="pill new">v1.4</span></td><td><code>/track-transfer/{ref}/{sig}/</code> with 5-step timeline</td></tr>
+      <tr><td>"My FFL Transfers" WC account tab</td><td><span class="pill new">v1.3</span></td><td>For logged-in customers</td></tr>
+      <tr><td>Click-to-call + Maps Directions on dealer card</td><td><span class="pill new">v1.4</span></td><td>Mobile-first</td></tr>
+      <tr><td>SMS notifications via Verifyistic</td><td><span class="pill new">v1.3</span></td><td>Five customer-facing milestones</td></tr>
+    </tbody>
+  </table>
+
+  <h3>Operations / automation</h3>
+  <table>
+    <thead><tr><th>Feature</th><th>Status</th><th>Notes</th></tr></thead>
+    <tbody>
+      <tr><td>WC order status → transfer status bridge</td><td><span class="pill new">v1.3</span></td><td>completed → transferred, refunded → cancelled, etc.</td></tr>
+      <tr><td>Carrier tracking auto-advance</td><td><span class="pill new">v1.4</span></td><td>Tracking number entry flips to shipped_to_dealer</td></tr>
+      <tr><td>NICS 3-day rule automation</td><td><span class="pill new">v1.3</span></td><td>Mon–Fri counting; nightly admin alert</td></tr>
+      <tr><td>Async dealer-portal email</td><td><span class="pill new">v1.3</span></td><td>SMTP delays never block checkout</td></tr>
+      <tr><td>Dealer auto-reminder schedule</td><td><span class="pill done">Shipped</span></td><td>Configurable: 3/7/14 days default</td></tr>
+      <tr><td>Monthly ATF dealer sync</td><td><span class="pill done">Shipped</span></td><td>~80k dealers, fully resumable</td></tr>
+      <tr><td>Theme transfer-request bridge</td><td><span class="pill new">v1.3</span></td><td>G2A theme form → FFL transfer record</td></tr>
+    </tbody>
+  </table>
+
+  <h3>Branding &amp; UX</h3>
+  <table>
+    <thead><tr><th>Feature</th><th>Status</th><th>Notes</th></tr></thead>
+    <tbody>
+      <tr><td>Guns 2 Ammo brass palette throughout</td><td><span class="pill new">v1.3</span></td><td>Mirrors <code>guns2ammo/assets/css/tokens.css</code></td></tr>
+      <tr><td>White-label by default (no "Powered by")</td><td><span class="pill new">v1.3</span></td><td>Flip in Settings → Theme to re-show</td></tr>
+      <tr><td>Theme Customizer wiring</td><td><span class="pill new">v1.3</span></td><td><code>g2a_business_*</code> + <code>g2a_ffl_license</code> auto-read</td></tr>
+      <tr><td>Full theming engine</td><td><span class="pill done">Shipped</span></td><td>Color, font, logo, layout, custom CSS</td></tr>
+      <tr><td>Portal preview mode for admins</td><td><span class="pill done">Shipped</span></td><td><code>/ffl-confirm/PREVIEW/</code> renders mock data</td></tr>
+    </tbody>
+  </table>
+
+  <h3>Security &amp; compliance</h3>
+  <table>
+    <thead><tr><th>Feature</th><th>Status</th><th>Notes</th></tr></thead>
+    <tbody>
+      <tr><td>HPOS-safe order meta</td><td><span class="pill new">v1.3</span></td><td>Order API everywhere; HPOS-only stores work</td></tr>
+      <tr><td>Dealer ID validation on save</td><td><span class="pill new">v1.3</span></td><td>Forge-proof — verified against dealers table</td></tr>
+      <tr><td>Payment-gated dealer email</td><td><span class="pill new">v1.3</span></td><td>Only on <code>$order-&gt;is_paid()</code> = true</td></tr>
+      <tr><td>HMAC-SHA256 portal tokens</td><td><span class="pill done">Shipped</span></td><td>SHA-256 hash storage; raw never persisted</td></tr>
+      <tr><td>Honeypot on checkout widget</td><td><span class="pill new">v1.4</span></td><td>Plus the one on the dealer portal form</td></tr>
+      <tr><td>Public dealers search rate-limit</td><td><span class="pill new">v1.3</span></td><td>30 req/min/IP; <code>wpistic_ffl_search_rate_limit</code></td></tr>
+      <tr><td>Trusted-proxy CIDR filter</td><td><span class="pill new">v1.3</span></td><td>Stops spoofed X-Forwarded-For audit entries</td></tr>
+      <tr><td>Regenerate HMAC secret action</td><td><span class="pill new">v1.4</span></td><td>One click rotates secret + revokes all active tokens</td></tr>
+      <tr><td>Admin nag for <code>WPISTIC_FFL_TOKEN_SECRET</code></td><td><span class="pill new">v1.4</span></td><td>Dismissible, scoped to FFL pages</td></tr>
+      <tr><td>15-point Compliance audit page</td><td><span class="pill new">v1.4</span></td><td>WC, HPOS, secrets, cron, data, integrations</td></tr>
+    </tbody>
+  </table>
+
+  <h3>Admin surfaces &amp; integrations</h3>
+  <table>
+    <thead><tr><th>Feature</th><th>Status</th><th>Notes</th></tr></thead>
+    <tbody>
+      <tr><td>📋 Activity Log admin page</td><td><span class="pill new">v1.4</span></td><td>Cross-table feed with one-click drill-down</td></tr>
+      <tr><td>JSON activity feed REST endpoints</td><td><span class="pill new">v1.4</span></td><td>For the G2A dashboard app</td></tr>
+      <tr><td>Per-transfer JSON details endpoint</td><td><span class="pill new">v1.4</span></td><td><code>/transfers/{id}/details</code></td></tr>
+      <tr><td>Compliance audit JSON endpoint</td><td><span class="pill new">v1.4</span></td><td><code>/compliance/audit</code></td></tr>
+      <tr><td>WC Blocks + HPOS compat declared</td><td><span class="pill done">Shipped</span></td><td><code>FeaturesUtil::declare_compatibility</code></td></tr>
+      <tr><td>JWT bridge for G2A dashboard</td><td><span class="pill done">Shipped</span></td><td>Injects <code>g2a_role</code>, <code>g2a_permissions</code> claims</td></tr>
+      <tr><td>Memberistic + Verifyistic interop</td><td><span class="pill done">Shipped</span></td><td>Zero hook / option / REST namespace collisions</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<!-- =========================== 07 EMAIL & SMS =========================== -->
+<section>
+  <div class="section-header">
+    <span class="num">Section 07</span>
+    <h2>Email Notifications &amp; SMS</h2>
+  </div>
+
+  <p>
+    Every email uses the same G2A-branded frame — brass header, graphite surface, monospace
+    transfer reference, footer with the store name + FFL number. The "View Transfer Status"
+    CTA is auto-baked in.
+  </p>
+
+  <h3>Customer emails (status-triggered)</h3>
+  <table>
+    <thead><tr><th>Status</th><th>Subject line</th><th>Accent</th><th>SMS dispatched?</th></tr></thead>
+    <tbody>
+      <tr><td><code>payment_confirmed</code></td><td>Order Confirmed — FFL Transfer #G2A-XXXX</td><td>Success green</td><td>No</td></tr>
+      <tr><td><code>shipped_to_dealer</code></td><td>Item Shipped — FFL Transfer #…</td><td>Brass</td><td><strong>Yes</strong></td></tr>
+      <tr><td><code>received_by_dealer</code></td><td>Item Arrived at Dealer — FFL Transfer #…</td><td>Brass</td><td><strong>Yes (highest value)</strong></td></tr>
+      <tr><td><code>nics_pending</code></td><td>Background Check Initiated — FFL Transfer #…</td><td>Warning amber</td><td>No</td></tr>
+      <tr><td><code>delayed</code></td><td>Background Check Delayed — FFL Transfer #…</td><td>Warning amber</td><td><strong>Yes</strong></td></tr>
+      <tr><td><code>approved</code></td><td>NICS Approved — FFL Transfer #…</td><td>Success green</td><td><strong>Yes</strong></td></tr>
+      <tr><td><code>denied</code></td><td>Background Check Denied — FFL Transfer #…</td><td>Danger red</td><td>No</td></tr>
+      <tr><td><code>transferred</code></td><td>🎉 Transfer Complete — FFL Transfer #…</td><td>Success green</td><td><strong>Yes</strong></td></tr>
+      <tr><td><code>cancelled</code></td><td>Transfer Cancelled — FFL Transfer #…</td><td>Muted</td><td>No</td></tr>
+    </tbody>
+  </table>
+
+  <h3>Admin emails (operational)</h3>
+  <ul>
+    <li><strong>[G2A] Item Received at Dealer</strong> — informational</li>
+    <li><strong>[G2A] ⚠️ NICS Delay</strong> — 3-day rule monitoring trigger</li>
+    <li><strong>[G2A] ❌ NICS Denial</strong> — refund prompt</li>
+    <li><strong>[G2A] ⏰ NICS 3-Day Window Reached</strong> — auto-fired by <code>G2A_NICS</code></li>
+    <li><strong>[G2A] ✓ Dealer Confirmed Receipt</strong> / <strong>⚠️ Issue Reported</strong> / <strong>✗ Rejected Shipment</strong></li>
+  </ul>
+
+  <h3>Dealer-facing emails</h3>
+  <ul>
+    <li><strong>Action Required: Confirm FFL Transfer Receipt</strong> — sent the moment the order is placed (gated on payment); contains the single-use magic link</li>
+    <li><strong>Friendly / Reminder / Final reminder</strong> — auto-sent at 3 / 7 / 14 days if no action</li>
+  </ul>
+
+  <div class="callout">
+    <strong>Deliverability:</strong> every email is sent with List-Unsubscribe headers, a unique Message-ID, and an automatic plain-text alternative — Gmail 2024+ sender-guideline compliant. <code>wp_mail</code> failures are captured to the mail log so silent SMTP issues are visible in Diagnostics.
+  </div>
+</section>
+
+<!-- =========================== 08 SECURITY & COMPLIANCE =========================== -->
+<section>
+  <div class="section-header">
+    <span class="num">Section 08</span>
+    <h2>FFL Compliance &amp; Security Layer</h2>
+  </div>
+
+  <h3>Compliance touchpoints</h3>
+  <table>
+    <thead><tr><th>Regulation / standard</th><th>How the plugin handles it</th></tr></thead>
+    <tbody>
+      <tr><td>ATF Form 4473</td><td>Dedicated <code>form_4473_ref</code> column on every transfer; admin enters at handover</td></tr>
+      <tr><td>NICS Transaction Number (NTN)</td><td>Dedicated <code>nics_transaction_number</code> column; required at <code>transferred</code> status</td></tr>
+      <tr><td>NICS 3-business-day rule (18 USC §922(t))</td><td>Auto-set <code>nics_delay_expires</code> Mon–Fri; nightly cron flags expiries with audit log entry</td></tr>
+      <tr><td>State waiting periods / permits / rosters</td><td>State rules table → checkout notices for CA, NY, NJ, MA, MD, IL, HI, CO, WA</td></tr>
+      <tr><td>ATF licensee verification</td><td>Monthly sync of the full ~80k FFL list; dealer license shown on every confirmation</td></tr>
+      <tr><td>Audit traceability</td><td>Append-only <code>events</code> table — actor, IP, old/new status, notes — for every change</td></tr>
+      <tr><td>WP HPOS (WC modern order storage)</td><td>Compatibility declared; all order meta routes through <code>$order</code> API</td></tr>
+    </tbody>
+  </table>
+
+  <h3>Security layer (token / portal / API)</h3>
+  <ul>
+    <li><strong>HMAC-SHA256</strong> signed tokens with payload <code>v1.tid.did.action.exp.nonce</code></li>
+    <li><strong>SHA-256 hash storage</strong> — the raw token is emailed to the dealer and never persisted</li>
+    <li><strong>Constant-time comparison</strong> via <code>hash_equals()</code> — timing-attack resistant</li>
+    <li><strong>Single-use enforcement</strong> at the DB level via <code>used_at</code> column</li>
+    <li><strong>Re-issue invalidates</strong> all prior active tokens for the same transfer</li>
+    <li><strong>Per-IP rate limit</strong> on portal submissions (5/min) and dealer searches (30/min)</li>
+    <li><strong>Honeypot fields</strong> on both the checkout widget and the dealer portal form</li>
+    <li><strong>Nonce</strong> on every form submission</li>
+    <li><strong>Trusted-proxy CIDR filter</strong> — X-Forwarded-For only honored from configured upstreams</li>
+    <li><strong>Optional HTTPS-only</strong> redirect for the portal</li>
+    <li><strong>Optional last-4 FFL 2FA</strong> — verifies the link reached a real dealer</li>
+    <li><strong>Full audit log</strong> with binary-packed IP + UA for ATF traceability</li>
+    <li><strong>One-click HMAC rotation</strong> from the Compliance page</li>
+    <li><strong>wp-config secret nag</strong> — pushes admins to the strongest config</li>
+  </ul>
+
+  <h3>Compliance audit dashboard (live, 15 checks)</h3>
+  <table>
+    <thead><tr><th>Check</th><th>What it confirms</th></tr></thead>
+    <tbody>
+      <tr><td>WooCommerce active</td><td>Required for checkout integration</td></tr>
+      <tr><td>HPOS compatibility declared</td><td>Modern WC order storage support</td></tr>
+      <tr><td>HMAC token secret in wp-config</td><td>Strongest portal-token security</td></tr>
+      <tr><td>Trusted-proxy CIDR list configured</td><td>Accurate IPs in audit log if behind CDN/LB</td></tr>
+      <tr><td>JWT Auth plugin detected</td><td>Required for G2A dashboard app login</td></tr>
+      <tr><td>Verifyistic detected</td><td>SMS dispatch capability</td></tr>
+      <tr><td>Cron events scheduled (×3)</td><td>ZIP import, monthly sync, daily portal runner</td></tr>
+      <tr><td>ZIP centroid + ATF data populated</td><td>Distance search + dealer registry usable</td></tr>
+      <tr><td>Store FFL license number set</td><td>Surfaces on customer emails + dealer portal</td></tr>
+      <tr><td>Portal settings present</td><td>Defaults guaranteed on every load</td></tr>
+      <tr><td>State compliance rules seeded</td><td>Checkout notices for regulated states</td></tr>
+      <tr><td>NICS 3-day attention queue</td><td>Transfers at or past the federal window</td></tr>
+      <tr><td>Dealers reachable by email</td><td>Portal links go to real addresses, not admin fallback</td></tr>
+      <tr><td>Active portal tokens</td><td>Outstanding magic links in circulation</td></tr>
+      <tr><td>Memberistic detected</td><td>User identity shared with G2A dashboard</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<!-- =========================== 09 ADMIN & ACTIVITY =========================== -->
+<section>
+  <div class="section-header">
+    <span class="num">Section 09</span>
+    <h2>Admin Surfaces &amp; Activity Log</h2>
+  </div>
+
+  <h3>Activity Log page</h3>
+  <p>
+    Every status change, dealer portal action, NICS event, email send, and customer
+    tracking-page view lands in one table. The feed merges the
+    <code>events</code> and <code>analytics_events</code> tables via a UNION query
+    so it sorts cleanly even when an event came from the portal funnel rather than
+    a status change.
+  </p>
+  <p>
+    Each row shows: <em>relative time + absolute timestamp</em>, the event label, the
+    transfer reference (one-click to jump in), the actor (system, wc-bridge,
+    dealer-portal, etc.), and a snippet of the notes column.
+  </p>
+
+  <h3>Compliance &amp; Security page</h3>
+  <p>
+    Top of the page is a four-tile summary (Pass / Warn / Fail / Info), followed by the
+    full check table with one-click remediation links. Below that, a
+    <strong>Regenerate HMAC Token Secret</strong> button — protected by nonce, capability,
+    and confirm dialog — rotates the secret and revokes every live token in one shot.
+  </p>
+
+  <div class="callout">
+    Both pages mirror their data to JSON endpoints (see next section) so the standalone
+    <strong>app.guns2ammo.com</strong> dashboard can render the same information without
+    a second integration pass.
+  </div>
+</section>
+
+<!-- =========================== 10 REST API =========================== -->
+<section>
+  <div class="section-header">
+    <span class="num">Section 10</span>
+    <h2>REST API for the Dashboard</h2>
+  </div>
+
+  <p>All endpoints under namespace <code>wpistic-ffl/v1</code>. Auth accepts both WP cookie+nonce and JWT Bearer tokens.</p>
+
+  <h4>Dealers</h4>
+  <table>
+    <thead><tr><th>Method</th><th>Endpoint</th><th>Auth</th></tr></thead>
+    <tbody>
+      <tr><td>GET</td><td><code>/dealers/search?zip=…&amp;name=…</code></td><td>Public (rate-limited 30/min/IP)</td></tr>
+      <tr><td>GET</td><td><code>/dealers/{id}</code></td><td>Public</td></tr>
+      <tr><td>GET</td><td><code>/dealers</code></td><td>Manager</td></tr>
+      <tr><td>PUT</td><td><code>/dealers/{id}</code></td><td>Manager (fee, preferred, notes, email)</td></tr>
+    </tbody>
+  </table>
+
+  <h4>Transfers</h4>
+  <table>
+    <thead><tr><th>Method</th><th>Endpoint</th><th>Auth</th></tr></thead>
+    <tbody>
+      <tr><td>GET</td><td><code>/transfers</code></td><td>Staff</td></tr>
+      <tr><td>POST</td><td><code>/transfers</code></td><td>Staff</td></tr>
+      <tr><td>GET</td><td><code>/transfers/{id}</code></td><td>Staff</td></tr>
+      <tr><td>GET</td><td><code>/transfers/{id}/details</code></td><td>Staff · full timeline + tracking URL</td></tr>
+      <tr><td>PUT</td><td><code>/transfers/{id}/status</code></td><td>Staff (fires <code>wpistic_ffl_transfer_status_changed</code> + <code>_updated</code>)</td></tr>
+      <tr><td>GET</td><td><code>/transfers/export</code></td><td>Manager · CSV download</td></tr>
+    </tbody>
+  </table>
+
+  <h4>Activity &amp; analytics</h4>
+  <table>
+    <thead><tr><th>Method</th><th>Endpoint</th><th>Notes</th></tr></thead>
+    <tbody>
+      <tr><td>GET</td><td><code>/activity</code></td><td>Cross-table feed</td></tr>
+      <tr><td>GET</td><td><code>/activity/summary</code></td><td>Daily counts + funnel</td></tr>
+      <tr><td>GET</td><td><code>/analytics/portal</code></td><td>Dealer-portal funnel summary</td></tr>
+      <tr><td>GET</td><td><code>/analytics/dealers</code></td><td>Slowest-confirming dealers</td></tr>
+      <tr><td>GET</td><td><code>/analytics/woocommerce</code></td><td>Store revenue / orders / AOV</td></tr>
+      <tr><td>GET</td><td><code>/analytics/leads</code></td><td>Multi-source lead breakdown</td></tr>
+    </tbody>
+  </table>
+
+  <h4>Portal &amp; compliance</h4>
+  <table>
+    <thead><tr><th>Method</th><th>Endpoint</th><th>Notes</th></tr></thead>
+    <tbody>
+      <tr><td>POST</td><td><code>/portal/issue-token</code></td><td>Issue + email a new dealer token</td></tr>
+      <tr><td>POST</td><td><code>/portal/resend</code></td><td>Re-issue (revokes prior)</td></tr>
+      <tr><td>POST</td><td><code>/portal/revoke</code></td><td>Manager only</td></tr>
+      <tr><td>GET</td><td><code>/compliance/audit</code></td><td>Full 15-point JSON audit</td></tr>
+      <tr><td>GET</td><td><code>/compliance/{state}</code></td><td>Per-state regulatory notes</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<!-- =========================== 11 G2A INTEGRATION =========================== -->
+<section>
+  <div class="section-header">
+    <span class="num">Section 11</span>
+    <h2>Integration with the Guns 2 Ammo Stack</h2>
+  </div>
+
+  <p>
+    The FFL plugin is a sibling to the rest of the G2A plugin family. Every option,
+    cron hook, AJAX action, REST namespace, and JS global is prefixed
+    <code>wpistic_ffl_*</code> — zero collisions confirmed against the other plugins.
+  </p>
+
+  <table>
+    <thead><tr><th>Component</th><th>How FFL plugs in</th></tr></thead>
+    <tbody>
+      <tr><td>WPistic Theme (guns2ammo)</td><td>Reads <code>g2a_business_*</code> + <code>g2a_ffl_license</code> Customizer mods as Theming defaults. Bridges the <code>admin_post_g2a_request</code> form into draft transfers. Uses <code>tokens.css</code> palette for emails + portal.</td></tr>
+      <tr><td>G2A Booking Engine</td><td>Independent — different REST namespace (<code>g2a-booking/v1</code>). No conflict.</td></tr>
+      <tr><td>Memberistic Membership Solutions</td><td>Shares the WP user identity via JWT bridge. Member ID flows into the customer "My FFL Transfers" tab.</td></tr>
+      <tr><td>Verifyistic</td><td>FFL dispatches <code>ffl_transfer_status</code> events to <code>Verifyistic_Webhooks::dispatch()</code> — any configured SMS provider (Twilio, OtterText, custom) receives them.</td></tr>
+      <tr><td>WPistic Contact Form</td><td>Theme bridge logs transfer-request submissions to the contact form inbox AND creates an FFL transfer in parallel.</td></tr>
+      <tr><td>G2A Theme Control</td><td>No direct dependency.</td></tr>
+      <tr><td>Standalone <code>app.guns2ammo.com</code> dashboard</td><td>JWT login + <code>g2a_role</code> / <code>g2a_permissions</code> claims; reads from every <code>/wpistic-ffl/v1/*</code> endpoint.</td></tr>
+    </tbody>
+  </table>
+
+  <h3>Install order</h3>
+  <ol>
+    <li>G2A Theme Control</li>
+    <li>G2A Booking Engine</li>
+    <li>Memberistic Membership Solutions</li>
+    <li>WPistic Contact Form</li>
+    <li>Verifyistic</li>
+    <li><strong>Advanced FFL Checkout (G2A Edition)</strong></li>
+    <li>WPistic Theme (guns2ammo)</li>
+  </ol>
+
+  <pre>// Recommended addition to wp-config.php
+define( 'WPISTIC_FFL_TOKEN_SECRET', 'a-64-char-random-string-here' );
+
+// And in functions.php — only if you sit behind Cloudflare or a LB:
+add_filter( 'wpistic_ffl_trusted_proxies', function () {
+    return [ '173.245.48.0/20', '103.21.244.0/22' ]; // CF ranges
+} );</pre>
+</section>
+
+<!-- =========================== 12 FUTURE ROADMAP =========================== -->
+<section>
+  <div class="section-header">
+    <span class="num">Section 12</span>
+    <h2>Future Improvement Roadmap</h2>
+  </div>
+
+  <p>v1.5 and beyond — opportunities to deepen the FFL workflow once the core is in production. Ranked by leverage.</p>
+
+  <h3>Round 1 — High-leverage automation</h3>
+  <table>
+    <thead><tr><th>Improvement</th><th>Effort</th><th>Why it matters</th></tr></thead>
+    <tbody>
+      <tr><td><span class="pill future">v1.5</span> <strong>Carrier API integration</strong> (UPS / USPS / FedEx live status)</td><td>Medium</td><td>Auto-flip to <code>received_by_dealer</code> when the carrier reports delivery — reduces dealer portal-confirmation burden by ~50%.</td></tr>
+      <tr><td><span class="pill future">v1.5</span> <strong>Email-otp 2FA</strong> for the dealer portal (currently last-4 FFL only)</td><td>Small</td><td>Adds a second factor independent of the dealer license — protects against forwarded magic-link emails.</td></tr>
+      <tr><td><span class="pill future">v1.5</span> <strong>Inbound email parsing</strong> — dealers replying "received" via email auto-confirm</td><td>Large (IMAP needed)</td><td>Some dealers prefer email-only workflows.</td></tr>
+      <tr><td><span class="pill future">v1.5</span> <strong>Action Scheduler integration</strong> for all async paths</td><td>Small</td><td>More observability + retry handling than <code>wp_schedule_single_event</code>.</td></tr>
+    </tbody>
+  </table>
+
+  <h3>Round 2 — Customer experience</h3>
+  <table>
+    <thead><tr><th>Improvement</th><th>Effort</th><th>Why it matters</th></tr></thead>
+    <tbody>
+      <tr><td><span class="pill future">v1.6</span> <strong>Customer "request a new dealer"</strong> action on the tracking page</td><td>Small</td><td>When the chosen dealer goes out of business or refuses the shipment, customer self-serves.</td></tr>
+      <tr><td><span class="pill future">v1.6</span> <strong>Calendar invite (.ics)</strong> attached to the "ready for pickup" email</td><td>Small</td><td>Reduces no-shows.</td></tr>
+      <tr><td><span class="pill future">v1.6</span> <strong>Photo upload</strong> from the dealer portal — proof of receipt</td><td>Medium</td><td>Adds visual audit evidence; useful in chargeback disputes.</td></tr>
+      <tr><td><span class="pill future">v1.6</span> <strong>"Save dealer to my profile"</strong> for repeat customers</td><td>Small</td><td>Skips the dealer search on subsequent firearm purchases — big conversion win.</td></tr>
+      <tr><td><span class="pill future">v1.6</span> <strong>Localized tracking page</strong> (es-US first)</td><td>Medium</td><td>Spanish-language customer base in AZ/CA/TX/FL.</td></tr>
+    </tbody>
+  </table>
+
+  <h3>Round 3 — Operations &amp; analytics</h3>
+  <table>
+    <thead><tr><th>Improvement</th><th>Effort</th><th>Why it matters</th></tr></thead>
+    <tbody>
+      <tr><td><span class="pill future">v1.7</span> <strong>Dealer-fee bulk editor</strong> — set fees by state or radius from a CSV upload</td><td>Small</td><td>Operationally critical when expanding into new states.</td></tr>
+      <tr><td><span class="pill future">v1.7</span> <strong>Per-customer LTV view</strong> with transfer history + average pickup time</td><td>Medium</td><td>Powers loyalty + repeat-purchase campaigns.</td></tr>
+      <tr><td><span class="pill future">v1.7</span> <strong>Dealer scorecard PDF export</strong> — for ATF compliance reviews</td><td>Medium</td><td>Quarterly ops review artifact.</td></tr>
+      <tr><td><span class="pill future">v1.7</span> <strong>Webhook outbound</strong> — fire to any URL on status change (Zapier, Make, custom CRM)</td><td>Small</td><td>Generalizes the Verifyistic dispatch path.</td></tr>
+      <tr><td><span class="pill future">v1.7</span> <strong>Dealer health alerts</strong> — flag dealers with high "report issue" rates</td><td>Small</td><td>Surface bad actors before they hit the customer.</td></tr>
+    </tbody>
+  </table>
+
+  <h3>Round 4 — Compliance &amp; security</h3>
+  <table>
+    <thead><tr><th>Improvement</th><th>Effort</th><th>Why it matters</th></tr></thead>
+    <tbody>
+      <tr><td><span class="pill future">v1.8</span> <strong>Form 4473 digital draft</strong> generated from transfer data</td><td>Large (regulatory)</td><td>Pre-fills the dealer's paperwork — massive operational time saver.</td></tr>
+      <tr><td><span class="pill future">v1.8</span> <strong>State law engine</strong> — full 50-state seed with citation + last-updated date</td><td>Medium (research)</td><td>Today only 9 states are seeded.</td></tr>
+      <tr><td><span class="pill future">v1.8</span> <strong>NICS API integration</strong> (FBI-direct submission, future)</td><td>Large (federal cert)</td><td>Long-term goal once the FBI opens the API.</td></tr>
+      <tr><td><span class="pill future">v1.8</span> <strong>2FA TOTP</strong> for admin staff accessing transfer data</td><td>Medium</td><td>Defense-in-depth for the ops team.</td></tr>
+      <tr><td><span class="pill future">v1.8</span> <strong>GDPR-style customer data export</strong></td><td>Small</td><td>Some states (CA, CO) extend similar rights to firearms purchase data.</td></tr>
+    </tbody>
+  </table>
+
+  <h3>Round 5 — Native dashboard + Blocks</h3>
+  <table>
+    <thead><tr><th>Improvement</th><th>Effort</th><th>Why it matters</th></tr></thead>
+    <tbody>
+      <tr><td><span class="pill future">v2.0</span> <strong>Native WC Blocks checkout integration</strong> (CheckoutBlockContext)</td><td>Medium</td><td>Hooks into the modern WC checkout for stores that switch.</td></tr>
+      <tr><td><span class="pill future">v2.0</span> <strong>Native React admin pages</strong> — no full page reloads</td><td>Large</td><td>Faster, snappier ops experience.</td></tr>
+      <tr><td><span class="pill future">v2.0</span> <strong>Public dealer onboarding form</strong> — FFLs apply to join the recommended list</td><td>Medium</td><td>Builds the dealer network passively.</td></tr>
+      <tr><td><span class="pill future">v2.0</span> <strong>Mobile app push notifications</strong> via FCM</td><td>Large</td><td>Customer + ops mobile alerts.</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<!-- =========================== 13 OPS REFERENCE =========================== -->
+<section>
+  <div class="section-header">
+    <span class="num">Section 13</span>
+    <h2>Operational Reference</h2>
+  </div>
+
+  <h3>Key WordPress action / filter hooks</h3>
+  <table>
+    <thead><tr><th>Hook</th><th>Type</th><th>What it does</th></tr></thead>
+    <tbody>
+      <tr><td><code>wpistic_ffl_transfer_created</code></td><td>action</td><td>Fired right after a transfer row is inserted</td></tr>
+      <tr><td><code>wpistic_ffl_transfer_status_changed</code></td><td>action</td><td>Fired on every status flip (id, old, new)</td></tr>
+      <tr><td><code>wpistic_ffl_transfer_updated</code></td><td>action</td><td>Fired on any column update (id, changes)</td></tr>
+      <tr><td><code>wpistic_ffl_can_notify_dealer_on_order</code></td><td>filter</td><td>Override payment-paid gate for special integrations</td></tr>
+      <tr><td><code>wpistic_ffl_dealer_portal_email</code></td><td>filter</td><td>Resolve dealer email from external CRM</td></tr>
+      <tr><td><code>wpistic_ffl_trusted_proxies</code></td><td>filter</td><td>CIDR list of trusted X-Forwarded-For sources</td></tr>
+      <tr><td><code>wpistic_ffl_search_rate_limit</code></td><td>filter</td><td>Tune the public dealer-search rate limit</td></tr>
+      <tr><td><code>wpistic_ffl_sms_message</code></td><td>filter</td><td>Customize per-status customer SMS copy</td></tr>
+      <tr><td><code>wpistic_ffl_transfer_ref_prefix</code></td><td>filter</td><td>Override the <code>G2A-</code> reference prefix</td></tr>
+    </tbody>
+  </table>
+
+  <h3>Key wp-config.php constants</h3>
+  <table>
+    <thead><tr><th>Constant</th><th>Effect</th></tr></thead>
+    <tbody>
+      <tr><td><code>WPISTIC_FFL_TOKEN_SECRET</code></td><td>HMAC signing key — defining here is the strongest option</td></tr>
+      <tr><td><code>WPISTIC_FFL_PORTAL_SLUG</code></td><td>Override default <code>ffl-confirm</code> path</td></tr>
+      <tr><td><code>WPISTIC_FFL_UNLIMITED</code></td><td>Unlock every Pro feature for the G2A install</td></tr>
+    </tbody>
+  </table>
+
+  <h3>Activity Log REST quick reference</h3>
+  <pre>GET /wp-json/wpistic-ffl/v1/activity?per_page=50
+GET /wp-json/wpistic-ffl/v1/activity/summary?days=30
+GET /wp-json/wpistic-ffl/v1/transfers/{id}/details
+GET /wp-json/wpistic-ffl/v1/compliance/audit</pre>
+
+  <h3>Day-one checklist</h3>
+  <ol>
+    <li>Install the plugin (Plugins → Upload → <code>advanced-ffl-checkout.zip</code>).</li>
+    <li>Define <code>WPISTIC_FFL_TOKEN_SECRET</code> in wp-config.php.</li>
+    <li>Visit <strong>Advanced FFL → Dashboard</strong>, click <em>Import ZIP Codes</em>.</li>
+    <li>Wait for the ZIP import to complete (~5–10 minutes background), then ATF sync auto-starts (~2–4 hours background).</li>
+    <li>Set the receiving FFL license in <strong>Appearance → Customize → G2A Business Info</strong>.</li>
+    <li>Mark firearm products as <em>FFL Transfer Required</em> in their general data tab.</li>
+    <li>Visit <strong>Advanced FFL → 🛡️ Compliance</strong> — confirm all green.</li>
+    <li>Test the checkout dealer search with any ZIP.</li>
+    <li>Open <strong>Advanced FFL → 📋 Activity Log</strong> — your test event should show.</li>
+  </ol>
+
+  <div class="callout tactical" style="margin-top:24px;">
+    <strong>One number to keep an eye on:</strong> the &laquo;NICS 3-day attention queue&raquo; row on the Compliance page. While that stays at zero, the federal window has never been missed.
+  </div>
+
+</section>
+
+</body>
+</html>
