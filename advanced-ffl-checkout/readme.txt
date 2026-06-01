@@ -4,7 +4,7 @@ Tags: FFL, firearms, WooCommerce, dealer, checkout, ATF, transfer, NICS, guns2am
 Requires at least: 6.4
 Tested up to: 6.7
 Requires PHP: 8.1
-Stable tag: 1.7.1
+Stable tag: 1.7.2
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -127,6 +127,15 @@ Deactivation preserves all data. Data is only removed on plugin deletion IF you 
 Yes. The plugin is fully self-contained. The dashboard integration is optional.
 
 == Changelog ==
+
+= 1.7.2 — G2A Edition (Selected-dealer contrast + theme-bleed guard + responsive pass) =
+* FIX: **"Selected Dealer" card on checkout was white-on-white.** The card still carried the light-gradient background from the original design (`linear-gradient(180deg, #F0FDF4 0%, #FFFFFF 100%)`) but the text used the new `var(--wf-text)` (white). Replaced with a tinted-on-dark gradient matching the brass / success palette; the "Directions", phone, and "Change Dealer" links now pin to brass instead of inheriting the host theme's cyan link color.
+* NEW: **Theme bleed-through guard.** The Guns2Ammo theme paints anchors cyan and headings brass via `.entry-content` descendant rules — those were leaking into the widget. Added a scoped one-level guard inside `.wpistic-ffl-widget` for anchors, h1–h6, strong/b, label, p, and button elements. Wins the cascade against the theme without `!important` on every line.
+* NEW: **Inline JS color hard-codes removed** for the selected-dealer renderer (Directions + phone links). CSS now owns those colors so the brand is applied consistently and the JS payload shrinks.
+* NEW: **Expanded responsive breakpoints.** Old stylesheet had a single `max-width: 600px` rule; now layered at 980px (tablet — saved-dealer grid → 2-col), 720px (phone — card actions stack, results-bar collapses), and 480px (narrow phone — tabs go vertical, inputs upgrade to 44 px iOS-finger-target + 16 px font-size to defeat iOS focus-zoom).
+* FIX: Loading-message error variant repainted with semantic warning tokens — `rgba(232,128,47,0.12)` background + `var(--wf-warning)` text — instead of the old light-mode `#FEE2E2 / #991B1B` pair.
+* FIX: View-toggle "is-active" pill now uses `var(--wf-text)` foreground (was dark-on-dark `var(--wf-ink)` ⇒ unreadable).
+* FIX: `#wpistic-ffl-change-btn` specifically styled as a ghost button on dark surface; defeats theme button-default styling.
 
 = 1.7.1 — G2A Edition (Compliance audit accuracy patch) =
 * FIX: **Compliance audit no longer flags `wpistic_ffl_process_zip_import` as WARN when the ZIP import has legitimately completed.** The cron correctly self-cancels once `wpistic_ffl_zip_import_status` is `complete` — that's expected behavior, not a problem. Audit now reports PASS with "Work complete — cron correctly unscheduled".

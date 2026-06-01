@@ -328,13 +328,14 @@
 }
 @keyframes wpistic-ffl-spin { to { transform: rotate(360deg); } }
 
-/* Selected panel */
+/* Selected panel — brass-tinted on dark, mirrors is-recommended card. */
 .wpistic-ffl-selected {
 	margin-top: 16px;
 	padding: 18px;
-	background: linear-gradient(180deg, #F0FDF4 0%, #FFFFFF 100%);
+	background: linear-gradient(180deg, rgba(74,222,128,0.14) 0%, var(--wf-surface) 100%);
 	border: 2px solid var(--wf-success);
 	border-radius: var(--wf-radius);
+	color: var(--wf-text);
 }
 .wpistic-ffl-selected__header {
 	display: flex;
@@ -351,13 +352,26 @@
 	font-size: 14px;
 	color: var(--wf-text);
 	margin-bottom: 12px;
-	line-height: 1.55;
+	line-height: 1.6;
 }
 .wpistic-ffl-selected__info strong {
 	color: var(--wf-text);
 	display: block;
 	font-size: 16px;
 	margin-bottom: 4px;
+}
+/* Inline links rendered by JS (Directions, phone) — pin to brass so theme
+   styles can't repaint them cyan / default-link blue. */
+.wpistic-ffl-selected__info a,
+.wpistic-ffl-selected__info a:link,
+.wpistic-ffl-selected__info a:visited {
+	color: var(--wf-primary) !important;
+	text-decoration: none !important;
+	font-weight: 600;
+}
+.wpistic-ffl-selected__info a:hover {
+	color: var(--wf-primary-hover) !important;
+	text-decoration: underline !important;
 }
 
 /* InfoWindow */
@@ -425,3 +439,135 @@
 	letter-spacing: 0.06em; text-transform: uppercase;
 }
 .wpistic-ffl-saved__use { align-self: flex-start; }
+
+/* ───────────────────────────────────────────────────────────────────────────
+   G2A v1.7.2 — Theme bleed-through guard
+   The Guns2Ammo theme paints links cyan and headings brass via .entry-content
+   descendant rules. Scope our own styles inside .wpistic-ffl-widget with one
+   level of specificity to win against them without resorting to !important
+   on everything.
+   ─────────────────────────────────────────────────────────────────────────── */
+
+.wpistic-ffl-widget a,
+.wpistic-ffl-widget a:link,
+.wpistic-ffl-widget a:visited {
+	color: var(--wf-primary);
+	text-decoration: none;
+}
+.wpistic-ffl-widget a:hover,
+.wpistic-ffl-widget a:focus {
+	color: var(--wf-primary-hover);
+	text-decoration: underline;
+}
+
+.wpistic-ffl-widget h1,
+.wpistic-ffl-widget h2,
+.wpistic-ffl-widget h3,
+.wpistic-ffl-widget h4,
+.wpistic-ffl-widget h5,
+.wpistic-ffl-widget h6 {
+	color: var(--wf-text);
+	font-family: var(--wf-font);
+	background: transparent;
+	margin: 0;
+	padding: 0;
+	border: none;
+}
+
+.wpistic-ffl-widget strong,
+.wpistic-ffl-widget b {
+	color: inherit;
+	background: transparent;
+	font-weight: 700;
+}
+
+.wpistic-ffl-widget label,
+.wpistic-ffl-widget p {
+	color: inherit;
+	background: transparent;
+}
+
+/* Buttons inside the widget — guard against theme button rules. */
+.wpistic-ffl-widget button,
+.wpistic-ffl-widget input[type="button"],
+.wpistic-ffl-widget input[type="submit"] {
+	font-family: var(--wf-font);
+	text-transform: none;
+	letter-spacing: 0;
+}
+
+/* Change-dealer ghost link — keep it visible on dark surface. */
+#wpistic-ffl-change-btn {
+	color: var(--wf-text);
+	background: transparent;
+	border: 1.5px solid var(--wf-border-strong);
+}
+#wpistic-ffl-change-btn:hover {
+	color: var(--wf-ink);
+	background: var(--wf-primary);
+	border-color: var(--wf-primary);
+}
+
+/* Loading-message variants — switch to dark-mode-friendly palette. */
+.wpistic-ffl-msg-error {
+	background: rgba(232,128,47,0.12);
+	color: var(--wf-warning);
+	border: 1px solid var(--wf-warning);
+}
+
+/* ───────────────────────────────────────────────────────────────────────────
+   Responsiveness — expanded breakpoints for tablet + narrow-phone.
+   ─────────────────────────────────────────────────────────────────────────── */
+
+@media (max-width: 980px) {
+	.wpistic-ffl-widget { padding: 20px; }
+	.wpistic-ffl-saved__grid { grid-template-columns: 1fr 1fr; }
+}
+
+@media (max-width: 720px) {
+	.wpistic-ffl-card {
+		grid-template-columns: 1fr;
+		gap: 10px;
+	}
+	.wpistic-ffl-card__actions {
+		flex-direction: row;
+		flex-wrap: wrap;
+	}
+	.wpistic-ffl-card__actions .wpistic-ffl-btn {
+		flex: 1 1 calc(50% - 6px);
+	}
+	.wpistic-ffl-saved__grid { grid-template-columns: 1fr; }
+	.wpistic-ffl-resultsbar {
+		flex-direction: column;
+		align-items: flex-start;
+		gap: 4px;
+	}
+}
+
+@media (max-width: 480px) {
+	.wpistic-ffl-widget {
+		padding: 14px;
+		border-radius: 10px;
+	}
+	.wpistic-ffl-widget__heading { font-size: 17px; }
+	.wpistic-ffl-widget__lede    { font-size: 13px; }
+	.wpistic-ffl-tabs {
+		flex-direction: column;
+		gap: 4px;
+	}
+	.wpistic-ffl-tab {
+		min-width: 100%;
+		text-align: left;
+	}
+	.wpistic-ffl-filters { gap: 8px; }
+	.wpistic-ffl-input,
+	.wpistic-ffl-select {
+		min-height: 44px; /* iOS finger target */
+		font-size: 16px;  /* prevent iOS zoom on focus */
+	}
+	.wpistic-ffl-btn {
+		min-height: 44px;
+		font-size: 14px;
+	}
+	.wpistic-ffl-map { height: 220px; }
+}

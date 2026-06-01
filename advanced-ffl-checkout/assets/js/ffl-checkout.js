@@ -323,11 +323,11 @@
 		const mapsHref = addr ? 'https://www.google.com/maps/dir/?api=1&destination=' + encodeURIComponent( addr ) : '';
 		if ( info ) {
 			info.innerHTML =
-				'<strong>' + escapeHtml( dealer.business_name || '' ) + ( dealer.is_preferred ? ' ' + recommendedBadge() : '' ) + '</strong>' +
-				escapeHtml( addr ) +
-				( mapsHref ? ' <a href="' + mapsHref + '" target="_blank" rel="noopener" style="margin-left:6px;color:inherit;text-decoration:underline;">🧭 Directions</a>' : '' ) +
-				( dealer.phone ? '<br>📞 <a href="tel:' + encodeURIComponent( dealer.phone ) + '" style="color:inherit;">' + escapeHtml( dealer.phone ) + '</a>' : '' ) +
-				'<br>FFL: ' + escapeHtml( dealer.license_number || '—' );
+			'<strong>' + escapeHtml( dealer.business_name || '' ) + ( dealer.is_preferred ? ' ' + recommendedBadge() : '' ) + '</strong>' +
+			escapeHtml( addr ) +
+			( mapsHref ? ' <a href="' + mapsHref + '" target="_blank" rel="noopener">🧭 Directions</a>' : '' ) +
+			( dealer.phone ? '<br>📞 <a href="tel:' + encodeURIComponent( dealer.phone ) + '">' + escapeHtml( dealer.phone ) + '</a>' : '' ) +
+			'<br>FFL: ' + escapeHtml( dealer.license_number || '—' );
 		}
 
 		hideResultsArea();
