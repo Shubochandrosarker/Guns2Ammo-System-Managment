@@ -18,6 +18,26 @@
 
             this.bindEvents();
             this.showOverlay();
+            // Replace the inline token (which may have come from a cached
+            // HTML response) with a freshly-minted one. Cached pages share a
+            // single token across all visitors, and after the first user
+            // verifies, that shared jti is burned — every other user then
+            // sees "Please take a moment to complete the form…". Fetching
+            // per-visitor sidesteps the cache.
+            this.refreshToken();
+        },
+
+        // ── Fetch a fresh signed form token ──────────────────────
+        refreshToken: function () {
+            var self = this;
+            $.post(this.data.ajaxUrl, {
+                action: 'verifyistic_token',
+                nonce:  this.data.nonce
+            }, function (res) {
+                if (res && res.success && res.data && res.data.token) {
+                    $('#vfy-form-token').val(res.data.token);
+                }
+            });
         },
 
         // ── Show Overlay ─────────────────────────────────────────
@@ -124,11 +144,15 @@
                         self.onVerified(res.data, $form);
                     } else {
                         self.showError($err, res.data.message || self.data.strings.ageError);
+                        // Mint a fresh token so the user's next attempt
+                        // isn't blocked by an expired or stale-cache token.
+                        self.refreshToken();
                     }
                 },
                 error: function () {
                     self.setButtonLoading($btn, false);
                     self.showError($err, 'Network error. Please try again.');
+                    self.refreshToken();
                 }
             });
         },
@@ -174,11 +198,13 @@
                     self.onVerified(res.data, null);
                 } else {
                     self.showYesNoError((res && res.data && res.data.message) || 'Verification failed. Please try again.');
+                    self.refreshToken();
                 }
             }).fail(function () {
                 self.setButtonLoading($btn, false);
                 // SECURITY: do NOT let through on network failure. Fail closed.
                 self.showYesNoError('Network error. Please try again.');
+                self.refreshToken();
             });
         },
 

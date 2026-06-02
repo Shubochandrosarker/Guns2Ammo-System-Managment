@@ -8,6 +8,23 @@ class Verifyistic_Ajax {
         add_action( 'wp_ajax_nopriv_verifyistic_verify', array( $this, 'handle_verification' ) );
         add_action( 'wp_ajax_verifyistic_decline',        array( $this, 'handle_decline' ) );
         add_action( 'wp_ajax_nopriv_verifyistic_decline', array( $this, 'handle_decline' ) );
+        // Fresh-token endpoint: bypasses page caching by minting tokens at
+        // request time instead of at HTML render time.
+        add_action( 'wp_ajax_verifyistic_token',        array( $this, 'handle_token' ) );
+        add_action( 'wp_ajax_nopriv_verifyistic_token', array( $this, 'handle_token' ) );
+    }
+
+    /**
+     * Issue a fresh form token. Called by the popup JS on show + after each
+     * failed submission so users behind page caches (WP Rocket, LiteSpeed,
+     * Cloudflare, etc.) and users retrying after a typo aren't blocked by a
+     * stale or already-burned token baked into cached HTML.
+     */
+    public function handle_token() {
+        check_ajax_referer( 'verifyistic_verify_nonce', 'nonce' );
+        wp_send_json_success( array(
+            'token' => Verifyistic_Security::issue_form_token(),
+        ) );
     }
 
     /**
@@ -31,7 +48,11 @@ class Verifyistic_Ajax {
             return;
         }
         // 3. Signed timing token — rejects instant bot posts + stale replays.
-        if ( ! Verifyistic_Security::verify_form_token( sanitize_text_field( wp_unslash( $_POST['vfy_token'] ?? '' ) ) ) ) {
+        // The jti is NOT burned here; only after the full verification
+        // succeeds (below), so a user who corrects a DOB typo can retry
+        // without hitting a false "complete the form" error.
+        $token_jti = Verifyistic_Security::verify_form_token( sanitize_text_field( wp_unslash( $_POST['vfy_token'] ?? '' ) ) );
+        if ( false === $token_jti ) {
             Verifyistic_Security::register_attempt( $ip );
             wp_send_json_error( array( 'message' => __( 'Please take a moment to complete the form and try again.', 'verifyistic' ) ) );
             return;
@@ -81,6 +102,11 @@ class Verifyistic_Ajax {
             wp_send_json_error( array( 'message' => $result->get_error_message() ) );
             return;
         }
+
+        // Verification fully passed — now burn the token's jti so it can't
+        // be replayed by a bot. Failed attempts (above) intentionally do
+        // NOT burn, so honest users can retry after a typo.
+        Verifyistic_Security::burn_form_token( $token_jti );
 
         // Save to DB
         $log_id = Verifyistic_DB::insert_log( $log_data );
