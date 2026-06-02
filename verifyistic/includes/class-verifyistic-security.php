@@ -34,8 +34,12 @@ class Verifyistic_Security {
 
 	/**
 	 * Validate the token: signature must match and elapsed time must sit in a
-	 * human-plausible window. Each token is one-time-use (jti is consumed by
-	 * burning a short-lived transient).
+	 * human-plausible window. Replay protection (jti burn) is handled
+	 * separately by burn_form_token(), called only AFTER full verification
+	 * has succeeded — so a user who corrects a DOB typo can resubmit.
+	 *
+	 * @return string|false  The jti on success (empty string for legacy
+	 *                       2-part tokens), or false on failure.
 	 */
 	public static function verify_form_token( $token ) {
 		$token = (string) $token;
@@ -55,13 +59,24 @@ class Verifyistic_Security {
 		if ( ! hash_equals( $expected, (string) $sig ) ) return false;
 		$elapsed = time() - (int) $t;
 		if ( $elapsed < self::MIN_SECONDS || $elapsed > self::MAX_SECONDS ) return false;
-		// One-shot: burn jti so the same token can't be replayed.
+		// Replay check: refuse if this jti was already burned by a previous
+		// SUCCESSFUL verification. Tokens that failed downstream checks (bad
+		// DOB, under age, etc.) are NOT burned, so retries work.
 		if ( $jti ) {
 			$burn_key = 'vfy_jti_' . md5( $jti );
 			if ( get_transient( $burn_key ) ) return false;
-			set_transient( $burn_key, 1, self::MAX_SECONDS );
 		}
-		return true;
+		return $jti;
+	}
+
+	/**
+	 * Mark a token's jti as consumed. Call this only AFTER the user has
+	 * passed every verification step — never before, or a single typo will
+	 * permanently lock the user out of retrying.
+	 */
+	public static function burn_form_token( $jti ) {
+		if ( ! $jti ) return;
+		set_transient( 'vfy_jti_' . md5( $jti ), 1, self::MAX_SECONDS );
 	}
 
 	private static function salt() {
