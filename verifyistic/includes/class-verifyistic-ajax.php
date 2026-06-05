@@ -47,15 +47,31 @@ class Verifyistic_Ajax {
             wp_send_json_error( array( 'message' => __( 'Verification could not be completed.', 'verifyistic' ) ) );
             return;
         }
-        // 3. Signed timing token — rejects instant bot posts + stale replays.
-        // The jti is NOT burned here; only after the full verification
+        // 3. Signed timing token — an ANTI-BOT signal layered on top of the
+        // nonce, honeypot, and per-IP rate limit. It is NOT the age gate
+        // itself. The jti is NOT burned here; only after the full verification
         // succeeds (below), so a user who corrects a DOB typo can retry
         // without hitting a false "complete the form" error.
-        $token_jti = Verifyistic_Security::verify_form_token( sanitize_text_field( wp_unslash( $_POST['vfy_token'] ?? '' ) ) );
+        //
+        // On sites behind a full-page cache (WP Rocket, LiteSpeed, Cloudflare,
+        // …) the token baked into cached HTML can reach us stale, expired
+        // (>2h old), or already burned by an earlier visitor who shared the
+        // same cached token. Hard-failing on that produced a false "please
+        // complete the form" wall that locked legitimate, of-age customers out
+        // of the site entirely. So we fail OPEN for those cache artifacts and
+        // only hard-block the one signature that unambiguously identifies a
+        // bot: a correctly-signed token submitted impossibly fast for a human.
+        $raw_token = sanitize_text_field( wp_unslash( $_POST['vfy_token'] ?? '' ) );
+        $token_jti = Verifyistic_Security::verify_form_token( $raw_token );
         if ( false === $token_jti ) {
-            Verifyistic_Security::register_attempt( $ip );
-            wp_send_json_error( array( 'message' => __( 'Please take a moment to complete the form and try again.', 'verifyistic' ) ) );
-            return;
+            if ( Verifyistic_Security::is_token_bot_fast( $raw_token ) ) {
+                Verifyistic_Security::register_attempt( $ip );
+                wp_send_json_error( array( 'message' => __( 'Please take a moment to complete the form and try again.', 'verifyistic' ) ) );
+                return;
+            }
+            // Stale / expired / burned / missing token from a cache: proceed.
+            // There is no valid jti to burn, so replay-burn is simply skipped.
+            $token_jti = '';
         }
 
         $mode    = sanitize_text_field( $_POST['mode'] ?? 'dob' );

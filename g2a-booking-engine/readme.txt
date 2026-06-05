@@ -207,6 +207,15 @@ Yes. REST API at `/wp-json/g2a-booking/v1/` covers bookings, forms, calendar, fr
 
 == Changelog ==
 
+= 1.12.3 =
+* FIX: Manual Booking (Bookings → Manual Booking) failed for every staff
+  member with "Invalid start time." The admin form uses an HTML5
+  <input type="datetime-local">, whose browser-submitted value carries a
+  literal "T" separator (YYYY-MM-DDTHH:MM); the REST controller only accepted
+  the space-separated form and rejected the request before it ever reached the
+  database. The controller now normalises the "T" separator to a space, so
+  phone, walk-in, and staff bookings save correctly.
+
 = 1.4.0 =
 **Front Desk + Check-in.**
 
