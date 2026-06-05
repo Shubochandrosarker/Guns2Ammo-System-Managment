@@ -79,6 +79,42 @@ class Verifyistic_Security {
 		set_transient( 'vfy_jti_' . md5( $jti ), 1, self::MAX_SECONDS );
 	}
 
+	/**
+	 * Distinguish a genuinely automated (bot) submission from a benign
+	 * cache artifact, used only when verify_form_token() has already failed.
+	 *
+	 * A correctly-signed token that arrives faster than a human could
+	 * plausibly complete the form (< MIN_SECONDS) is the one signature that
+	 * unambiguously identifies a bot, so it stays a hard block. Every other
+	 * failure mode verify_form_token() rejects — an expired token (page cached
+	 * for >2h), an already-burned jti (token shared across visitors by a
+	 * full-page cache), a missing token, or a bad/forged signature — is NOT
+	 * treated as bot-fast here, so the caller can fail open and let the nonce,
+	 * honeypot, rate limit, and DOB age check decide. This prevents the false
+	 * "please complete the form" wall that locked of-age customers out on
+	 * cached sites.
+	 *
+	 * @return bool True only when the token is correctly signed AND submitted
+	 *              impossibly fast for a human.
+	 */
+	public static function is_token_bot_fast( $token ) {
+		$parts = explode( '.', (string) $token );
+		if ( 3 === count( $parts ) ) {
+			list( $t, $jti, $sig ) = $parts;
+			$expected = hash_hmac( 'sha256', $t . '|' . $jti, self::salt() );
+		} elseif ( 2 === count( $parts ) ) {
+			list( $t, $sig ) = $parts;
+			$expected = hash_hmac( 'sha256', (string) $t, self::salt() );
+		} else {
+			return false;
+		}
+		if ( ! ctype_digit( (string) $t ) ) return false;
+		// A forged / mismatched signature is not "our" token: let the other
+		// hard gates handle it rather than hard-blocking on timing.
+		if ( ! hash_equals( $expected, (string) $sig ) ) return false;
+		return ( time() - (int) $t ) < self::MIN_SECONDS;
+	}
+
 	private static function salt() {
 		// wp_salt() is unique per-site and never exposed to the client.
 		return wp_salt( 'auth' ) . '|verifyistic-form';

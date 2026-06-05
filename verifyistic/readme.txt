@@ -102,6 +102,17 @@ No. All verification is handled locally. The webhook integration is optional and
 
 == Changelog ==
 
+= 1.3.2 =
+* FIX: Customers on page-cached sites (WP Rocket, LiteSpeed, Cloudflare, etc.)
+  could be permanently blocked at the age gate with "Please take a moment to
+  complete the form and try again", even with a valid date of birth. The
+  anti-bot timing token baked into cached HTML was arriving stale, expired, or
+  already burned by an earlier visitor and was treated as a hard failure. The
+  token is now a soft anti-bot signal: a stale/expired/burned/missing token
+  fails open (the nonce, honeypot, per-IP rate limit and DOB age check remain
+  the hard gates), while a correctly-signed token submitted impossibly fast for
+  a human is still hard-blocked as a bot.
+
 = 1.2.0 =
 * NEW: Mobile-friendly Date of Birth picker — replaced the native date input
   with fast Month / Day / Year dropdowns (no more endless year-scrolling on
