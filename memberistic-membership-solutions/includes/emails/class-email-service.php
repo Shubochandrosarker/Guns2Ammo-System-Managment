@@ -249,6 +249,7 @@ final class Email_Service {
 			'{member_name}'        => (string) ( $person['full_name'] ?? '' ),
 			'{membership_id}'      => (string) ( $membership['membership_uuid'] ?? '' ),
 			'{plan_name}'          => (string) ( $membership['plan_name'] ?? '' ),
+			'{status}'             => ucwords( str_replace( '_', ' ', (string) ( $membership['status'] ?? '' ) ) ),
 			'{billing_cycle}'      => ucwords( str_replace( '_', ' ', (string) ( $membership['billing_cycle'] ?? '' ) ) ),
 			'{renewal_date}'       => ! empty( $membership['renewal_date'] ) ? date_i18n( get_option( 'date_format' ), strtotime( $membership['renewal_date'] ) ) : __( 'Not set', 'memberistic' ),
 			'{expiration_date}'    => ! empty( $membership['end_date'] ) ? date_i18n( get_option( 'date_format' ), strtotime( $membership['end_date'] ) ) : ( ! empty( $membership['renewal_date'] ) ? date_i18n( get_option( 'date_format' ), strtotime( $membership['renewal_date'] ) ) : __( 'Not set', 'memberistic' ) ),
@@ -290,7 +291,7 @@ final class Email_Service {
 		if ( '' === $body ) {
 			// Generic body falls back to a status summary.
 			$body = __(
-				"Hi {member_name},\n\nMembership: {membership_id}\nPlan: {plan_name}\nStatus: {plan_name}\nRenewal: {renewal_date}\n\nView your account here:\n{account_url}\n\n{brand_label}",
+				"Hi {member_name},\n\nMembership: {membership_id}\nPlan: {plan_name}\nStatus: {status}\nRenewal: {renewal_date}\n\nView your account here:\n{account_url}\n\n{brand_label}",
 				'memberistic'
 			);
 		}

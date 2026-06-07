@@ -4,7 +4,7 @@ Tags: FFL, firearms, WooCommerce, dealer, checkout, ATF, transfer, NICS, guns2am
 Requires at least: 6.4
 Tested up to: 6.7
 Requires PHP: 8.1
-Stable tag: 1.3.0
+Stable tag: 1.4.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -29,9 +29,10 @@ Complete Federal Firearms License (FFL) dealer management, WooCommerce checkout 
 * Automatic background processing with progress tracking
 
 **ZIP Code Engine**
-* 43,000 US ZIP code centroids sourced from GeoNames
-* Downloaded and imported on activation (resumable, no bundled data)
-* Powers instant Haversine distance queries — no geocoding API needed
+* On-demand ZIP centroid resolution via the free zippopotam.us service
+* Results are cached locally in the `zip_coords` table the first time a ZIP is queried — no large bundled dataset, no activation-time download
+* Powers Haversine distance queries on subsequent searches without external API calls
+* Hardened against upstream outages with a short timeout and a failure cache to prevent retry storms
 
 **Transfer Lifecycle Tracking**
 * Full 11-stage pipeline: dealer selected → payment confirmed → shipped → at dealer → NICS pending/delayed/approved/denied → transferred
@@ -79,8 +80,8 @@ All endpoints under namespace `wpistic-ffl/v1`:
 1. Upload the `advanced-ffl-checkout` folder to `/wp-content/plugins/`
 2. Activate the plugin through the **Plugins** menu in WordPress
 3. Navigate to **Advanced FFL → Dashboard** in your admin menu
-4. Click **Import ZIP Codes** to start the ZIP centroid import
-5. The ATF dealer database will begin syncing automatically after ZIP import completes
+4. Run **Sync ATF Dealers** to import the current month's ATF FFL licensee list (chunked, resumable in the background)
+5. ZIP centroids are resolved on demand the first time each ZIP is searched — no separate import step
 6. Mark products as **FFL Transfer Required** in each product's general settings
 7. Configure email and checkout options under **Advanced FFL → Settings**
 
@@ -99,12 +100,12 @@ All endpoints under namespace `wpistic-ffl/v1`:
 
 = How does dealer distance search work without a Google Maps API key? =
 
-The plugin downloads 43,000 US ZIP code centroids from GeoNames on activation. When a customer enters a ZIP code, it looks up the lat/lng from the local database and runs a Haversine SQL query against dealer ZIP centroids — no external API calls required at search time. Google Maps is optional for the visual map widget only.
+The first time a customer enters a ZIP code that the plugin hasn't seen before, the lat/lng is resolved from the free zippopotam.us lookup service and cached in the local `zip_coords` table. Subsequent searches use that cached row and run a Haversine SQL query against dealer ZIP centroids with no external API calls. Google Maps is optional and only powers the visual map widget.
 
 = How long does the initial data import take? =
 
-ZIP import: ~5-10 minutes of background processing (43k rows, 500/batch, 1 batch/minute).
-ATF dealer sync: 2-4 hours of background processing (~80k dealers across 55 state CSV files). Both are fully resumable — a server restart or power outage will not restart from zero.
+ZIP centroids are populated lazily as customers search, so there is no activation-time ZIP import to wait for.
+ATF dealer sync: 2-4 hours of background processing (~80k dealers across 55 state CSV files), fully resumable — a server restart or power outage will not restart from zero.
 
 = How do I mark a product as requiring FFL transfer? =
 
@@ -127,6 +128,21 @@ Deactivation preserves all data. Data is only removed on plugin deletion IF you 
 Yes. The plugin is fully self-contained. The dashboard integration is optional.
 
 == Changelog ==
+
+= 1.4.0 =
+* SECURITY: CORS handler is now scoped strictly to the `wpistic-ffl/v1` REST namespace via `rest_pre_serve_request` — `Access-Control-Allow-Origin` and `Allow-Credentials` are no longer emitted on every request. OPTIONS preflight short-circuit is likewise limited to the plugin's REST routes.
+* SECURITY: State-compliance checkout violations are now hard errors that block the order by default. A new `wpistic_ffl_compliance_strict` option (default `1`) lets stores opt back into legacy warning-only behavior.
+* SECURITY: Theme-bridge no longer captures arbitrary `g2a_request` submissions whose subject merely contains the word "transfer" — strict match on `FFL Transfer Request` (subject) or `ffl_transfer` (form_type).
+* SECURITY: Admin CSV export now requires a valid `wpistic_ffl_export` nonce; export link is wrapped in `wp_nonce_url()`.
+* SECURITY: JWT bridge no longer falls through to `staff` for any authenticated WP user — default role is `none` and the resulting permission list is empty unless the user has `manage_woocommerce` or an explicit `wpistic_ffl_g2a_role` meta entry.
+* SECURITY: Dealer portal magic-link emails are no longer silently rerouted to the site admin when a dealer has no email on file — `Mailer::dealer_email_for()` returns a `WP_Error` and the send is skipped with a mail-log entry.
+* RELIABILITY: ATF full sync no longer pre-marks every dealer inactive before the download/import. A new `Sync::mark_unseen_dealers_inactive()` runs only after a successful import with non-zero rows, so a mid-run failure can never empty the checkout dealer selector.
+* RELIABILITY: `update_transfer_status` REST endpoint accepts `payment_confirmed` as a valid status.
+* RELIABILITY: Admin bulk-upsert SQL now passes positional placeholders via the spread operator (`...$values`) to match the same fix already shipped in the cron sync path.
+* COMPLIANCE: New `Compliance::validate_dealer_for_buyer()` runs an advisory state-pair audit when a transfer is created — missing dealer or buyer state is logged to the events table. TODO marker left in place for an admin-managed state-pair allow-list.
+* ANALYTICS: WooCommerce KPI query now uses `wc_get_orders()` on HPOS-only stores instead of reading `wp_posts` directly.
+* NOTICES: An admin notice now surfaces when SMS notifications are enabled but the Verifyistic plugin is missing — previously the dispatch was a silent no-op.
+* DOCS: ZIP-centroid description updated — there is no 43k-row activation import; centroids are resolved on demand via zippopotam.us and cached locally.
 
 = 1.3.0 — G2A Edition =
 * G2A: **HPOS-safe order meta** — Dealer ID, name and ZIP now route through `$order->update_meta_data()` / `get_meta()` instead of `update_post_meta()`. Fixes silent failures on stores running HPOS-only mode.

@@ -221,6 +221,24 @@ final class Stripe_Service {
 
 		$user_id = self::resolve_checkout_user( $email, $full_name );
 
+		// Re-entrance guard: a refresh, back-button, or double-click on the
+		// checkout form used to create a SECOND pending membership for the
+		// same email. If a pending row already exists for this email, reuse
+		// it (and its existing Stripe checkout URL) instead of inserting a
+		// duplicate.
+		$pending_existing = Memberships_Repository::get_pending_by_person_email( $email );
+		if ( $pending_existing && ! empty( $pending_existing['id'] ) ) {
+			$existing_session = self::create_checkout_session( (int) $pending_existing['id'], $plan, $billing_cycle, $email );
+			if ( ! is_wp_error( $existing_session ) && ! empty( $existing_session['url'] ) ) {
+				$redirect_url  = esc_url_raw( $existing_session['url'] );
+				$redirect_host = wp_parse_url( $redirect_url, PHP_URL_HOST );
+				if ( in_array( $redirect_host, array( 'checkout.stripe.com', 'billing.stripe.com' ), true ) ) {
+					wp_redirect( $redirect_url ); // phpcs:ignore WordPress.Security.SafeRedirect.wp_redirect_wp_redirect
+					exit;
+				}
+			}
+		}
+
 		$membership_id = Memberships_Repository::create(
 			array(
 				'plan_id'        => $plan_id,
@@ -471,6 +489,49 @@ final class Stripe_Service {
 		return hash_equals( $expected, $signature );
 	}
 
+	/**
+	 * Stripe webhook dedup: persistent processed-event-id store.
+	 *
+	 * Backed by an option (FIFO-capped at 500 ids) so a redeploy / object-
+	 * cache flush doesn't reset dedup and cause a duplicate Payments row +
+	 * duplicate receipt email on Stripe retries.
+	 */
+	private static function processed_events_option_key() {
+		return 'memberistic_stripe_processed_events';
+	}
+
+	public static function is_event_processed( $event_id ) {
+		$event_id = (string) $event_id;
+		if ( '' === $event_id ) {
+			return false;
+		}
+		$list = get_option( self::processed_events_option_key(), array() );
+		if ( ! is_array( $list ) ) {
+			$list = array();
+		}
+		return in_array( $event_id, $list, true );
+	}
+
+	public static function mark_event_processed( $event_id ) {
+		$event_id = (string) $event_id;
+		if ( '' === $event_id ) {
+			return;
+		}
+		$list = get_option( self::processed_events_option_key(), array() );
+		if ( ! is_array( $list ) ) {
+			$list = array();
+		}
+		if ( in_array( $event_id, $list, true ) ) {
+			return;
+		}
+		$list[] = $event_id;
+		// FIFO cap — keep the most recent 500 ids.
+		if ( count( $list ) > 500 ) {
+			$list = array_slice( $list, -500 );
+		}
+		update_option( self::processed_events_option_key(), $list, false );
+	}
+
 	public static function process_webhook_event( $event ) {
 		$type     = isset( $event['type'] ) ? $event['type'] : '';
 		$event_id = isset( $event['id'] ) ? sanitize_text_field( (string) $event['id'] ) : '';
@@ -479,16 +540,15 @@ final class Stripe_Service {
 		// Idempotency: Stripe retries on 5xx (and occasionally double-sends
 		// on success). Without dedup, every retry creates a duplicate
 		// Payments row, a duplicate Activity row, and a duplicate
-		// membership_activated / payment_received email. Track event_id
-		// in a transient (object-cache fronted in production); skip
-		// processing on a repeat.
+		// membership_activated / payment_received email. We persist the
+		// processed event ids in a capped option list so dedup survives an
+		// object-cache flush (transients used to fail open after a redeploy).
 		if ( '' !== $event_id ) {
-			$dedup_key = 'memberistic_stripe_evt_' . md5( $event_id );
-			if ( false !== get_transient( $dedup_key ) ) {
+			if ( self::is_event_processed( $event_id ) ) {
 				do_action( 'memberistic_stripe_webhook_event_duplicate', $event_id, $type );
 				return true;
 			}
-			set_transient( $dedup_key, time(), 7 * DAY_IN_SECONDS );
+			self::mark_event_processed( $event_id );
 		}
 
 		do_action( 'memberistic_stripe_webhook_event', $type, $obj, $event );
@@ -554,19 +614,32 @@ final class Stripe_Service {
 			)
 		);
 
-		Payments_Repository::create(
-			array(
-				'membership_id'          => $membership_id,
-				'amount'                 => ! empty( $invoice['amount_paid'] ) ? ( (float) $invoice['amount_paid'] / 100 ) : 0,
-				'currency'               => ! empty( $invoice['currency'] ) ? strtoupper( $invoice['currency'] ) : 'USD',
-				'payment_method'         => 'stripe_subscription',
-				'payment_gateway'        => 'stripe',
-				'gateway_transaction_id' => isset( $invoice['payment_intent'] ) ? sanitize_text_field( (string) $invoice['payment_intent'] ) : sanitize_text_field( (string) ( $invoice['id'] ?? '' ) ),
-				'status'                 => 'completed',
-				'paid_at'                => current_time( 'mysql' ),
-				'raw_response'           => $invoice,
-			)
-		);
+		// The very first invoice fires alongside checkout.session.completed,
+		// which already writes the Payments row + sends the receipt. Skip
+		// the create() here to avoid a duplicate Payments row + duplicate
+		// receipt for the same initial charge. A secondary safety guards
+		// against any other path that might double-write the same txn id.
+		if ( ! $is_first_invoice ) {
+			$txn_id = isset( $invoice['payment_intent'] )
+				? sanitize_text_field( (string) $invoice['payment_intent'] )
+				: sanitize_text_field( (string) ( $invoice['id'] ?? '' ) );
+			$already = '' !== $txn_id ? Payments_Repository::get_by_gateway_transaction_id( $txn_id ) : null;
+			if ( ! $already ) {
+				Payments_Repository::create(
+					array(
+						'membership_id'          => $membership_id,
+						'amount'                 => ! empty( $invoice['amount_paid'] ) ? ( (float) $invoice['amount_paid'] / 100 ) : 0,
+						'currency'               => ! empty( $invoice['currency'] ) ? strtoupper( $invoice['currency'] ) : 'USD',
+						'payment_method'         => 'stripe_subscription',
+						'payment_gateway'        => 'stripe',
+						'gateway_transaction_id' => $txn_id,
+						'status'                 => 'completed',
+						'paid_at'                => current_time( 'mysql' ),
+						'raw_response'           => $invoice,
+					)
+				);
+			}
+		}
 
 		// On renewals (every invoice after the first) send two distinct
 		// messages: a transactional charge receipt, then a renewal
@@ -643,19 +716,25 @@ final class Stripe_Service {
 			)
 		);
 
-		Payments_Repository::create(
-			array(
-				'membership_id'          => $membership_id,
-				'amount'                 => ! empty( $session['amount_total'] ) ? ( (float) $session['amount_total'] / 100 ) : 0,
-				'currency'               => ! empty( $session['currency'] ) ? strtoupper( $session['currency'] ) : 'USD',
-				'payment_method'         => 'stripe_checkout',
-				'payment_gateway'        => 'stripe',
-				'gateway_transaction_id' => isset( $session['payment_intent'] ) ? sanitize_text_field( (string) $session['payment_intent'] ) : sanitize_text_field( (string) ( isset( $session['id'] ) ? $session['id'] : '' ) ),
-				'status'                 => 'completed',
-				'paid_at'                => current_time( 'mysql' ),
-				'raw_response'           => $session,
-			)
-		);
+		$checkout_txn_id = isset( $session['payment_intent'] )
+			? sanitize_text_field( (string) $session['payment_intent'] )
+			: sanitize_text_field( (string) ( isset( $session['id'] ) ? $session['id'] : '' ) );
+		$existing_payment = '' !== $checkout_txn_id ? Payments_Repository::get_by_gateway_transaction_id( $checkout_txn_id ) : null;
+		if ( ! $existing_payment ) {
+			Payments_Repository::create(
+				array(
+					'membership_id'          => $membership_id,
+					'amount'                 => ! empty( $session['amount_total'] ) ? ( (float) $session['amount_total'] / 100 ) : 0,
+					'currency'               => ! empty( $session['currency'] ) ? strtoupper( $session['currency'] ) : 'USD',
+					'payment_method'         => 'stripe_checkout',
+					'payment_gateway'        => 'stripe',
+					'gateway_transaction_id' => $checkout_txn_id,
+					'status'                 => 'completed',
+					'paid_at'                => current_time( 'mysql' ),
+					'raw_response'           => $session,
+				)
+			);
+		}
 
 		Activity_Repository::log(
 			array(
@@ -691,15 +770,21 @@ final class Stripe_Service {
 	}
 
 	private static function handle_subscription_deleted( $subscription ) {
-		$membership_id = ! empty( $subscription['metadata']['membership_id'] ) ? absint( $subscription['metadata']['membership_id'] ) : 0;
-
-		// Fallback: subscription cancelled events sometimes don't carry our metadata
-		// if the subscription was created outside our flow. Match by sub-id instead.
-		if ( ! $membership_id && ! empty( $subscription['id'] ) ) {
+		// Trust the subscription_id over metadata: metadata can be stale (the
+		// subscription may have been edited in the Stripe dashboard, or the
+		// metadata.membership_id may point at a different row after a
+		// re-subscribe), but stripe_subscription_id is authoritative on our
+		// side. Fall back to metadata only when no row maps to the sub id.
+		$membership_id = 0;
+		if ( ! empty( $subscription['id'] ) ) {
 			$existing = Memberships_Repository::get_by_stripe_subscription_id( sanitize_text_field( (string) $subscription['id'] ) );
 			if ( $existing ) {
 				$membership_id = (int) $existing['id'];
 			}
+		}
+
+		if ( ! $membership_id && ! empty( $subscription['metadata']['membership_id'] ) ) {
+			$membership_id = absint( $subscription['metadata']['membership_id'] );
 		}
 
 		if ( ! $membership_id ) {

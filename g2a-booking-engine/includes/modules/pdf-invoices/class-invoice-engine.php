@@ -24,6 +24,93 @@ class G2AB_Invoice_Engine {
 	const OPT_TAX_LABEL     = 'g2ab_invoice_tax_label';
 	const OPT_TAX_RATE      = 'g2ab_invoice_tax_rate';
 
+	public function __construct() {
+		// The invoice "Pay Now" CTA links to ?g2ab_pay={uuid}; without this
+		// handler the customer hits a 404. Resolve the booking and forward to
+		// the existing payment flow (Woo checkout if the bridge created an
+		// order, otherwise the frontend pay page).
+		add_action( 'template_redirect', array( $this, 'maybe_handle_pay_now' ) );
+	}
+
+	/**
+	 * Format an amount using the configured currency symbol.
+	 * Falls back to the raw amount with no symbol when the currency is unmapped.
+	 */
+	private function format_money( $amount ) {
+		$currency = get_option( 'g2ab_currency', 'USD' );
+		$symbols = array(
+			'USD' => '$',
+			'CAD' => 'CA$',
+			'GBP' => '£',
+			'EUR' => '€',
+			'AUD' => 'A$',
+			'NZD' => 'NZ$',
+		);
+		$sym = isset( $symbols[ $currency ] ) ? $symbols[ $currency ] : '';
+		return $sym . number_format( (float) $amount, 2 );
+	}
+
+	/**
+	 * Handle `?g2ab_pay={uuid}` — used by the "Pay Now" CTA on unpaid invoices
+	 * and emailed reminders. Redirects the visitor to the right place:
+	 *
+	 *   - If a WooCommerce order already exists for the booking → checkout
+	 *     pay-for-order URL.
+	 *   - Else → the frontend booking page with `?g2ab_pay={uuid}` so the
+	 *     existing inline pay flow can pick it up.
+	 *
+	 * If we can't resolve the booking we 404 cleanly rather than silently
+	 * leaking the lookup signal.
+	 */
+	public function maybe_handle_pay_now() {
+		if ( empty( $_GET['g2ab_pay'] ) ) {
+			return;
+		}
+		$uuid = sanitize_text_field( wp_unslash( $_GET['g2ab_pay'] ) );
+		if ( ! preg_match( '/^[a-f0-9-]{16,64}$/i', $uuid ) ) {
+			return; // not our UUID shape — let WP keep handling.
+		}
+		global $wpdb;
+		$booking = $wpdb->get_row( $wpdb->prepare(
+			"SELECT * FROM {$wpdb->prefix}g2ab_bookings WHERE uuid = %s LIMIT 1",
+			$uuid
+		) );
+		if ( ! $booking ) {
+			status_header( 404 );
+			wp_die( 'Booking not found.', 'Not Found', array( 'response' => 404 ) );
+		}
+
+		// 1. Prefer the WooCommerce pay-for-order URL when a WC order exists.
+		if ( ! empty( $booking->gateway_intent_id ) && 0 === strpos( (string) $booking->gateway_intent_id, 'wc_order:' ) && function_exists( 'wc_get_order' ) ) {
+			$order_id = (int) substr( $booking->gateway_intent_id, strlen( 'wc_order:' ) );
+			$order    = $order_id ? wc_get_order( $order_id ) : null;
+			if ( $order && is_callable( array( $order, 'get_checkout_payment_url' ) ) ) {
+				wp_safe_redirect( $order->get_checkout_payment_url( true ) );
+				exit;
+			}
+		}
+
+		// 2. Fall back: let a site-defined URL handle the pay state. Sites can
+		//    point `g2ab_pay_now_fallback_url` at the public booking page that
+		//    hosts the [g2ab_booking_form] shortcode; assets/js/frontend.js
+		//    already reads `?g2ab_pay={uuid}` and resumes payment.
+		$default_fallback = home_url( '/' );
+		$fallback = (string) apply_filters( 'g2ab_pay_now_fallback_url', $default_fallback, $booking );
+		// Never redirect to a URL that still carries g2ab_pay (would loop back here).
+		$fallback = remove_query_arg( 'g2ab_pay', $fallback );
+		$fallback = add_query_arg( 'g2ab_pay', $uuid, $fallback );
+
+		// If the fallback resolves to the SAME request we're handling, don't
+		// redirect — just let WP continue rendering home so the frontend JS
+		// picks up the pay state inline.
+		$current = isset( $_SERVER['REQUEST_URI'] ) ? esc_url_raw( home_url( wp_unslash( $_SERVER['REQUEST_URI'] ) ) ) : '';
+		if ( $current && trailingslashit( $current ) === trailingslashit( $fallback ) ) {
+			return;
+		}
+		wp_safe_redirect( $fallback );
+		exit;
+	}
+
 	/**
 	 * Generate PDF (or HTML fallback) and return ['type' => 'pdf'|'html', 'path' => ..., 'url' => ...].
 	 */
@@ -163,6 +250,18 @@ class G2AB_Invoice_Engine {
 
 	private function pdf_escape( $text ) {
 		$text = wp_strip_all_tags( (string) $text );
+		// Preserve accented characters by transliterating UTF-8 → ASCII when
+		// iconv is available. Without this, names like "José" / "Renée" render
+		// as "Jos " / "Ren e" in the lite PDF. iconv can return false or warn
+		// on hosts without the right charset map — fall back to the legacy
+		// strip in that case so we never produce broken bytes for the PDF
+		// stream.
+		if ( function_exists( 'iconv' ) ) {
+			$translit = @iconv( 'UTF-8', 'ASCII//TRANSLIT//IGNORE', $text ); // phpcs:ignore WordPress.PHP.NoSilencedErrors.Discouraged
+			if ( is_string( $translit ) && '' !== $translit ) {
+				$text = $translit;
+			}
+		}
 		$text = preg_replace( '/[^\x20-\x7E]/', ' ', $text );
 		return str_replace( array( '\\', '(', ')' ), array( '\\\\', '\\(', '\\)' ), $text );
 	}
@@ -334,18 +433,18 @@ table.inv__items td.right { text-align: right; }
 						</small>
 					</td>
 					<td class="right">1</td>
-					<td class="right">$<?php echo esc_html( number_format( $subtotal, 2 ) ); ?></td>
-					<td class="right">$<?php echo esc_html( number_format( $subtotal, 2 ) ); ?></td>
+					<td class="right"><?php echo esc_html( $this->format_money( $subtotal ) ); ?></td>
+					<td class="right"><?php echo esc_html( $this->format_money( $subtotal ) ); ?></td>
 				</tr>
 			</tbody>
 		</table>
 
 		<table class="inv__totals">
-			<tr><td>Subtotal</td><td class="right">$<?php echo esc_html( number_format( $subtotal, 2 ) ); ?></td></tr>
+			<tr><td>Subtotal</td><td class="right"><?php echo esc_html( $this->format_money( $subtotal ) ); ?></td></tr>
 			<?php if ( $tax_amount > 0 ) : ?>
-				<tr><td><?php echo esc_html( $tax_label ); ?> (<?php echo esc_html( $tax_rate ); ?>%)</td><td class="right">$<?php echo esc_html( number_format( $tax_amount, 2 ) ); ?></td></tr>
+				<tr><td><?php echo esc_html( $tax_label ); ?> (<?php echo esc_html( $tax_rate ); ?>%)</td><td class="right"><?php echo esc_html( $this->format_money( $tax_amount ) ); ?></td></tr>
 			<?php endif; ?>
-			<tr class="grand"><td>TOTAL</td><td class="right">$<?php echo esc_html( number_format( $total, 2 ) ); ?> <?php echo esc_html( $currency ); ?></td></tr>
+			<tr class="grand"><td>TOTAL</td><td class="right"><?php echo esc_html( $this->format_money( $total ) ); ?> <?php echo esc_html( $currency ); ?></td></tr>
 		</table>
 
 		<?php if ( ! in_array( $status, array( 'paid', 'completed' ), true ) ) : ?>

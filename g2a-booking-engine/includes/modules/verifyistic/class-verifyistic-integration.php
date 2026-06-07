@@ -52,6 +52,11 @@ final class G2AB_Module_Verifyistic {
 		// Enrich the booking row immediately after creation.
 		add_action( 'g2ab_booking_created', array( $this, 'enrich_booking_with_verification' ), 10, 2 );
 
+		// PRE-validation: with auto-accept on, treat the waiver requirement as
+		// satisfied for age-verified visitors so the booking controller doesn't
+		// reject the request before the POST-insert enrich hook ever runs.
+		add_filter( 'g2ab_waiver_satisfied', array( $this, 'auto_satisfy_waiver_for_verified' ), 10, 3 );
+
 		// Tiny REST endpoint to pre-fill the frontend form.
 		add_action( 'rest_api_init', array( $this, 'register_routes' ) );
 	}
@@ -211,6 +216,33 @@ final class G2AB_Module_Verifyistic {
 			'context'    => wp_json_encode( $meta['verifyistic'] ),
 			'created_at' => current_time( 'mysql' ),
 		) );
+	}
+
+	/**
+	 * If "auto-accept waiver for verified visitors" is on AND the visitor has a
+	 * valid Verifyistic record, mark the waiver requirement satisfied so the
+	 * REST controller doesn't reject the booking for a missing waiver checkbox.
+	 *
+	 * @param bool  $satisfied    Whether the waiver was already considered satisfied.
+	 * @param array $fields       Submitted form fields (unused, signature compat).
+	 * @param mixed $booking_type Booking type row (unused, signature compat).
+	 * @return bool
+	 */
+	public function auto_satisfy_waiver_for_verified( $satisfied, $fields = array(), $booking_type = null ) {
+		if ( $satisfied ) {
+			return true; // already satisfied — short-circuit.
+		}
+		if ( ! $this->is_enabled() ) {
+			return $satisfied;
+		}
+		if ( 1 !== (int) get_option( self::OPT_AUTO_WAIVER, 1 ) ) {
+			return $satisfied;
+		}
+		$verification = $this->get_current_verification();
+		if ( ! $verification ) {
+			return $satisfied;
+		}
+		return true;
 	}
 
 	public function register_routes() {

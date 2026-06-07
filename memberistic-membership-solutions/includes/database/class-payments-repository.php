@@ -25,6 +25,29 @@ final class Payments_Repository {
 		return $wpdb->get_results( $wpdb->prepare( 'SELECT * FROM ' . self::table() . ' WHERE membership_id = %d ORDER BY created_at DESC', $membership_id ), ARRAY_A ) ?: array();
 	}
 
+	/**
+	 * Lookup a payment row by its gateway transaction id (e.g. Stripe
+	 * payment_intent / invoice id). Used by the Stripe service to
+	 * suppress duplicate Payments_Repository::create() inserts when the
+	 * same charge is reported twice (e.g. checkout.session.completed +
+	 * invoice.payment_succeeded both fire for the first invoice).
+	 *
+	 * @param string $txn_id Gateway transaction id.
+	 * @return array<string,mixed>|null
+	 */
+	public static function get_by_gateway_transaction_id( $txn_id ) {
+		global $wpdb;
+		$txn_id = trim( (string) $txn_id );
+		if ( '' === $txn_id ) {
+			return null;
+		}
+		$row = $wpdb->get_row(
+			$wpdb->prepare( 'SELECT * FROM ' . self::table() . ' WHERE gateway_transaction_id = %s LIMIT 1', $txn_id ),
+			ARRAY_A
+		);
+		return $row ?: null;
+	}
+
 	public static function get_all( $args = array() ) {
 		global $wpdb;
 
@@ -155,13 +178,16 @@ final class Payments_Repository {
 	public static function stats_summary() {
 		global $wpdb;
 		$table   = self::table();
-		$year    = (int) gmdate( 'Y' );
-		$month   = (int) gmdate( 'm' );
-		$start_m = sprintf( '%04d-%02d-01 00:00:00', $year, $month );
-		$end_m   = gmdate( 'Y-m-t 23:59:59', strtotime( $start_m ) );
-		$prev_ts = strtotime( '-1 month', strtotime( $start_m ) );
-		$start_p = gmdate( 'Y-m-01 00:00:00', $prev_ts );
-		$end_p   = gmdate( 'Y-m-t 23:59:59', $prev_ts );
+		// Site-local (wp_date) anchored on current_time('timestamp') so the
+		// "this month" / "last month" KPIs match the calendar the staff see in
+		// the dashboard. Was UTC-via-gmdate, which silently rolled to the
+		// "next" month around 5pm at Mesa AZ (UTC-7) and other non-UTC sites.
+		$now_ts  = current_time( 'timestamp' );
+		$start_m = wp_date( 'Y-m-01 00:00:00', $now_ts );
+		$end_m   = wp_date( 'Y-m-t 23:59:59', $now_ts );
+		$prev_ts = strtotime( '-1 month', (int) strtotime( $start_m ) );
+		$start_p = wp_date( 'Y-m-01 00:00:00', $prev_ts );
+		$end_p   = wp_date( 'Y-m-t 23:59:59', $prev_ts );
 
 		$rev_this = (float) $wpdb->get_var( $wpdb->prepare(
 			"SELECT COALESCE(SUM(amount), 0) FROM {$table} WHERE status = %s AND paid_at BETWEEN %s AND %s",
@@ -291,7 +317,8 @@ final class Payments_Repository {
 
 		$months = max( 1, min( 36, (int) $months ) );
 		$table  = self::table();
-		$start  = gmdate( 'Y-m-01 00:00:00', strtotime( '-' . ( $months - 1 ) . ' months', time() ) );
+		$now_ts = current_time( 'timestamp' );
+		$start  = wp_date( 'Y-m-01 00:00:00', strtotime( '-' . ( $months - 1 ) . ' months', $now_ts ) );
 
 		$rows = $wpdb->get_results(
 			$wpdb->prepare(
@@ -313,9 +340,9 @@ final class Payments_Repository {
 
 		$series = array();
 		for ( $i = $months - 1; $i >= 0; $i-- ) {
-			$ts    = strtotime( '-' . $i . ' months', time() );
-			$key   = gmdate( 'Y-m', $ts );
-			$label = gmdate( 'M y', $ts );
+			$ts    = strtotime( '-' . $i . ' months', $now_ts );
+			$key   = wp_date( 'Y-m', $ts );
+			$label = wp_date( 'M y', $ts );
 
 			$series[] = array(
 				'month'   => $key,

@@ -492,7 +492,7 @@ class Mailer {
 			return false;
 		}
 		$dealer_email = self::dealer_email_for( $transfer );
-		if ( ! $dealer_email ) {
+		if ( is_wp_error( $dealer_email ) || ! $dealer_email ) {
 			return false;
 		}
 
@@ -545,7 +545,7 @@ class Mailer {
 			return false;
 		}
 		$dealer_email = self::dealer_email_for( $transfer );
-		if ( ! $dealer_email ) {
+		if ( is_wp_error( $dealer_email ) || ! $dealer_email ) {
 			return false;
 		}
 
@@ -658,13 +658,18 @@ class Mailer {
 	/**
 	 * Figure out the dealer email address.
 	 *
-	 * Resolution order (v1.2.0):
+	 * Resolution order:
 	 *   1. Dedicated `email` column on the dealers table.
 	 *   2. Legacy regex match against the dealer `notes` field (`email: foo@bar`).
 	 *   3. `wpistic_ffl_dealer_portal_email` filter for CRM / ATF API integrations.
-	 *   4. Admin notification email — last-resort so the message is never silently dropped.
+	 *
+	 * Returns WP_Error when none of the sources yield a usable address — the
+	 * admin-email fallback was removed because magic-link portal URLs must not
+	 * be delivered to a site admin who isn't the FFL dealer of record.
+	 *
+	 * @return string|\WP_Error
 	 */
-	private static function dealer_email_for( object $transfer ): string {
+	private static function dealer_email_for( object $transfer ) {
 		$dealer_email = '';
 
 		global $wpdb;
@@ -673,27 +678,25 @@ class Mailer {
 			(int) $transfer->dealer_id
 		) );
 
-		// 1. Dedicated email column (preferred)
 		if ( $row && ! empty( $row->email ) ) {
 			$dealer_email = sanitize_email( (string) $row->email );
 		}
 
-		// 2. Legacy `email: foo@bar` baked into notes
 		if ( ! $dealer_email && $row && ! empty( $row->notes ) && preg_match( '/email\s*[:=]\s*([^\s,;]+@[^\s,;]+)/i', (string) $row->notes, $m ) ) {
 			$dealer_email = sanitize_email( $m[1] );
 		}
 
-		// 3. Allow external integrations (CRM, ATF API) to provide the right address
 		$dealer_email = apply_filters( 'wpistic_ffl_dealer_portal_email', $dealer_email, $transfer );
 
 		if ( ! $dealer_email ) {
-			// 4. Fallback: notify the admin so they can forward manually. Safer than silent failure.
-			$dealer_email = self::admin_email();
 			self::log( sprintf(
-				'dealer_email_for: no email on dealer #%d — falling back to admin (%s)',
-				(int) $transfer->dealer_id,
-				$dealer_email
+				'dealer_email_for: no email on dealer #%d — portal magic link send skipped.',
+				(int) $transfer->dealer_id
 			) );
+			return new \WP_Error(
+				'wpistic_ffl_no_dealer_email',
+				sprintf( 'No dealer email on file for dealer #%d.', (int) $transfer->dealer_id )
+			);
 		}
 
 		return (string) $dealer_email;

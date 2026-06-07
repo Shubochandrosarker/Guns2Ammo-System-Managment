@@ -35,6 +35,62 @@ final class G2AB_Module_Memberistic {
 		add_filter( 'g2ab_user_is_member', array( $this, 'filter_user_is_member' ), 11, 3 );
 		add_filter( 'g2ab_booking_pricing', array( $this, 'filter_booking_pricing' ), 11, 4 );
 		add_filter( 'g2ab_booking_display_pricing', array( $this, 'filter_display_pricing' ), 11, 4 );
+
+		// Fail-safe: ensure the customer's email is at least upserted into the
+		// Memberistic People repository on booking creation so the booking ↔ person
+		// link doesn't silently disappear if the upstream Memberistic plugin is
+		// misconfigured. No-op when Memberistic isn't installed.
+		add_action( 'g2ab_booking_created', array( $this, 'failsafe_log_person' ), 20, 2 );
+	}
+
+	/**
+	 * Best-effort: when a booking is created, push the customer email into the
+	 * Memberistic People_Repository (if available). Catches all throwables —
+	 * never let a booking insert fail because the people log throws.
+	 *
+	 * @param mixed $booking_or_id Booking row, array, or id.
+	 * @param array $context       Optional context.
+	 * @return void
+	 */
+	public function failsafe_log_person( $booking_or_id, $context = array() ) {
+		if ( ! class_exists( '\\WordPressistic\\Memberistic\\Database\\People_Repository' ) ) {
+			return; // upstream plugin missing — silent no-op.
+		}
+		try {
+			$email = '';
+			$name  = '';
+			if ( is_object( $booking_or_id ) ) {
+				$email = (string) ( $booking_or_id->customer_email ?? '' );
+				$name  = (string) ( $booking_or_id->customer_name ?? '' );
+			} elseif ( is_array( $booking_or_id ) ) {
+				$email = (string) ( $booking_or_id['customer_email'] ?? '' );
+				$name  = (string) ( $booking_or_id['customer_name'] ?? '' );
+			} else {
+				$id = absint( $booking_or_id );
+				if ( $id ) {
+					global $wpdb;
+					$row = $wpdb->get_row( $wpdb->prepare(
+						"SELECT customer_email, customer_name FROM {$wpdb->prefix}g2ab_bookings WHERE id = %d LIMIT 1",
+						$id
+					) );
+					if ( $row ) {
+						$email = (string) $row->customer_email;
+						$name  = (string) $row->customer_name;
+					}
+				}
+			}
+			if ( ! $email || ! is_email( $email ) ) {
+				return;
+			}
+			$repo = '\\WordPressistic\\Memberistic\\Database\\People_Repository';
+			if ( is_callable( array( $repo, 'upsert_by_email' ) ) ) {
+				call_user_func( array( $repo, 'upsert_by_email' ), $email, array( 'name' => $name ) );
+			} elseif ( is_callable( array( $repo, 'upsertByEmail' ) ) ) {
+				call_user_func( array( $repo, 'upsertByEmail' ), $email, array( 'name' => $name ) );
+			}
+		} catch ( \Throwable $e ) {
+			error_log( '[G2AB Memberistic] failsafe_log_person: ' . $e->getMessage() );
+		}
 	}
 
 	public function is_enabled() {

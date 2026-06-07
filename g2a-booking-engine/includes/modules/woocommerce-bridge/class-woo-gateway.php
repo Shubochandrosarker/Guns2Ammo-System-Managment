@@ -55,22 +55,32 @@ class G2AB_Gateway_Woocommerce {
 			$order = wc_create_order();
 			if ( is_wp_error( $order ) ) return $order;
 
-			// Customer info from booking fields.
-			$fields = array();
-			if ( ! empty( $booking->fields ) ) {
-				$decoded = json_decode( $booking->fields, true );
-				if ( is_array( $decoded ) ) $fields = $decoded;
+			// Customer info from booking form_data. The bookings table column is
+			// `form_data` (LONGTEXT JSON) — there is no `fields` column. We also
+			// prefer the canonical customer_* columns when present, since
+			// form_data carries arbitrary form-builder keys that vary per form.
+			$form = array();
+			if ( ! empty( $booking->form_data ) ) {
+				$decoded = is_string( $booking->form_data )
+					? json_decode( $booking->form_data, true )
+					: ( is_array( $booking->form_data ) ? $booking->form_data : (array) $booking->form_data );
+				if ( is_array( $decoded ) ) $form = $decoded;
 			}
 
-			$first_name = $fields['first_name'] ?? '';
-			$last_name  = $fields['last_name'] ?? '';
-			if ( ! $first_name && ! empty( $fields['name'] ) ) {
-				$parts = explode( ' ', trim( $fields['name'] ), 2 );
+			$first_name = $form['first_name'] ?? '';
+			$last_name  = $form['last_name'] ?? '';
+			if ( ! $first_name && ! empty( $form['name'] ) ) {
+				$parts = explode( ' ', trim( $form['name'] ), 2 );
 				$first_name = $parts[0];
 				$last_name  = $parts[1] ?? '';
 			}
-			$email = $fields['email'] ?? '';
-			$phone = $fields['phone'] ?? '';
+			if ( ! $first_name && ! empty( $booking->customer_name ) ) {
+				$parts      = explode( ' ', trim( (string) $booking->customer_name ), 2 );
+				$first_name = $parts[0];
+				$last_name  = $last_name ?: ( $parts[1] ?? '' );
+			}
+			$email = $booking->customer_email ?? ( $form['email'] ?? '' );
+			$phone = $booking->customer_phone ?? ( $form['phone'] ?? '' );
 
 			$address = array(
 				'first_name' => $first_name,

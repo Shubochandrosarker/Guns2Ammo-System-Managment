@@ -497,7 +497,7 @@ class Admin {
 					phone          = VALUES(phone),
 					is_active      = VALUES(is_active),
 					last_synced    = VALUES(last_synced)',
-				$values
+				...$values
 			);
 
 			$wpdb->query( $sql ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared,WordPress.DB.DirectDatabaseQuery
@@ -600,6 +600,11 @@ class Admin {
 
 		if ( ! current_user_can( 'manage_woocommerce' ) ) {
 			wp_die( esc_html__( 'You do not have permission to export.', 'advanced-ffl-checkout' ), 403 );
+		}
+
+		$nonce = isset( $_GET['_wpnonce'] ) ? sanitize_text_field( wp_unslash( $_GET['_wpnonce'] ) ) : '';
+		if ( ! wp_verify_nonce( $nonce, 'wpistic_ffl_export' ) ) {
+			wp_die( esc_html__( 'Invalid or expired export link. Please re-open the Transfers screen and try again.', 'advanced-ffl-checkout' ), 403 );
 		}
 
 		// Optional status / date filters

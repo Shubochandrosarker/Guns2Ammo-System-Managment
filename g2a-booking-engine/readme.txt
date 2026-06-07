@@ -4,7 +4,7 @@ Tags: booking, reservation, scheduling, appointments, shooting range, firearms, 
 Requires at least: 6.2
 Tested up to: 6.5
 Requires PHP: 8.0
-Stable tag: 1.5.1
+Stable tag: 1.12.4
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -206,6 +206,49 @@ Yes. REST API at `/wp-json/g2a-booking/v1/` covers bookings, forms, calendar, fr
 7. Migration wizard — dry-run preview before live import.
 
 == Changelog ==
+
+= 1.12.4 =
+**Lifecycle, payment, and invoice correctness fixes.**
+
+* FIX: `{invoice_url}` merge tag in customer emails now includes the signed
+  `t=` token. Previously customers clicking the link were hit with a 403
+  because the renderer requires a valid HMAC token for guest access.
+* FIX: Email automation handlers now normalize the `g2ab_booking_*` hook
+  argument. Hooks fired with a booking id (vs. a row) used to collapse to
+  `[0 => 123]` inside `build_tags()`, blanking every merge tag in the
+  rendered email. A `resolve_booking()` helper now fetches the row by id
+  when needed, mirroring the PDF Invoices module.
+* FIX: Verifyistic auto-accept now satisfies the waiver requirement at the
+  REST validation layer via `g2ab_waiver_satisfied`. Previously the
+  enrichment ran POST-insert, so age-verified visitors were still blocked
+  by the controller's pre-insert waiver check.
+* FIX: Invoice "Pay Now" CTA (`?g2ab_pay={uuid}`) is now handled. Resolves
+  the booking, redirects to the existing WooCommerce pay-for-order URL if
+  a WC order exists, otherwise forwards to the public booking page so the
+  frontend script can resume the pay flow.
+* FIX: WooCommerce gateway billing prefill referenced a non-existent
+  `$booking->fields` column. Switched to the real `form_data` JSON column
+  and prefer the canonical `customer_*` row columns where present.
+* FIX: Hardcoded `$` currency symbol in invoice HTML and `booking_paid`
+  email templates now respects the `g2ab_currency` option (USD, CAD, GBP,
+  EUR, AUD, NZD). New `{amount_formatted}` merge tag exposes the
+  currency-aware value to custom templates.
+* FIX: PDF Lite generator transliterates accented characters via
+  `iconv('UTF-8','ASCII//TRANSLIT//IGNORE')` instead of stripping them to
+  spaces, so names like "José" / "Renée" render correctly. Falls back to
+  the legacy strip when iconv is unavailable.
+* PERF: Email reminder cron's `NOT IN (SELECT booking_id FROM g2ab_logs)`
+  subquery now has a composite `(event_type, booking_id)` index. New
+  installs already had this in dbDelta; existing installs get a one-shot
+  self-healing ALTER on the next admin/cron tick (guarded by the
+  `g2ab_logs_idx_v1` option flag).
+* NEW: Memberistic module now fires a fail-safe on `g2ab_booking_created`
+  that upserts the customer's email into the People_Repository when
+  present, so the booking-to-person link doesn't silently disappear when
+  the upstream plugin is misconfigured. No-op when Memberistic isn't
+  installed.
+* Version bumped to 1.12.4. Schema version stays at 1.6.1 (no new tables;
+  the index already lives in the dbDelta CREATE TABLE for fresh installs).
 
 = 1.12.3 =
 * FIX: Manual Booking (Bookings → Manual Booking) failed for every staff

@@ -6,6 +6,8 @@ $total_failed = Verifyistic_DB::get_count( 'failed' );
 $today_count  = Verifyistic_DB::get_today_count();
 $enabled      = get_option( 'verifyistic_enabled', '1' );
 $mode         = get_option( 'verifyistic_mode', 'dob' );
+$id_mode      = (int) get_option( 'verifyistic_id_verification', 0 );
+if ( $id_mode ) { $mode = 'id_face'; }
 $min_age      = get_option( 'verifyistic_min_age', '21' );
 $recent_logs  = Verifyistic_DB::get_logs( array( 'limit' => 8 ) );
 

@@ -124,7 +124,15 @@ final class Plugin {
 				Integrations\Booking_Engine::register();
 			}
 		} );
-		add_action( 'init', array( Integrations\WooCommerce_Bridge::class, 'register' ) );
+		// WooCommerce bridge is gated by its Integrations toggle. Was registered
+		// unconditionally — meaning a site that turned WooCommerce off in the
+		// Integrations panel would still fire WC order hooks (no-op when WC
+		// isn't installed, but still loaded and burning hooks unnecessarily).
+		add_action( 'init', function () {
+			if ( Integrations\Integrations_Registry::is_enabled( 'woocommerce' ) ) {
+				Integrations\WooCommerce_Bridge::register();
+			}
+		} );
 		add_action( 'init', array( Integrations\Verifyistic_Bridge::class, 'register' ) );
 		add_action( 'init', array( Scheduler::class, 'register' ) );
 		// Save handler for the Integrations page toggles.

@@ -339,8 +339,28 @@ class API {
 			$revenue = (float) ( $cur->revenue ?? 0 );
 			$orders  = (int) ( $cur->orders ?? 0 );
 			$aov     = $orders > 0 ? round( $revenue / $orders, 2 ) : 0;
+		} elseif ( class_exists( '\\Automattic\\WooCommerce\\Utilities\\OrderUtil' )
+			&& \Automattic\WooCommerce\Utilities\OrderUtil::custom_orders_table_usage_is_enabled()
+		) {
+			// HPOS path — bypass wp_posts entirely.
+			$revenue = 0.0;
+			$orders  = 0;
+			$query   = wc_get_orders( [
+				'status'       => [ 'processing', 'completed', 'on-hold' ],
+				'date_created' => '>=' . gmdate( 'Y-m-d H:i:s', strtotime( $since ) ),
+				'limit'        => -1,
+				'return'       => 'objects',
+			] );
+			foreach ( (array) $query as $o ) {
+				if ( $o instanceof \WC_Order ) {
+					$revenue += (float) $o->get_total();
+					$orders++;
+				}
+			}
+			$aov      = $orders > 0 ? round( $revenue / $orders, 2 ) : 0;
+			$prev_row = (object) [ 'orders' => 0, 'revenue' => 0 ];
 		} else {
-			// Fallback: query wp_posts directly
+			// Fallback: query wp_posts directly (legacy CPT storage).
 			$revenue = (float) $wpdb->get_var( $wpdb->prepare( // phpcs:ignore WordPress.DB
 				"SELECT COALESCE(SUM(pm.meta_value+0),0)
 				 FROM {$wpdb->posts} p
@@ -1115,7 +1135,7 @@ class API {
 
 		// Status names must match the TypeScript TransferStatus union in fflData.ts
 		$valid_statuses = [
-			'pending_selection', 'dealer_selected',
+			'pending_selection', 'dealer_selected', 'payment_confirmed',
 			'shipped_to_dealer', 'received_by_dealer',
 			'background_check', 'approved', 'delayed',
 			'denied', 'transferred', 'cancelled',

@@ -3,7 +3,7 @@
  * Plugin Name:       Advanced FFL Checkout Solutions — G2A Edition
  * Plugin URI:        https://wordpressistic.com/products/advanced-ffl-checkout
  * Description:       Federal Firearms License (FFL) dealer management, WooCommerce checkout integration, transfer tracking and one-click dealer confirmation portal — customized for the Guns2Ammo system (HPOS-safe order meta, brass/graphite branding, customer "My FFL Transfers" tab, NICS 3-day automation, SMS via Verifyistic, WC order ↔ transfer status bridge).
- * Version:           1.3.0
+ * Version:           1.4.0
  * Requires at least: 6.4
  * Requires PHP:      8.1
  * Author:            Wordpressistic
@@ -29,7 +29,7 @@ if ( version_compare( PHP_VERSION, '8.1', '<' ) ) {
 }
 
 // ── Constants ─────────────────────────────────────────────────────────────────
-define( 'WPISTIC_FFL_VERSION',   '1.3.0' );
+define( 'WPISTIC_FFL_VERSION',   '1.4.0' );
 define( 'WPISTIC_FFL_FILE',      __FILE__ );
 define( 'WPISTIC_FFL_PATH',      plugin_dir_path( __FILE__ ) );
 define( 'WPISTIC_FFL_URL',       plugin_dir_url( __FILE__ ) );
@@ -167,27 +167,72 @@ add_filter( 'cron_schedules', function ( array $schedules ): array {
 } );
 
 // ── CORS — allow G2A Dashboard (app.guns2ammo.com) to call WP REST API ───────
-add_action( 'init', function (): void {
-	$allowed_origins = array(
+// Scoped strictly to the plugin's REST namespace so we don't leak credentials
+// to unrelated WP REST routes or front-end pages.
+function wpistic_ffl_cors_allowed_origins(): array {
+	return array(
 		'https://app.guns2ammo.com',
 		'http://localhost:3000',
 		'http://localhost:5173',
 	);
+}
+
+function wpistic_ffl_request_is_plugin_route(): bool {
+	if ( isset( $_SERVER['REQUEST_URI'] ) ) {
+		$uri = wp_unslash( $_SERVER['REQUEST_URI'] );
+		if ( false !== strpos( $uri, '/wp-json/' . WPISTIC_FFL_REST_NS . '/' )
+			|| false !== strpos( $uri, '?rest_route=/' . WPISTIC_FFL_REST_NS . '/' )
+		) {
+			return true;
+		}
+	}
+	return false;
+}
+
+add_action( 'rest_api_init', function (): void {
+	add_filter( 'rest_pre_serve_request', function ( $served, $result, $request ) {
+		if ( ! $request instanceof \WP_REST_Request ) {
+			return $served;
+		}
+		$route = (string) $request->get_route();
+		if ( 0 !== strpos( $route, '/' . WPISTIC_FFL_REST_NS . '/' ) ) {
+			return $served;
+		}
+
+		$origin = isset( $_SERVER['HTTP_ORIGIN'] ) ? sanitize_text_field( wp_unslash( $_SERVER['HTTP_ORIGIN'] ) ) : '';
+		if ( $origin && in_array( $origin, wpistic_ffl_cors_allowed_origins(), true ) ) {
+			header( 'Access-Control-Allow-Origin: ' . $origin );
+			header( 'Access-Control-Allow-Credentials: true' );
+			header( 'Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS' );
+			header( 'Access-Control-Allow-Headers: Authorization, Content-Type, X-WP-Nonce, X-Requested-With' );
+			header( 'Access-Control-Max-Age: 600' );
+			header( 'Vary: Origin', false );
+		}
+		return $served;
+	}, 10, 3 );
+}, 5 );
+
+// OPTIONS preflight short-circuit — only for the plugin's REST routes.
+// Fires before WP's REST router so the browser sees a 200 without auth/cookies.
+add_action( 'init', function (): void {
+	if ( ! isset( $_SERVER['REQUEST_METHOD'] ) || 'OPTIONS' !== $_SERVER['REQUEST_METHOD'] ) {
+		return;
+	}
+	if ( ! wpistic_ffl_request_is_plugin_route() ) {
+		return;
+	}
 
 	$origin = isset( $_SERVER['HTTP_ORIGIN'] ) ? sanitize_text_field( wp_unslash( $_SERVER['HTTP_ORIGIN'] ) ) : '';
-
-	if ( in_array( $origin, $allowed_origins, true ) ) {
+	if ( $origin && in_array( $origin, wpistic_ffl_cors_allowed_origins(), true ) ) {
 		header( 'Access-Control-Allow-Origin: ' . $origin );
 		header( 'Access-Control-Allow-Credentials: true' );
 		header( 'Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS' );
 		header( 'Access-Control-Allow-Headers: Authorization, Content-Type, X-WP-Nonce, X-Requested-With' );
 		header( 'Access-Control-Max-Age: 600' );
+		header( 'Vary: Origin', false );
 	}
-
-	if ( isset( $_SERVER['REQUEST_METHOD'] ) && 'OPTIONS' === $_SERVER['REQUEST_METHOD'] ) {
-		status_header( 200 );
-		exit();
-	}
+	status_header( 200 );
+	exit();
 }, 1 );
 
 // ── Boot ──────────────────────────────────────────────────────────────────────

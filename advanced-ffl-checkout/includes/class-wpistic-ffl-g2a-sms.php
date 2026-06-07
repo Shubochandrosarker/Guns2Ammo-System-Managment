@@ -37,6 +37,27 @@ class G2A_SMS {
 
 	public function __construct() {
 		add_action( 'wpistic_ffl_transfer_status_changed', [ $this, 'dispatch' ], 20, 3 );
+		add_action( 'admin_notices',                       [ $this, 'maybe_warn_missing_verifyistic' ] );
+	}
+
+	/**
+	 * Surface a visible warning when SMS is enabled but Verifyistic is absent —
+	 * otherwise dispatches silently no-op and admins assume SMS is working.
+	 */
+	public function maybe_warn_missing_verifyistic(): void {
+		if ( ! current_user_can( 'manage_woocommerce' ) ) {
+			return;
+		}
+		$portal = get_option( 'wpistic_ffl_portal_settings', [] );
+		$sms_enabled = ! empty( $portal['sms_enabled'] )
+			|| (bool) apply_filters( 'wpistic_ffl_sms_enabled', true );
+		if ( ! $sms_enabled ) {
+			return;
+		}
+		if ( class_exists( '\\Verifyistic_Webhooks' ) ) {
+			return;
+		}
+		echo '<div class="notice notice-warning"><p><strong>Advanced FFL Checkout —</strong> SMS notifications are enabled but the Verifyistic plugin is not active. SMS will not be sent.</p></div>';
 	}
 
 	public function dispatch( int $transfer_id, string $old_status, string $new_status ): void {
