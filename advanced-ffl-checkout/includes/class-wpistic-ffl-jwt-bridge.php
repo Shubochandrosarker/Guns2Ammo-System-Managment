@@ -74,14 +74,18 @@ class JWT_Bridge {
 			return $meta_role;
 		}
 
-		// Map from WP capabilities — administrators stay owners, shop managers
-		// stay managers, but plain authenticated users default to 'none' so a
-		// stray WP login can't grant access to the dashboard.
+		// Map from WP capabilities
 		if ( user_can( $user, 'manage_options' ) || user_can( $user, 'administrator' ) ) {
 			return 'owner';
 		}
-		if ( user_can( $user, 'manage_woocommerce' ) ) {
+		if ( user_can( $user, 'edit_others_posts' ) || user_can( $user, 'manage_woocommerce' ) ) {
 			return 'manager';
+		}
+		// 'staff' must be earned: either an explicit WC capability or the meta
+		// flag set by an admin. Defaulting to 'staff' meant any WP subscriber
+		// who could mint a JWT got dashboard/crm/comms/ffl access.
+		if ( user_can( $user, 'manage_woocommerce' ) ) {
+			return 'staff';
 		}
 		return 'none';
 	}

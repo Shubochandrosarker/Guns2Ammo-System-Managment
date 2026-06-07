@@ -121,6 +121,9 @@ class Checkout {
 				<p class="wpistic-ffl-widget__lede"><?php esc_html_e( 'This order contains firearms that must transfer through a licensed FFL dealer. Search by ZIP, name, license number, or phone — recommended dealers shown first.', 'advanced-ffl-checkout' ); ?></p>
 			</div>
 
+			<!-- Saved-dealer Quick Pick (hydrated by JS when the user has any). -->
+			<div id="wpistic-ffl-saved" class="wpistic-ffl-saved" style="display:none;"></div>
+
 			<!-- Filter tabs -->
 			<div class="wpistic-ffl-tabs" role="tablist">
 				<button type="button" class="wpistic-ffl-tab is-active" data-tab="zip" role="tab" aria-selected="true"><?php esc_html_e( '📍 By ZIP', 'advanced-ffl-checkout' ); ?></button>
@@ -217,6 +220,12 @@ class Checkout {
 				<button type="button" id="wpistic-ffl-change-btn" class="wpistic-ffl-btn wpistic-ffl-btn--ghost"><?php esc_html_e( 'Change Dealer', 'advanced-ffl-checkout' ); ?></button>
 			</div>
 
+			<!-- Honeypot — real users never see/fill this; bots do. -->
+			<label class="wpistic-ffl-hp" aria-hidden="true" style="position:absolute;left:-99999px;width:1px;height:1px;overflow:hidden;">
+				<?php esc_html_e( 'Dealer URL (leave blank)', 'advanced-ffl-checkout' ); ?>
+				<input type="text" name="wpistic_ffl_hp" value="" tabindex="-1" autocomplete="off">
+			</label>
+
 			<!-- Hidden fields -->
 			<input type="hidden" id="wpistic_ffl_dealer_id"   name="wpistic_ffl_dealer_id"   value="">
 			<input type="hidden" id="wpistic_ffl_dealer_name" name="wpistic_ffl_dealer_name" value="">
@@ -231,7 +240,18 @@ class Checkout {
 			return;
 		}
 
-		$dealer_id = (int) ( $_POST['wpistic_ffl_dealer_id'] ?? 0 ); // phpcs:ignore WordPress.Security.NonceVerification
+		// phpcs:disable WordPress.Security.NonceVerification
+		// Honeypot — bots fill any visible-looking text input. Silent reject.
+		if ( ! empty( $_POST['wpistic_ffl_hp'] ) ) {
+			wc_add_notice(
+				__( 'Your submission was flagged by our spam filter. Please reload and try again.', 'advanced-ffl-checkout' ),
+				'error'
+			);
+			return;
+		}
+
+		$dealer_id = (int) ( $_POST['wpistic_ffl_dealer_id'] ?? 0 );
+		// phpcs:enable
 		if ( ! $dealer_id ) {
 			wc_add_notice(
 				__( 'Please select an FFL dealer before placing your order.', 'advanced-ffl-checkout' ),
@@ -319,17 +339,6 @@ class Checkout {
 			return;
 		}
 
-		// Resolve the dealer row up front so we can run a state-pair audit.
-		global $wpdb;
-		$dealer = $wpdb->get_row( $wpdb->prepare( // phpcs:ignore WordPress.DB.DirectDatabaseQuery
-			'SELECT id, business_name, premise_state FROM ' . DB::table( 'dealers' ) . ' WHERE id = %d LIMIT 1',
-			$dealer_id
-		) );
-		if ( $dealer ) {
-			// Advisory only — logs a compliance event when state info is missing.
-			Compliance::validate_dealer_for_buyer( $dealer, $order );
-		}
-
 		// Find the first FFL item
 		$ffl_item     = null;
 		$ffl_product  = null;
@@ -346,7 +355,17 @@ class Checkout {
 			return;
 		}
 
+		global $wpdb;
 		$ref = 'G2A-' . strtoupper( substr( uniqid( '', true ), -8 ) );
+
+		// Advisory: log when dealer state and buyer billing state don't match.
+		$dealer_row = $wpdb->get_row( $wpdb->prepare( // phpcs:ignore WordPress.DB.DirectDatabaseQuery
+			'SELECT id, state FROM ' . DB::table( 'dealers' ) . ' WHERE id = %d LIMIT 1',
+			$dealer_id
+		) );
+		if ( $dealer_row ) {
+			Compliance::validate_dealer_for_buyer( $dealer_row, $order );
+		}
 
 		$wpdb->insert( DB::table( 'transfers' ), [ // phpcs:ignore WordPress.DB.DirectDatabaseQuery
 			'transfer_ref'     => $ref,
@@ -390,10 +409,9 @@ class Checkout {
 			$can_notify_dealer = $order->is_paid() && ! empty( $portal_settings['enabled'] ) && ! empty( $portal_settings['notify_dealer_on_order'] );
 			$can_notify_dealer = (bool) apply_filters( 'wpistic_ffl_can_notify_dealer_on_order', $can_notify_dealer, $order, $transfer_id );
 			if ( $can_notify_dealer ) {
-				// Async — never block checkout on SMTP.
-				if ( ! wp_next_scheduled( 'wpistic_ffl_async_issue_dealer_token', [ $transfer_id ] ) ) {
-					wp_schedule_single_event( time() + 5, 'wpistic_ffl_async_issue_dealer_token', [ $transfer_id ] );
-				}
+				// Async — never block checkout on SMTP. Routes through
+				// Action Scheduler when available, WP-Cron otherwise.
+				G2A_Scheduler::async( 'wpistic_ffl_async_issue_dealer_token', [ $transfer_id ] );
 			}
 
 			do_action( 'wpistic_ffl_transfer_created', $transfer_id, $order_id );
@@ -494,7 +512,9 @@ class Checkout {
 			);
 		}
 
-		wp_localize_script( 'wpistic-ffl-checkout', 'wpistic_ffl', [
+		// Filter-able payload so feature classes (e.g. saved dealers) can
+		// extend the localized data without touching Checkout.
+		$localized = apply_filters( 'wpistic_ffl_checkout_localize', [
 			'api_url'   => rest_url( WPISTIC_FFL_REST_NS . '/dealers/search' ),
 			'nonce'     => wp_create_nonce( 'wp_rest' ),
 			'radius'    => (int) ( $settings['default_radius'] ?? 50 ),
@@ -517,6 +537,7 @@ class Checkout {
 				'no_geo'       => __( 'Address only — not yet on the map', 'advanced-ffl-checkout' ),
 			],
 		] );
+		wp_localize_script( 'wpistic-ffl-checkout', 'wpistic_ffl', $localized );
 	}
 
 	// ── Helpers ───────────────────────────────────────────────────────────────

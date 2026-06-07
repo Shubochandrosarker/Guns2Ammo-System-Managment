@@ -197,6 +197,12 @@ class Mailer {
 	}
 
 	private static function email_customer_dealer_received( object $transfer ): void {
+		// G2A: attach a tentative .ics pickup invite so the customer can one-tap
+		// block off time to visit the dealer. Tentative + has a 1-hour reminder.
+		$ics_path = null;
+		if ( class_exists( '\WpisticFFL\G2A_Ics' ) ) {
+			$ics_path = \WpisticFFL\G2A_Ics::build_temp_file( $transfer );
+		}
 		self::send(
 			$transfer->customer_email,
 			sprintf( __( 'Item Arrived at Dealer — FFL Transfer #%s', 'advanced-ffl-checkout' ), $transfer->transfer_ref ),
@@ -206,10 +212,16 @@ class Mailer {
 				sprintf(
 					__( 'Your firearm has been received by <strong>%s</strong>. The dealer will contact you to schedule your background check and pickup.', 'advanced-ffl-checkout' ),
 					esc_html( $transfer->dealer_name )
-				) . self::dealer_block( $transfer ),
+				) . self::dealer_block( $transfer )
+				. ( $ics_path ? '<p style="margin-top:14px;font-size:13px;opacity:.8;">📅 ' . esc_html__( 'A tentative calendar invite is attached — use it as a starting point for your pickup appointment.', 'advanced-ffl-checkout' ) . '</p>' : '' ),
 				'primary'
-			)
+			),
+			'', // legacy nonce arg unused
+			$ics_path ? [ $ics_path ] : []
 		);
+		if ( $ics_path && file_exists( $ics_path ) ) {
+			@unlink( $ics_path ); // phpcs:ignore WordPress.PHP.NoSilencedErrors
+		}
 	}
 
 	private static function email_customer_nics_pending( object $transfer ): void {
@@ -317,7 +329,7 @@ class Mailer {
 
 	// ── Email utilities ───────────────────────────────────────────────────────
 
-	private static function send( string $to, string $subject, string $body, string $nonce = '' ): bool {
+	private static function send( string $to, string $subject, string $body, string $nonce = '', array $attachments = [] ): bool {
 		// v1.1.4 — deliverability headers to reduce spam-folder routing
 		$site_host  = wp_parse_url( home_url(), PHP_URL_HOST );
 		$from_email = self::admin_email();
@@ -353,7 +365,7 @@ class Mailer {
 		};
 		add_action( 'wp_mail_failed', $capture );
 
-		$ok = wp_mail( $to, $subject, $body, $headers );
+		$ok = wp_mail( $to, $subject, $body, $headers, $attachments );
 
 		remove_action( 'wp_mail_failed', $capture );
 		remove_action( 'phpmailer_init', $plain_text_cb );
@@ -400,6 +412,10 @@ class Mailer {
 		$year        = date( 'Y' );
 		$ffl_license = $theme['ffl_license'] ?? '';
 
+		// G2A: every customer email gets a "view your transfer" CTA pointing at
+		// the public tracking page so users always have a one-click status check.
+		$track_url   = \WpisticFFL\G2A_Customer_Tracking::url_for( (string) $transfer->transfer_ref );
+
 		$accent_map = [
 			'primary' => $theme['color_primary'],
 			'success' => $theme['color_success'],
@@ -445,6 +461,15 @@ class Mailer {
       <p style="margin:0;font-size:11px;color:' . esc_attr( $text_muted ) . ';text-transform:uppercase;letter-spacing:.08em;">Transfer Reference</p>
       <p style="margin:4px 0 0;font-size:20px;font-weight:700;color:' . esc_attr( $accent ) . ';letter-spacing:1px;font-family:ui-monospace,SFMono-Regular,monospace;">' . esc_html( $transfer->transfer_ref ) . '</p>
     </div>
+
+    <!-- View status CTA -->
+    <table width="100%" cellpadding="0" cellspacing="0" style="margin:8px 0 4px;">
+      <tr><td align="center">
+        <a href="' . esc_url( $track_url ) . '" style="display:inline-block;background:' . esc_attr( $accent ) . ';color:#0F0E12;padding:12px 28px;border-radius:10px;font-size:14px;font-weight:800;text-decoration:none;letter-spacing:.02em;">' .
+        esc_html__( 'View Transfer Status', 'advanced-ffl-checkout' ) .
+        '</a>
+      </td></tr>
+    </table>
   </td></tr>
 
   <!-- Footer -->
@@ -656,16 +681,86 @@ class Mailer {
 	}
 
 	/**
+	 * Public wrapper for the dealer-email resolver — used by the Portal
+	 * class to display the masked recipient on the OTP form. Same fallback
+	 * chain as the private method but without the audit-log side effect.
+	 */
+	public static function resolve_dealer_email_public( object $transfer ): string {
+		$email = self::dealer_email_for( $transfer );
+		return is_wp_error( $email ) ? '' : (string) $email;
+	}
+
+	/**
+	 * Send a one-time passcode to the dealer's email for portal 2FA.
+	 * Brand-aligned, 10-minute expiry shown, manual paste-in fallback if
+	 * the dealer's email client mangles the magic-link.
+	 */
+	public static function send_dealer_otp_email( int $transfer_id, string $code ): bool {
+		$transfer = self::fetch_transfer_for_portal( $transfer_id );
+		if ( ! $transfer ) {
+			return false;
+		}
+		$to = self::dealer_email_for( $transfer );
+		if ( is_wp_error( $to ) || ! $to ) {
+			return false;
+		}
+		$theme   = \WpisticFFL\Theming::settings();
+		$accent  = $theme['color_primary'];
+		$bg      = $theme['color_bg'];
+		$surface = $theme['color_surface'];
+		$text    = $theme['color_text'];
+		$muted   = $theme['color_text_muted'];
+		$border  = $theme['color_border'];
+		$store   = $theme['business_name'] ?: get_bloginfo( 'name' );
+
+		$subject = sprintf(
+			/* translators: 1: store, 2: transfer ref */
+			__( '%1$s — Your FFL Portal Verification Code (#%2$s)', 'advanced-ffl-checkout' ),
+			$store,
+			$transfer->transfer_ref
+		);
+
+		$body = '<!DOCTYPE html><html><head><meta charset="UTF-8"></head>
+<body style="margin:0;padding:0;background:' . esc_attr( $bg ) . ';font-family:-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,sans-serif;color:' . esc_attr( $text ) . ';">
+<table width="100%" cellpadding="0" cellspacing="0" style="padding:32px 0;background:' . esc_attr( $bg ) . ';">
+<tr><td align="center">
+<table width="520" cellpadding="0" cellspacing="0" style="background:' . esc_attr( $surface ) . ';border:1px solid ' . esc_attr( $border ) . ';border-radius:14px;overflow:hidden;">
+  <tr><td style="background:' . esc_attr( $accent ) . ';padding:22px 28px;text-align:center;">
+    <span style="color:#0F0E12;font-size:20px;font-weight:800;letter-spacing:-.01em;">' . esc_html( $store ) . '</span><br>
+    <span style="color:#0F0E12;font-size:11px;letter-spacing:.16em;text-transform:uppercase;opacity:.8;">Secure FFL Portal · Verification Code</span>
+  </td></tr>
+  <tr><td style="padding:30px 32px 6px;text-align:center;">
+    <p style="margin:0;font-size:14px;color:' . esc_attr( $muted ) . ';">' . esc_html__( 'Use this code to confirm receipt of FFL transfer', 'advanced-ffl-checkout' ) . '</p>
+    <p style="margin:6px 0 18px;font-size:13px;color:' . esc_attr( $text ) . ';font-family:ui-monospace,SFMono-Regular,monospace;">#' . esc_html( $transfer->transfer_ref ) . '</p>
+    <div style="display:inline-block;padding:16px 28px;background:' . esc_attr( $bg ) . ';border:1.5px solid ' . esc_attr( $accent ) . ';border-radius:10px;">
+      <span style="font-family:ui-monospace,SFMono-Regular,monospace;font-size:32px;font-weight:800;letter-spacing:.4em;color:' . esc_attr( $accent ) . ';">' . esc_html( $code ) . '</span>
+    </div>
+    <p style="margin:18px 0 0;font-size:12px;color:' . esc_attr( $muted ) . ';">' . esc_html__( 'This code expires in 10 minutes and can only be used once.', 'advanced-ffl-checkout' ) . '</p>
+  </td></tr>
+  <tr><td style="padding:18px 32px 28px;text-align:center;">
+    <p style="margin:0;font-size:12px;color:' . esc_attr( $muted ) . ';line-height:1.5;">' . esc_html__( "If you didn't request this code, you can safely ignore this email — no action will be taken on your FFL.", 'advanced-ffl-checkout' ) . '</p>
+  </td></tr>
+</table>
+</td></tr>
+</table>
+</body></html>';
+
+		return self::send( $to, $subject, $body );
+	}
+
+	/**
 	 * Figure out the dealer email address.
 	 *
-	 * Resolution order:
+	 * Resolution order (v1.2.0):
 	 *   1. Dedicated `email` column on the dealers table.
 	 *   2. Legacy regex match against the dealer `notes` field (`email: foo@bar`).
 	 *   3. `wpistic_ffl_dealer_portal_email` filter for CRM / ATF API integrations.
-	 *
-	 * Returns WP_Error when none of the sources yield a usable address — the
-	 * admin-email fallback was removed because magic-link portal URLs must not
-	 * be delivered to a site admin who isn't the FFL dealer of record.
+	 *   4. Admin notification email — last-resort so the message is never silently dropped.
+	 */
+	/**
+	 * Resolve the dealer's email for portal mail. Returns a WP_Error when the
+	 * only available address is the site admin — callers should guard rather
+	 * than silently mail confidential portal links to the wrong recipient.
 	 *
 	 * @return string|\WP_Error
 	 */
@@ -678,24 +773,27 @@ class Mailer {
 			(int) $transfer->dealer_id
 		) );
 
+		// 1. Dedicated email column (preferred)
 		if ( $row && ! empty( $row->email ) ) {
 			$dealer_email = sanitize_email( (string) $row->email );
 		}
 
+		// 2. Legacy `email: foo@bar` baked into notes
 		if ( ! $dealer_email && $row && ! empty( $row->notes ) && preg_match( '/email\s*[:=]\s*([^\s,;]+@[^\s,;]+)/i', (string) $row->notes, $m ) ) {
 			$dealer_email = sanitize_email( $m[1] );
 		}
 
+		// 3. Allow external integrations (CRM, ATF API) to provide the right address
 		$dealer_email = apply_filters( 'wpistic_ffl_dealer_portal_email', $dealer_email, $transfer );
 
 		if ( ! $dealer_email ) {
 			self::log( sprintf(
-				'dealer_email_for: no email on dealer #%d — portal magic link send skipped.',
+				'dealer_email_for: no email on dealer #%d — refusing to fall back to admin.',
 				(int) $transfer->dealer_id
 			) );
 			return new \WP_Error(
-				'wpistic_ffl_no_dealer_email',
-				sprintf( 'No dealer email on file for dealer #%d.', (int) $transfer->dealer_id )
+				'no_dealer_email',
+				sprintf( 'No deliverable email address on dealer #%d.', (int) $transfer->dealer_id )
 			);
 		}
 

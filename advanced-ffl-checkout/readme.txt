@@ -4,7 +4,7 @@ Tags: FFL, firearms, WooCommerce, dealer, checkout, ATF, transfer, NICS, guns2am
 Requires at least: 6.4
 Tested up to: 6.7
 Requires PHP: 8.1
-Stable tag: 1.4.0
+Stable tag: 1.7.3
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -29,10 +29,9 @@ Complete Federal Firearms License (FFL) dealer management, WooCommerce checkout 
 * Automatic background processing with progress tracking
 
 **ZIP Code Engine**
-* On-demand ZIP centroid resolution via the free zippopotam.us service
-* Results are cached locally in the `zip_coords` table the first time a ZIP is queried — no large bundled dataset, no activation-time download
-* Powers Haversine distance queries on subsequent searches without external API calls
-* Hardened against upstream outages with a short timeout and a failure cache to prevent retry storms
+* On-demand ZIP centroid lookup via the public zippopotam.us API — fetched the first time each ZIP is searched, then cached locally so repeat searches are free
+* No bulk 43k-row activation import; the plugin warms its own cache as customers shop
+* Powers instant Haversine distance queries against the local cache once a ZIP has been seen
 
 **Transfer Lifecycle Tracking**
 * Full 11-stage pipeline: dealer selected → payment confirmed → shipped → at dealer → NICS pending/delayed/approved/denied → transferred
@@ -80,8 +79,8 @@ All endpoints under namespace `wpistic-ffl/v1`:
 1. Upload the `advanced-ffl-checkout` folder to `/wp-content/plugins/`
 2. Activate the plugin through the **Plugins** menu in WordPress
 3. Navigate to **Advanced FFL → Dashboard** in your admin menu
-4. Run **Sync ATF Dealers** to import the current month's ATF FFL licensee list (chunked, resumable in the background)
-5. ZIP centroids are resolved on demand the first time each ZIP is searched — no separate import step
+4. Click **Import ZIP Codes** to start the ZIP centroid import
+5. The ATF dealer database will begin syncing automatically after ZIP import completes
 6. Mark products as **FFL Transfer Required** in each product's general settings
 7. Configure email and checkout options under **Advanced FFL → Settings**
 
@@ -100,12 +99,12 @@ All endpoints under namespace `wpistic-ffl/v1`:
 
 = How does dealer distance search work without a Google Maps API key? =
 
-The first time a customer enters a ZIP code that the plugin hasn't seen before, the lat/lng is resolved from the free zippopotam.us lookup service and cached in the local `zip_coords` table. Subsequent searches use that cached row and run a Haversine SQL query against dealer ZIP centroids with no external API calls. Google Maps is optional and only powers the visual map widget.
+The plugin looks up ZIP centroids on demand from the public zippopotam.us API the first time each ZIP is searched, then caches the lat/lng row locally. From then on it runs a pure-SQL Haversine query against dealer ZIP centroids — no external API call at search time. Google Maps is optional for the visual map widget only.
 
 = How long does the initial data import take? =
 
-ZIP centroids are populated lazily as customers search, so there is no activation-time ZIP import to wait for.
-ATF dealer sync: 2-4 hours of background processing (~80k dealers across 55 state CSV files), fully resumable — a server restart or power outage will not restart from zero.
+ZIP cache: warms itself as customers search (no bulk activation import). Each unseen ZIP costs one cached API call (~200ms) the first time.
+ATF dealer sync: 2-4 hours of background processing (~80k dealers across 55 state CSV files). Fully resumable — a server restart or power outage will not restart from zero.
 
 = How do I mark a product as requiring FFL transfer? =
 
@@ -129,20 +128,108 @@ Yes. The plugin is fully self-contained. The dashboard integration is optional.
 
 == Changelog ==
 
-= 1.4.0 =
-* SECURITY: CORS handler is now scoped strictly to the `wpistic-ffl/v1` REST namespace via `rest_pre_serve_request` — `Access-Control-Allow-Origin` and `Allow-Credentials` are no longer emitted on every request. OPTIONS preflight short-circuit is likewise limited to the plugin's REST routes.
-* SECURITY: State-compliance checkout violations are now hard errors that block the order by default. A new `wpistic_ffl_compliance_strict` option (default `1`) lets stores opt back into legacy warning-only behavior.
-* SECURITY: Theme-bridge no longer captures arbitrary `g2a_request` submissions whose subject merely contains the word "transfer" — strict match on `FFL Transfer Request` (subject) or `ffl_transfer` (form_type).
-* SECURITY: Admin CSV export now requires a valid `wpistic_ffl_export` nonce; export link is wrapped in `wp_nonce_url()`.
-* SECURITY: JWT bridge no longer falls through to `staff` for any authenticated WP user — default role is `none` and the resulting permission list is empty unless the user has `manage_woocommerce` or an explicit `wpistic_ffl_g2a_role` meta entry.
-* SECURITY: Dealer portal magic-link emails are no longer silently rerouted to the site admin when a dealer has no email on file — `Mailer::dealer_email_for()` returns a `WP_Error` and the send is skipped with a mail-log entry.
-* RELIABILITY: ATF full sync no longer pre-marks every dealer inactive before the download/import. A new `Sync::mark_unseen_dealers_inactive()` runs only after a successful import with non-zero rows, so a mid-run failure can never empty the checkout dealer selector.
-* RELIABILITY: `update_transfer_status` REST endpoint accepts `payment_confirmed` as a valid status.
-* RELIABILITY: Admin bulk-upsert SQL now passes positional placeholders via the spread operator (`...$values`) to match the same fix already shipped in the cron sync path.
-* COMPLIANCE: New `Compliance::validate_dealer_for_buyer()` runs an advisory state-pair audit when a transfer is created — missing dealer or buyer state is logged to the events table. TODO marker left in place for an admin-managed state-pair allow-list.
-* ANALYTICS: WooCommerce KPI query now uses `wc_get_orders()` on HPOS-only stores instead of reading `wp_posts` directly.
-* NOTICES: An admin notice now surfaces when SMS notifications are enabled but the Verifyistic plugin is missing — previously the dispatch was a silent no-op.
-* DOCS: ZIP-centroid description updated — there is no 43k-row activation import; centroids are resolved on demand via zippopotam.us and cached locally.
+= 1.7.3 — G2A Edition (Security + correctness audit pass) =
+SECURITY
+* CORS headers are now scoped to the plugin's REST namespace (`/wpistic-ffl/v1/`) via `rest_pre_serve_request` instead of being emitted globally on every WP request. Stops the dashboard's allow-list from leaking onto unrelated theme/plugin endpoints.
+* JWT bridge no longer defaults unknown users to the `staff` role; resolves to `none` (with `[]` permissions) unless `manage_woocommerce` is held or `wpistic_ffl_g2a_role` user meta is explicitly set. Fixes a privilege-escalation surface where any user who could mint a JWT got dashboard / CRM / FFL module access.
+* CSV transfer export now requires a `wpistic_ffl_export` nonce. The Export CSV button in `admin/views/transfers.php` is wrapped in `wp_nonce_url()`. Stops CSRF-induced data dumps.
+* Theme-bridge subject match (`G2A_Bridge`) tightened — was matching any subject containing the substring "transfer" (sweeping in "Transfer my membership", "Transfer a vehicle", etc.). Now requires the strict subject `ffl transfer request` or an explicit `form_type=ffl_transfer` field.
+* `Mailer::dealer_email_for()` now returns `WP_Error` instead of silently falling back to the site admin's address. Confidential dealer-portal links can no longer be misdelivered when a dealer has no `email` column set; callers (`send_dealer_confirmation_email`, `send_dealer_reminder_email`, OTP email) guard via `is_wp_error()`.
+
+CORRECTNESS
+* Compliance checkout notices now block checkout by default (`wc_add_notice( ..., 'error' )`). Strict mode can be opted out via `update_option( 'wpistic_ffl_compliance_strict', '0' )` for the legacy warning behavior.
+* New `Compliance::validate_dealer_for_buyer()` advisory log fires from `Checkout::create_transfer_on_payment()` when the selected dealer's state and the buyer's billing state aren't on an admin-defined allow-list. Logs only; never blocks.
+* `wpdb->prepare()` in `admin/class-wpistic-ffl-admin.php` line 500 now spreads `$values` instead of passing the array — the legacy form silently yields `null` on PHP 8.x and the bulk upsert wasn't running. (Matches the same fix already in `includes/class-wpistic-ffl-sync.php`.)
+* `payment_confirmed` added to the `$valid_statuses` whitelist in `API::update_transfer_status()`; that's the status `Checkout::create_transfer_on_payment` writes and it was being rejected with HTTP 400 when the dashboard tried to set it explicitly.
+* `Sync::start_full_sync()` no longer mass-inactivates every dealer up front. An aborted import would leave the whole dealer list disabled. We capture `started_at` and only sweep rows whose `last_synced` is older than this run via `Sync::mark_unseen_dealers_inactive()` at the end of `finish_sync()`, and only when at least one row was actually imported.
+* Analytics WooCommerce endpoint is now HPOS-aware. When HPOS is active and `wc_order_stats` is unavailable, revenue/orders fall back to `wc_get_orders()` instead of an empty `wp_posts` query. Status breakdown reads from `wc_orders` directly under HPOS.
+
+VISIBILITY
+* SMS class now surfaces an admin notice when SMS is enabled but `Verifyistic_Webhooks` is missing, instead of silently no-op'ing for the lifetime of the install.
+
+DOCS
+* readme.txt ZIP description corrected — the plugin uses on-demand zippopotam.us lookups with a local cache, not a bulk 43k-row activation import.
+
+= 1.7.2 — G2A Edition (Selected-dealer contrast + theme-bleed guard + responsive pass) =
+* FIX: **"Selected Dealer" card on checkout was white-on-white.** The card still carried the light-gradient background from the original design (`linear-gradient(180deg, #F0FDF4 0%, #FFFFFF 100%)`) but the text used the new `var(--wf-text)` (white). Replaced with a tinted-on-dark gradient matching the brass / success palette; the "Directions", phone, and "Change Dealer" links now pin to brass instead of inheriting the host theme's cyan link color.
+* NEW: **Theme bleed-through guard.** The Guns2Ammo theme paints anchors cyan and headings brass via `.entry-content` descendant rules — those were leaking into the widget. Added a scoped one-level guard inside `.wpistic-ffl-widget` for anchors, h1–h6, strong/b, label, p, and button elements. Wins the cascade against the theme without `!important` on every line.
+* NEW: **Inline JS color hard-codes removed** for the selected-dealer renderer (Directions + phone links). CSS now owns those colors so the brand is applied consistently and the JS payload shrinks.
+* NEW: **Expanded responsive breakpoints.** Old stylesheet had a single `max-width: 600px` rule; now layered at 980px (tablet — saved-dealer grid → 2-col), 720px (phone — card actions stack, results-bar collapses), and 480px (narrow phone — tabs go vertical, inputs upgrade to 44 px iOS-finger-target + 16 px font-size to defeat iOS focus-zoom).
+* FIX: Loading-message error variant repainted with semantic warning tokens — `rgba(232,128,47,0.12)` background + `var(--wf-warning)` text — instead of the old light-mode `#FEE2E2 / #991B1B` pair.
+* FIX: View-toggle "is-active" pill now uses `var(--wf-text)` foreground (was dark-on-dark `var(--wf-ink)` ⇒ unreadable).
+* FIX: `#wpistic-ffl-change-btn` specifically styled as a ghost button on dark surface; defeats theme button-default styling.
+
+= 1.7.1 — G2A Edition (Compliance audit accuracy patch) =
+* FIX: **Compliance audit no longer flags `wpistic_ffl_process_zip_import` as WARN when the ZIP import has legitimately completed.** The cron correctly self-cancels once `wpistic_ffl_zip_import_status` is `complete` — that's expected behavior, not a problem. Audit now reports PASS with "Work complete — cron correctly unscheduled".
+* FIX: Cron-check block also looks for **Action Scheduler-pending actions** (`as_next_scheduled_action`), not just WP-Cron. Async paths migrated to AS in v1.6 are now visible to the audit.
+
+= 1.7.0 — G2A Edition (Customer + Ops + Compliance roundup) =
+BRAND / UX
+* Critical contrast fix on the checkout widget — the dealer-list result count, card titles, and "Contact Dealer for Fee" were rendering with the brass-button contrast color on a dark surface, making them unreadable. Swapped every misuse of `--wf-ink` for `--wf-text`; recommended + selected dealer cards rebuilt with brass-tinted-on-dark backgrounds instead of light gradients.
+* Active tab now uses brass-on-dark for stronger brand alignment.
+
+CUSTOMER EXPERIENCE
+* "Request a different dealer" form on the public tracking page — visible only while the parcel is still pre-arrival; HMAC-signature-protected, honeypot, single click confirms.
+* .ics calendar invite auto-attached to the "your firearm is ready for pickup" email — next-business-day 12:00 local, 30 min window, 1-hour reminder, dealer name + address in LOCATION, pickup-checklist in DESCRIPTION.
+* Spanish (es_US) localization for the customer tracking page — `?lang=es` toggle, header link to flip.
+
+OPERATIONS / ANALYTICS
+* Generic outbound webhook dispatcher (G2A_Webhooks_Out) — POST every FFL event to Zapier / Make / n8n / custom CRM / Slack-relay endpoints. HMAC-signed via `X-Wpistic-Ffl-Signature`; failed deliveries retry with exponential backoff (1m / 5m / 30m / 2h / 12h). Per-endpoint event filter. Admin page at FFL → 🔌 Webhooks Out.
+* Operations Toolset (G2A_Ops_Tools) admin page at FFL → 🛠️ Ops Tools:
+  - **Bulk-set dealer transfer fee by state** (with "only if currently 0.00" safety toggle).
+  - **Customer LTV lookup** by email — total transfers, lifetime value (via WC), avg days from order → pickup, last dealer used, full recent-transfer list with one-click order links.
+  - **Dealer health alerts** — nightly cron flags dealers whose recent issue-reported rate exceeds 25% (min 5 transfers). Admin email fires when a new dealer joins the flagged list.
+
+SECURITY / COMPLIANCE
+* Admin TOTP 2FA (G2A_Admin_2FA) — opt-in per user from their Profile page. RFC 6238, Google Authenticator / Authy / 1Password compatible. Backup codes (8, single-use, SHA-256 hashed). Secret AES-256-CBC encrypted at rest with NONCE_SALT-derived key. Challenge interstitial blocks the admin UI until a valid code is entered. Validated against the RFC 4226 test vectors at smoke-test time.
+* WordPress personal-data exporter + eraser (G2A_Gdpr) — Tools → Export/Erase Personal Data now includes FFL transfers + saved dealers. Erasure anonymizes customer name/email/phone but retains the row for ATF compliance.
+* Form 4473 worksheet generator (G2A_Form_4473) at `/ffl-4473-draft/{transfer_id}/` — admin-only, browser-printable HTML page that pre-fills Section A/B/C/D field labels from the transfer record. Banner-stamped "DRAFT — NOT FOR ATF SUBMISSION" on every page.
+* State law engine expanded to all 50 states + DC (G2A_State_Laws) — top-up routine that adds a baseline rule for every previously-unseeded state. Hand-tuned states are never overwritten.
+
+REACH
+* Public dealer onboarding shortcode `[g2a_ffl_dealer_onboard]` — branded form FFLs can fill in to apply for inclusion. Honeypot + per-IP rate limit (3/hour). Submissions land in the events table + admin email.
+
+ADMIN ARTIFACTS
+* Per-dealer Scorecard PDF (G2A_Scorecard) at `/ffl-scorecard/{dealer_id}/` — admin-only, browser-printable 90-day report: total transfers, in-flight, completed, issues, avg ship→arrival days, portal-confirmation rate. Quarterly ATF-review-ready.
+
+= 1.6.0 — G2A Edition (OTP 2FA + Scheduler + Saved Dealers) =
+* G2A: **Email-OTP 2FA for the dealer portal** — when `two_factor_method = email_otp`, the portal auto-issues a 6-digit code to the dealer's email on first page load and renders an OTP input. Transient-backed (no schema migration), 10-minute expiry, hash-equals verification, 5-miss brute-force cap, throttled "Resend" link (1/min). Recipient address is shown masked (`j***@example.com`).
+* G2A: **New brand-aligned OTP email template** — short, clear, 32-pt monospace code, brass-on-graphite frame, 10-min expiry warning.
+* G2A: **G2A_Scheduler abstraction** — single class wrapping Action Scheduler (bundled with WC) with a graceful WP-Cron fallback. Gives us idempotent enqueue, retry policy, per-action logging at Tools → Scheduled Actions. Every existing async + recurring job migrated: dealer-token async, carrier daily poll. Async dealer email no longer stacks duplicate cron events under load.
+* G2A: **Deactivation cleanup hardened** — cancels every plugin hook from both engines (AS + WP-Cron) to prevent leaked schedules after plugin removal.
+* G2A: **Saved dealers / "quick pick" for repeat customers** — auto-populated after every successful FFL order (cap 5, most-recent first). Surfaced as a one-tap strip above the dealer search at checkout. Customer can pin a default or remove entries from the My Account → My FFL Transfers tab. REST endpoints `GET|POST|DELETE /me/saved-dealers` for the dashboard app.
+* G2A: **wpistic_ffl_checkout_localize filter** — feature classes can extend the localized JS payload without touching the Checkout class.
+* G2A: **Mailer::resolve_dealer_email_public** — public wrapper around the dealer-email resolver so the Portal can render a masked recipient on the OTP form without duplicating the fallback chain.
+
+= 1.5.0 — G2A Edition (Carrier API integration) =
+* G2A: **Live carrier status sync** — new G2A_Carrier_Providers class adds three ingestion paths so delivered parcels auto-advance the transfer to `received_by_dealer` without a manual dealer-portal click.
+* G2A: **Pull path** — daily WP-Cron (`wpistic_ffl_carrier_poll`) checks every in-flight transfer (status `shipped_to_dealer`, has tracking number) against EasyPost. One key covers UPS / USPS / FedEx / DHL / OnTrac.
+* G2A: **Push path** — REST endpoint `/wpistic-ffl/v1/carrier/webhook` accepts HMAC-signed events from EasyPost, Shippo, AfterShip, ShipStation (auto-detected by payload shape). Generic `X-Wpistic-Ffl-Signature` header also supported for custom integrations. Verification gate: `hash_equals( hash_hmac('sha256', body, secret), header )`.
+* G2A: **Manual "Check now"** AJAX action (`wpistic_ffl_carrier_check_now`) so any admin can on-demand poll the provider per transfer.
+* G2A: **📦 Carriers admin page** at Advanced FFL → 📦 Carriers — provider dropdown, EasyPost API key field, webhook URL display, HMAC secret with one-click rotate, toggle for auto-advance.
+* G2A: **Carrier check added to Compliance audit** — surfaces whether the integration is configured (pass/warn/info).
+* G2A: **wpistic_ffl_carrier_providers filter** — third-party providers can register themselves; `wpistic_ffl_carrier_webhook_verify` filter lets custom signature schemes override the default HMAC check.
+* G2A: **Audit-logged** — every carrier status reception (pull, push, manual) creates an `events` row + `analytics_events` row so the activity log shows the carrier event even when no status advance happens.
+
+= 1.4.0 — G2A Edition (Improvements pack) =
+* G2A: **Public customer tracking page** at `/track-transfer/{ref}/{sig}/` — HMAC-protected. Every customer email now includes a "View Transfer Status" CTA pointing here. Visual 5-step timeline (Order Placed → Shipped → Arrived → Background Check → Complete) plus dealer card with click-to-call and Maps directions.
+* G2A: **Activity Log admin page** at Advanced FFL → 📋 Activity Log. Surfaces a unified feed of the `events` and `analytics_events` tables — status changes, dealer portal actions, NICS 3-day flags, email sends, customer track-page views. One-click links to each transfer.
+* G2A: **Compliance & Security audit page** at Advanced FFL → 🛡️ Compliance. 15 real-time checks (WC active, HPOS declared, token secret in wp-config, trusted-proxy filter, JWT Auth, Verifyistic, cron health, ZIP/ATF data sizes, store FFL license, state rules, NICS attention queue, dealer-email coverage, active tokens, Memberistic).
+* G2A: **Regenerate HMAC token secret** admin action — rotates `wpistic_ffl_token_secret`, revokes every active dealer-portal token in one shot, audit-logged.
+* G2A: **Admin nag notice** if `WPISTIC_FFL_TOKEN_SECRET` is not defined in wp-config.php (dismissible, scoped to FFL pages).
+* G2A: **Carrier auto-advance** (G2A_Carrier) — when admin enters a tracking number on a pre-shipment transfer, status auto-flips to `shipped_to_dealer` and `shipped_date` defaults to today. Public carrier-track URLs generated for UPS, USPS, FedEx, DHL.
+* G2A: **Honeypot on the checkout dealer-selector widget** — silent reject for bots; real users never see the trap field.
+* G2A: **Google Maps "Directions" link** on the selected-dealer card so mobile shoppers can tap to navigate to the pickup point. Click-to-call phone link too.
+* G2A: **`wpistic_ffl_transfer_updated` action** fired from the central API status-update path. Plugins (and G2A_Carrier) can react to arbitrary column changes, not just status flips.
+* G2A: **`{tracking_url}` merge tag** added to `Theming::replace_tags()` and auto-derived from `{transfer_ref}` so email templates can drop the customer-tracking link inline.
+* G2A: **REST endpoints for the dashboard app**:
+  - `GET /wpistic-ffl/v1/activity` — paginated cross-table feed
+  - `GET /wpistic-ffl/v1/activity/summary` — daily counts, status breakdown, funnel
+  - `GET /wpistic-ffl/v1/transfers/{id}/details` — transfer + dealer + activity timeline + customer tracking URL
+  - `GET /wpistic-ffl/v1/compliance/audit` — full audit JSON
+* BRAND: full admin + checkout asset rebrand — admin.css purple variables remapped to brass tokens, menu icon switched to the FFL shield in brass, settings header SVG re-skinned, checkout widget CSS variables remapped to graphite + brass (mirrors `guns2ammo/assets/css/tokens.css`), Google Maps marker fill recolored.
+* SECURITY: Honeypot on the checkout widget closes the second-to-last attack surface (portal already had one).
+* DOCS: `Compliance & Security` page is self-documenting — points admins at exactly the line of wp-config / functions.php they need to touch.
 
 = 1.3.0 — G2A Edition =
 * G2A: **HPOS-safe order meta** — Dealer ID, name and ZIP now route through `$order->update_meta_data()` / `get_meta()` instead of `update_post_meta()`. Fixes silent failures on stores running HPOS-only mode.
