@@ -889,9 +889,13 @@ final class Memberships_Controller extends REST_Controller {
 		$people      = $wpdb->prefix . 'memberistic_people';
 		$memberships = $wpdb->prefix . 'memberistic_memberships';
 
+		// Site-local cutoffs anchored on current_time('timestamp'). Was UTC
+		// gmdate — mis-rolled around evening at Mesa AZ (UTC-7) and other
+		// non-UTC sites, flipping today's stats to "tomorrow".
+		$now_ts      = current_time( 'timestamp' );
 		$today_start = current_time( 'Y-m-d 00:00:00' );
-		$week_start  = gmdate( 'Y-m-d 00:00:00', strtotime( '-6 days' ) );
-		$month_start = gmdate( 'Y-m-01 00:00:00' );
+		$week_start  = wp_date( 'Y-m-d 00:00:00', strtotime( '-6 days', $now_ts ) );
+		$month_start = wp_date( 'Y-m-01 00:00:00', $now_ts );
 
 		$sent_today = (int) $wpdb->get_var( $wpdb->prepare( "SELECT COUNT(*) FROM {$logs} WHERE sent_at >= %s", $today_start ) );
 		$sent_week  = (int) $wpdb->get_var( $wpdb->prepare( "SELECT COUNT(*) FROM {$logs} WHERE sent_at >= %s", $week_start ) );
@@ -1507,12 +1511,22 @@ final class Memberships_Controller extends REST_Controller {
 		$header = isset( $_SERVER['HTTP_X_WC_WEBHOOK_SIGNATURE'] ) ? sanitize_text_field( wp_unslash( $_SERVER['HTTP_X_WC_WEBHOOK_SIGNATURE'] ) ) : '';
 		$body   = $request->get_body();
 
-		if ( '' !== $secret ) {
-			$expected = base64_encode( hash_hmac( 'sha256', $body, $secret, true ) );
+		// SECURITY: an empty secret previously short-circuited the signature
+		// check, leaving the webhook endpoint effectively open-auth — any
+		// unauthenticated POST would call sync_completed_order(). Refuse the
+		// request when the secret has not been configured.
+		if ( '' === $secret ) {
+			return new \WP_Error(
+				'memberistic_webhook_secret_missing',
+				__( 'Webhook secret is not configured', 'memberistic' ),
+				array( 'status' => 503 )
+			);
+		}
 
-			if ( '' === $header || ! hash_equals( $expected, $header ) ) {
-				return new \WP_Error( 'memberistic_woo_bad_signature', __( 'Invalid WooCommerce webhook signature.', 'memberistic' ), array( 'status' => 400 ) );
-			}
+		$expected = base64_encode( hash_hmac( 'sha256', $body, $secret, true ) );
+
+		if ( '' === $header || ! hash_equals( $expected, $header ) ) {
+			return new \WP_Error( 'memberistic_woo_bad_signature', __( 'Invalid WooCommerce webhook signature.', 'memberistic' ), array( 'status' => 400 ) );
 		}
 
 		$payload = json_decode( $body, true );

@@ -29,6 +29,52 @@ class G2AB_Email_Cron {
 
 		// Clean up on module deactivate.
 		add_action( 'g2ab_module_deactivated_email_automation', array( $this, 'unschedule' ) );
+
+		// Lazy one-shot index check. The reminder subqueries in tick() filter on
+		// (event_type, booking_id); without a composite index every cron run
+		// becomes a full scan of g2ab_logs and degrades linearly as logs grow.
+		// Only run during admin or cron contexts so normal frontend page loads
+		// don't pay the get_option/ALTER cost.
+		if ( wp_doing_cron() || is_admin() ) {
+			$this->maybe_add_logs_index();
+		}
+	}
+
+	/**
+	 * Idempotent: adds the composite index on g2ab_logs(event_type, booking_id)
+	 * for existing installs whose schema predates it. Newly installed sites
+	 * already have the index via the dbDelta CREATE TABLE.
+	 *
+	 * Uses an option flag so we don't re-issue the ALTER on every cron tick.
+	 * The ALTER itself is wrapped in a try/catch — MySQL errors `Duplicate key`
+	 * if the index already exists, and we want to record the option in that
+	 * case too.
+	 */
+	private function maybe_add_logs_index() {
+		if ( get_option( 'g2ab_logs_idx_v1' ) ) {
+			return;
+		}
+		global $wpdb;
+		$logs = $wpdb->prefix . 'g2ab_logs';
+		try {
+			// Check first — avoids a noisy error log on the duplicate path.
+			$existing = $wpdb->get_results( $wpdb->prepare(
+				"SHOW INDEX FROM {$logs} WHERE Key_name = %s", // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+				'idx_event_booking'
+			) );
+			if ( empty( $existing ) ) {
+				// Suppress wpdb errors for the duration of this single ALTER —
+				// we re-raise via the catch and don't want WP to noisy-log it.
+				$prev = $wpdb->suppress_errors( true );
+				$wpdb->query( "ALTER TABLE {$logs} ADD INDEX idx_event_booking (event_type, booking_id)" ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+				$wpdb->suppress_errors( $prev );
+			}
+			update_option( 'g2ab_logs_idx_v1', current_time( 'mysql' ), false );
+		} catch ( \Throwable $e ) {
+			// Don't crash the cron tick — log + set the option so we don't loop.
+			error_log( '[G2AB] logs index add failed: ' . $e->getMessage() );
+			update_option( 'g2ab_logs_idx_v1', 'error:' . substr( $e->getMessage(), 0, 100 ), false );
+		}
 	}
 
 	public function unschedule() {

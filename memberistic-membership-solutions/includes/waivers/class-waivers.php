@@ -526,10 +526,18 @@ final class Waiver_Public {
 	public static function render_kiosk() {
 		$guest   = self::guest_url();
 		$account = home_url( '/account/' );
+		// Brand colors flow through CSS custom properties so the kiosk + the
+		// guest-waiver pages stay in sync with whatever the site has
+		// configured for primary / accent. Was hardcoded to the launch
+		// partner's dark palette.
+		$primary = (string) get_option( 'memberistic_primary_brand_color', '#0F2044' );
+		$accent  = (string) get_option( 'memberistic_accent_brand_color', '#E8802F' );
 		$big     = 'display:block;width:100%;box-sizing:border-box;margin:0 0 14px;padding:20px;border-radius:8px;font-weight:700;font-size:17px;letter-spacing:.04em;text-decoration:none;';
-		$html    = '<p style="color:#CBCAD2;margin:0 0 24px;font-size:15px;">' . esc_html__( 'Welcome to the range. Tap an option to check in.', 'memberistic' ) . '</p>';
-		$html   .= '<a href="' . esc_url( $guest ) . '" style="' . esc_attr( $big ) . 'background:#E8802F;color:#111;">' . esc_html__( 'Guest / First Visit — Sign Waiver', 'memberistic' ) . '</a>';
-		$html   .= '<a href="' . esc_url( $account ) . '" style="' . esc_attr( $big ) . 'background:#2A323D;color:#fff;border:1px solid #3A4453;">' . esc_html__( 'Member — Sign In to Show Your Pass', 'memberistic' ) . '</a>';
+		$style   = '<style>:root{--memberistic-brand-primary:' . esc_attr( $primary ) . ';--memberistic-brand-accent:' . esc_attr( $accent ) . ';}</style>';
+		$html    = $style;
+		$html   .= '<p style="color:#CBCAD2;margin:0 0 24px;font-size:15px;">' . esc_html__( 'Welcome to the range. Tap an option to check in.', 'memberistic' ) . '</p>';
+		$html   .= '<a href="' . esc_url( $guest ) . '" style="' . esc_attr( $big ) . 'background:var(--memberistic-brand-accent);color:#111;">' . esc_html__( 'Guest / First Visit — Sign Waiver', 'memberistic' ) . '</a>';
+		$html   .= '<a href="' . esc_url( $account ) . '" style="' . esc_attr( $big ) . 'background:var(--memberistic-brand-primary);color:#fff;border:1px solid rgba(255,255,255,.1);">' . esc_html__( 'Member — Sign In to Show Your Pass', 'memberistic' ) . '</a>';
 		$html   .= '<p style="color:#5A6371;font-size:12px;margin-top:20px;">' . esc_html__( 'Already have your member QR on your phone? Just show it at the desk.', 'memberistic' ) . '</p>';
 		self::render( __( 'Range Check-In', 'memberistic' ), $html, 200 );
 	}
@@ -541,10 +549,13 @@ final class Waiver_Public {
 	public static function kiosk_shortcode( $atts = array() ) {
 		$guest   = self::guest_url();
 		$account = home_url( '/account/' );
+		$primary = (string) get_option( 'memberistic_primary_brand_color', '#0F2044' );
+		$accent  = (string) get_option( 'memberistic_accent_brand_color', '#E8802F' );
 		ob_start();
+		echo '<style>.memberistic-kiosk{--memberistic-brand-primary:' . esc_attr( $primary ) . ';--memberistic-brand-accent:' . esc_attr( $accent ) . ';}</style>';
 		echo '<div class="memberistic-frontend memberistic-kiosk" style="max-width:520px;margin:0 auto;text-align:center;">';
-		echo '<a class="memberistic-plan-button" style="display:block;margin-bottom:14px;" href="' . esc_url( $guest ) . '">' . esc_html__( 'Guest / First Visit — Sign Waiver', 'memberistic' ) . '</a>';
-		echo '<a class="memberistic-secondary-button" style="display:block;" href="' . esc_url( $account ) . '">' . esc_html__( 'Member — Sign In to Show Your Pass', 'memberistic' ) . '</a>';
+		echo '<a class="memberistic-plan-button" style="display:block;margin-bottom:14px;background:var(--memberistic-brand-accent);" href="' . esc_url( $guest ) . '">' . esc_html__( 'Guest / First Visit — Sign Waiver', 'memberistic' ) . '</a>';
+		echo '<a class="memberistic-secondary-button" style="display:block;background:var(--memberistic-brand-primary);color:#fff;" href="' . esc_url( $account ) . '">' . esc_html__( 'Member — Sign In to Show Your Pass', 'memberistic' ) . '</a>';
 		echo '</div>';
 		return ob_get_clean();
 	}
@@ -737,12 +748,18 @@ final class Waiver_Public {
 		status_header( (int) $code );
 		header( 'Content-Type: text/html; charset=utf-8' );
 		$brand = memberistic_get_brand_label();
+		// Brand palette is configurable per-site. Was hardcoded to the launch
+		// partner's dark + gold scheme; CSS variables let the kiosk + the
+		// guest waiver pages stay in sync with whatever the site admin sets.
+		$primary = (string) get_option( 'memberistic_primary_brand_color', '#0F2044' );
+		$accent  = (string) get_option( 'memberistic_accent_brand_color', '#E8802F' );
 		echo '<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">';
 		echo '<title>' . esc_html( $brand ) . ' — ' . esc_html( $title ) . '</title>';
-		echo '<style>body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;background:#0F1115;color:#fff;margin:0;min-height:100vh;display:grid;place-items:center;padding:24px;}'
+		echo '<style>:root{--memberistic-brand-primary:' . esc_attr( $primary ) . ';--memberistic-brand-accent:' . esc_attr( $accent ) . ';}'
+			. 'body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;background:var(--memberistic-brand-primary);color:#fff;margin:0;min-height:100vh;display:grid;place-items:center;padding:24px;}'
 			. '.b{max-width:520px;width:100%;background:#1A1F26;border:1px solid #2A323D;border-radius:12px;padding:32px;text-align:center;box-sizing:border-box;}'
 			. '.brand{font-family:"Bebas Neue",Impact,sans-serif;letter-spacing:.18em;color:#C9A84C;text-transform:uppercase;font-size:13px;margin-bottom:14px;}'
-			. 'h1{font-size:22px;margin:0 0 16px;}a.btn{display:inline-block;margin-top:8px;padding:12px 22px;background:#E8802F;color:#111;text-decoration:none;border-radius:4px;font-weight:700;}</style>';
+			. 'h1{font-size:22px;margin:0 0 16px;}a.btn{display:inline-block;margin-top:8px;padding:12px 22px;background:var(--memberistic-brand-accent);color:#111;text-decoration:none;border-radius:4px;font-weight:700;}</style>';
 		echo '</head><body><div class="b"><div class="brand">' . esc_html( $brand ) . '</div><h1>' . esc_html( $title ) . '</h1>' . $html . '</div></body></html>'; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
 		exit;
 	}

@@ -319,6 +319,17 @@ class Checkout {
 			return;
 		}
 
+		// Resolve the dealer row up front so we can run a state-pair audit.
+		global $wpdb;
+		$dealer = $wpdb->get_row( $wpdb->prepare( // phpcs:ignore WordPress.DB.DirectDatabaseQuery
+			'SELECT id, business_name, premise_state FROM ' . DB::table( 'dealers' ) . ' WHERE id = %d LIMIT 1',
+			$dealer_id
+		) );
+		if ( $dealer ) {
+			// Advisory only — logs a compliance event when state info is missing.
+			Compliance::validate_dealer_for_buyer( $dealer, $order );
+		}
+
 		// Find the first FFL item
 		$ffl_item     = null;
 		$ffl_product  = null;
@@ -335,7 +346,6 @@ class Checkout {
 			return;
 		}
 
-		global $wpdb;
 		$ref = 'G2A-' . strtoupper( substr( uniqid( '', true ), -8 ) );
 
 		$wpdb->insert( DB::table( 'transfers' ), [ // phpcs:ignore WordPress.DB.DirectDatabaseQuery

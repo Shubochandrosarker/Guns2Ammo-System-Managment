@@ -111,7 +111,11 @@ class Sync {
 			return;
 		}
 
-		// Store import state
+		// Store import state. We tag the run with a unique id so we can defer the
+		// destructive "mark unseen dealers inactive" step until the import has
+		// actually completed — a mid-run failure must NOT leave every dealer
+		// inactive (which would empty the checkout selector).
+		$run_id = uniqid( 'atfsync_', true );
 		update_option( 'wpistic_ffl_atf_sync_status',      'running' );
 		update_option( 'wpistic_ffl_atf_sync_message',     '' );
 		update_option( 'wpistic_ffl_atf_sync_files',       wp_json_encode( $csv_files ) );
@@ -119,17 +123,28 @@ class Sync {
 		update_option( 'wpistic_ffl_atf_sync_file_offset', 0 );
 		update_option( 'wpistic_ffl_atf_sync_total_done',  0 );
 		update_option( 'wpistic_ffl_atf_sync_started_at',  current_time( 'mysql' ) );
-
-		// Mark all existing dealers as pending re-verification
-		global $wpdb;
-		$wpdb->query( // phpcs:ignore WordPress.DB.DirectDatabaseQuery
-			'UPDATE ' . DB::table( 'dealers' ) . ' SET is_active = 0'
-		);
+		update_option( 'wpistic_ffl_atf_sync_run_id',      $run_id );
 
 		// Schedule chunked cron if not already running
 		if ( ! wp_next_scheduled( 'wpistic_ffl_process_atf_sync' ) ) {
 			wp_schedule_event( time() + 5, 'every_minute', 'wpistic_ffl_process_atf_sync' );
 		}
+	}
+
+	/**
+	 * After a successful import, mark dealers that were NOT touched during the
+	 * current run as inactive. Compares against last_synced to avoid affecting
+	 * rows that were just upserted.
+	 */
+	public static function mark_unseen_dealers_inactive( string $run_started_at ): void {
+		if ( ! $run_started_at ) {
+			return;
+		}
+		global $wpdb;
+		$wpdb->query( $wpdb->prepare( // phpcs:ignore WordPress.DB.DirectDatabaseQuery
+			'UPDATE ' . DB::table( 'dealers' ) . ' SET is_active = 0 WHERE last_synced < %s',
+			$run_started_at
+		) );
 	}
 
 	/**
@@ -482,6 +497,14 @@ class Sync {
 	 * Mark sync complete, clean up temp files, record timestamp.
 	 */
 	private static function finish_sync( int $total_done ): void {
+		// Only collapse the active set once we know the import actually finished
+		// AND produced rows. A zero-row run almost certainly means the upstream
+		// CSV was empty/corrupt — keep the previous active set in that case.
+		if ( $total_done > 0 ) {
+			$run_started_at = (string) get_option( 'wpistic_ffl_atf_sync_started_at', '' );
+			self::mark_unseen_dealers_inactive( $run_started_at );
+		}
+
 		update_option( 'wpistic_ffl_atf_sync_status',       'complete' );
 		update_option( 'wpistic_ffl_atf_sync_total_done',   $total_done );
 		update_option( 'wpistic_ffl_atf_sync_completed_at', current_time( 'mysql' ) );

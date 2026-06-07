@@ -67,6 +67,10 @@ class Verifyistic_DB {
 
         $data = wp_parse_args( $data, $defaults );
 
+        if ( isset( $data['dob'] ) && '' === $data['dob'] ) {
+            $data['dob'] = null;
+        }
+
         $wpdb->insert( $table, $data, array(
             '%s', '%s', '%s', '%s', '%s', '%d', '%s', '%s', '%s', '%s', '%s', '%s', '%d', '%s'
         ) );

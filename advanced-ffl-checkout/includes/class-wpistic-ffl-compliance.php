@@ -42,16 +42,19 @@ class Compliance {
 
 		$rules = $this->get_applicable_rules( $state, $ffl_item_types );
 
+		// Strict mode (default) blocks checkout with an error; warnings-only mode
+		// preserves the legacy non-blocking notice behavior for shops that opt in.
+		$strict = '1' === (string) get_option( 'wpistic_ffl_compliance_strict', '1' );
+		$type   = $strict ? 'error' : 'notice';
+
 		foreach ( $rules as $rule ) {
-			// Waiting periods and permit requirements are warnings (don't block)
-			// Outright bans might block — extend this logic per business need
 			wc_add_notice(
 				sprintf(
 					'<strong>' . __( 'FFL Compliance Notice (%s)', 'advanced-ffl-checkout' ) . ':</strong> %s',
 					esc_html( $state ),
 					esc_html( $rule->description )
 				),
-				'notice'
+				$type
 			);
 		}
 	}
@@ -107,6 +110,45 @@ class Compliance {
 	 */
 	public static function is_restricted( string $state, string $item_type ): bool {
 		return count( self::get_applicable_rules( $state, [ $item_type ] ) ) > 0;
+	}
+
+	/**
+	 * Validate that a resolved dealer is permitted to receive a transfer for
+	 * the buyer on a given order. Currently advisory only: logs a compliance
+	 * audit event when either side of the state pair is missing.
+	 *
+	 * TODO: replace with an admin-managed state-pair allow/deny list keyed on
+	 * (dealer_state, buyer_state, item_type) once the rules editor lands.
+	 *
+	 * @param object    $dealer  Row from the dealers table (must expose premise_state).
+	 * @param \WC_Order $order   The order being processed.
+	 * @return bool true if the pair looks valid, false if missing data.
+	 */
+	public static function validate_dealer_for_buyer( $dealer, \WC_Order $order ): bool {
+		$dealer_state = is_object( $dealer ) ? strtoupper( (string) ( $dealer->premise_state ?? '' ) ) : '';
+		$buyer_state  = strtoupper( (string) $order->get_billing_state() );
+
+		if ( ! $dealer_state || ! $buyer_state ) {
+			global $wpdb;
+			$transfer_id = (int) $order->get_meta( '_wpistic_ffl_transfer_id' );
+			$notes       = sprintf(
+				'Compliance audit: dealer/buyer state pair incomplete (dealer=%s, buyer=%s) on order #%d.',
+				$dealer_state ?: '?',
+				$buyer_state  ?: '?',
+				(int) $order->get_id()
+			);
+			$wpdb->insert( DB::table( 'events' ), [ // phpcs:ignore WordPress.DB.DirectDatabaseQuery
+				'transfer_id' => $transfer_id ?: 0,
+				'event_type'  => 'compliance_warning',
+				'new_status'  => null,
+				'notes'       => $notes,
+				'actor'       => 'system',
+				'actor_ip'    => '',
+			] );
+			return false;
+		}
+
+		return true;
 	}
 
 	// ── Private helpers ───────────────────────────────────────────────────────

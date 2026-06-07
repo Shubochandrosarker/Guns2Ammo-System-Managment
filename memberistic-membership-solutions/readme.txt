@@ -3,8 +3,8 @@ Contributors: wordpressistic
 Tags: membership, operations, staff dashboard, stripe, woocommerce, rest api
 Requires at least: 6.0
 Requires PHP: 8.0
-Tested up to: 6.6
-Stable tag: 1.10.0
+Tested up to: 6.7
+Stable tag: 1.44.0
 License: GPLv2 or later
 
 A modern membership operations engine for service businesses. Co-developed by WordPressistic and launch partner Guns 2 Ammo (https://guns2ammo.com).

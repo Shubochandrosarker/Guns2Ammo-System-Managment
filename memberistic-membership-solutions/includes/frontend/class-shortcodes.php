@@ -251,7 +251,31 @@ final class Shortcodes {
 
 					<div class="memberistic-auth-divider"><?php esc_html_e( 'OR', 'memberistic' ); ?></div>
 					<a class="memberistic-auth-btn memberistic-auth-btn--secondary" href="<?php echo esc_url( $plans_url ); ?>"><?php esc_html_e( 'Join As A Member', 'memberistic' ); ?></a>
-					<div class="memberistic-auth-alt"><?php esc_html_e( 'From $29.99/mo - Cancel Anytime', 'memberistic' ); ?></div>
+					<?php
+					// Dynamic "From $X.XX/mo - Cancel Anytime" line. Was hardcoded
+					// to "$29.99/mo" (Defender tier) and went stale every time
+					// pricing changed. Now reads the minimum active monthly price
+					// and silently drops the line when no active plans are
+					// published (rather than printing a misleading placeholder).
+					$active_plans = Plans_Repository::get_all( array( 'status' => 'active' ) );
+					$min_monthly  = null;
+					foreach ( (array) $active_plans as $ap ) {
+						$price = isset( $ap['monthly_price'] ) ? (float) $ap['monthly_price'] : 0.0;
+						if ( $price > 0 && ( null === $min_monthly || $price < $min_monthly ) ) {
+							$min_monthly = $price;
+						}
+					}
+					if ( null !== $min_monthly ) {
+						$currency = (string) \WordPressistic\Memberistic\memberistic_get_setting( 'currency', 'USD' );
+						$symbol   = 'USD' === $currency ? '$' : '';
+						$line     = sprintf(
+							/* translators: %s: formatted plan price (e.g. $29.99) */
+							__( 'From %s/mo - Cancel Anytime', 'memberistic' ),
+							$symbol . number_format_i18n( $min_monthly, 2 )
+						);
+						echo '<div class="memberistic-auth-alt">' . esc_html( $line ) . '</div>';
+					}
+					?>
 				</form>
 			</div>
 		</div>

@@ -2,6 +2,34 @@
 
 All notable changes are tracked here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## 1.43.5 — Stabilization & integration hardening
+
+### Fixed
+- Duplicate Stripe payment row on first invoice (handle_invoice_succeeded now defers to handle_checkout_completed for the initial charge).
+- Activity log mis-classified `payment_past_due` events; added to the valid-types whitelist alongside `payment_receipt` and `payment_refunded`.
+- WooCommerce bridge now respects the Integrations Registry toggle.
+- WooCommerce webhook endpoint refuses requests when the shared secret is empty (was: skip verification → effectively open auth).
+- Verifyistic bridge cookie reader enforces a 30-day max age (default; configurable).
+- Stripe webhook dedupe persists across object-cache flush via a capped option list.
+- Hardcoded "From $29.99/mo" on login shortcode now reads the minimum active plan monthly price.
+- Mesa AZ (UTC-7) and other non-UTC sites: monthly KPI cutoffs use `wp_date()` with `current_time('timestamp')`.
+- Stripe checkout no longer creates duplicate pending memberships on form refresh.
+- Generic fallback email "Status: {plan_name}" merge tag corrected to "{status}".
+- Stripe subscription deletion: subscription_id is the primary lookup, metadata is the fallback.
+
+## 1.40.0 — Public kiosk + profile image upload
+- Auto-created `/check-in/` page and `[memberistic_kiosk]` shortcode for front-desk QR scan workflows.
+- Profile image upload REST routes (`POST /profile/image`).
+
+## 1.38.0 — Stripe billing portal
+- Customer-facing "Manage billing" link via Stripe's Billing Portal.
+
+## 1.35.0 — Corporate Guest auto-enroll
+- Buyers without a membership are auto-enrolled on a hidden Guest Pass plan on `woocommerce_payment_complete` and on `g2ab_booking_created/paid`.
+
+## 1.34.0 — Schema 1.4.0 / 1.5.0
+- Added `memberistic_waiver_signatures`, `memberistic_documents`, `memberistic_waivers_archive` tables.
+
 ## 1.33.0 — Automatic Guest members for non-members
 
 Non-members are now remembered. Anyone who books a range lane or buys a product without a membership level is saved automatically as a **Guest member** — with their own WordPress login account, a Digital Card with dynamic QR, a waiver request, and their contact details on file — so the next visit the front desk can pull them up by QR scan and their information persists.

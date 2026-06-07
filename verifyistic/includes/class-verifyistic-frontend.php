@@ -21,6 +21,15 @@ class Verifyistic_Frontend {
         // Don't show in admin
         if ( is_admin() ) return false;
 
+        // Already verified — skip rendering the popup entirely so cached HTML
+        // doesn't contain it for the verified visitor.
+        if ( ! empty( $_COOKIE['verifyistic_verified'] ) ) {
+            $token = sanitize_text_field( wp_unslash( $_COOKIE['verifyistic_verified'] ) );
+            if ( strlen( $token ) >= 16 && preg_match( '/^[A-Za-z0-9_\-]+$/', $token ) ) {
+                return false;
+            }
+        }
+
         // Check excluded pages
         $excluded = get_option( 'verifyistic_exclude_pages', '' );
         if ( ! empty( $excluded ) ) {
@@ -95,6 +104,7 @@ class Verifyistic_Frontend {
             'mode'        => $mode,
             'rememberMe'  => $remember_me,
             'cookieDays'  => $cookie_days,
+            'cookieDomain' => (string) get_option( 'verifyistic_cookie_domain', '' ),
             'redirectUrl' => esc_url( $redirect ),
             'strings'     => array(
                 'ageError'    => sprintf( __( 'You must be at least %d years old to access this site.', 'verifyistic' ), $min_age ),

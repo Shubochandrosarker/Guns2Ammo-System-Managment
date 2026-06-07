@@ -321,6 +321,35 @@ final class Memberships_Repository {
 		return $row ?: null;
 	}
 
+	/**
+	 * Find a pending membership belonging to the primary person with the
+	 * given email. Used by the Stripe checkout handler to detect a
+	 * refresh / back-button / double-submit on the public checkout form and
+	 * reuse the existing pending row instead of creating a duplicate.
+	 *
+	 * @param string $email Primary person email.
+	 * @return array<string,mixed>|null
+	 */
+	public static function get_pending_by_person_email( $email ) {
+		global $wpdb;
+		$email = sanitize_email( (string) $email );
+		if ( '' === $email ) {
+			return null;
+		}
+		$people = $wpdb->prefix . 'memberistic_people';
+		$m      = self::table();
+		$row    = $wpdb->get_row( $wpdb->prepare(
+			"SELECT m.* FROM {$m} m
+			INNER JOIN {$people} p ON p.membership_id = m.id AND p.role = 'primary'
+			WHERE m.status = %s AND p.email = %s
+			ORDER BY m.created_at DESC
+			LIMIT 1",
+			'pending',
+			$email
+		), ARRAY_A );
+		return $row ?: null;
+	}
+
 	public static function get_by_stripe_subscription_id( $subscription_id ) {
 		global $wpdb;
 		$row = $wpdb->get_row( $wpdb->prepare( 'SELECT * FROM ' . self::table() . ' WHERE stripe_subscription_id = %s LIMIT 1', sanitize_text_field( $subscription_id ) ), ARRAY_A );
@@ -569,7 +598,10 @@ final class Memberships_Repository {
 
 	public static function count_new_this_month() {
 		global $wpdb;
-		$start = gmdate( 'Y-m-01 00:00:00' );
+		// Site-local month cutoff (was UTC gmdate, which mis-rolled in the
+		// evening on non-UTC sites and dropped late-day signups out of
+		// "this month").
+		$start = wp_date( 'Y-m-01 00:00:00', current_time( 'timestamp' ) );
 		return (int) $wpdb->get_var( $wpdb->prepare( 'SELECT COUNT(*) FROM ' . self::table() . ' WHERE created_at >= %s', $start ) );
 	}
 

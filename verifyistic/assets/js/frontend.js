@@ -229,7 +229,9 @@
                 return;
             }
             // Set cookie
-            var remember = $form ? $form.find('.vfy-remember-checkbox').is(':checked') : true;
+            var remember = $form
+                ? $form.find('.vfy-remember-checkbox').is(':checked')
+                : !!this.data.rememberMe;
             var days     = remember ? (parseInt(this.data.cookieDays) || 30) : 0;
             this.setCookie(this.cookieName, data.token, days);
 
@@ -327,13 +329,19 @@
 
         // ── Cookie Helpers ───────────────────────────────────────
         setCookie: function (name, value, days) {
-            var expires = '';
+            var attrs = '';
             if (days) {
                 var date = new Date();
                 date.setTime(date.getTime() + (days * 24 * 60 * 60 * 1000));
-                expires = '; expires=' + date.toUTCString();
+                attrs += '; expires=' + date.toUTCString();
             }
-            document.cookie = name + '=' + encodeURIComponent(value) + expires + '; path=/; SameSite=Lax';
+            if (this.data && this.data.cookieDomain) {
+                attrs += '; Domain=' + this.data.cookieDomain;
+            }
+            if (typeof window !== 'undefined' && window.location && window.location.protocol === 'https:') {
+                attrs += '; Secure';
+            }
+            document.cookie = name + '=' + encodeURIComponent(value) + attrs + '; path=/; SameSite=Lax';
         },
 
         getCookie: function (name) {

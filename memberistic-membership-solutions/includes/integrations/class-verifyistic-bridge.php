@@ -78,10 +78,25 @@ final class Verifyistic_Bridge {
 		if ( $exists !== $table ) {
 			return null;
 		}
+		// Compliance TTL: stale verifications must not unlock the gate forever.
+		// Tries the namespaced setting helper first (UI surface) then falls
+		// back to a stand-alone option so this works even before the helper
+		// is in scope.
+		$max_age_days = 0;
+		if ( function_exists( 'WordPressistic\\Memberistic\\memberistic_get_setting' ) ) {
+			$max_age_days = (int) \WordPressistic\Memberistic\memberistic_get_setting( 'verifyistic_max_age_days', 30 );
+		}
+		if ( $max_age_days <= 0 ) {
+			$max_age_days = (int) get_option( 'memberistic_verifyistic_max_age_days', 30 );
+		}
+		if ( $max_age_days <= 0 ) {
+			$max_age_days = 30;
+		}
 		// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
 		$row = $wpdb->get_row( $wpdb->prepare(
-			"SELECT * FROM {$table} WHERE verify_token = %s AND status = 'passed' ORDER BY id DESC LIMIT 1",
-			$token
+			"SELECT * FROM {$table} WHERE verify_token = %s AND status = 'passed' AND verified_at >= DATE_SUB(NOW(), INTERVAL %d DAY) ORDER BY id DESC LIMIT 1",
+			$token,
+			$max_age_days
 		) );
 		return $row ?: null;
 	}

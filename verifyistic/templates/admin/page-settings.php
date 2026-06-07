@@ -120,7 +120,7 @@ function vfya_opt( $key, $default = '' ) {
                 </label>
                 <div>
                   <span class="vfya-toggle-label">Enable ID &amp; Face Verification Mode</span>
-                  <span class="vfya-label-sub" style="display:block;margin-top:2px;">When enabled, users must upload a government ID + selfie. Overrides the mode above. Verified data is saved for 30 days.</span>
+                  <span class="vfya-label-sub" style="display:block;margin-top:2px;">When enabled, users must upload a government ID + selfie. Overrides the mode above. Verified data is saved for <?php echo (int) get_option('verifyistic_cookie_days', 30); ?> days.</span>
                 </div>
               </div>
             </div>
@@ -343,7 +343,7 @@ function vfya_opt( $key, $default = '' ) {
                   <span class="vfya-toggle-slider"></span>
                 </label>
                 <div>
-                  <span class="vfya-toggle-label">Show "Remember Me for 30 Days" Checkbox</span>
+                  <span class="vfya-toggle-label">Show "Remember Me for <?php echo (int) get_option('verifyistic_cookie_days', 30); ?> Days" Checkbox</span>
                   <span class="vfya-label-sub" style="display:block;margin-top:2px;">Shown in DOB mode. If unchecked by the user, verification expires at session end.</span>
                 </div>
               </div>
@@ -352,6 +352,39 @@ function vfya_opt( $key, $default = '' ) {
             <div class="vfya-field" style="max-width:280px;">
               <label class="vfya-label">Cookie Duration (days) <span class="vfya-label-sub">Default: 30. Applied when user checks "Remember Me".</span></label>
               <input type="number" class="vfya-input" name="verifyistic_cookie_days" value="<?php echo esc_attr(vfya_opt('verifyistic_cookie_days','30')); ?>" min="1" max="365">
+            </div>
+
+            <div class="vfya-field">
+              <label class="vfya-label" for="verifyistic_cookie_domain">Cookie Domain <span class="vfya-label-sub">Optional. Set to <code>.example.com</code> (with leading dot) to share the verification cookie between www and apex subdomains. Leave empty to scope to the exact current host only.</span></label>
+              <input type="text" class="vfya-input" id="verifyistic_cookie_domain" name="verifyistic_cookie_domain" value="<?php echo esc_attr(vfya_opt('verifyistic_cookie_domain','')); ?>" placeholder=".example.com">
+            </div>
+
+            <div class="vfya-section-divider">Advanced Security</div>
+
+            <div class="vfya-field">
+              <div class="vfya-toggle-wrap">
+                <label class="vfya-toggle">
+                  <input type="checkbox" name="verifyistic_strict_mode" value="1" <?php checked(vfya_opt('verifyistic_strict_mode','0'),'1'); ?>>
+                  <span class="vfya-toggle-slider"></span>
+                </label>
+                <div>
+                  <span class="vfya-toggle-label">Strict Mode</span>
+                  <span class="vfya-label-sub" style="display:block;margin-top:2px;">Treats anti-bot timing token failures as hard blocks instead of soft signals. Recommended only when not behind a page cache (WP Rocket, LiteSpeed, Cloudflare, etc.).</span>
+                </div>
+              </div>
+            </div>
+
+            <div class="vfya-field">
+              <div class="vfya-toggle-wrap">
+                <label class="vfya-toggle">
+                  <input type="checkbox" name="verifyistic_skip_bot_detection" value="1" <?php checked(vfya_opt('verifyistic_skip_bot_detection','0'),'1'); ?>>
+                  <span class="vfya-toggle-slider"></span>
+                </label>
+                <div>
+                  <span class="vfya-toggle-label">Disable Bot/Crawler Bypass</span>
+                  <span class="vfya-label-sub" style="display:block;margin-top:2px;">By default, known search engine crawlers (Googlebot, Bingbot, etc.) skip the popup so content stays indexable. Enable this to force the popup for every visitor, including bots.</span>
+                </div>
+              </div>
             </div>
 
             <div class="vfya-section-divider">Webhook / API Integration</div>
@@ -493,7 +526,7 @@ function vfya_opt( $key, $default = '' ) {
   "id": 42,
   "timestamp": "2025-01-15T14:30:00+00:00",
   "site_url": "https://yoursite.com",
-  "verify_type": "dob",
+  "verify_type": "DOB",
   "first_name": "John",
   "last_name": "Doe",
   "dob": "1990-05-15",

@@ -9,7 +9,7 @@
  * Merge tags supported in subject + body:
  *   {customer_name}, {customer_email}, {customer_phone},
  *   {booking_id}, {uuid}, {resource_name}, {start_at}, {end_at},
- *   {duration}, {party_size}, {amount}, {currency},
+ *   {duration}, {party_size}, {amount}, {amount_formatted}, {currency},
  *   {business_name}, {business_phone}, {business_address},
  *   {invoice_url}, {pay_url}, {cancel_url},
  *   {site_url}, {date_now}, {brand_color}, {brand_logo_url}
@@ -202,7 +202,14 @@ class G2AB_Email_Engine {
 		$brand_logo  = get_option( self::OPTION_LOGO_URL, '' );
 
 		$uuid = isset( $booking['uuid'] ) ? $booking['uuid'] : '';
-		$invoice_url = $uuid ? add_query_arg( 'g2ab_invoice', $uuid, $site_url ) : '';
+		$invoice_url = '';
+		if ( $uuid ) {
+			$invoice_args = array( 'g2ab_invoice' => $uuid );
+			if ( function_exists( 'g2ab_invoice_sign_token' ) ) {
+				$invoice_args['t'] = g2ab_invoice_sign_token( $uuid );
+			}
+			$invoice_url = add_query_arg( $invoice_args, $site_url );
+		}
 		$pay_url     = isset( $context['pay_url'] ) ? $context['pay_url'] : '';
 		$cancel_url  = $uuid ? add_query_arg( array( 'g2ab_cancel' => $uuid ), $site_url ) : '';
 
@@ -231,6 +238,7 @@ class G2AB_Email_Engine {
 			'duration'         => isset( $booking['duration_min'] ) ? (int) $booking['duration_min'] : 60,
 			'party_size'       => isset( $booking['party_size'] ) ? (int) $booking['party_size'] : 1,
 			'amount'           => isset( $booking['amount'] ) ? number_format( (float) $booking['amount'], 2 ) : '0.00',
+			'amount_formatted' => $this->format_money( isset( $booking['amount'] ) ? $booking['amount'] : 0 ),
 			'currency'         => get_option( 'g2ab_currency', 'USD' ),
 			'business_name'    => $biz_name,
 			'business_phone'   => $biz_phone,
@@ -243,6 +251,24 @@ class G2AB_Email_Engine {
 			'brand_color'      => $brand_color,
 			'brand_logo_url'   => $brand_logo,
 		);
+	}
+
+	/**
+	 * Format a monetary amount using the configured g2ab_currency symbol.
+	 * Falls back to the raw amount when no symbol is mapped.
+	 */
+	private function format_money( $amount ) {
+		$currency = get_option( 'g2ab_currency', 'USD' );
+		$symbols = array(
+			'USD' => '$',
+			'CAD' => 'CA$',
+			'GBP' => '£',
+			'EUR' => '€',
+			'AUD' => 'A$',
+			'NZD' => 'NZ$',
+		);
+		$sym = isset( $symbols[ $currency ] ) ? $symbols[ $currency ] : '';
+		return $sym . number_format( (float) $amount, 2 );
 	}
 
 	private function format_dt( $iso ) {
@@ -322,10 +348,10 @@ class G2AB_Email_Engine {
 				'enabled'            => 1,
 				'recipient_customer' => 1,
 				'recipient_admin'    => 1,
-				'subject'            => 'Payment received — ${amount} {currency}',
+				'subject'            => 'Payment received — {amount_formatted} {currency}',
 				'body_html'          => '<h2 style="color:{brand_color};margin:0 0 16px;">Payment Received</h2>'
 					. '<p>Hi {customer_name},</p>'
-					. '<p>We received your payment of <strong>${amount} {currency}</strong> for confirmation <code>{uuid}</code>.</p>'
+					. '<p>We received your payment of <strong>{amount_formatted} {currency}</strong> for confirmation <code>{uuid}</code>.</p>'
 					. '<p>Your invoice is attached and available online:</p>'
 					. '<p><a href="{invoice_url}" style="display:inline-block;background:{brand_color};color:#fff;padding:14px 28px;text-decoration:none;font-weight:bold;text-transform:uppercase;letter-spacing:.04em;">View Invoice</a></p>'
 					. '<p style="margin-top:24px;font-size:13px;color:#666;">Thank you for your business.</p>',

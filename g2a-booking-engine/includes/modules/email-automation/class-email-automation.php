@@ -41,32 +41,76 @@ final class G2AB_Module_Email_Automation {
 
 	public function on_created( $booking, $context = array() ) {
 		if ( ! $this->is_event_enabled( 'booking_created' ) ) return;
+		$booking = $this->resolve_booking( $booking );
+		if ( ! $booking ) return;
 		$this->engine->send_event( 'booking_created', $booking, $context );
 	}
 
 	public function on_confirmed( $booking, $context = array() ) {
 		if ( ! $this->is_event_enabled( 'booking_confirmed' ) ) return;
+		$booking = $this->resolve_booking( $booking );
+		if ( ! $booking ) return;
 		$this->engine->send_event( 'booking_confirmed', $booking, $context );
 	}
 
 	public function on_paid( $booking, $context = array() ) {
 		if ( ! $this->is_event_enabled( 'booking_paid' ) ) return;
+		$booking = $this->resolve_booking( $booking );
+		if ( ! $booking ) return;
 		$this->engine->send_event( 'booking_paid', $booking, $context );
 	}
 
 	public function on_cancelled( $booking, $context = array() ) {
 		if ( ! $this->is_event_enabled( 'booking_cancelled' ) ) return;
+		$booking = $this->resolve_booking( $booking );
+		if ( ! $booking ) return;
 		$this->engine->send_event( 'booking_cancelled', $booking, $context );
 	}
 
 	public function on_no_show( $booking, $context = array() ) {
 		if ( ! $this->is_event_enabled( 'booking_no_show' ) ) return;
+		$booking = $this->resolve_booking( $booking );
+		if ( ! $booking ) return;
 		$this->engine->send_event( 'booking_no_show', $booking, $context );
 	}
 
 	public function on_completed( $booking, $context = array() ) {
 		if ( ! $this->is_event_enabled( 'booking_completed' ) ) return;
+		$booking = $this->resolve_booking( $booking );
+		if ( ! $booking ) return;
 		$this->engine->send_event( 'booking_completed', $booking, $context );
+	}
+
+	/**
+	 * Normalize the booking arg into a row object.
+	 *
+	 * Lifecycle hooks like `g2ab_booking_paid` are fired by multiple call sites
+	 * — some pass the full booking row, others pass just the booking id. Without
+	 * this normalization the merge-tag build collapses an int to `[0 => 123]`
+	 * and every customer-facing tag renders empty.
+	 *
+	 * Mirrors the implementation in G2AB_Module_PDF_Invoices::resolve_booking().
+	 *
+	 * @param mixed $booking_or_id Object, array, or numeric id.
+	 * @return object|null Booking row, or null if not resolvable.
+	 */
+	private function resolve_booking( $booking_or_id ) {
+		if ( is_object( $booking_or_id ) && ! empty( $booking_or_id->uuid ) ) {
+			return $booking_or_id;
+		}
+		if ( is_array( $booking_or_id ) && ! empty( $booking_or_id['id'] ) ) {
+			return (object) $booking_or_id;
+		}
+		$id = absint( $booking_or_id );
+		if ( ! $id ) {
+			return null;
+		}
+		global $wpdb;
+		$row = $wpdb->get_row( $wpdb->prepare(
+			"SELECT * FROM {$wpdb->prefix}g2ab_bookings WHERE id = %d LIMIT 1",
+			$id
+		) );
+		return $row ?: null;
 	}
 
 	private function is_event_enabled( $event ) {

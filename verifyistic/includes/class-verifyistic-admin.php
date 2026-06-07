@@ -181,6 +181,7 @@ class Verifyistic_Admin {
             'verifyistic_webhook_url', 'verifyistic_webhook_enabled', 'verifyistic_webhook_secret',
             'verifyistic_exclude_pages', 'verifyistic_redirect_url', 'verifyistic_custom_css',
             'verifyistic_privacy_text', 'verifyistic_id_upload_label', 'verifyistic_selfie_label',
+            'verifyistic_cookie_domain', 'verifyistic_strict_mode', 'verifyistic_skip_bot_detection',
         );
         foreach ( $options as $option ) {
             register_setting( 'verifyistic_settings', $option, array( 'sanitize_callback' => 'sanitize_text_field' ) );
@@ -188,6 +189,26 @@ class Verifyistic_Admin {
         register_setting( 'verifyistic_settings', 'verifyistic_custom_css', array( 'sanitize_callback' => 'wp_strip_all_tags' ) );
         register_setting( 'verifyistic_settings', 'verifyistic_message_text', array( 'sanitize_callback' => 'wp_kses_post' ) );
         register_setting( 'verifyistic_settings', 'verifyistic_privacy_text', array( 'sanitize_callback' => 'wp_kses_post' ) );
+        register_setting( 'verifyistic_settings', 'verifyistic_cookie_domain', array( 'sanitize_callback' => array( $this, 'sanitize_cookie_domain' ) ) );
+        register_setting( 'verifyistic_settings', 'verifyistic_strict_mode', array( 'sanitize_callback' => 'intval' ) );
+        register_setting( 'verifyistic_settings', 'verifyistic_skip_bot_detection', array( 'sanitize_callback' => 'intval' ) );
+    }
+
+    /**
+     * Sanitize a cookie Domain attribute. Allows an optional leading dot,
+     * followed by valid host characters. Returns empty string on invalid input.
+     */
+    public function sanitize_cookie_domain( $value ) {
+        $value = sanitize_text_field( (string) $value );
+        $value = trim( $value );
+        if ( '' === $value ) {
+            return '';
+        }
+        // Allow optional leading dot, then label.label characters.
+        if ( ! preg_match( '/^\.?[A-Za-z0-9]([A-Za-z0-9\-]*[A-Za-z0-9])?(\.[A-Za-z0-9]([A-Za-z0-9\-]*[A-Za-z0-9])?)+$/', $value ) ) {
+            return '';
+        }
+        return $value;
     }
 
     // ─── Page: Dashboard ─────────────────────────────────────────────────────
@@ -239,6 +260,7 @@ class Verifyistic_Admin {
             'verifyistic_accent_color'      => 'sanitize_hex_color',
             'verifyistic_remember_me'       => 'intval',
             'verifyistic_cookie_days'       => 'absint',
+            'verifyistic_cookie_domain'     => array( $this, 'sanitize_cookie_domain' ),
             'verifyistic_webhook_url'       => 'esc_url_raw',
             'verifyistic_webhook_enabled'   => 'intval',
             'verifyistic_webhook_secret'    => 'sanitize_text_field',
@@ -247,12 +269,14 @@ class Verifyistic_Admin {
             'verifyistic_privacy_text'      => 'wp_kses_post',
             'verifyistic_id_upload_label'   => 'sanitize_text_field',
             'verifyistic_selfie_label'      => 'sanitize_text_field',
+            'verifyistic_strict_mode'       => 'intval',
+            'verifyistic_skip_bot_detection'=> 'intval',
         );
 
         foreach ( $fields as $key => $sanitize ) {
             $value = isset( $_POST[ $key ] ) ? $_POST[ $key ] : '';
             // Checkboxes
-            if ( in_array( $key, array( 'verifyistic_enabled', 'verifyistic_id_verification', 'verifyistic_webhook_enabled', 'verifyistic_remember_me' ), true ) ) {
+            if ( in_array( $key, array( 'verifyistic_enabled', 'verifyistic_id_verification', 'verifyistic_webhook_enabled', 'verifyistic_remember_me', 'verifyistic_strict_mode', 'verifyistic_skip_bot_detection' ), true ) ) {
                 $value = isset( $_POST[ $key ] ) ? 1 : 0;
             }
             update_option( $key, call_user_func( $sanitize, $value ) );
@@ -271,6 +295,36 @@ class Verifyistic_Admin {
 
         // Multi-webhook connections.
         $this->save_webhook_connections();
+
+        // Mirror the legacy single-webhook fields into the connections list so
+        // toggling the legacy "Enable Webhook" checkbox is not dead post-migration.
+        if ( class_exists( 'Verifyistic_Webhooks' ) ) {
+            $url     = (string) get_option( 'verifyistic_webhook_url', '' );
+            $enabled = (int) get_option( 'verifyistic_webhook_enabled', 0 );
+            if ( '' !== $url ) {
+                $conns   = Verifyistic_Webhooks::get_connections();
+                $matched = false;
+                foreach ( $conns as $i => $c ) {
+                    if ( isset( $c['url'] ) && $c['url'] === $url ) {
+                        $conns[ $i ]['enabled'] = $enabled ? 1 : 0;
+                        $matched = true;
+                        break;
+                    }
+                }
+                if ( ! $matched ) {
+                    $conns[] = array(
+                        'id'       => 'wh_' . substr( md5( $url . microtime( true ) . wp_rand() ), 0, 12 ),
+                        'name'     => __( 'Legacy', 'verifyistic' ),
+                        'url'      => $url,
+                        'secret'   => (string) get_option( 'verifyistic_webhook_secret', '' ),
+                        'platform' => 'legacy',
+                        'enabled'  => $enabled ? 1 : 0,
+                        'events'   => array( 'passed', 'failed', 'declined' ),
+                    );
+                }
+                Verifyistic_Webhooks::save_connections( $conns );
+            }
+        }
     }
 
     // ─── Save multi-webhook connections ────────────────────────────────────────

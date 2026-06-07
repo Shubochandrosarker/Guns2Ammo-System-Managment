@@ -74,14 +74,16 @@ class JWT_Bridge {
 			return $meta_role;
 		}
 
-		// Map from WP capabilities
+		// Map from WP capabilities — administrators stay owners, shop managers
+		// stay managers, but plain authenticated users default to 'none' so a
+		// stray WP login can't grant access to the dashboard.
 		if ( user_can( $user, 'manage_options' ) || user_can( $user, 'administrator' ) ) {
 			return 'owner';
 		}
-		if ( user_can( $user, 'edit_others_posts' ) || user_can( $user, 'manage_woocommerce' ) ) {
+		if ( user_can( $user, 'manage_woocommerce' ) ) {
 			return 'manager';
 		}
-		return 'staff';
+		return 'none';
 	}
 
 	/**
@@ -92,6 +94,9 @@ class JWT_Bridge {
 	 * defaulting to a sensible base set if nothing is set.
 	 */
 	public static function resolve_permissions( \WP_User $user, string $role ): array {
+		if ( 'none' === $role ) {
+			return [];
+		}
 		if ( 'owner' === $role ) {
 			return self::ALL_MODULES;
 		}

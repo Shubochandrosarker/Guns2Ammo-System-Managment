@@ -77,7 +77,7 @@ $status_labels = [
 <div class="wrap wpistic-ffl-admin">
 	<div class="wpistic-ffl-page-header">
 		<h1 class="wpistic-ffl-page-title"><?php esc_html_e( 'G2A - FFL Transfers', 'advanced-ffl-checkout' ); ?></h1>
-		<a href="<?php echo esc_url( admin_url( 'admin.php?page=wpistic-ffl-transfers&action=export' ) ); ?>" class="button wpistic-ffl-export-btn">⬇ <?php esc_html_e( 'Export CSV', 'advanced-ffl-checkout' ); ?></a>
+		<a href="<?php echo esc_url( wp_nonce_url( admin_url( 'admin.php?page=wpistic-ffl-transfers&action=export' ), 'wpistic_ffl_export' ) ); ?>" class="button wpistic-ffl-export-btn">⬇ <?php esc_html_e( 'Export CSV', 'advanced-ffl-checkout' ); ?></a>
 	</div>
 
 	<!-- Filter bar -->

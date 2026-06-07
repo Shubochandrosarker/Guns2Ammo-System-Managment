@@ -3,7 +3,7 @@ Contributors: wordpressistic
 Tags: age verification, age gate, age check, firearms, alcohol, adult, cannabis, popup, COPPA
 Requires at least: 5.8
 Tested up to: 6.7
-Stable tag: 1.0.0
+Stable tag: 1.4.0
 Requires PHP: 7.4
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
@@ -84,7 +84,7 @@ Yes. In Settings → General, add comma-separated page IDs to exclude.
 Yes. The popup works on all WordPress pages including WooCommerce shop, product, and checkout pages.
 
 = Where are ID uploads stored? =
-ID and selfie uploads are stored in `/wp-content/uploads/verifyistic-ids/` with year/month subfolders. The directory is not publicly listed.
+ID and selfie uploads are stored in `/wp-content/uploads/private/verifyistic-ids/` with year/month subfolders. The directory is not publicly listed.
 
 = Does this require any third-party API? =
 No. All verification is handled locally. The webhook integration is optional and connects to your own endpoints.
@@ -140,6 +140,15 @@ No. All verification is handled locally. The webhook integration is optional and
 * ADA-compliant, SEO-friendly popup
 
 == Upgrade Notice ==
+
+= 1.3.2 =
+* Hardened anti-bot timing token; added per-IP rate limit; webhook fanout to multiple connections.
+
+= 1.2.0 =
+* Multiple webhook connections; admin diagnostics.
+
+= 1.1.0 =
+* Strict mode; SSRF guard on webhook URL.
 
 = 1.0.0 =
 Initial release.
