@@ -1,0 +1,82 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html, body, #g2a-pos-dashboard {
+    height: 100%;
+  }
+  body {
+    @apply bg-zinc-50 text-zinc-900 dark:bg-zinc-950 dark:text-zinc-100 antialiased;
+    font-family: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  }
+  /* Don't let WP admin override the dashboard font */
+  #wpcontent #g2a-pos-dashboard {
+    font-family: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  }
+  /* Width neutralisation of WP admin chrome (#wpcontent, #wpbody-content,
+     .wrap) is done via inline <style> in Pages::render_spa() to avoid
+     :has() compatibility issues and to fire before this bundle loads. */
+  #g2a-pos-dashboard {
+    width: 100%;
+    max-width: 100%;
+  }
+  /* WordPress admin forces #1d2327 (near-black) text on h1–h6 inside .wrap
+     and on form controls, which makes our titles + input text unreadable in
+     dark mode. Use ID-prefixed selectors so we beat WP's element selectors
+     without !important. Tailwind utility classes (font-semibold, text-2xl,
+     bg-*, etc.) still apply because they have lower specificity than this
+     ID-prefixed rule for the properties WE set, but our Tailwind colour
+     classes (dark:text-zinc-100, etc.) override `inherit` because they
+     target classes which (under @layer utilities) win. */
+  #g2a-pos-dashboard :is(h1, h2, h3, h4, h5, h6) {
+    color: inherit;
+    font-family: inherit;
+    margin: 0;
+    padding: 0;
+  }
+  #g2a-pos-dashboard :is(input, select, textarea, button) {
+    color: inherit;
+    font-family: inherit;
+  }
+  #g2a-pos-dashboard :is(input, select, textarea):focus {
+    box-shadow: none;
+  }
+}
+
+@layer components {
+  .card {
+    @apply block w-full rounded-xl border border-zinc-200 bg-white shadow-sm dark:border-zinc-800 dark:bg-zinc-900;
+  }
+  .btn {
+    @apply inline-flex items-center justify-center rounded-lg px-3.5 py-2 text-sm font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-brand focus:ring-offset-2 dark:focus:ring-offset-zinc-900;
+  }
+  .btn-primary {
+    @apply btn bg-brand text-white hover:bg-brand-dark;
+  }
+  .btn-secondary {
+    @apply btn border border-zinc-300 bg-white text-zinc-800 hover:bg-zinc-100 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100 dark:hover:bg-zinc-800;
+  }
+  .badge {
+    @apply inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium;
+  }
+  .badge-green { @apply badge bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300; }
+  .badge-amber { @apply badge bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300; }
+  .badge-red   { @apply badge bg-rose-100 text-rose-700 dark:bg-rose-900/40 dark:text-rose-300; }
+  .badge-zinc  { @apply badge bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300; }
+  .input {
+    @apply w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm focus:border-brand focus:outline-none focus:ring-1 focus:ring-brand dark:border-zinc-700 dark:bg-zinc-900;
+  }
+  .table-head { @apply text-left text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400; }
+  .table-cell { @apply whitespace-nowrap px-4 py-3 text-sm; }
+  .btn-sm {
+    @apply inline-flex items-center justify-center rounded-md border border-zinc-300 bg-white px-2 py-1 text-xs font-medium text-zinc-800 hover:bg-zinc-100 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100 dark:hover:bg-zinc-800;
+  }
+  .link {
+    @apply text-brand hover:underline cursor-pointer;
+  }
+}
+
+/* WordPress admin reset — keep our scope */
+#g2a-pos-dashboard * { box-sizing: border-box; }
+#g2a-pos-dashboard button { cursor: pointer; }

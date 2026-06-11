@@ -38,7 +38,10 @@
 			url += '?confirm_token=' + encodeURIComponent(confirmToken);
 		}
 		var sessionId = qs('session_id');
-		return fetch(url, { headers: { 'X-WP-Nonce': window.G2AB_DATA.nonce || '' } })
+		// NOTE: no X-WP-Nonce here. These routes authenticate with the
+		// per-booking confirm_token, and a stale nonce from cached page HTML
+		// makes WordPress core reject the whole request with a 403.
+		return fetch(url, { headers: { 'Accept': 'application/json' } })
 			.then(function (r) { return r.json(); })
 			.then(function (json) {
 				var data = json && json.data ? json.data : null;
@@ -49,7 +52,7 @@
 				// Fallback: ask the server to confirm via gateway API.
 				return fetch(window.G2AB_DATA.rest_url + 'bookings/' + encodeURIComponent(uuid) + '/confirm-payment', {
 					method: 'POST',
-					headers: { 'Content-Type': 'application/json', 'X-WP-Nonce': window.G2AB_DATA.nonce || '' },
+					headers: { 'Content-Type': 'application/json' },
 					body: JSON.stringify({ session_id: sessionId, confirm_token: confirmToken })
 				})
 					.then(function (r) { return r.json(); })

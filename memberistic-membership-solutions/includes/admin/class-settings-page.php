@@ -82,7 +82,7 @@ final class Settings_Page {
 			add_settings_error( 'memberistic_settings', 'settings_saved', __( 'Settings saved successfully.', 'memberistic' ), 'success' );
 		}
 
-		return array(
+		$output = array(
 			// Customer-facing brand label. Defaults to the WP site name
 			// (e.g. "Guns 2 Ammo") so out-of-the-box installs never expose
 			// the plugin author's name "Memberistic" in customer mail.
@@ -120,6 +120,46 @@ final class Settings_Page {
 			'failed_payment_page_id'   => isset( $settings['failed_payment_page_id'] ) ? absint( $settings['failed_payment_page_id'] ) : 0,
 			'staff_dashboard_page_id'  => isset( $settings['staff_dashboard_page_id'] ) ? absint( $settings['staff_dashboard_page_id'] ) : 0,
 		);
+
+		// ── Integration toggles ─────────────────────────────────────────
+		// This sanitizer runs on EVERY update_option('memberistic_settings')
+		// call (register_setting wires it into the sanitize_option_* filter),
+		// including the Integrations page save handler. Before this loop the
+		// returned allowlist silently STRIPPED every integration_* key, which
+		// is why toggles like Verifyistic flipped back off after saving.
+		$registry = '\\WordPressistic\\Memberistic\\Integrations\\Integrations_Registry';
+		if ( class_exists( $registry ) ) {
+			foreach ( $registry::definitions() as $key => $def ) {
+				if ( ! empty( $def['coming_soon'] ) || empty( $def['setting'] ) || isset( $output[ $def['setting'] ] ) ) {
+					continue;
+				}
+				$skey = $def['setting'];
+				$raw  = $settings[ $skey ] ?? ( $existing[ $skey ] ?? $def['default'] );
+				$output[ $skey ] = memberistic_sanitize_yes_no( $raw );
+			}
+		}
+
+		// Integration sub-options + known keys that were missing from the
+		// allowlist (and therefore wiped on each save).
+		$output['integration_verifyistic_autostamp']     = memberistic_sanitize_yes_no( $settings['integration_verifyistic_autostamp'] ?? ( $existing['integration_verifyistic_autostamp'] ?? 'yes' ) );
+		$output['integration_verifyistic_require_signup'] = memberistic_sanitize_yes_no( $settings['integration_verifyistic_require_signup'] ?? ( $existing['integration_verifyistic_require_signup'] ?? 'no' ) );
+		$output['email_reply_to_address']                 = sanitize_email( (string) ( $settings['email_reply_to_address'] ?? ( $existing['email_reply_to_address'] ?? '' ) ) );
+		$output['verifyistic_max_age_days']               = absint( $settings['verifyistic_max_age_days'] ?? ( $existing['verifyistic_max_age_days'] ?? 0 ) );
+
+		// ── Unknown-key passthrough ─────────────────────────────────────
+		// Other modules (waivers, bridges, future integrations) also store
+		// keys in memberistic_settings. Returning a fixed allowlist deleted
+		// them on every unrelated save. Preserve any scalar key we did not
+		// explicitly sanitize above; private/meta keys (leading underscore,
+		// e.g. the _locked_secrets echo from the REST GET) are dropped.
+		foreach ( array_merge( $existing, $settings ) as $key => $value ) {
+			if ( array_key_exists( $key, $output ) || ! is_string( $key ) || '' === $key || '_' === $key[0] || ! is_scalar( $value ) ) {
+				continue;
+			}
+			$output[ $key ] = memberistic_sanitize_text( (string) $value );
+		}
+
+		return $output;
 	}
 
 	/**

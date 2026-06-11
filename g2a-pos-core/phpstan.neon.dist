@@ -1,0 +1,24 @@
+includes:
+    - vendor/szepeviktor/phpstan-wordpress/extension.neon
+    - phpstan-baseline.neon
+
+parameters:
+    level: 5
+    paths:
+        - includes
+    excludePaths:
+        - includes/*/vendor/*
+    treatPhpDocTypesAsCertain: false
+    reportUnmatchedIgnoredErrors: false
+    bootstrapFiles:
+        - tests/phpstan-bootstrap.php
+    ignoreErrors:
+        # WooCommerce symbols — we rely on WC at runtime; stubs are not loaded here.
+        - '#Function (wc_get_product|wc_get_order|wc_price|wc_update_product_stock|is_checkout) not found\.#'
+        - '#Call to an undefined method object::get_price\(\)\.#'
+        # DB_NAME comes from wp-config.php, not WP core stubs.
+        - '#Constant DB_NAME not found\.#'
+        # Repository::table() builds names like "{prefix}name"; many internal SQL strings
+        # interpolate that constant. WPCS/PHPStan can't statically prove safety.
+        - identifier: argument.type
+          path: includes/Database/*

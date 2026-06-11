@@ -533,7 +533,14 @@ final class G2AB_Frontend {
 	 * Build a `style=""` attribute value with CSS custom properties.
 	 */
 	private function build_css_vars( $tokens ) {
-		$vars = array(
+		// The `site` and `ladies` skins define their full palette in CSS
+		// (so they can react to the host theme's light/dark mode). Inline
+		// color vars would defeat that cascade — emit shape/typography only.
+		$inherits = in_array( $tokens['theme'], array( 'site', 'ladies' ), true );
+		$vars = $inherits ? array(
+			'--g2ab-radius'      => $tokens['radius'] . 'px',
+			'--g2ab-radius-pill' => $tokens['radius_pill'] . 'px',
+		) : array(
 			'--g2ab-primary'  => $tokens['primary'],
 			'--g2ab-accent'   => $tokens['accent'],
 			'--g2ab-bg'       => $tokens['bg'],
@@ -760,6 +767,7 @@ final class G2AB_Frontend {
 			'i18n'        => array(
 				'loading'  => __( 'Loading available times…', 'g2a-booking' ),
 				'no_slots' => __( 'No times available on this date.', 'g2a-booking' ),
+				'load_failed' => __( 'We couldn\'t load times just now — please refresh the page and try again.', 'g2a-booking' ),
 				'closed'   => __( 'Closed on this date.', 'g2a-booking' ),
 				'submitting' => __( 'Reserving…', 'g2a-booking' ),
 				'failed'   => __( 'Could not complete booking. Please try again.', 'g2a-booking' ),
@@ -803,7 +811,24 @@ final class G2AB_Frontend {
 
 			var $ = function(sel, ctx){ return (ctx || root).querySelector(sel); };
 			var $$ = function(sel, ctx){ return Array.prototype.slice.call((ctx || root).querySelectorAll(sel)); };
-			function headers(hasBody){ var h = {}; if (hasBody !== false) h['Content-Type'] = 'application/json'; if (config.nonce) h['X-WP-Nonce'] = config.nonce; return h; }
+			// Public GET endpoints must NOT carry a nonce: pages are often served
+			// from a page cache, so the nonce baked into the HTML can be stale —
+			// and WordPress core rejects ANY REST request bearing an invalid
+			// X-WP-Nonce with a 403 before the route even runs. That is what made
+			// logged-out guests see "No times available" on every date while
+			// logged-in users (who bypass the page cache) saw slots normally.
+			function headers(hasBody){ var h = {}; if (hasBody !== false) { h['Content-Type'] = 'application/json'; if (config.nonce) h['X-WP-Nonce'] = config.nonce; } return h; }
+			// Fetch a fresh wp_rest nonce just-in-time (used before POSTs so a
+			// cached page's stale nonce can never fail the booking submit).
+			function freshNonce(){
+				return fetch(config.rest_url + 'session', { headers: { 'Accept': 'application/json' }, cache: 'no-store' })
+					.then(function(r){ return r.json(); })
+					.then(function(json){
+						if (json && json.success && json.data && json.data.nonce) { config.nonce = json.data.nonce; }
+						return config.nonce;
+					})
+					.catch(function(){ return config.nonce; });
+			}
 			function pad(n){ return n < 10 ? '0'+n : ''+n; }
 			function ymd(d){ return d.getFullYear() + '-' + pad(d.getMonth()+1) + '-' + pad(d.getDate()); }
 
@@ -986,13 +1011,15 @@ final class G2AB_Frontend {
 					.then(function(r){ return r.json(); })
 					.then(function(json){
 						var data = json && json.success ? json.data : null;
-						if (!data) { if (hint) hint.style.display = 'none'; box.innerHTML = '<p class="g2ab-muted">' + config.i18n.no_slots + '</p>'; return; }
+						// A failed request is NOT the same as an empty day — say so,
+						// instead of telling the guest there are no times.
+						if (!data) { if (hint) hint.style.display = 'none'; box.innerHTML = '<p class="g2ab-muted">' + (config.i18n.load_failed || config.i18n.no_slots) + '</p>'; return; }
 						if (data.closed) { if (hint) hint.style.display = 'none'; box.innerHTML = '<p class="g2ab-muted">' + config.i18n.closed + '</p>'; return; }
 						renderSlots(data.slots);
 					})
 					.catch(function(){
 						if (hint) hint.style.display = 'none';
-						box.innerHTML = '<p class="g2ab-muted">' + config.i18n.no_slots + '</p>';
+						box.innerHTML = '<p class="g2ab-muted">' + (config.i18n.load_failed || config.i18n.no_slots) + '</p>';
 					});
 			}
 
@@ -1091,18 +1118,27 @@ final class G2AB_Frontend {
 					});
 					if (errEl) { errEl.hidden = true; errEl.textContent = ''; }
 					if (submit) { submit.disabled = true; submit.textContent = config.i18n.submitting; }
-					fetch(config.rest_url + 'bookings', {
-						method: 'POST',
-						headers: headers(true),
-						body: JSON.stringify({
-							booking_type_id: parseInt(root.dataset.bookingTypeId, 10) || 0,
-							resource_id: state.resourceId,
-							form_id: parseInt(root.dataset.formId, 10) || 0,
-							start_at: state.slot.start,
-							party_size: parseInt(fields.party_size || 1, 10),
-							fields: fields
-						})
-					}).then(function(r){ return r.json().then(function(j){ return {ok:r.ok, body:j}; }); })
+					var payload = JSON.stringify({
+						booking_type_id: parseInt(root.dataset.bookingTypeId, 10) || 0,
+						resource_id: state.resourceId,
+						form_id: parseInt(root.dataset.formId, 10) || 0,
+						start_at: state.slot.start,
+						party_size: parseInt(fields.party_size || 1, 10),
+						fields: fields
+					});
+					function postBooking(){
+						return fetch(config.rest_url + 'bookings', { method: 'POST', headers: headers(true), body: payload })
+							.then(function(r){ return r.json().then(function(j){ return {ok:r.ok, status:r.status, body:j}; }); });
+					}
+					// Always grab a fresh nonce first: the one rendered into the
+					// page may be hours old if the page came from a cache, and a
+					// stale nonce 403s the booking for logged-out guests.
+					freshNonce().then(postBooking)
+					.then(function(res){
+						var nonceFailed = res && !res.ok && res.body && (res.body.code === 'g2ab_invalid_nonce' || res.body.code === 'rest_cookie_invalid_nonce');
+						if (nonceFailed) { return freshNonce().then(postBooking); }
+						return res;
+					})
 					.then(function(res){
 						if (!res.ok || !res.body || !res.body.success) {
 							var msg = (res.body && res.body.message) || config.i18n.failed;

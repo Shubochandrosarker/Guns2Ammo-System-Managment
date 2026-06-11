@@ -154,7 +154,7 @@ img, video, iframe, svg, canvas { max-width: 100%; height: auto; }
 
 /* Very small phones  calendar day cells stay legible */
 @media (max-width: 380px) {
-  .cal { gap: 3px; }
+  .cal { gap: 6px; }
   .cal .day { font-size: 12px; }
 }
 
@@ -176,6 +176,36 @@ body.g2a-noscroll { overflow: hidden; }
   -webkit-overflow-scrolling: touch;
 }
 .g2a-mobile.open { transform: translateX(0); visibility: visible; }
+/* Staggered link entrance — each row drifts in 40ms after the previous
+   one (drawer slide is 320ms, so the cascade reads as one motion). */
+.g2a-mobile__links { display: flex; flex-direction: column; gap: 8px; }
+.g2a-mobile__links a {
+  opacity: 0; transform: translateX(18px);
+  transition: opacity 280ms var(--ease-out), transform 280ms var(--ease-out);
+  transition-delay: 0ms;
+}
+.g2a-mobile.open .g2a-mobile__links a {
+  opacity: 1; transform: none;
+  transition-delay: calc(120ms + var(--i, 0) * 40ms);
+}
+@media (prefers-reduced-motion: reduce) {
+  .g2a-mobile__links a { opacity: 1 !important; transform: none !important; transition: none !important; }
+}
+.g2a-mobile__foot {
+  margin-top: auto; padding-top: 28px;
+  display: flex; flex-direction: column; gap: 12px;
+}
+/* The footer CTAs are .btn pills — undo the giant drawer-link styles. */
+.g2a-mobile .g2a-mobile__foot a.btn {
+  font-family: var(--font-condensed); font-size: 14px;
+  padding: 16px 28px; border-bottom-width: 1.5px;
+  display: inline-flex; justify-content: center;
+}
+.g2a-mobile .g2a-mobile__tel {
+  font-family: var(--font-mono); font-size: 14px;
+  color: var(--color-brass-bright); border: none;
+  padding: 12px 0 0; letter-spacing: 0.2em; text-align: center;
+}
 @media (max-width: 600px) {
   .g2a-mobile { padding: 22px 20px 40px; }
   .g2a-mobile a { font-size: 26px; padding: 15px 4px; }
@@ -250,7 +280,7 @@ body.g2a-noscroll { overflow: hidden; }
   .bk-layout { padding: 36px 16px; }
   .step { padding: 22px 18px; }
   .step h3 { font-size: 26px; }
-  .cal { gap: 5px; }
+  .cal { gap: 8px; }
   .slots { grid-template-columns: repeat(3, 1fr) !important; }
   /* Shooters/Lanes steppers stack instead of squeezing side-by-side */
   .step > div[style*="grid-template-columns:1fr 1fr"],

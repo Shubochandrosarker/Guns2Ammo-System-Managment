@@ -35,10 +35,10 @@
   } else {
     document.addEventListener('DOMContentLoaded', dismissPreloader, { once: true });
   }
-  // Safety net: was 4s and visibly stalled the page in incognito on
-  // cold caches. 1.2s is plenty for the preloader to register
-  // visually without ever blocking the real site for noticeable time.
-  setTimeout(dismissPreloader, 1200);
+  // Safety net only — the inline header script owns the 400ms ceiling;
+  // this catches the rare case where that script was stripped by an
+  // optimizer plugin.
+  setTimeout(dismissPreloader, 800);
 
   document.addEventListener('DOMContentLoaded', function () {
 
@@ -130,12 +130,53 @@
       if (window.innerWidth > 1100 && drawer && drawer.classList.contains('open')) closeDrawer();
     });
 
+    /* ===== Theme mode toggle (light / dark) =====
+     * header.php stamps <html data-theme> before first paint (saved
+     * choice → OS preference → dark). This button flips it manually
+     * and persists the choice; while no manual choice exists, OS-level
+     * scheme changes are mirrored live. */
+    var modeBtn = document.getElementById('g2a-mode-toggle');
+    var applyTheme = function (t, persist) {
+      document.documentElement.setAttribute('data-theme', t);
+      if (persist) {
+        document.documentElement.removeAttribute('data-theme-auto');
+        try { localStorage.setItem('g2a-theme', t); } catch (e) {}
+      }
+      var meta = document.getElementById('g2a-theme-color');
+      if (meta) meta.setAttribute('content', t === 'light' ? '#F4F2ED' : '#1A191E');
+    };
+    if (modeBtn) {
+      modeBtn.addEventListener('click', function () {
+        var next = document.documentElement.getAttribute('data-theme') === 'light' ? 'dark' : 'light';
+        applyTheme(next, true);
+      });
+    }
+    if (window.matchMedia) {
+      var mq = window.matchMedia('(prefers-color-scheme: light)');
+      var onScheme = function (e) {
+        if (document.documentElement.hasAttribute('data-theme-auto')) {
+          applyTheme(e.matches ? 'light' : 'dark', false);
+        }
+      };
+      if (mq.addEventListener) mq.addEventListener('change', onScheme);
+      else if (mq.addListener) mq.addListener(onScheme);
+    }
+
     /* ===== Profile dropdown ===== */
     var profile = document.getElementById('g2a-profile');
     var pBtn    = document.getElementById('g2a-profile-btn');
     if (profile && pBtn) {
-      pBtn.addEventListener('click', function (e) { e.stopPropagation(); profile.classList.toggle('open'); });
-      document.addEventListener('click', function (e) { if (!profile.contains(e.target)) profile.classList.remove('open'); });
+      pBtn.addEventListener('click', function (e) {
+        e.stopPropagation();
+        var open = profile.classList.toggle('open');
+        pBtn.setAttribute('aria-expanded', open ? 'true' : 'false');
+      });
+      document.addEventListener('click', function (e) {
+        if (!profile.contains(e.target)) {
+          profile.classList.remove('open');
+          pBtn.setAttribute('aria-expanded', 'false');
+        }
+      });
     }
     var logoutLink = document.getElementById('g2a-logout');
     if (logoutLink) logoutLink.addEventListener('click', function (e) {

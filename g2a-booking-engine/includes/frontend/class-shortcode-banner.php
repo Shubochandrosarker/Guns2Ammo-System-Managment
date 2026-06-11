@@ -81,7 +81,7 @@ final class G2AB_Frontend_Shortcode_Banner {
 		ob_start();
 		$this->print_styles();
 		?>
-		<section class="g2ab-banr g2ab-banr--theme-<?php echo esc_attr( $atts['theme'] ); ?>">
+		<section class="g2ab-banr g2ab-banr--theme-<?php echo esc_attr( $atts['theme'] ); ?> g2ab-banr--type-<?php echo esc_attr( sanitize_title( (string) $type->slug ) ); ?>">
 			<div class="g2ab-banr__camo"></div>
 			<div class="g2ab-banr__grid"></div>
 

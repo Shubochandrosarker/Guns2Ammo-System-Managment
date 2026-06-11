@@ -1,0 +1,18 @@
+<?php
+defined( 'ABSPATH' ) || exit;
+$location = is_array( $location ?? null ) ? $location : [];
+?>
+<div class="wrap messageistic-wrap">
+    <h1><?php esc_html_e( 'Locations', 'messageistic' ); ?></h1>
+    <?php if ( $notice ) : ?><div class="notice notice-info"><p><?php echo esc_html( $notice ); ?></p></div><?php endif; ?>
+    <div class="messageistic-grid messageistic-grid--split">
+        <form method="post" class="messageistic-card">
+            <?php wp_nonce_field( 'messageistic_save_location' ); ?>
+            <input type="hidden" name="action" value="save"><input type="hidden" name="id" value="<?php echo (int) ( $location['id'] ?? 0 ); ?>">
+            <h2><?php echo empty( $location['id'] ) ? esc_html__( 'Add Location', 'messageistic' ) : esc_html__( 'Edit Location', 'messageistic' ); ?></h2>
+            <table class="form-table"><tr><th><?php esc_html_e( 'Name', 'messageistic' ); ?></th><td><input required name="name" value="<?php echo esc_attr( (string) ( $location['name'] ?? '' ) ); ?>"></td></tr><tr><th><?php esc_html_e( 'Code', 'messageistic' ); ?></th><td><input required name="code" value="<?php echo esc_attr( (string) ( $location['code'] ?? '' ) ); ?>"></td></tr><tr><th><?php esc_html_e( 'City / State / ZIP', 'messageistic' ); ?></th><td><input name="city" value="<?php echo esc_attr( (string) ( $location['city'] ?? '' ) ); ?>"> <input name="state" size="4" maxlength="2" value="<?php echo esc_attr( (string) ( $location['state'] ?? '' ) ); ?>"> <input name="postal_code" value="<?php echo esc_attr( (string) ( $location['postal_code'] ?? '' ) ); ?>"></td></tr><tr><th><?php esc_html_e( 'Address', 'messageistic' ); ?></th><td><textarea name="address"><?php echo esc_textarea( (string) ( $location['address'] ?? '' ) ); ?></textarea></td></tr><tr><th><?php esc_html_e( 'Timezone', 'messageistic' ); ?></th><td><input name="timezone" value="<?php echo esc_attr( (string) ( $location['timezone'] ?? 'America/New_York' ) ); ?>"></td></tr><tr><th><?php esc_html_e( 'Provider / Sender', 'messageistic' ); ?></th><td><input name="provider_key" value="<?php echo esc_attr( (string) ( $location['provider_key'] ?? '' ) ); ?>"> <input name="sender" value="<?php echo esc_attr( (string) ( $location['sender'] ?? '' ) ); ?>"></td></tr><tr><th><?php esc_html_e( 'Active', 'messageistic' ); ?></th><td><input type="checkbox" name="is_active" value="1" <?php checked( ! isset( $location['is_active'] ) || ! empty( $location['is_active'] ) ); ?>></td></tr></table>
+            <?php submit_button( empty( $location['id'] ) ? __( 'Add Location', 'messageistic' ) : __( 'Update Location', 'messageistic' ) ); ?>
+        </form>
+        <div class="messageistic-card"><table class="widefat striped"><thead><tr><th><?php esc_html_e( 'Name', 'messageistic' ); ?></th><th><?php esc_html_e( 'Code', 'messageistic' ); ?></th><th><?php esc_html_e( 'State', 'messageistic' ); ?></th><th><?php esc_html_e( 'Provider', 'messageistic' ); ?></th><th><?php esc_html_e( 'Sender', 'messageistic' ); ?></th><th><?php esc_html_e( 'Active', 'messageistic' ); ?></th><th></th></tr></thead><tbody><?php foreach ( $rows as $row ) : ?><tr><td><?php echo esc_html( $row['name'] ); ?></td><td><?php echo esc_html( $row['code'] ); ?></td><td><?php echo esc_html( $row['state'] ); ?></td><td><?php echo esc_html( $row['provider_key'] ); ?></td><td><?php echo esc_html( $row['sender'] ); ?></td><td><?php echo $row['is_active'] ? '✓' : '—'; ?></td><td><a href="<?php echo esc_url( add_query_arg( [ 'page' => 'messageistic-locations', 'location_id' => (int) $row['id'] ], admin_url( 'admin.php' ) ) ); ?>"><?php esc_html_e( 'Edit', 'messageistic' ); ?></a></td></tr><?php endforeach; ?></tbody></table></div>
+    </div>
+</div>

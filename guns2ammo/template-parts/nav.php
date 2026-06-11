@@ -106,9 +106,20 @@ $phone_tel = preg_replace( '/[^0-9+]/', '', '+1' . $phone );
 			<span><span id="g2a-live-label">Closed</span> <span class="label" id="g2a-live-time"></span></span>
 		</div>
 		<a class="phone" href="tel:<?php echo esc_attr( $phone_tel ); ?>"><?php echo esc_html( $phone ); ?></a>
+		<button class="g2a-mode" id="g2a-mode-toggle" type="button" aria-label="<?php esc_attr_e( 'Switch light / dark mode', 'guns2ammo' ); ?>" title="<?php esc_attr_e( 'Light / dark mode', 'guns2ammo' ); ?>">
+			<svg class="ico-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg>
+			<svg class="ico-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="4.4"/><path d="M12 2v2.2M12 19.8V22M4.9 4.9l1.6 1.6M17.5 17.5l1.6 1.6M2 12h2.2M19.8 12H22M4.9 19.1l1.6-1.6M17.5 6.5l1.6-1.6"/></svg>
+		</button>
 		<div class="g2a-profile" id="g2a-profile">
-			<button class="profile-btn" id="g2a-profile-btn" aria-label="Account">
-				<span class="av" id="g2a-profile-av"><?php echo is_user_logged_in() ? esc_html( strtoupper( substr( wp_get_current_user()->display_name, 0, 2 ) ) ) : ''; ?></span>
+			<button class="profile-btn" id="g2a-profile-btn" aria-label="Account" aria-haspopup="true" aria-expanded="false">
+				<span class="av" id="g2a-profile-av"><?php
+				if ( is_user_logged_in() ) {
+					echo esc_html( strtoupper( substr( wp_get_current_user()->display_name, 0, 2 ) ) );
+				} else {
+					// Guest state: a real person icon, not an empty disc.
+					?><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="8" r="3.6"/><path d="M4.5 20c1.2-3.6 4-5.4 7.5-5.4s6.3 1.8 7.5 5.4"/></svg><?php
+				}
+				?></span>
 				<svg width="8" height="8" viewBox="0 0 8 8" fill="currentColor" aria-hidden="true"><path d="M1 2 L4 6 L7 2 Z"/></svg>
 			</button>
 			<div class="profile-menu" id="g2a-profile-menu">

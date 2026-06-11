@@ -1,30 +1,90 @@
-/* G2A Event Banner styles — extracted from class-shortcode-banner.php */
-		.g2ab-banr{position:relative;background:linear-gradient(135deg,#0F1115 0%,#1A1F26 60%,#0F1115 100%);color:#E8E8E8;overflow:hidden;border:1px solid #2A323D;margin:24px 0;font-family:'Inter',system-ui,-apple-system,sans-serif;}
-		.g2ab-banr__camo{position:absolute;inset:0;opacity:.05;background-image:repeating-linear-gradient(45deg,transparent 0,transparent 12px,#4A5D3A 12px,#4A5D3A 16px),repeating-linear-gradient(-45deg,transparent 0,transparent 18px,#D2691E 18px,#D2691E 22px);pointer-events:none;}
-		.g2ab-banr__grid{position:absolute;inset:0;background-image:linear-gradient(rgba(74,93,58,.08) 1px,transparent 1px),linear-gradient(90deg,rgba(74,93,58,.08) 1px,transparent 1px);background-size:40px 40px;pointer-events:none;}
-		.g2ab-banr__inner{position:relative;display:grid;grid-template-columns:1.2fr 1fr;gap:40px;padding:40px 48px;max-width:1200px;margin:0 auto;align-items:center;}
-		@media (max-width:780px){.g2ab-banr__inner{grid-template-columns:1fr;padding:28px 22px;gap:24px;}}
-		.g2ab-banr__chip{display:inline-block;background:#D2691E;color:#fff;padding:5px 12px;font-size:10px;letter-spacing:.18em;font-weight:700;font-family:'Rajdhani','Oswald',Impact,sans-serif;margin-bottom:14px;border-radius:2px;}
-		.g2ab-banr__title{margin:0 0 18px;font-family:'Rajdhani','Oswald',Impact,sans-serif;font-size:48px;font-weight:700;letter-spacing:.04em;line-height:1.05;color:#fff;text-transform:uppercase;text-shadow:3px 3px 0 #4A5D3A;}
-		@media (max-width:780px){.g2ab-banr__title{font-size:32px;text-shadow:2px 2px 0 #4A5D3A;}}
-		.g2ab-banr__date{display:flex;align-items:baseline;gap:14px;margin-bottom:14px;border-left:4px solid #D2691E;padding-left:14px;}
-		.g2ab-banr__date-day{font-family:'Rajdhani','Oswald',Impact,sans-serif;font-size:28px;font-weight:700;color:#D2691E;letter-spacing:.04em;}
-		.g2ab-banr__date-time{font-size:13px;color:#8A95A5;letter-spacing:.06em;text-transform:uppercase;}
-		.g2ab-banr__meta{display:flex;flex-wrap:wrap;gap:18px;font-size:11px;letter-spacing:.1em;color:#8A95A5;font-weight:700;margin-bottom:24px;}
-		.g2ab-banr__meta span{display:inline-flex;align-items:center;gap:5px;}
-		.g2ab-banr__icon{color:#D2691E;font-weight:400;}
-		.g2ab-banr__cta{display:inline-flex;align-items:center;gap:14px;background:#D2691E;color:#fff !important;padding:18px 32px;text-decoration:none;font-family:'Rajdhani','Oswald',Impact,sans-serif;font-size:16px;letter-spacing:.16em;font-weight:700;text-transform:uppercase;border-radius:2px;transition:all .15s ease;border:2px solid #D2691E;}
-		.g2ab-banr__cta:hover{background:transparent;color:#D2691E !important;letter-spacing:.2em;}
-		.g2ab-banr__cta-arrow{font-size:22px;}
-		.g2ab-banr__right{display:flex;flex-direction:column;gap:24px;}
-		.g2ab-banr__count{background:rgba(0,0,0,.4);padding:18px 20px;border:1px solid #2A323D;border-left:3px solid #D2691E;}
-		.g2ab-banr__count-label{font-size:10px;letter-spacing:.18em;color:#8A95A5;font-weight:700;margin-bottom:12px;}
-		.g2ab-banr__count-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;}
-		.g2ab-banr__count-cell{text-align:center;background:#0F1115;padding:12px 8px;border-radius:2px;border:1px solid #2A323D;}
-		.g2ab-banr__count-cell span{display:block;font-family:'Rajdhani','SF Mono','Monaco',monospace;font-size:36px;font-weight:700;color:#D2691E;line-height:1;}
-		.g2ab-banr__count-cell small{display:block;font-size:9px;color:#8A95A5;letter-spacing:.16em;margin-top:4px;font-weight:700;}
-		.g2ab-banr__seats-row{display:flex;justify-content:space-between;font-size:11px;letter-spacing:.1em;color:#8A95A5;font-weight:700;margin-bottom:8px;}
-		.g2ab-banr__seats-left{color:#4CAF50;}
-		.g2ab-banr__seats-bar{height:8px;background:#0F1115;overflow:hidden;border:1px solid #2A323D;border-radius:1px;}
-		.g2ab-banr__seats-fill{height:100%;background:linear-gradient(90deg,#4A5D3A 0,#D2691E 70%,#C62828 100%);transition:width .4s ease;}
-		.g2ab-banr--empty{padding:30px;background:#1A1F26;color:#8A95A5;text-align:center;border-left:3px solid #D2691E;}
+/* G2A Event Banner — premium countdown banner.
+   Token-driven: on the Guns2Ammo theme it inherits the site palette
+   (including light/dark mode via html[data-theme]); anywhere else the
+   fallback values reproduce a tasteful dark slate. Variants:
+     .g2ab-banr--type-<slug>      per-event accents (ladies-day shipped)
+*/
+.g2ab-banr{
+	--banr-bg:        var(--color-surface-1, #14171D);
+	--banr-bg2:       var(--color-surface-2, #1B2027);
+	--banr-accent:    var(--color-ember, #D2691E);
+	--banr-accent-2:  var(--color-brass, #C9A84C);
+	--banr-text:      var(--color-white, #F4F4F6);
+	--banr-muted:     var(--color-silver, #8A95A5);
+	--banr-line:      var(--color-hairline, rgba(255,255,255,.09));
+	--banr-cell:      var(--color-void, #0F1115);
+	--banr-ok:        var(--color-active, #4CAF50);
+	position:relative;overflow:hidden;margin:24px 0;
+	background:
+		radial-gradient(110% 90% at 85% -10%, color-mix(in srgb, var(--banr-accent-2) 10%, transparent) 0%, transparent 55%),
+		radial-gradient(110% 90% at 0% 110%, color-mix(in srgb, var(--banr-accent) 9%, transparent) 0%, transparent 55%),
+		linear-gradient(135deg, var(--banr-bg) 0%, var(--banr-bg2) 60%, var(--banr-bg) 100%);
+	color:var(--banr-text);
+	border:1px solid var(--banr-line);
+	border-radius:4px;
+	font-family:var(--font-body, 'Inter', system-ui, -apple-system, sans-serif);
+}
+/* Subtle crosshair grid — replaces the old camo stripes. */
+.g2ab-banr__camo{position:absolute;inset:0;opacity:.35;pointer-events:none;background:
+	radial-gradient(circle at 82% 50%, color-mix(in srgb, var(--banr-accent) 12%, transparent) 0, transparent 38%);}
+.g2ab-banr__grid{position:absolute;inset:0;pointer-events:none;opacity:.6;background-image:
+	linear-gradient(color-mix(in srgb, var(--banr-muted) 9%, transparent) 1px, transparent 1px),
+	linear-gradient(90deg, color-mix(in srgb, var(--banr-muted) 9%, transparent) 1px, transparent 1px);
+	background-size:44px 44px;}
+.g2ab-banr__inner{position:relative;display:grid;grid-template-columns:1.2fr 1fr;gap:40px;padding:42px 48px;max-width:1200px;margin:0 auto;align-items:center;}
+@media (max-width:780px){.g2ab-banr__inner{grid-template-columns:1fr;padding:28px 22px;gap:24px;}}
+.g2ab-banr__chip{display:inline-block;background:var(--banr-accent);color:#fff;padding:5px 12px;font-size:10px;letter-spacing:.18em;font-weight:700;font-family:var(--font-condensed,'Rajdhani','Oswald',Impact,sans-serif);margin-bottom:14px;border-radius:2px;text-transform:uppercase;}
+.g2ab-banr__title{margin:0 0 18px;font-family:var(--font-display,'Rajdhani','Oswald',Impact,sans-serif);font-size:48px;font-weight:700;letter-spacing:.04em;line-height:1.05;color:var(--banr-text);text-transform:uppercase;}
+@media (max-width:780px){.g2ab-banr__title{font-size:32px;}}
+.g2ab-banr__date{display:flex;align-items:baseline;gap:14px;margin-bottom:14px;border-left:4px solid var(--banr-accent);padding-left:14px;}
+.g2ab-banr__date-day{font-family:var(--font-display,'Rajdhani','Oswald',Impact,sans-serif);font-size:28px;font-weight:700;color:var(--banr-accent);letter-spacing:.04em;}
+.g2ab-banr__date-time{font-size:13px;color:var(--banr-muted);letter-spacing:.06em;text-transform:uppercase;}
+.g2ab-banr__meta{display:flex;flex-wrap:wrap;gap:18px;font-size:11px;letter-spacing:.1em;color:var(--banr-muted);font-weight:700;margin-bottom:24px;}
+.g2ab-banr__meta span{display:inline-flex;align-items:center;gap:5px;}
+.g2ab-banr__icon{color:var(--banr-accent);font-weight:400;}
+.g2ab-banr__cta{display:inline-flex;align-items:center;gap:14px;background:var(--banr-accent);color:#fff !important;padding:18px 32px;text-decoration:none;font-family:var(--font-condensed,'Rajdhani','Oswald',Impact,sans-serif);font-size:16px;letter-spacing:.16em;font-weight:700;text-transform:uppercase;border-radius:2px;transition:all .18s ease;border:2px solid var(--banr-accent);}
+.g2ab-banr__cta:hover{background:transparent;color:var(--banr-accent) !important;letter-spacing:.2em;}
+.g2ab-banr__cta-arrow{font-size:22px;transition:transform .18s ease;}
+.g2ab-banr__cta:hover .g2ab-banr__cta-arrow{transform:translateX(4px);}
+.g2ab-banr__right{display:flex;flex-direction:column;gap:24px;}
+.g2ab-banr__count{background:color-mix(in srgb, var(--banr-cell) 55%, transparent);padding:18px 20px;border:1px solid var(--banr-line);border-left:3px solid var(--banr-accent);border-radius:3px;backdrop-filter:blur(4px);}
+.g2ab-banr__count-label{font-size:10px;letter-spacing:.18em;color:var(--banr-muted);font-weight:700;margin-bottom:12px;text-transform:uppercase;}
+.g2ab-banr__count-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;}
+.g2ab-banr__count-cell{text-align:center;background:var(--banr-cell);padding:12px 8px;border-radius:3px;border:1px solid var(--banr-line);}
+.g2ab-banr__count-cell span{display:block;font-family:var(--font-mono,'Rajdhani','SF Mono','Monaco',monospace);font-size:36px;font-weight:700;color:var(--banr-accent);line-height:1;font-variant-numeric:tabular-nums;}
+.g2ab-banr__count-cell small{display:block;font-size:9px;color:var(--banr-muted);letter-spacing:.16em;margin-top:4px;font-weight:700;}
+.g2ab-banr__seats-row{display:flex;justify-content:space-between;font-size:11px;letter-spacing:.1em;color:var(--banr-muted);font-weight:700;margin-bottom:8px;}
+.g2ab-banr__seats-left{color:var(--banr-ok);}
+.g2ab-banr__seats-bar{height:8px;background:var(--banr-cell);overflow:hidden;border:1px solid var(--banr-line);border-radius:99px;}
+.g2ab-banr__seats-fill{height:100%;background:linear-gradient(90deg, var(--banr-accent-2) 0, var(--banr-accent) 70%, #C62828 100%);transition:width .4s ease;border-radius:99px;}
+.g2ab-banr--empty{padding:30px;background:var(--banr-bg2);color:var(--banr-muted);text-align:center;border-left:3px solid var(--banr-accent);}
+
+/* Light-mode polish on the host theme: countdown digits stay readable on
+   paper cells (the tokens above already flip the surfaces). */
+html[data-theme="light"] .g2ab-banr{--banr-cell:#FFFFFF;}
+html[data-theme="light"] .g2ab-banr__count{background:rgba(255,255,255,.6);}
+
+/* ── Ladies Tuesday variant — rose-gold accents, same structure ── */
+.g2ab-banr--type-ladies-day,
+.g2ab-banr--type-ladies-tuesday{
+	--banr-accent:#E25C8E;
+	--banr-accent-2:#E8B4C8;
+	--banr-bg:#241522;
+	--banr-bg2:#2E1B2A;
+	--banr-muted:#BA9FAE;
+	--banr-line:rgba(255,235,245,.10);
+	--banr-cell:#1D1019;
+}
+html[data-theme="light"] .g2ab-banr--type-ladies-day,
+html[data-theme="light"] .g2ab-banr--type-ladies-tuesday{
+	--banr-accent:#C2447A;
+	--banr-accent-2:#9C5C7C;
+	--banr-bg:#FAF2F6;
+	--banr-bg2:#F3E4EC;
+	--banr-muted:#7E6470;
+	--banr-line:rgba(60,20,44,.12);
+	--banr-cell:#FFFFFF;
+	color:#311F2A;
+}
+html[data-theme="light"] .g2ab-banr--type-ladies-day .g2ab-banr__title,
+html[data-theme="light"] .g2ab-banr--type-ladies-tuesday .g2ab-banr__title{color:#311F2A;}

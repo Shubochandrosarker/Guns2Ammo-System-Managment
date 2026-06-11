@@ -8,13 +8,15 @@ All zips are at the repo root and can be uploaded directly via **WP Admin → Pl
 
 | Artifact | Filename | Current version |
 |---|---|---|
-| Theme | `WPistic-Theme-For-G2A-Version-1.8.9.zip` *(also in `releases/`)* | **1.21.0** |
-| Booking Engine plugin | `g2a-booking-engine.zip` | **1.10.0** (DB schema 1.6.0) |
-| Memberistic Membership Solutions plugin | `memberistic-membership-solutions.zip` | **1.43.0** (DB schema 1.5.0) |
-| WPistic Contact Form plugin | `wpistic-contact-form-main.zip` | **1.5.0** (DB schema 1.2.0) |
+| Theme | `WPistic-Theme-For-G2A-Version-1.8.9.zip` *(also in `releases/`)* | **1.24.0** |
+| Booking Engine plugin | `g2a-booking-engine.zip` | **1.13.0** |
+| Memberistic Membership Solutions plugin | `memberistic-membership-solutions.zip` | **1.45.0** |
+| WPistic Contact Form plugin | `wpistic-contact-form-main.zip` | **1.5.1** (DB schema 1.2.0) |
 | G2A Theme Control plugin | `g2a-theme-control.zip` | **1.0.0** |
-| Verifyistic (age verification) plugin | `verifyistic.zip` | **1.1.0** |
+| Verifyistic (age verification) plugin | `verifyistic.zip` | **1.3.2** |
 | Advanced FFL Checkout (G2A Edition) plugin | `advanced-ffl-checkout.zip` | **1.3.0** (DB schema 1.2.0) |
+| Messageistic (SMS / local gateway) plugin | `messageistic.zip` | **0.5.1** |
+| G2A POS Core plugin | `g2a-pos-core.zip` | **3.0.1** (PHP 8.1+, vendors included) |
 
 > The root `WPistic-Theme-For-G2A-Version-1.8.9.zip` filename is preserved so the WP "Replace existing theme" flow recognises the upgrade. The `style.css` header inside reads `Version: 1.13.0` so WP treats it as an update, not a downgrade.
 
@@ -28,7 +30,9 @@ Plugins first, theme last, so the theme activation can see the plugins.
 4. **WPistic Contact Form** — contact form + auto-responder. Upload, activate.
 5. **Verifyistic** — age verification popup + multi-webhook delivery. Upload, activate. Then `Verifyistic → Settings` (see `docs/VERIFYISTIC_SETUP_G2A.md`). Replaces Ottertext — see `docs/OTTERTEXT_REMOVAL.md`.
 6. **Advanced FFL Checkout (G2A Edition)** — FFL dealer search at checkout, transfer lifecycle, dealer confirmation portal, customer "My FFL Transfers" tab, NICS 3-day automation, WC↔transfer status bridge, SMS via Verifyistic. Upload `advanced-ffl-checkout.zip`, activate. Watch `Advanced FFL → Dashboard` for the auto-started ZIP centroid + ATF dealer sync. Mark firearm products **FFL Transfer Required** in their general product data. Optional: define `WPISTIC_FFL_TOKEN_SECRET` in `wp-config.php` for the strongest portal token security. Optional: define `wpistic_ffl_trusted_proxies` filter for accurate IPs behind Cloudflare/LB.
-7. **WPistic Theme (guns2ammo)** — upload as theme, activate.
+7. **Messageistic** — SMS engine (local Android gateway / Jasmin / Twilio / OtterText). Upload, activate. Pick the provider under `Messageistic → Settings`, then enable the **SMS Notifications (Messageistic)** module in `Memberistic → Integrations` to turn on membership + booking texts.
+8. **G2A POS Core** — full FFL POS (requires PHP 8.1+; composer vendors ship inside the zip). Upload, activate, then enable the **POS Bridge** module in `Memberistic → Integrations` so the counter sees live membership status.
+9. **WPistic Theme (guns2ammo)** — upload as theme, activate. The theme ships system-aware light/dark mode (header toggle) and skins the booking widget automatically.
 
 ## Upgrade in place (existing site)
 
