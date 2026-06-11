@@ -130,6 +130,17 @@ final class Scheduler {
 				}
 
 				Email_Service::send_membership_email( (int) $row['id'], $w['template'] );
+
+				/**
+				 * Fires when a membership enters a renewal-reminder window
+				 * (30/7/1 days out). Lets add-ons — e.g. the Messageistic
+				 * SMS bridge — send their own reminders. Dedup above means
+				 * this fires once per membership per window.
+				 *
+				 * @param int $membership_id Membership row ID.
+				 * @param int $days_out      Whole days until renewal_date.
+				 */
+				do_action( 'memberistic_membership_expiring', (int) $row['id'], $days_out );
 			}
 		}
 	}
@@ -187,6 +198,14 @@ final class Scheduler {
 			);
 
 			Email_Service::send_membership_email( $membership_id, 'membership_expired' );
+
+			/**
+			 * Fires after a membership is auto-expired. Companion hook for
+			 * SMS/CRM bridges (the email above stays email-only).
+			 *
+			 * @param int $membership_id Membership row ID.
+			 */
+			do_action( 'memberistic_membership_expired', $membership_id );
 		}
 	}
 

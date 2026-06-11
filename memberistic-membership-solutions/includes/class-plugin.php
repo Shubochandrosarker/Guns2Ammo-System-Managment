@@ -56,6 +56,7 @@ final class Plugin {
 			'includes/integrations/class-booking-engine.php',
 			'includes/integrations/class-woocommerce-bridge.php',
 			'includes/integrations/class-verifyistic-bridge.php',
+			'includes/integrations/class-pos-bridge.php',
 			'includes/payments/class-stripe-service.php',
 			'includes/admin/class-admin-menu.php',
 			'includes/admin/class-dashboard-page.php',
@@ -109,7 +110,14 @@ final class Plugin {
 		Waivers\Waiver_Archive_Admin::register();
 		Waivers\Waiver_Import::register_cli();
 		Waivers\Waiver_Import::register();
-		Waivers\Waiver_Booking_Bridge::register();
+		// The booking-engine mirror is part of the Waiver Manager module
+		// (Integrations toggle, default ON). The waiver console, signing
+		// surfaces, and archive are core and always available.
+		add_action( 'init', function () {
+			if ( Integrations\Integrations_Registry::is_enabled( 'waiver_manager' ) ) {
+				Waivers\Waiver_Booking_Bridge::register();
+			}
+		}, 4 );
 		add_action( 'admin_notices', __NAMESPACE__ . '\\memberistic_admin_notices' );
 		add_action( 'admin_enqueue_scripts', array( $this, 'enqueue_admin_assets' ) );
 		add_action( 'wp_enqueue_scripts', array( $this, 'enqueue_frontend_assets' ) );
@@ -134,6 +142,9 @@ final class Plugin {
 			}
 		} );
 		add_action( 'init', array( Integrations\Verifyistic_Bridge::class, 'register' ) );
+		// POS Bridge: feeds live Memberistic status into the G2A POS counter
+		// screens (gated by its Integrations toggle + plugin presence).
+		add_action( 'init', array( Integrations\POS_Bridge::class, 'register' ) );
 		add_action( 'init', array( Scheduler::class, 'register' ) );
 		// Save handler for the Integrations page toggles.
 		add_action( 'admin_post_memberistic_save_integrations', array( Admin\Admin_Menu::class, 'save_integrations' ) );

@@ -1,0 +1,41 @@
+<?php return array(
+    'root' => array(
+        'name' => 'wordpressistic/g2a-pos-core',
+        'pretty_version' => 'dev-main',
+        'version' => 'dev-main',
+        'reference' => '3c3989b8ef58363bedf63a5c20f0d37a15e68f34',
+        'type' => 'wordpress-plugin',
+        'install_path' => __DIR__ . '/../../',
+        'aliases' => array(),
+        'dev' => false,
+    ),
+    'versions' => array(
+        'setasign/fpdf' => array(
+            'pretty_version' => '1.9.0',
+            'version' => '1.9.0.0',
+            'reference' => '051b70e4c57dedc88df41b1eff1c62894e5f9ed0',
+            'type' => 'library',
+            'install_path' => __DIR__ . '/../setasign/fpdf',
+            'aliases' => array(),
+            'dev_requirement' => false,
+        ),
+        'setasign/fpdi' => array(
+            'pretty_version' => 'v2.6.7',
+            'version' => '2.6.7.0',
+            'reference' => '388c51e69982a3fc16698710b763e8107a49f510',
+            'type' => 'library',
+            'install_path' => __DIR__ . '/../setasign/fpdi',
+            'aliases' => array(),
+            'dev_requirement' => false,
+        ),
+        'wordpressistic/g2a-pos-core' => array(
+            'pretty_version' => 'dev-main',
+            'version' => 'dev-main',
+            'reference' => '3c3989b8ef58363bedf63a5c20f0d37a15e68f34',
+            'type' => 'wordpress-plugin',
+            'install_path' => __DIR__ . '/../../',
+            'aliases' => array(),
+            'dev_requirement' => false,
+        ),
+    ),
+);

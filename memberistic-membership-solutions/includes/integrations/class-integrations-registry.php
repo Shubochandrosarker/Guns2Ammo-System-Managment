@@ -83,13 +83,37 @@ final class Integrations_Registry {
 				'available' => static function () { return true; },
 				'dep_label' => '',
 			),
+			'waiver_manager'   => array(
+				'name'      => __( 'Waiver Manager', 'memberistic' ),
+				'desc'      => __( 'Built-in digital range waivers: tokenized member signing, guest + kiosk surfaces, immutable signature archive, expiry tracking, and booking engine check-in mirroring.', 'memberistic' ),
+				'icon'      => 'W',
+				'setting'   => 'integration_waiver_enabled',
+				'default'   => 'yes',
+				'available' => static function () { return true; },
+				'dep_label' => '',
+			),
+			'pos_bridge'       => array(
+				'name'      => __( 'POS Bridge', 'memberistic' ),
+				'desc'      => __( 'Connect memberships with the G2A POS: live member lookup at the counter, tier + status on the customer profile, range bookings on the POS dashboard, and check-in sync.', 'memberistic' ),
+				'icon'      => 'P',
+				'setting'   => 'integration_pos_enabled',
+				'default'   => 'no',
+				'available' => static function () { return defined( 'G2A_POS_CORE_VERSION' ) || class_exists( '\\G2A\\POS\\Core\\Plugin' ); },
+				'dep_label' => __( 'Install & activate the G2A POS Core plugin to use this.', 'memberistic' ),
+			),
+			'sms_reminders'    => array(
+				'name'      => __( 'SMS Notifications (Messageistic)', 'memberistic' ),
+				'desc'      => __( 'Send membership welcome, activation, renewal, and expiry texts through Messageistic — including the local SMS gateway. Booking confirmations ride along when the booking engine is active.', 'memberistic' ),
+				'icon'      => 'T',
+				'setting'   => 'integration_sms_enabled',
+				'default'   => 'no',
+				'available' => static function () { return defined( 'MESSAGEISTIC_VERSION' ) || class_exists( '\\Messageistic\\Core\\Plugin' ); },
+				'dep_label' => __( 'Install & activate the Messageistic plugin to use this.', 'memberistic' ),
+			),
 		);
 
 		$coming = array(
 			'klaviyo'         => array( 'name' => __( 'Klaviyo Sync', 'memberistic' ), 'desc' => __( 'Export member segments, renewal windows, and failed payment audiences into marketing automation.', 'memberistic' ), 'icon' => 'K' ),
-			'pos_bridge'      => array( 'name' => __( 'POS Bridge', 'memberistic' ), 'desc' => __( 'Connect memberships with retail counter sales, barcode lookup, and staff checkout workflows.', 'memberistic' ), 'icon' => 'P' ),
-			'waiver_provider' => array( 'name' => __( 'Waiver Provider', 'memberistic' ), 'desc' => __( 'Connect signed range waivers with each person record and staff check-in status.', 'memberistic' ), 'icon' => 'W' ),
-			'sms_reminders'   => array( 'name' => __( 'SMS Reminders', 'memberistic' ), 'desc' => __( 'Send renewal, failed payment, check-in, and booking reminders by text message.', 'memberistic' ), 'icon' => 'T' ),
 		);
 		foreach ( $coming as $k => $c ) {
 			$defs[ $k ] = array_merge( $c, array( 'setting' => '', 'default' => 'no', 'available' => static function () { return false; }, 'dep_label' => '', 'coming_soon' => true ) );

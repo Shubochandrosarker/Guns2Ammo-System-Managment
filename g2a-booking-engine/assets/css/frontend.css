@@ -55,6 +55,63 @@
 		var(--g2ab-bg);
 }
 
+/* ===== Site theme ========================================================
+   Inherits the host theme's design tokens (Guns2Ammo brass/ember), so the
+   widget follows the site automatically — INCLUDING its light/dark mode
+   (html[data-theme]). Falls back to a tasteful dark when the tokens are
+   absent (plugin used on another theme). */
+.g2ab-booking.g2ab-theme-site {
+	--g2ab-primary:  var(--color-ember, #E8802F);
+	--g2ab-accent:   var(--color-brass, #C9A84C);
+	--g2ab-bg:       var(--color-surface-1, #211F26);
+	--g2ab-surface:  var(--color-gunmetal, #26252C);
+	--g2ab-surface2: var(--color-surface-2, #2B2932);
+	--g2ab-text:     var(--color-white, #F7F7F9);
+	--g2ab-muted:    var(--color-silver, #A7A6AE);
+	--g2ab-border:   var(--color-hairline, rgba(255,255,255,0.085));
+	--g2ab-shadow:   0 30px 80px rgba(0,0,0,0.35);
+	--g2ab-font:     var(--font-body, "Inter","Segoe UI",Roboto,Helvetica,Arial,sans-serif);
+	background:
+		radial-gradient(120% 80% at 80% 0%, color-mix(in srgb, var(--g2ab-accent) 10%, transparent) 0%, transparent 50%),
+		radial-gradient(120% 80% at 0% 100%, color-mix(in srgb, var(--g2ab-primary) 9%, transparent) 0%, transparent 55%),
+		var(--g2ab-bg);
+}
+html[data-theme="light"] .g2ab-booking.g2ab-theme-site {
+	--g2ab-shadow: 0 24px 60px rgba(40, 30, 8, 0.12);
+}
+
+/* ===== Ladies Tuesday skin ===============================================
+   A deliberately different look for the Ladies Tuesday event flow: warm
+   rose-gold over plum, same structure. Applied via shortcode theme="ladies"
+   (or the host theme's design-token filter on the Ladies Tuesday page).
+   Light-mode aware. */
+.g2ab-booking.g2ab-theme-ladies {
+	--g2ab-primary:  #E25C8E;
+	--g2ab-accent:   #E8B4C8;
+	--g2ab-bg:       #241522;
+	--g2ab-surface:  #2E1B2A;
+	--g2ab-surface2: #281725;
+	--g2ab-text:     #FAF4F8;
+	--g2ab-muted:    #BA9FAE;
+	--g2ab-border:   rgba(255, 235, 245, 0.10);
+	--g2ab-shadow:   0 30px 80px rgba(28, 8, 22, 0.5);
+	background:
+		radial-gradient(120% 80% at 80% 0%, rgba(232, 180, 200, 0.12) 0%, transparent 50%),
+		radial-gradient(120% 80% at 0% 100%, rgba(226, 92, 142, 0.14) 0%, transparent 55%),
+		var(--g2ab-bg);
+}
+html[data-theme="light"] .g2ab-booking.g2ab-theme-ladies {
+	--g2ab-primary:  #C2447A;
+	--g2ab-accent:   #9C5C7C;
+	--g2ab-bg:       #FAF2F6;
+	--g2ab-surface:  #FFFFFF;
+	--g2ab-surface2: #F6EAF0;
+	--g2ab-text:     #311F2A;
+	--g2ab-muted:    #7E6470;
+	--g2ab-border:   rgba(60, 20, 44, 0.12);
+	--g2ab-shadow:   0 24px 60px rgba(60, 20, 44, 0.12);
+}
+
 /* ===== Layout shell ====================================================== */
 .g2ab-shell {
 	display: grid;

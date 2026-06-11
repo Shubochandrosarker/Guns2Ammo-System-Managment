@@ -1,0 +1,9 @@
+{
+  "name": "G2A POS Lane",
+  "short_name": "G2A Lane",
+  "start_url": "./",
+  "display": "standalone",
+  "background_color": "#1f2326",
+  "theme_color": "#f58220",
+  "icons": []
+}

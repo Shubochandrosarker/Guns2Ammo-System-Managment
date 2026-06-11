@@ -2,6 +2,18 @@
 
 All notable changes are tracked here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## 1.45.0 — Integrations toggle fix + POS Bridge + SMS module + waiver module
+
+### Fixed
+- **Integration toggles (Verifyistic et al.) finally persist.** `register_setting`'s sanitize callback ran on *every* `update_option('memberistic_settings')` — including the Integrations page save — and returned a fixed allowlist that stripped every `integration_*` key. Toggling Verifyistic ON, saving, and reloading showed it OFF again. The sanitizer now persists every Integrations Registry toggle, the Verifyistic sub-options, `email_reply_to_address`, `verifyistic_max_age_days`, and passes through unknown scalar keys instead of deleting them.
+- React Settings → Integrations tab rendered only the WooCommerce toggle; it now renders every registry module (with availability/coming-soon states) from a new `_integrations` snapshot on `GET /settings`.
+
+### Added
+- **POS Bridge module** (Integrations toggle, requires G2A POS Core): answers the POS `g2a_pos_membership_lookup` filter with live Memberistic status/plan/expiry/benefits at the counter, feeds upcoming range bookings to the POS dashboard via `g2a_pos_membership_bookings`, and stamps `pos_customer_id` on membership rows.
+- **SMS Notifications (Messageistic) module** (Integrations toggle, requires Messageistic): one switch controls membership + booking SMS sent through Messageistic (incl. the local SMS gateway).
+- **Waiver Manager module card** replaces the "Waiver Provider — coming soon" placeholder: the built-in waiver system (tokenized member signing, guest + kiosk surfaces, immutable archive, expiry tracking) is now surfaced as a real module; the toggle gates the booking-engine check-in mirror.
+- New lifecycle hooks for add-ons: `memberistic_membership_expiring( $membership_id, $days_out )` (30/7/1-day windows, deduped) and `memberistic_membership_expired( $membership_id )`.
+
 ## 1.43.5 — Stabilization & integration hardening
 
 ### Fixed

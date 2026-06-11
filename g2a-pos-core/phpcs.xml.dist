@@ -1,0 +1,126 @@
+<?xml version="1.0"?>
+<ruleset name="G2A POS Core">
+    <description>Coding standards for G2A POS Core plugin.</description>
+
+    <file>includes</file>
+    <file>g2a-pos-core.php</file>
+    <file>uninstall.php</file>
+
+    <exclude-pattern>vendor/*</exclude-pattern>
+    <exclude-pattern>tests/*</exclude-pattern>
+    <exclude-pattern>*.min.*</exclude-pattern>
+
+    <arg name="basepath" value="."/>
+    <arg name="colors"/>
+    <arg name="parallel" value="4"/>
+    <arg value="sp"/>
+
+    <config name="minimum_supported_wp_version" value="6.5"/>
+    <config name="testVersion" value="8.1-"/>
+
+    <rule ref="WordPress-Extra">
+        <!--
+            This plugin is a modern, namespaced, PSR-4 OOP codebase rather than a
+            classic procedural WordPress plugin. The sniffs below target classic-WP
+            conventions that conflict with the project's deliberate, consistent
+            style; the security- and correctness-focused WPCS sniffs remain active.
+        -->
+
+        <!-- File-naming / structure rules that do not fit PSR-4 class files. -->
+        <exclude name="WordPress.Files.FileName"/>
+        <exclude name="Universal.Files.SeparateFunctionsFromOO"/>
+
+        <!-- Doc-comment formatting is not enforced project-wide. -->
+        <exclude name="Squiz.Commenting.FunctionComment"/>
+        <exclude name="Squiz.Commenting.InlineComment"/>
+        <exclude name="Generic.Commenting.DocComment"/>
+
+        <!-- Intentional modern style: camelCase members, no Yoda conditions,
+             short ternaries, and interface-mandated unused parameters. -->
+        <exclude name="WordPress.NamingConventions.ValidVariableName"/>
+        <exclude name="WordPress.NamingConventions.ValidFunctionName"/>
+        <exclude name="WordPress.PHP.YodaConditions"/>
+        <exclude name="Universal.Operators.DisallowShortTernary"/>
+        <exclude name="Generic.CodeAnalysis.UnusedFunctionParameter"/>
+
+        <!--
+            Table names are built by Repository::table() as "{$wpdb->prefix}name"
+            (prefix + internal constant) and interpolated into otherwise-prepared
+            queries; all user-supplied values use $wpdb->prepare() placeholders.
+            WPCS cannot statically prove the table-name source is safe. This mirrors
+            the documented carve-out already present in phpstan.neon.dist.
+        -->
+        <exclude name="WordPress.DB.PreparedSQL"/>
+
+        <!--
+            Low-level binary/device and integration I/O the plugin legitimately
+            needs: ESC/POS + ZPL printing, PDF generation, and CSV/feed streaming.
+            WP_Filesystem and the HTTP API are not appropriate for raw device
+            streams or large feed parsing, and base64 here is encoding (crypto /
+            binary payloads), not obfuscation.
+        -->
+        <exclude name="WordPress.WP.AlternativeFunctions"/>
+        <exclude name="WordPress.PHP.DiscouragedPHPFunctions.obfuscation_base64_decode"/>
+        <exclude name="WordPress.PHP.DiscouragedPHPFunctions.obfuscation_base64_encode"/>
+        <exclude name="Generic.Strings.UnnecessaryStringConcat"/>
+
+        <!-- error_log() is the transport inside the Support\Logger class itself. -->
+        <exclude name="WordPress.PHP.DevelopmentFunctions.error_log_error_log"/>
+
+        <!-- Best-effort cleanup/HTTP paths intentionally suppress non-fatal warnings. -->
+        <exclude name="WordPress.PHP.NoSilencedErrors"/>
+
+        <!-- date()/gmdate() output is kept in the store's local timezone for
+             compliance records and operator-facing displays. -->
+        <exclude name="WordPress.DateTime.RestrictedFunctions.date_date"/>
+
+        <!-- Idiomatic streaming reads, e.g. while (($row = fgetcsv($h)) !== false). -->
+        <exclude name="Generic.CodeAnalysis.AssignmentInCondition"/>
+
+        <!-- Exceptions/strings passed to throw or HTTP clients, not HTML output. -->
+        <exclude name="WordPress.Security.EscapeOutput.ExceptionNotEscaped"/>
+
+        <!-- The POS queue worker registers a per-minute schedule by design. -->
+        <exclude name="WordPress.WP.CronInterval.CronSchedulesInterval"/>
+    </rule>
+
+    <rule ref="WordPress.WP.I18n">
+        <properties>
+            <property name="text_domain" type="array">
+                <element value="g2a-pos-core"/>
+            </property>
+        </properties>
+    </rule>
+
+    <!-- Declare the plugin's custom capabilities so the sniff still catches typos. -->
+    <rule ref="WordPress.WP.Capabilities">
+        <properties>
+            <property name="custom_capabilities" type="array">
+                <element value="g2a_pos_access"/>
+                <element value="g2a_pos_checkin_range_customer"/>
+                <element value="g2a_pos_edit_bound_book"/>
+                <element value="g2a_pos_manage_ai"/>
+                <element value="g2a_pos_manage_compliance"/>
+                <element value="g2a_pos_manage_crm"/>
+                <element value="g2a_pos_manage_inventory"/>
+                <element value="g2a_pos_manage_messaging"/>
+                <element value="g2a_pos_manage_nfa"/>
+                <element value="g2a_pos_manage_pricing"/>
+                <element value="g2a_pos_manage_register"/>
+                <element value="g2a_pos_manage_repairs"/>
+                <element value="g2a_pos_manage_settings"/>
+                <element value="g2a_pos_manage_shipping"/>
+                <element value="g2a_pos_manage_wholesalers"/>
+                <element value="g2a_pos_manager"/>
+                <element value="g2a_pos_process_firearm_sale"/>
+                <element value="g2a_pos_search_customers"/>
+                <element value="g2a_pos_submit_dropship"/>
+                <element value="g2a_pos_use_ai"/>
+                <element value="g2a_pos_view_bound_book"/>
+                <element value="g2a_pos_view_customer_contact"/>
+                <element value="g2a_pos_view_waiver_sensitive_data"/>
+                <element value="g2a_pos_view_waivers"/>
+            </property>
+        </properties>
+    </rule>
+</ruleset>

@@ -59,6 +59,16 @@ final class G2AB_REST_Bookings_Controller {
 			'callback' => array( $this, 'list_payment_methods' ),
 			'permission_callback' => array( $this, 'permission_public_read' ),
 		) );
+		// Fresh-nonce endpoint. Booking pages are frequently served from a
+		// page cache, so the wp_rest nonce baked into the HTML can be hours
+		// or days old — guests then fail every nonce-checked request. The
+		// frontend calls this just-in-time before POST /bookings instead of
+		// trusting the cached value.
+		register_rest_route( G2AB_REST_NAMESPACE, '/session', array(
+			'methods' => WP_REST_Server::READABLE,
+			'callback' => array( $this, 'get_session' ),
+			'permission_callback' => array( $this, 'permission_public_read' ),
+		) );
 		register_rest_route( G2AB_REST_NAMESPACE, '/bookings', array(
 			'methods' => WP_REST_Server::CREATABLE,
 			'callback' => array( $this, 'create_booking' ),
@@ -169,6 +179,24 @@ final class G2AB_REST_Bookings_Controller {
 		}
 		set_transient( $key, $hits + 1, 10 * MINUTE_IN_SECONDS );
 		return true;
+	}
+
+	/**
+	 * Fresh wp_rest nonce + login state. Must never be cached: page caches
+	 * serving day-old HTML are exactly the failure mode this exists to fix.
+	 */
+	public function get_session() {
+		$response = rest_ensure_response( array(
+			'success' => true,
+			'data'    => array(
+				'nonce'     => wp_create_nonce( 'wp_rest' ),
+				'logged_in' => is_user_logged_in(),
+			),
+		) );
+		$response->header( 'Cache-Control', 'no-cache, no-store, must-revalidate, max-age=0' );
+		$response->header( 'Pragma', 'no-cache' );
+		$response->header( 'Expires', 'Thu, 01 Jan 1970 00:00:00 GMT' );
+		return $response;
 	}
 
 	public function list_payment_methods() {

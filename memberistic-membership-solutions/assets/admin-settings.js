@@ -305,10 +305,48 @@
 	}
 
 	function renderIntegrations(v, update) {
+		// Render every module from the server-side Integrations registry
+		// (delivered as the read-only `_integrations` snapshot on GET).
+		// Each connectable card binds its YesNo toggle to the card's real
+		// setting key, so saving here persists exactly like the legacy
+		// Memberistic → Integrations page.
+		var cards = Array.isArray(v._integrations) ? v._integrations : [];
+		if (!cards.length) {
+			return h(Fragment, null,
+				h('h2', { className: 'mb-card__head' }, __('Integrations', 'memberistic')),
+				h(Field, { label: __('WooCommerce bridge', 'memberistic'), hint: __('Sync completed orders to membership payments.', 'memberistic') },
+					h(YesNo, { value: v.woocommerce_enabled, onChange: update('woocommerce_enabled') })
+				)
+			);
+		}
 		return h(Fragment, null,
 			h('h2', { className: 'mb-card__head' }, __('Integrations', 'memberistic')),
-			h(Field, { label: __('WooCommerce bridge', 'memberistic'), hint: __('Sync completed orders to membership payments.', 'memberistic') },
-				h(YesNo, { value: v.woocommerce_enabled, onChange: update('woocommerce_enabled') })
+			h('p', { className: 'mb-card__sub' }, __('Turn each integration on or off. Modules whose plugin is not installed are listed but locked.', 'memberistic')),
+			cards.map(function (card) {
+				var hint = card.desc;
+				var locked = !card.coming_soon && !card.available;
+				if (card.coming_soon) {
+					hint = hint + ' — ' + __('Coming soon.', 'memberistic');
+				} else if (locked && card.dep_label) {
+					hint = hint + ' — ' + card.dep_label;
+				}
+				var control;
+				if (card.coming_soon) {
+					control = h('em', null, __('Coming soon', 'memberistic'));
+				} else if (locked) {
+					control = h('em', null, __('Plugin not detected', 'memberistic'));
+				} else {
+					var current = (v[card.setting] !== undefined && v[card.setting] !== '') ? v[card.setting] : card.default;
+					control = h(YesNo, { value: current, onChange: update(card.setting) });
+				}
+				return h(Field, { key: card.key, label: card.name, hint: hint }, control);
+			}),
+			h('h3', { className: 'mb-form__section' }, __('Verifyistic options', 'memberistic')),
+			h(Field, { label: __('Auto-stamp member records with verified age/DOB', 'memberistic') },
+				h(YesNo, { value: v.integration_verifyistic_autostamp || 'yes', onChange: update('integration_verifyistic_autostamp') })
+			),
+			h(Field, { label: __('Require age verification before membership signup', 'memberistic') },
+				h(YesNo, { value: v.integration_verifyistic_require_signup || 'no', onChange: update('integration_verifyistic_require_signup') })
 			)
 		);
 	}

@@ -6,7 +6,40 @@ zip + a PR commit; the section title links to the headline change.
 
 ---
 
-## Theme 1.18.0 / Memberistic 1.20.1 — CURRENT (May 27, 2026)
+## Theme 1.24.0 / Booking 1.13.0 / Memberistic 1.45.0 / Messageistic 0.5.1 / POS Core 3.0.1 — CURRENT (June 11, 2026)
+
+**Headline:** guest lane-booking fix (the bad-review bug), Integrations
+toggle persistence fix, POS + SMS bridges, system-aware light/dark theme.
+
+- CRITICAL: logged-out guests saw "No times available on this date." on
+  every lane/date — stale `wp_rest` nonce baked into cached HTML was sent
+  on public availability GETs and WP core 403'd the request before the
+  route ran. Public GETs are now nonce-free; booking POST fetches a fresh
+  nonce via the new `/session` endpoint (with one retry).
+- Memberistic Integrations toggles (Verifyistic etc.) were stripped by the
+  settings sanitizer on every save — now persisted; React Integrations tab
+  renders all modules.
+- New Memberistic modules: Waiver Manager (built-in waiver system card),
+  POS Bridge (live member lookup at the POS counter + bookings feed), SMS
+  Notifications via Messageistic. New `memberistic_membership_expiring` /
+  `_expired` hooks.
+- Messageistic vendored into the repo (0.5.1): dead Memberistic/booking
+  integrations rewritten against the real hooks, Twilio webhook signature
+  verification fixed, webhook routes restricted to the active provider.
+- G2A POS Core vendored into the repo (3.0.1) with composer vendors
+  (FPDF/FPDI) shipped; 4473 PDF render no longer fatals without them.
+- Theme: system-aware light/dark mode with header toggle (no-FOUC
+  bootstrap), guest profile icon in header (was an empty circle), mobile
+  drawer rebuilt (staggered links + CTA footer), preloader capped at
+  400 ms, booking widget restyled via new token-inheriting `site` skin +
+  rose-gold `ladies` skin for Ladies Tuesday, countdown banner redesigned.
+
+See docs/RELEASE_2026-06-11_GUEST_BOOKING_INTEGRATIONS_THEME.md for the
+full write-up.
+
+---
+
+## Theme 1.18.0 / Memberistic 1.20.1 (May 27, 2026)
 
 **Headline:** comprehensive SEO/AEO + UX cleanup.
 

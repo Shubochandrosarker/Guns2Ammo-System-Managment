@@ -1,0 +1,61 @@
+parameters:
+	ignoreErrors:
+		-
+			message: "#^Ternary operator condition is always true\\.$#"
+			count: 1
+			path: includes/API/RangeWaiverController.php
+
+		-
+			message: "#^Offset 'secret' on non\\-empty\\-array on left side of \\?\\? always exists and is not nullable\\.$#"
+			count: 1
+			path: includes/API/WebhookController.php
+
+		-
+			message: "#^Ternary operator condition is always true\\.$#"
+			count: 1
+			path: includes/Database/AtfReportRepository.php
+
+		-
+			message: "#^Ternary operator condition is always true\\.$#"
+			count: 1
+			path: includes/Database/BoundBookRepository.php
+
+		-
+			message: "#^Ternary operator condition is always true\\.$#"
+			count: 1
+			path: includes/Database/FflTransferRepository.php
+
+		-
+			message: "#^Strict comparison using \\=\\=\\= between mixed~\\(0\\|0\\.0\\|''\\|'0'\\|array\\{\\}\\|false\\|null\\) and '0' will always evaluate to false\\.$#"
+			count: 1
+			path: includes/Integrations/Membership/UserMetaProvider.php
+
+		-
+			message: "#^Constant G2A\\\\POS\\\\Pricing\\\\MapPricingService\\:\\:META_FLAG is unused\\.$#"
+			count: 1
+			path: includes/Pricing/MapPricingService.php
+
+		-
+			message: "#^Else branch is unreachable because ternary operator condition is always true\\.$#"
+			count: 1
+			path: includes/Wholesalers/Promotion/VendorProductPromoter.php
+
+		-
+			message: "#^Variable \\$regularPrice on left side of \\?\\? always exists and is not nullable\\.$#"
+			count: 2
+			path: includes/Wholesalers/Promotion/VendorProductPromoter.php
+
+		-
+			message: "#^is_wp_error\\(WP_Error\\) will always evaluate to true\\.$#"
+			count: 1
+			path: includes/Wholesalers/Promotion/VendorProductPromoter.php
+
+		-
+			message: "#^Method G2A\\\\POS\\\\Wholesalers\\\\Rsr\\\\RsrFeedImporter\\:\\:classifyByDepartment\\(\\) never returns null so it can be removed from the return type\\.$#"
+			count: 1
+			path: includes/Wholesalers/Rsr/RsrFeedImporter.php
+
+		-
+			message: "#^Method G2A\\\\POS\\\\Wholesalers\\\\SportsSouth\\\\SportsSouthCsvImporter\\:\\:classifyItemType\\(\\) never returns null so it can be removed from the return type\\.$#"
+			count: 1
+			path: includes/Wholesalers/SportsSouth/SportsSouthCsvImporter.php

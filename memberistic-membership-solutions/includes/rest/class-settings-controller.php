@@ -98,6 +98,29 @@ final class Settings_Controller extends REST_Controller {
 		}
 		$normalized['_locked_secrets'] = $locked;
 
+		// Integration registry snapshot so the React Integrations tab can
+		// render every module (not just WooCommerce). Underscore-prefixed,
+		// so the sanitizer drops it if the app echoes it back on PUT.
+		$registry = '\\WordPressistic\\Memberistic\\Integrations\\Integrations_Registry';
+		if ( class_exists( $registry ) ) {
+			$cards = array();
+			foreach ( $registry::definitions() as $key => $def ) {
+				$cards[] = array(
+					'key'         => $key,
+					'name'        => (string) $def['name'],
+					'desc'        => (string) $def['desc'],
+					'icon'        => (string) $def['icon'],
+					'setting'     => (string) $def['setting'],
+					'default'     => (string) $def['default'],
+					'coming_soon' => ! empty( $def['coming_soon'] ),
+					'available'   => $registry::is_available( $key ),
+					'enabled'     => $registry::is_enabled( $key ),
+					'dep_label'   => isset( $def['dep_label'] ) ? (string) $def['dep_label'] : '',
+				);
+			}
+			$normalized['_integrations'] = $cards;
+		}
+
 		return rest_ensure_response( $normalized );
 	}
 
@@ -112,7 +135,9 @@ final class Settings_Controller extends REST_Controller {
 
 		update_option( 'memberistic_settings', $sanitized, false );
 
-		return rest_ensure_response( $sanitized );
+		// Return the same enriched + masked payload as GET so the React app
+		// keeps its `_integrations` snapshot (and never receives raw secrets).
+		return $this->get_settings();
 	}
 
 	public function create_pages( $request ) {

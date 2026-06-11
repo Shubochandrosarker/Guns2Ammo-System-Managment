@@ -8,7 +8,27 @@ if ( ! defined( 'ABSPATH' ) ) exit;
 <head>
 <meta charset="<?php bloginfo( 'charset' ); ?>">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="theme-color" content="#1A191E">
+<meta name="theme-color" content="#1A191E" id="g2a-theme-color">
+<script>
+/* Theme mode bootstrap — runs before any CSS applies so there is never a
+   wrong-color flash. Resolution order:
+     1. visitor's saved choice (localStorage g2a-theme: 'light' | 'dark')
+     2. OS preference (prefers-color-scheme)
+     3. dark (brand default)
+   chrome.js owns the toggle UI; this only stamps <html data-theme="…">. */
+(function(){
+  var d = document.documentElement, t = null;
+  try { t = localStorage.getItem('g2a-theme'); } catch(e){}
+  if (t !== 'light' && t !== 'dark') {
+    t = (window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches) ? 'light' : 'dark';
+    // System-driven: keep following the OS if the user never chose manually.
+    d.setAttribute('data-theme-auto', '1');
+  }
+  d.setAttribute('data-theme', t);
+  var m = document.getElementById('g2a-theme-color');
+  if (m) m.setAttribute('content', t === 'light' ? '#F4F2ED' : '#1A191E');
+})();
+</script>
 
 <?php
 /* ============================================================
@@ -78,12 +98,13 @@ $g2a_uri = G2A_URI;
   } else {
     document.addEventListener('DOMContentLoaded', done, { once: true });
   }
-  // Hard ceiling: 500ms. Content paints BEHIND the preloader now
-  // (the visibility:hidden block was removed) so the preloader is
-  // purely a brand flash — no need to keep it longer than feels
-  // intentional. On fast connections DOMContentLoaded fires well
-  // under 500ms and dismisses sooner.
-  setTimeout(done, 500);
+  // Hard ceiling: 400ms. Content paints BEHIND the preloader (no
+  // visibility:hidden gate) so this is purely a brand flash — never
+  // a wait. On fast connections DOMContentLoaded dismisses sooner;
+  // on slow ones the page is readable the moment it streams in.
+  setTimeout(done, 400);
+  // Belt + braces: pagehide/bfcache restores must never resurrect it.
+  window.addEventListener('pageshow', done, { once: true });
 })();
 </script>
 

@@ -22,7 +22,7 @@ zip -rq "WPistic-Theme-For-G2A-Version-1.8.9.zip" guns2ammo \
 cp "WPistic-Theme-For-G2A-Version-1.8.9.zip" \
     "releases/WPistic-Theme-For-G2A-Version-${theme_version}.zip"
 
-for plugin in g2a-booking-engine g2a-theme-control memberistic-membership-solutions wpistic-contact-form-main verifyistic; do
+for plugin in g2a-booking-engine g2a-theme-control memberistic-membership-solutions wpistic-contact-form-main verifyistic messageistic g2a-pos-core advanced-ffl-checkout; do
   if [ -d "$plugin" ]; then
     echo "→ Packaging $plugin"
     rm -f "${plugin}.zip"

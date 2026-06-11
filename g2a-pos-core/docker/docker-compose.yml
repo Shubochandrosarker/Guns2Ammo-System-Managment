@@ -1,0 +1,59 @@
+# G2A POS — Local AI stack.
+#
+# Runs an Ollama LLM + embeddings server next to a Qdrant vector DB on the
+# merchant's own server. The WP plugin points at `OLLAMA_HOST` / `QDRANT_URL`
+# from AI Settings → Live mode.
+#
+# Quick start:
+#   cd g2a-pos-core/docker
+#   docker compose up -d
+#   docker exec g2a-ollama ollama pull qwen2.5:7b-instruct
+#   docker exec g2a-ollama ollama pull nomic-embed-text
+#
+# Then in WP admin → AI Settings:
+#   Mode:               live
+#   Chat endpoint:      http://<host>:11434/v1/chat/completions
+#   Embedding endpoint: http://<host>:11434/api/embeddings
+#   Chat model:         qwen2.5:7b-instruct
+#   Embedding model:    nomic-embed-text
+#
+# For air-gap mode, put both containers on a docker network with
+# `internal: true` and front them with the Cloudflare Worker only.
+
+services:
+  ollama:
+    image: ollama/ollama:latest
+    container_name: g2a-ollama
+    restart: unless-stopped
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama-models:/root/.ollama
+    environment:
+      - OLLAMA_KEEP_ALIVE=24h
+      - OLLAMA_MAX_LOADED_MODELS=2
+    # Uncomment for GPU acceleration (Nvidia runtime).
+    # deploy:
+    #   resources:
+    #     reservations:
+    #       devices:
+    #         - capabilities: ["gpu"]
+    healthcheck:
+      test: ["CMD", "ollama", "list"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  qdrant:
+    image: qdrant/qdrant:latest
+    container_name: g2a-qdrant
+    restart: unless-stopped
+    ports:
+      - "6333:6333"
+      - "6334:6334"
+    volumes:
+      - qdrant-storage:/qdrant/storage
+
+volumes:
+  ollama-models:
+  qdrant-storage:

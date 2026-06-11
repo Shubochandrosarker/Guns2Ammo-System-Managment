@@ -1,0 +1,63 @@
+body.toplevel_page_g2a-pos-dashboard .wrap,
+body.g2a-pos_page_g2a-pos-registers .wrap,
+body.g2a-pos_page_g2a-pos-orders .wrap,
+body.g2a-pos_page_g2a-pos-inventory .wrap,
+body.g2a-pos_page_g2a-pos-settings .wrap {
+  max-width: 1280px;
+}
+
+body.toplevel_page_g2a-pos-dashboard .wrap h1,
+body.g2a-pos_page_g2a-pos-registers .wrap h1,
+body.g2a-pos_page_g2a-pos-orders .wrap h1,
+body.g2a-pos_page_g2a-pos-inventory .wrap h1,
+body.g2a-pos_page_g2a-pos-settings .wrap h1 {
+  color: #0f2044;
+  font-weight: 800;
+}
+
+body.toplevel_page_g2a-pos-dashboard .widefat,
+body.g2a-pos_page_g2a-pos-registers .widefat,
+body.g2a-pos_page_g2a-pos-orders .widefat,
+body.g2a-pos_page_g2a-pos-inventory .widefat,
+body.g2a-pos_page_g2a-pos-settings .widefat,
+body.toplevel_page_g2a-pos-dashboard .form-table,
+body.g2a-pos_page_g2a-pos-registers .form-table,
+body.g2a-pos_page_g2a-pos-orders .form-table,
+body.g2a-pos_page_g2a-pos-inventory .form-table,
+body.g2a-pos_page_g2a-pos-settings .form-table {
+  background: #ffffff;
+  border: 1px solid #e6ebf4;
+  border-radius: 14px;
+  box-shadow: 0 8px 24px rgba(15, 32, 68, 0.08);
+  overflow: hidden;
+  margin-top: 12px;
+}
+
+body.toplevel_page_g2a-pos-dashboard .button-primary,
+body.g2a-pos_page_g2a-pos-registers .button-primary,
+body.g2a-pos_page_g2a-pos-orders .button-primary,
+body.g2a-pos_page_g2a-pos-inventory .button-primary,
+body.g2a-pos_page_g2a-pos-settings .button-primary {
+  background: linear-gradient(135deg, #0f2044, #1a3770);
+  border-color: #0f2044;
+  border-radius: 10px;
+  transition: transform 150ms ease, box-shadow 150ms ease;
+}
+
+body.toplevel_page_g2a-pos-dashboard .button-primary:hover,
+body.g2a-pos_page_g2a-pos-registers .button-primary:hover,
+body.g2a-pos_page_g2a-pos-orders .button-primary:hover,
+body.g2a-pos_page_g2a-pos-inventory .button-primary:hover,
+body.g2a-pos_page_g2a-pos-settings .button-primary:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 16px rgba(15, 32, 68, 0.25);
+}
+
+.g2a-pos-fade-in {
+  animation: g2aPosFadeIn 280ms ease;
+}
+
+@keyframes g2aPosFadeIn {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
+}

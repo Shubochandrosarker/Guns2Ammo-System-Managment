@@ -326,25 +326,35 @@ function g2a_plugin_bridge_css() {
 		.memberistic-staff-kpis{grid-template-columns:1fr 1fr!important;}
 	}
 
-	/* ============ G2A BOOKING ENGINE ============ */
-	[class^="g2ab-"],[class*=" g2ab-"]{color:var(--color-fog)!important;}
-	.g2ab-booking,.g2ab-form,.g2ab-card,.g2ab-aside__card,.g2ab-pick,.g2ab-cal,.g2ab-done,
-	[class^="g2ab-"][class*="card"],[class^="g2ab-"][class*="panel"]{
-		background:var(--color-gunmetal)!important;border:1px solid var(--color-hairline)!important;border-radius:2px;}
-	[class^="g2ab-"] h1,[class^="g2ab-"] h2,[class^="g2ab-"] h3,.g2ab-aside__title,
-	.g2ab-cal__title,.g2ab-done__title,.g2ab-field-label{color:var(--color-white)!important;}
-	[class^="g2ab-"] input,[class^="g2ab-"] select,[class^="g2ab-"] textarea,.g2ab-input{
-		background:var(--color-void)!important;border:1px solid var(--color-steel)!important;
-		color:var(--color-white)!important;border-radius:2px;}
-	.g2ab-btn,.g2ab-btn--primary{background:var(--color-ember)!important;color:#fff!important;border:none!important;
-		border-radius:2px;font-family:var(--font-condensed)!important;font-weight:600;letter-spacing:0.08em;
-		text-transform:uppercase;cursor:pointer;}
-	.g2ab-btn--ghost{background:transparent!important;border:1px solid var(--color-brass)!important;color:var(--color-brass-bright)!important;}
-	.g2ab-cal__cell,.g2ab-chip{background:var(--color-void)!important;border:1px solid var(--color-hairline-bright)!important;}
-	.g2ab-cal__cell.is-selected,.g2ab-chip.is-selected,.g2ab-pick.is-selected{background:var(--color-brass)!important;color:#111!important;border-color:var(--color-brass)!important;}
-	.g2ab-cal__dow,.g2ab-muted,.g2ab-help{color:var(--color-silver)!important;}
+	/* ============ G2A BOOKING ENGINE ============
+	   The booking widget itself now ships a `site` skin (selected via the
+	   g2ab_form_design_tokens filter below) that reads the theme tokens
+	   directly — including light/dark mode — so the old blanket !important
+	   recolour layer is gone. Only pieces rendered OUTSIDE the widget
+	   (event cards, list fallbacks) still need a nudge onto the tokens. */
+	.g2ab-evt__card{background:var(--color-gunmetal)!important;border:1px solid var(--color-hairline)!important;color:var(--color-fog)!important;border-radius:3px;}
+	.g2ab-evt__name{color:var(--color-white)!important;font-family:var(--font-condensed)!important;letter-spacing:0.03em;}
+	.g2ab-evt__meta,.g2ab-evt__seats{color:var(--color-silver)!important;}
+	.g2ab-evt__price{color:var(--color-brass-bright)!important;}
+	.g2ab-evt__tag{background:var(--color-ember)!important;color:#fff!important;}
+	.g2ab-evt__cta{background:var(--color-ember)!important;color:#fff!important;border-radius:2px;font-family:var(--font-condensed)!important;letter-spacing:0.1em;text-transform:uppercase;}
 	.g2ab-error,.g2ab-form__error{color:var(--color-ember)!important;}';
 }
+
+/* ---------- Booking form skin: follow the site theme (incl. light/dark) ----------
+ * The booking engine renders `g2ab-theme-{x}` and exposes the
+ * g2ab_form_design_tokens filter. We switch the skin to `site` (inherits
+ * the Guns2Ammo tokens), and to the dedicated rose-gold `ladies` skin on
+ * the Ladies Tuesday page so that flow gets its own premium look.
+ * Form-customizer radius/typography choices are preserved.
+ */
+add_filter( 'g2ab_form_design_tokens', function ( $tokens ) {
+	$tokens['theme'] = 'site';
+	if ( is_page_template( 'page-templates/template-ladies-tuesday.php' ) || is_page( 'ladies-tuesday' ) ) {
+		$tokens['theme'] = 'ladies';
+	}
+	return $tokens;
+} );
 
 /* ---------- Body class so templates/CSS can adapt when plugins are live ---------- */
 add_filter( 'body_class', function ( $classes ) {
