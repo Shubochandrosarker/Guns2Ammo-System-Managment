@@ -80,7 +80,20 @@ class WPISTIC_CF_Autoresponder {
 			$headers[] = 'Reply-To: ' . $from_email;
 		}
 
-		WPISTIC_CF_Capture::send_internal( $submission->sender_email, $subject, $body, $headers );
+		// Branded HTML mode (default on): the plain-text body the admin
+		// wrote — placeholders already substituted above — is escaped,
+		// linkified and wrapped in the shared 600px shell. Disable via the
+		// Auto-Responder settings tab to fall back to plain text.
+		if ( '1' === get_option( 'WPISTIC_CF_ar_html', '1' ) && class_exists( 'WPISTIC_CF_Email_Template' ) ) {
+			$inner = wpautop( make_clickable( esc_html( $body ) ) );
+			$body  = WPISTIC_CF_Email_Template::wrap( $inner, [ 'title' => $subject ] );
+			$headers[] = 'Content-Type: text/html; charset=UTF-8';
+		}
+
+		$sent = WPISTIC_CF_Capture::send_internal( $submission->sender_email, $subject, $body, $headers );
+		if ( ! $sent && defined( 'WP_DEBUG' ) && WP_DEBUG ) {
+			error_log( sprintf( '[WPISTIC_CF] Auto-responder email failed for submission #%d.', (int) $submission_id ) );
+		}
 	}
 
 	/**

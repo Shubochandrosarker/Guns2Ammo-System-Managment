@@ -144,6 +144,9 @@ final class Settings_Page {
 		$output['integration_verifyistic_autostamp']     = memberistic_sanitize_yes_no( $settings['integration_verifyistic_autostamp'] ?? ( $existing['integration_verifyistic_autostamp'] ?? 'yes' ) );
 		$output['integration_verifyistic_require_signup'] = memberistic_sanitize_yes_no( $settings['integration_verifyistic_require_signup'] ?? ( $existing['integration_verifyistic_require_signup'] ?? 'no' ) );
 		$output['email_reply_to_address']                 = sanitize_email( (string) ( $settings['email_reply_to_address'] ?? ( $existing['email_reply_to_address'] ?? '' ) ) );
+		// Branded HTML email layout toggle — defaults to on; "no" falls all
+		// transactional mail back to plain text (see Email_Service).
+		$output['email_html_enabled']                     = memberistic_sanitize_yes_no( $settings['email_html_enabled'] ?? ( $existing['email_html_enabled'] ?? 'yes' ) );
 		$output['verifyistic_max_age_days']               = absint( $settings['verifyistic_max_age_days'] ?? ( $existing['verifyistic_max_age_days'] ?? 0 ) );
 
 		// ── Unknown-key passthrough ─────────────────────────────────────
