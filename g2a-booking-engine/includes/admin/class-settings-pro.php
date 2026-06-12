@@ -531,6 +531,10 @@ final class G2AB_Admin_Settings_Pro {
 		$features     = get_option( 'g2ab_form_features', "Instant confirmation email\nReschedule or cancel anytime\nNo spam — just your booking" );
 		$continue_lbl = get_option( 'g2ab_form_continue_label', 'Continue' );
 		$submit_lbl   = get_option( 'g2ab_form_submit_label', '' );
+		$support_note = get_option(
+			'g2ab_form_support_notice',
+			class_exists( 'G2AB_Frontend' ) ? G2AB_Frontend::default_support_notice() : ''
+		);
 		?>
 		<div class="g2ab-set__panel">
 			<h3><?php esc_html_e( 'PRESETS', 'g2a-booking' ); ?></h3>
@@ -637,6 +641,15 @@ final class G2AB_Admin_Settings_Pro {
 			</div>
 		</div>
 
+		<div class="g2ab-set__panel">
+			<h3><?php esc_html_e( 'SUPPORT NOTICE (UNDER THE FORM)', 'g2a-booking' ); ?></h3>
+			<div class="g2ab-set__field">
+				<label><?php esc_html_e( 'Support notice text', 'g2a-booking' ); ?></label>
+				<textarea name="g2ab_form_support_notice" rows="4"><?php echo esc_textarea( $support_note ); ?></textarea>
+				<small><?php esc_html_e( 'Shown as a small note card below the booking widget. Basic HTML allowed (links, bold). Leave empty to hide the card entirely.', 'g2a-booking' ); ?></small>
+			</div>
+		</div>
+
 		<div class="g2ab-set__panel" style="background:#FAFBFD;">
 			<h3><?php esc_html_e( 'PREVIEW', 'g2a-booking' ); ?></h3>
 			<p class="g2ab-set__desc"><?php esc_html_e( 'Place this shortcode on a page to see the customized form:', 'g2a-booking' ); ?></p>
@@ -729,6 +742,14 @@ final class G2AB_Admin_Settings_Pro {
 			),
 			'form_customizer' => array(
 				'g2ab_form_animations', 'g2ab_form_primary_color', 'g2ab_form_features',
+				'g2ab_form_theme', 'g2ab_form_layout', 'g2ab_form_font',
+				'g2ab_form_primary', 'g2ab_form_accent', 'g2ab_form_bg',
+				'g2ab_form_surface', 'g2ab_form_surface2', 'g2ab_form_text', 'g2ab_form_muted',
+				'g2ab_form_radius', 'g2ab_form_title', 'g2ab_form_subtitle', 'g2ab_form_description',
+				'g2ab_form_continue_label', 'g2ab_form_submit_label',
+				'g2ab_form_badge_duration', 'g2ab_form_badge_price',
+				'g2ab_form_show_pricing', 'g2ab_form_show_lane_grid',
+				'g2ab_form_support_notice',
 			),
 			'danger'          => array(
 				'g2ab_remove_data_on_uninstall',
@@ -770,7 +791,7 @@ final class G2AB_Admin_Settings_Pro {
 				update_option( $k, sanitize_text_field( wp_unslash( $v ) ) );
 			} elseif ( in_array( $k, array( 'g2ab_booking_page_url' ), true ) ) {
 				update_option( $k, esc_url_raw( wp_unslash( $v ) ) );
-			} elseif ( strpos( $k, '_message' ) !== false || strpos( $k, '_body' ) !== false ) {
+			} elseif ( strpos( $k, '_message' ) !== false || strpos( $k, '_body' ) !== false || strpos( $k, '_notice' ) !== false || 'g2ab_form_description' === $k ) {
 				update_option( $k, wp_kses_post( wp_unslash( $v ) ) );
 			} elseif ( is_array( $v ) ) {
 				$clean = array_map( 'sanitize_text_field', wp_unslash( $v ) );

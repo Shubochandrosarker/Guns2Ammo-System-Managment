@@ -123,8 +123,21 @@ final class G2AB_Frontend {
 			'continue_label'  => sanitize_text_field( get_option( 'g2ab_form_continue_label', __( 'Continue', 'g2a-booking' ) ) ),
 			'submit_label'    => sanitize_text_field( get_option( 'g2ab_form_submit_label', '' ) ),
 			'shadow'          => sanitize_text_field( get_option( 'g2ab_form_shadow', '0 30px 80px rgba(8,12,32,0.45)' ) ),
+			'support_notice'  => wp_kses_post( get_option( 'g2ab_form_support_notice', self::default_support_notice() ) ),
 		);
 		return apply_filters( 'g2ab_form_design_tokens', $tokens );
+	}
+
+	/**
+	 * Default copy for the support note rendered under the booking widget.
+	 * Editable (or blankable to hide) via Settings → Form Customizer
+	 * (g2ab_form_support_notice).
+	 */
+	public static function default_support_notice() {
+		return 'Having trouble booking your lane? Send us a quick message and our team will take care of the rest '
+			. '&mdash; we want your experience at Guns 2 Ammo to be effortless from the first click to the firing line. '
+			. 'Thanks for choosing Guns 2 Ammo &mdash; your range partner. '
+			. '<a href="/contact/">Contact Us</a>';
 	}
 
 	private function sanitize_color( $value ) {
@@ -448,6 +461,7 @@ final class G2AB_Frontend {
 							</div>
 							<div class="g2ab-pick__slots">
 								<p class="g2ab-pick__hint" data-slots-hint><?php esc_html_e( 'Pick a date to see available times', 'g2a-booking' ); ?></p>
+								<div class="g2ab-slots-notice" data-slots-notice hidden role="status" aria-live="polite"></div>
 								<div class="g2ab-slots" data-slots></div>
 							</div>
 						</div>
@@ -523,6 +537,15 @@ final class G2AB_Frontend {
 
 				</main>
 			</div>
+
+			<?php if ( '' !== trim( wp_strip_all_tags( $tokens['support_notice'] ) ) ) : ?>
+				<aside class="g2ab-support-note">
+					<span class="g2ab-support-note__icon" aria-hidden="true">
+						<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg>
+					</span>
+					<div class="g2ab-support-note__body"><?php echo wp_kses_post( wpautop( $tokens['support_notice'] ) ); ?></div>
+				</aside>
+			<?php endif; ?>
 		</div>
 		<?php $this->render_inline_bootstrap( $instance_id ); ?>
 		<?php
@@ -775,6 +798,11 @@ final class G2AB_Frontend {
 				'loading_dates' => __( 'Loading available dates…', 'g2a-booking' ),
 				'no_events'  => __( 'No upcoming dates are open right now — please check back soon.', 'g2a-booking' ),
 				'pick_event' => __( 'Pick a highlighted date to see available times', 'g2a-booking' ),
+				/* translators: 1: number of available slots, 2: human date */
+				'slots_available'    => __( '%1$s time slots available on %2$s', 'g2a-booking' ),
+				/* translators: %s human date */
+				'slot_available_one' => __( '1 time slot available on %s', 'g2a-booking' ),
+				'fully_booked'       => __( 'Fully booked for this date — try another day', 'g2a-booking' ),
 				'months'   => array(
 					__( 'January', 'g2a-booking' ), __( 'February', 'g2a-booking' ), __( 'March', 'g2a-booking' ), __( 'April', 'g2a-booking' ),
 					__( 'May', 'g2a-booking' ), __( 'June', 'g2a-booking' ), __( 'July', 'g2a-booking' ), __( 'August', 'g2a-booking' ),
@@ -958,6 +986,37 @@ final class G2AB_Frontend {
 					});
 			}
 
+			// Availability notice rendered above the slot grid: shows how many
+			// slots are still open on the selected date, or a "fully booked"
+			// line when every slot is taken. Hidden when no date is selected.
+			function updateSlotsNotice(slots){
+				var note = $('[data-slots-notice]');
+				if (!note) return;
+				if (!state.date || !slots || !slots.length) {
+					note.hidden = true;
+					note.textContent = '';
+					note.className = 'g2ab-slots-notice';
+					return;
+				}
+				var avail = 0;
+				for (var i = 0; i < slots.length; i++) { if (slots[i].available) avail++; }
+				var dateLabel = state.date;
+				try {
+					dateLabel = new Date(state.date + 'T12:00:00').toLocaleDateString(undefined, { weekday:'short', month:'short', day:'numeric' });
+				} catch (e) {}
+				if (avail === 0) {
+					note.textContent = config.i18n.fully_booked;
+					note.className = 'g2ab-slots-notice is-full';
+				} else if (avail === 1) {
+					note.textContent = (config.i18n.slot_available_one || '1 slot on %s').replace('%s', dateLabel);
+					note.className = 'g2ab-slots-notice';
+				} else {
+					note.textContent = (config.i18n.slots_available || '%1$s slots on %2$s').replace('%1$s', avail).replace('%2$s', dateLabel);
+					note.className = 'g2ab-slots-notice';
+				}
+				note.hidden = false;
+			}
+
 			// Render an array of slot objects into the slots box.
 			function renderSlots(slots){
 				var box = $('[data-slots]');
@@ -965,6 +1024,7 @@ final class G2AB_Frontend {
 				if (!box) return;
 				if (hint) hint.style.display = 'none';
 				box.innerHTML = '';
+				updateSlotsNotice(slots);
 				if (!slots || !slots.length) { box.innerHTML = '<p class="g2ab-muted">' + config.i18n.no_slots + '</p>'; return; }
 				slots.forEach(function(slot){
 					var btn = document.createElement('button');
@@ -995,6 +1055,7 @@ final class G2AB_Frontend {
 				if (!box) return;
 				if (!state.resourceId || !state.date) {
 					box.innerHTML = '';
+					updateSlotsNotice(null);
 					if (hint) { hint.style.display = ''; hint.textContent = (eventMode ? (config.i18n.pick_event || config.i18n.pick_first) : config.i18n.pick_first) || 'Pick a date'; }
 					return;
 				}
@@ -1007,6 +1068,7 @@ final class G2AB_Frontend {
 				}
 				if (hint) { hint.style.display = ''; hint.textContent = config.i18n.loading; }
 				box.innerHTML = '';
+				updateSlotsNotice(null);
 				fetch(config.rest_url + 'availability?resource_id=' + encodeURIComponent(state.resourceId) + '&date=' + encodeURIComponent(state.date) + '&duration=' + encodeURIComponent(root.dataset.duration || 60), { headers: headers(false) })
 					.then(function(r){ return r.json(); })
 					.then(function(json){

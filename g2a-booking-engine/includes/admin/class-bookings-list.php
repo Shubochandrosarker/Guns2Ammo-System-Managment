@@ -398,13 +398,17 @@ final class G2AB_Admin_Bookings_List {
 .g2ab-mod__card--confirmed,.g2ab-mod__card--paid{border-left-color:#4CAF50;}
 .g2ab-mod__card-head{display:flex;justify-content:space-between;align-items:center;padding:12px 16px;border-bottom:1px solid #f0f1f3;}
 .g2ab-mod__card-id{font-family:"Rajdhani",sans-serif;font-size:14px;color:#8A95A5;font-weight:600;letter-spacing:.04em;}
-.g2ab-mod__badge{display:inline-block;padding:3px 10px;font-size:10px;font-weight:700;letter-spacing:.08em;border-radius:2px;background:#0F1115;color:#fff;}
-.g2ab-mod__badge--pending{background:#F9A825;}
-.g2ab-mod__badge--reserved{background:#666;}
-.g2ab-mod__badge--confirmed,.g2ab-mod__badge--paid{background:#4CAF50;}
-.g2ab-mod__badge--cancelled,.g2ab-mod__badge--no_show,.g2ab-mod__badge--refunded{background:#C62828;}
-.g2ab-mod__badge--completed{background:#0F1115;}
-.g2ab-mod__badge--xl{font-size:13px;padding:6px 16px;}
+.g2ab-mod__badge{display:inline-block;padding:3px 10px;font-size:10px;font-weight:700;letter-spacing:.08em;border-radius:999px;background:#0F1115;color:#fff;}
+.g2ab-mod__badge--pending{background:#B07D10;}
+.g2ab-mod__badge--reserved{background:#546E7A;}
+.g2ab-mod__badge--confirmed{background:#2E7D32;}
+.g2ab-mod__badge--paid{background:#1B5E20;}
+.g2ab-mod__badge--checked_in{background:#0277BD;}
+.g2ab-mod__badge--cancelled,.g2ab-mod__badge--refunded{background:#C62828;}
+.g2ab-mod__badge--no_show{background:#8E2424;}
+.g2ab-mod__badge--expired{background:#6B7280;}
+.g2ab-mod__badge--completed{background:#283593;}
+.g2ab-mod__badge--xl{font-size:13px;padding:8px 18px;box-shadow:0 0 0 1px rgba(255,255,255,.25) inset,0 2px 6px rgba(0,0,0,.35);}
 .g2ab-mod__card-body{padding:14px 16px;flex:1;}
 .g2ab-mod__card-name{font-size:17px;font-weight:700;margin-bottom:8px;color:#0F1115;}
 .g2ab-mod__card-line{display:flex;gap:8px;font-size:13px;color:#3c434a;line-height:1.7;}
@@ -418,26 +422,47 @@ final class G2AB_Admin_Bookings_List {
 .g2ab-mod__pages a.is-active{background:#D2691E;color:#fff;border-color:#D2691E;}
 .g2ab-mod__empty{background:#fff;padding:60px 20px;text-align:center;border:1px dashed #d0d4d9;}
 .g2ab-mod__empty-icon{font-size:48px;color:#8A95A5;margin-bottom:12px;}
-.g2ab-mod__detail{background:#fff;border:1px solid #d0d4d9;}
-.g2ab-mod__detail-head{display:flex;justify-content:space-between;align-items:center;padding:24px 28px;background:linear-gradient(135deg,#0F1115 0%,#1A1F26 100%);color:#fff;border-bottom:4px solid #D2691E;}
-.g2ab-mod__detail-uuid{font-size:11px;color:#8A95A5;letter-spacing:.08em;margin-top:6px;}
-.g2ab-mod__detail-uuid code{background:rgba(255,255,255,.1);color:#D2691E;padding:2px 8px;}
+/* ===== MISSION BRIEF (booking detail) ==================================== */
+.g2ab-mod__detail{background:transparent;border:0;}
+.g2ab-mod__detail-head{display:flex;justify-content:space-between;align-items:center;gap:18px;flex-wrap:wrap;padding:26px 30px;background:linear-gradient(135deg,#10141B 0%,#1B2230 62%,#23304A 100%);color:#fff;border-radius:10px;border-bottom:3px solid #D2691E;box-shadow:0 12px 28px rgba(15,17,21,.18);margin-bottom:16px;position:relative;overflow:hidden;}
+.g2ab-mod__detail-head::before{content:"";position:absolute;inset:0;background-image:repeating-linear-gradient(45deg,rgba(255,255,255,.03) 0,rgba(255,255,255,.03) 2px,transparent 2px,transparent 9px);pointer-events:none;}
+.g2ab-mod__detail-head>*{position:relative;}
+.g2ab-mod__detail-head h1{margin:0;padding:0;line-height:1.05;}
+.g2ab-mod__detail-head .g2ab-mod__stencil{font-family:"Rajdhani","Oswald",Impact,sans-serif;font-size:30px;font-weight:700;letter-spacing:.14em;color:#FFFFFF;text-shadow:0 2px 0 rgba(0,0,0,.5);}
+.g2ab-mod__detail-uuid{font-size:11px;color:#A8B3C2;letter-spacing:.1em;margin-top:10px;font-weight:700;}
+.g2ab-mod__detail-uuid code{display:inline-block;background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.22);color:#FFCE8A;padding:4px 12px;border-radius:999px;font-size:12px;letter-spacing:.05em;margin-left:4px;}
 .g2ab-mod__detail-back{margin:14px 0 8px;}
-.g2ab-mod__detail-back a{color:#0F1115;text-decoration:none;font-size:13px;}
-.g2ab-mod__detail-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:0;}
-.g2ab-mod__panel{padding:20px 28px;border-right:1px solid #f0f1f3;border-bottom:1px solid #f0f1f3;}
-.g2ab-mod__panel h3{font-family:"Rajdhani",sans-serif;font-size:13px;letter-spacing:.12em;color:#D2691E;margin:0 0 14px;font-weight:700;}
-.g2ab-mod__panel dl{margin:0;display:grid;grid-template-columns:120px 1fr;gap:6px 16px;font-size:13px;}
-.g2ab-mod__panel dt{color:#8A95A5;text-transform:uppercase;font-size:11px;letter-spacing:.06em;align-self:center;}
-.g2ab-mod__panel dd{margin:0;color:#0F1115;font-weight:500;}
+.g2ab-mod__detail-back a{color:#1d2327;text-decoration:none;font-size:13px;font-weight:600;}
+.g2ab-mod__detail-back a:hover{color:#D2691E;}
+.g2ab-mod__detail-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-bottom:16px;}
+.g2ab-mod__detail .g2ab-mod__panel{background:#fff;border:1px solid #dcdfe5;border-top:3px solid #4A5D3A;border-radius:8px;padding:20px 24px;box-shadow:0 2px 8px rgba(16,20,27,.06);margin-bottom:16px;}
+.g2ab-mod__detail-grid .g2ab-mod__panel{margin-bottom:0;}
+.g2ab-mod__panel h3{font-family:"Rajdhani","Oswald",sans-serif;font-size:12px;letter-spacing:.16em;color:#9A4F12;margin:0 0 14px;font-weight:700;text-transform:uppercase;padding-bottom:10px;border-bottom:1px solid #eef0f3;}
+.g2ab-mod__panel dl{margin:0;display:grid;grid-template-columns:110px 1fr;gap:8px 16px;font-size:13px;}
+.g2ab-mod__panel dt{color:#646b76;text-transform:uppercase;font-size:10.5px;letter-spacing:.07em;font-weight:600;align-self:center;}
+.g2ab-mod__panel dd{margin:0;color:#1d2327;font-weight:600;font-size:13.5px;overflow-wrap:anywhere;}
+.g2ab-mod__panel dd a{color:#1d2327;text-decoration:none;border-bottom:1px dotted #b6bcc4;}
+.g2ab-mod__panel dd a:hover{color:#D2691E;border-bottom-color:#D2691E;}
 .g2ab-mod__formdata{grid-template-columns:160px 1fr;}
 .g2ab-mod__statusform{display:flex;gap:10px;align-items:center;flex-wrap:wrap;}
+.g2ab-mod__statusform select{padding:7px 12px;border:1px solid #ccd0d4;border-radius:4px;font-size:13px;font-weight:600;}
 .g2ab-mod__log{list-style:none;padding:0;margin:0;font-family:"SF Mono","Monaco","Menlo",monospace;font-size:12px;}
-.g2ab-mod__log li{padding:6px 0;border-bottom:1px solid #f0f1f3;display:grid;grid-template-columns:140px 100px 1fr;gap:10px;align-items:center;}
-.g2ab-mod__log-time{color:#8A95A5;}
-.g2ab-mod__log-event{padding:2px 8px;background:#f0f1f3;color:#3c434a;font-size:10px;letter-spacing:.06em;text-align:center;}
+.g2ab-mod__log li{padding:8px 0;border-bottom:1px solid #eef0f3;display:grid;grid-template-columns:140px 110px 1fr;gap:10px;align-items:center;}
+.g2ab-mod__log li:last-child{border-bottom:0;}
+.g2ab-mod__log li:nth-child(even){background:#fafbfc;}
+.g2ab-mod__log-time{color:#646b76;}
+.g2ab-mod__log-event{padding:3px 8px;background:#eef0f3;color:#3c434a;font-size:10px;font-weight:700;letter-spacing:.06em;text-align:center;border-radius:999px;}
 .g2ab-mod__log-event--error{background:#C62828;color:#fff;}
-.g2ab-mod__log-event--warning{background:#F9A825;color:#fff;}
+.g2ab-mod__log-event--warning{background:#B07D10;color:#fff;}
+.g2ab-mod__log-msg{color:#3c434a;overflow-wrap:anywhere;}
+@media (max-width:1200px){.g2ab-mod__detail-grid{grid-template-columns:repeat(2,1fr);}}
+@media (max-width:900px){
+	.g2ab-mod__detail-grid{grid-template-columns:1fr;}
+	.g2ab-mod__detail-head{flex-direction:column;align-items:flex-start;padding:22px;}
+	.g2ab-mod__detail .g2ab-mod__panel{padding:18px;}
+	.g2ab-mod__panel dl{grid-template-columns:100px 1fr;}
+	.g2ab-mod__log li{grid-template-columns:1fr;gap:4px;}
+}
 </style>';
 	}
 }

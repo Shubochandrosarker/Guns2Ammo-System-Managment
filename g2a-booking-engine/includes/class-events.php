@@ -513,9 +513,14 @@ final class G2AB_Events {
 			foreach ( $events as $post ) {
 				$e   = $this->event_data( $post );
 				$cta = $e['cta_url'] ? $e['cta_url'] : '';
-				echo '<article class="g2a-ev-row' . ( $e['featured'] ? ' is-featured' : '' ) . '">';
+				echo '<article class="g2a-ev-row' . ( $e['featured'] ? ' is-featured' : '' ) . ( $e['image'] ? ' has-image' : '' ) . '">';
 				echo '<div class="g2a-ev-datebox"><span class="g2a-ev-d">' . esc_html( $e['day'] ) . '</span>'
-					. '<span class="g2a-ev-m">' . esc_html( $e['month'] ) . '</span></div>';
+					. '<span class="g2a-ev-m">' . esc_html( $e['month'] ) . '</span>'
+					. ( $e['weekday'] ? '<span class="g2a-ev-w">' . esc_html( $e['weekday'] ) . '</span>' : '' )
+					. '</div>';
+				if ( $e['image'] ) {
+					echo '<div class="g2a-ev-rowimg" style="background-image:url(\'' . esc_url( $e['image'] ) . '\')" role="img" aria-label="' . esc_attr( $e['title'] ) . '"></div>';
+				}
 				echo '<div class="g2a-ev-rowbody">';
 				if ( $e['featured'] ) {
 					echo '<span class="g2a-ev-flag">' . esc_html__( 'Featured', 'g2a-booking' ) . '</span>';

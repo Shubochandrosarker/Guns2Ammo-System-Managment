@@ -48,7 +48,7 @@ export default function Membership() {
     <div>
       <PageHeader
         title="Range Membership"
-        subtitle="Detects WooCommerce Memberships, PMPro, MemberPress, or a custom user-meta schema. Host themes can override via the g2a_pos_membership_lookup filter."
+        subtitle="Detects Memberistic, WooCommerce Memberships, PMPro, MemberPress, or a custom user-meta schema. Host themes can override via the g2a_pos_membership_lookup filter."
       />
 
       {loading ? <div className="card p-6 text-sm text-zinc-500">Loading…</div> : (
@@ -77,7 +77,7 @@ export default function Membership() {
               <label className="flex items-center gap-3 rounded-lg border border-zinc-200 p-3 dark:border-zinc-800">
                 <input type="radio" name="provider" checked={pinned === ''} onChange={() => setPinned('')} />
                 <span className="font-medium">Auto-detect</span>
-                <span className="text-xs text-zinc-500">Try WC Memberships → PMPro → MemberPress → user-meta.</span>
+                <span className="text-xs text-zinc-500">Try Memberistic → WC Memberships → PMPro → MemberPress → user-meta.</span>
               </label>
             </div>
           </div>

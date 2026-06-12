@@ -769,3 +769,71 @@ html[data-theme="light"] .g2ab-booking.g2ab-theme-ladies {
 		margin-right: 0;
 	}
 }
+
+/* ===== Slot availability notice (above the time-slot grid) ============== */
+.g2ab-slots-notice {
+	display: inline-flex;
+	align-items: center;
+	gap: 8px;
+	margin: 0 0 12px;
+	padding: 6px 14px;
+	border-radius: var(--g2ab-radius-pill, 999px);
+	font-size: 12.5px;
+	font-weight: 600;
+	letter-spacing: .01em;
+	line-height: 1.4;
+	color: var(--g2ab-text, #fff);
+	background: color-mix(in srgb, var(--g2ab-primary, #5B7BFF) 14%, transparent);
+	border: 1px solid color-mix(in srgb, var(--g2ab-primary, #5B7BFF) 32%, transparent);
+}
+.g2ab-slots-notice::before {
+	content: "";
+	width: 7px;
+	height: 7px;
+	border-radius: 50%;
+	background: var(--g2ab-primary, #5B7BFF);
+	flex: 0 0 auto;
+}
+.g2ab-slots-notice.is-full {
+	color: var(--g2ab-text, #fff);
+	background: color-mix(in srgb, #C62828 13%, transparent);
+	border-color: color-mix(in srgb, #C62828 38%, transparent);
+}
+.g2ab-slots-notice.is-full::before { background: #C62828; }
+.g2ab-slots-notice[hidden] { display: none; }
+
+/* ===== Support note (under the booking widget) =========================== */
+.g2ab-support-note {
+	display: flex;
+	align-items: flex-start;
+	gap: 14px;
+	margin-top: 18px;
+	padding: 16px 20px;
+	border-radius: var(--g2ab-radius, 16px);
+	background: var(--g2ab-surface, #121833);
+	border: 1px solid var(--g2ab-border, rgba(255,255,255,0.08));
+	color: var(--g2ab-muted, #8B93B4);
+	font-family: var(--g2ab-font, "Inter","Segoe UI",sans-serif);
+	font-size: 13.5px;
+	line-height: 1.65;
+}
+.g2ab-support-note__icon {
+	flex: 0 0 auto;
+	width: 36px;
+	height: 36px;
+	display: inline-grid;
+	place-items: center;
+	border-radius: 50%;
+	background: color-mix(in srgb, var(--g2ab-primary, #5B7BFF) 16%, transparent);
+	color: var(--g2ab-primary, #5B7BFF);
+	margin-top: 2px;
+}
+.g2ab-support-note__body p { margin: 0 0 8px; }
+.g2ab-support-note__body p:last-child { margin-bottom: 0; }
+.g2ab-support-note__body a {
+	color: var(--g2ab-primary, #5B7BFF);
+	font-weight: 600;
+	text-decoration: underline;
+	text-underline-offset: 2px;
+}
+.g2ab-support-note__body a:hover { color: var(--g2ab-accent, #7C9CFF); }
