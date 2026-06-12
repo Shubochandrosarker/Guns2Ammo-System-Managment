@@ -1,2 +1,5 @@
 # Extracted plugin/theme archives used for audit only (originals are zipped at repo root)
 _audit/
+
+# Node build deps (POS admin SPA)
+g2a-pos-core/admin/node_modules/
