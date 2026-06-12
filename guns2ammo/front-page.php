@@ -218,7 +218,7 @@ $g2a_mg4_desc           = get_post_meta( $g2a_page_id, 'mg_fourth_weapon_desc', 
         <div class="bg" style="background-image: linear-gradient(180deg, rgba(26,25,30,0.3), rgba(26,25,30,0.85)), url('<?php echo esc_url( content_url( '/uploads/2024/08/one-1-a.webp' ) ); ?>');"></div>
         <div class="scrim"></div>
         <div class="body">
-          <div class="cat">$25 Flat Fee</div>
+          <div class="cat">$35 Flat Fee</div>
           <h3>TRANSFERS</h3>
           <span class="more">Start </span>
         </div>

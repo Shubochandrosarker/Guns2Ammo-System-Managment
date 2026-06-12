@@ -208,7 +208,7 @@ get_header();
           <span style="font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.2em; color: var(--color-silver); text-transform: uppercase;">Estimated Total</span>
           <span style="font-family: var(--font-display); font-size: 28px; color: var(--color-brass-bright);">$45.00</span>
         </div>
-        <a class="btn btn-brass" style="width: 100%; margin-top: 16px;" href="contact.html?service=ship">Schedule Drop-Off </a>
+        <a class="btn btn-brass" style="width: 100%; margin-top: 16px;" href="/contact/">Schedule Drop-Off </a>
       </div>
     </div>
   </div>
@@ -222,8 +222,8 @@ get_header();
         <h2 style="margin-top: 8px;">CONSIGNMENT<br><span class="a">SALES</span></h2>
         <p>Bring in any firearm or accessory in working condition. We display, photograph, list across our network, and handle the sale + transfer. You keep 80% of the listed price.</p>
         <div style="display: flex; gap: 10px; flex-wrap: wrap;">
-          <a class="btn btn-brass" href="contact.html?service=consign">Request Appraisal</a>
-          <a class="btn btn-ghost" href="shop.html?filter=used">Browse Consignment Inventory</a>
+          <a class="btn btn-brass" href="/contact/?service=consign">Request Appraisal</a>
+          <a class="btn btn-ghost" href="/shop/">Browse Consignment Inventory</a>
         </div>
       </div>
       <div class="split-rate">

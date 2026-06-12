@@ -94,7 +94,7 @@ get_header();
   <div class="c">
     <span class="eyebrow" style="justify-content:center;"> Our Philosophy</span>
     <blockquote>"A safe shooter is a <em>disciplined</em> shooter. A disciplined shooter is a <em>trained</em> shooter. We are not in the business of selling guns. We are in the business of <em>training people</em> to handle them correctly  for life."</blockquote>
-    <div class="sig"> Robert &amp; Diane Halsey  Owners</div>
+    <div class="sig"> The Guns 2 Ammo Team</div>
   </div>
 </section>
 
@@ -106,7 +106,7 @@ get_header();
       <div class="cred">
         <div class="ic"><span></span></div>
         <h4>NRA CERTIFIED</h4>
-        <p>Every primary instructor holds NRA certification. Every assistant has 5,000+ documented hours.</p>
+        <p>Every instructor holds NRA certification, backed by military and law-enforcement experience.</p>
         <div class="meta">National Rifle Association</div>
       </div>
       <div class="cred">
@@ -148,39 +148,27 @@ get_header();
     <span class="eyebrow"> The Team</span>
     <h2>OPERATORS,<br>TEACHERS, FAMILY.</h2>
     <p style="color: var(--color-fog); max-width:64ch; margin: 0 0 32px;">Decades of combined experience from law enforcement, military, and competitive shooting. The team you train with is the team that owns the building.</p>
-    <div class="team-grid">
-      <div class="member">
-        <div class="photo" data-pl="EDITORIAL  ROBERT"></div>
-        <div class="body">
-          <div class="role">Owner  Lead Instructor</div>
-          <h4>ROBERT HALSEY</h4>
-          <p>22 years USAF security forces. NRA Pistol &amp; Rifle. AZ DPS approved.</p>
+    <?php
+    /* Real roster — same single source as /training/ (inc/instructors.php).
+       The fabricated Halsey/Cruz/Okafor grid conflicted with the training
+       page's equally fabricated Mendoza/Kelly/Tran roster. */
+    $g2a_team = function_exists( 'g2a_instructors' ) ? g2a_instructors() : array();
+    ?>
+    <div class="team-grid" data-reveal-stagger>
+      <?php foreach ( $g2a_team as $g2a_member ) : ?>
+        <div class="member g2a-lift">
+          <?php if ( ! empty( $g2a_member['photo'] ) ) : ?>
+            <div class="photo" style="background-image:url('<?php echo esc_url( $g2a_member['photo'] ); ?>');background-size:cover;background-position:center;"></div>
+          <?php else : ?>
+            <div class="photo" data-pl="<?php echo esc_attr( strtoupper( $g2a_member['name'] ) ); ?>"></div>
+          <?php endif; ?>
+          <div class="body">
+            <div class="role"><?php echo esc_html( $g2a_member['role'] ); ?></div>
+            <h4><?php echo esc_html( strtoupper( $g2a_member['name'] ) ); ?></h4>
+            <p><?php echo esc_html( implode( ' · ', array_slice( (array) ( $g2a_member['creds'] ?? array() ), 0, 3 ) ) ); ?></p>
+          </div>
         </div>
-      </div>
-      <div class="member">
-        <div class="photo" data-pl="EDITORIAL  DIANE"></div>
-        <div class="body">
-          <div class="role">Owner  Operations</div>
-          <h4>DIANE HALSEY</h4>
-          <p>Built the curriculum. Runs the shop. Probably the reason you came back.</p>
-        </div>
-      </div>
-      <div class="member">
-        <div class="photo" data-pl="EDITORIAL  MARCUS"></div>
-        <div class="body">
-          <div class="role">Senior RSO</div>
-          <h4>MARCUS CRUZ</h4>
-          <p>14 years Mesa PD SWAT. USPSA Master Class. Quietest man on the line.</p>
-        </div>
-      </div>
-      <div class="member">
-        <div class="photo" data-pl="EDITORIAL  SARAH"></div>
-        <div class="body">
-          <div class="role">CCW Instructor</div>
-          <h4>SARAH OKAFOR</h4>
-          <p>USMC veteran. Specializes in first-time owners and women's-only classes.</p>
-        </div>
-      </div>
+      <?php endforeach; ?>
     </div>
   </div>
 </section>

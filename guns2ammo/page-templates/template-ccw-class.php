@@ -20,7 +20,7 @@ get_header();
 $img = '/wp-content/uploads/';
 
 $faq = [
-	[ 'q' => 'Is the Arizona CCW class really free with a machine gun package?', 'a' => 'Yes. Every Signature Experience package  Basic, Premium, and Elite  includes the Arizona CCW class at no extra cost, a $75 value.' ],
+	[ 'q' => 'Is the Arizona CCW class really free with a machine gun package?', 'a' => 'Yes. Every Signature Experience package  Basic, Premium, and Elite  includes the Arizona CCW class at no extra cost, an $85 value.' ],
 	[ 'q' => 'Do I get an actual CCW certificate?', 'a' => 'Yes. On completion you receive the Arizona CCW certificate of training, which supports your concealed-weapons permit application.' ],
 	[ 'q' => 'How many states does the Arizona permit cover?', 'a' => 'An Arizona concealed-carry permit is honored in 37+ states through reciprocity. Pair it with our California course for even broader coverage.' ],
 	[ 'q' => 'Can I take the CCW class on the same day?', 'a' => 'Often yes. Many guests complete the class the same day as their machine gun experience  tell us your plan when you book and we will schedule it together.' ],

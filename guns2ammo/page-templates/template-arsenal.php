@@ -24,7 +24,7 @@ $weapons = [
 		'sub'      => 'The world\'s most iconic submachine gun',
 		'lead'     => 'Roller-delayed, buttery-smooth, and instantly recognizable  the MP5 is the easiest full-auto platform to control and the perfect first machine gun.',
 		'image'    => $img . '2025/06/IMG_1055.webp',
-		'cartridge'=> '919mm Parabellum',
+		'cartridge'=> '9×19mm Parabellum',
 		'specs'    => [ 'Rate of Fire' => '~800 RPM', 'Magazine' => '25 Rounds', 'Action' => 'Roller-delayed blowback', 'Caliber' => '9mm', 'Origin' => 'Germany', 'From' => '$249' ],
 		'story'    => 'Adopted by elite units and law-enforcement teams worldwide, the MP5 earned its reputation on control. Its roller-delayed action keeps recoil flat and predictable, so even a first-time shooter can hold a tight group on full auto. If you have ever seen a special-operations film, you have seen this gun.',
 		'feel'     => 'Soft, smooth, and almost gentle for a machine gun. The 9mm cartridge means modest recoil  most first-timers are grinning before the first magazine is empty.',
@@ -58,14 +58,14 @@ $weapons = [
 		'sub'      => 'The most recognizable rifle on earth',
 		'lead'     => 'Rugged, thunderous, and unmistakable  the AK-47 delivers the raw, hard-hitting full-auto experience guests come back for.',
 		'image'    => $img . '2025/03/IMG_20250317_085324.webp',
-		'cartridge'=> '7.6239mm',
-		'specs'    => [ 'Rate of Fire' => '~600 RPM', 'Magazine' => '30 Rounds', 'Action' => 'Long-stroke gas piston', 'Caliber' => '7.6239', 'Origin' => 'Russia', 'From' => '$349' ],
+		'cartridge'=> '7.62×39mm',
+		'specs'    => [ 'Rate of Fire' => '~600 RPM', 'Magazine' => '30 Rounds', 'Action' => 'Long-stroke gas piston', 'Caliber' => '7.62×39', 'Origin' => 'Russia', 'From' => '$349' ],
 		'story'    => 'Designed in 1947, the AK-47 is the most produced and most recognizable rifle in history. Its long-stroke piston action is famously reliable, and its heavier 7.62 cartridge gives every burst a deep, authoritative punch you feel in your chest.',
 		'feel'     => 'Loud and powerful  this is the big-bore full-auto experience. The 7.62 round has real recoil, but your RSO sets you up so it is exhilarating, never overwhelming.',
 		'includes' => [ 'One-on-one certified RSO instruction', 'Ammunition, eye and ear protection', 'Targets and certificate of completion', 'A FREE Arizona CCW class with every package' ],
 		'faq'      => [
 			[ 'q' => 'Is the AK-47 too much for a beginner?', 'a' => 'Not with our coaching. The recoil is heavier than the MP5 or M16, but a one-on-one RSO sets your stance and grip so you stay in full control.' ],
-			[ 'q' => 'Why does the AK feel so different?', 'a' => 'The larger 7.6239 cartridge delivers a deeper, harder-hitting recoil impulse  that authoritative punch is exactly why guests love it.' ],
+			[ 'q' => 'Why does the AK feel so different?', 'a' => 'The larger 7.62×39 cartridge delivers a deeper, harder-hitting recoil impulse  that authoritative punch is exactly why guests love it.' ],
 			[ 'q' => 'Can I shoot it with the other platforms?', 'a' => 'Yes. The Premium and Elite packages combine the AK-47 with the MP5 and M16 for the full arsenal experience.' ],
 		],
 	],
@@ -161,7 +161,7 @@ if ( function_exists( 'g2a_faq_schema' ) && function_exists( 'g2a_emit_jsonld' )
   <div class="ar-ccw">
     <div>
       <h3>Includes A FREE Arizona CCW Class</h3>
-      <p>A $75 value  same-day certificate, carry legally across 37+ reciprocal states.</p>
+      <p>An $85 value  same-day certificate, carry legally across 37+ reciprocal states.</p>
     </div>
     <a class="btn btn-brass btn-arrow" href="<?php echo esc_url( home_url( '/free-ccw-class/' ) ); ?>">Read CCW Details</a>
   </div>
@@ -196,7 +196,7 @@ if ( function_exists( 'g2a_faq_schema' ) && function_exists( 'g2a_emit_jsonld' )
 get_template_part( 'template-parts/reservation-form', null, [
 	'subject' => $w['title'] . ' Machine Gun Experience',
 	'heading' => 'BOOK THE ' . $w['title'] . ' EXPERIENCE',
-	'intro'   => 'Reserve your ' . $w['title'] . ' experience. Send your details and our team will confirm a date  Signature Experiences book 46 weeks out, so reserve early.',
+	'intro'   => 'Reserve your ' . $w['title'] . ' experience. Send your details and our team will confirm a date  Signature Experiences book 4–6 weeks out, so reserve early.',
 	'cta'     => 'Request This Experience',
 ] );
 get_footer();

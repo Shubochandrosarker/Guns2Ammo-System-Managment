@@ -7,7 +7,7 @@
 
 if ( ! defined( 'ABSPATH' ) ) exit;
 
-define( 'G2A_VERSION', '1.24.0' );
+define( 'G2A_VERSION', '1.25.0' );
 define( 'G2A_DIR', get_stylesheet_directory() );
 define( 'G2A_URI', get_stylesheet_directory_uri() );
 
@@ -139,6 +139,7 @@ add_filter( 'body_class', function ( $classes ) {
 
 /* ---------- SEO + Schema ---------- */
 require_once G2A_DIR . '/inc/business-info.php';
+require_once G2A_DIR . '/inc/instructors.php';
 require_once G2A_DIR . '/inc/seo.php';
 
 /* ---------- WooCommerce tweaks ---------- */

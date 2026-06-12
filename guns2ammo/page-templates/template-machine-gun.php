@@ -15,7 +15,7 @@ $g2a_mg_ccw_replace      = get_post_meta( $g2a_page_id, 'mg_ccw_remove_text', tr
 ?>
 <header class="mg-hero">
   <div class="c">
-    <span class="eyebrow" style="color: var(--color-ember);">Signature Experience  Booked 46 weeks out</span>
+    <span class="eyebrow" style="color: var(--color-ember);">Signature Experience  Booked 4–6 weeks out</span>
     <h1 style="margin-top:18px;"><span class="thin">FIRE THE</span>UNTHINKABLE<span class="ember">.</span></h1>
     <p><?php echo esc_html( $g2a_mg_hero_intro ? $g2a_mg_hero_intro : 'One-on-one, fully-automatic instruction. Three legendary platforms. A certified RSO at your side. Built for adrenaline, entertainment, and unforgettable range time.' ); ?></p>
     <div style="display:flex; gap:14px; flex-wrap:wrap;">

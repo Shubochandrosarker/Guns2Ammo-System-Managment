@@ -17,7 +17,7 @@ if ( ! class_exists( 'WooCommerce' ) ) {
 }
 
 $paged = max( 1, (int) get_query_var( 'paged' ), (int) ( $_GET['paged'] ?? 1 ) );
-$search = sanitize_text_field( wp_unslash( $_GET['s'] ?? '' ) );
+$search = sanitize_text_field( wp_unslash( $_GET['g2a_q'] ?? ( $_GET['s'] ?? '' ) ) );
 $order  = sanitize_text_field( wp_unslash( $_GET['orderby'] ?? 'menu_order' ) );
 $cat    = sanitize_title( wp_unslash( $_GET['product_cat'] ?? '' ) );
 $stock  = sanitize_text_field( wp_unslash( $_GET['stock'] ?? '' ) );
@@ -36,7 +36,7 @@ $args = [
 	'paged'          => $paged,
 	's'              => $search,
 	'tax_query'      => [],
-	'meta_query'     => WC()->query->get_meta_query(),
+	'meta_query'     => ( function_exists( 'WC' ) && WC()->query ) ? WC()->query->get_meta_query() : [],
 ];
 
 if ( $cat ) {
@@ -120,7 +120,7 @@ get_header();
 		<div class="head">
 			<div><span class="eyebrow">Retail Catalog</span><h1>Shop</h1></div>
 			<form method="get" class="toolbar" style="margin:0;">
-				<input type="search" name="s" value="<?php echo esc_attr( $search ); ?>" placeholder="Search products">
+				<input type="search" name="g2a_q" value="<?php echo esc_attr( $search ); ?>" placeholder="Search products">
 				<select name="orderby">
 					<option value="menu_order" <?php selected( $order, 'menu_order' ); ?>>Default</option>
 					<option value="date" <?php selected( $order, 'date' ); ?>>Newest</option>
@@ -150,7 +150,7 @@ get_header();
 					?>
 				</div>
 				<form method="get" class="filters" style="margin-top:16px;">
-					<?php if ( $search ) : ?><input type="hidden" name="s" value="<?php echo esc_attr( $search ); ?>"><?php endif; ?>
+					<?php if ( $search ) : ?><input type="hidden" name="g2a_q" value="<?php echo esc_attr( $search ); ?>"><?php endif; ?>
 					<?php if ( $cat ) : ?><input type="hidden" name="product_cat" value="<?php echo esc_attr( $cat ); ?>"><?php endif; ?>
 					<?php if ( $order ) : ?><input type="hidden" name="orderby" value="<?php echo esc_attr( $order ); ?>"><?php endif; ?>
 					<div><label for="stock">Stock</label><select id="stock" name="stock"><option value="">Any</option><option value="in" <?php selected( $stock, 'in' ); ?>>In stock</option><option value="out" <?php selected( $stock, 'out' ); ?>>Out of stock</option></select></div>
