@@ -114,7 +114,23 @@ $phone_tel = preg_replace( '/[^0-9+]/', '', '+1' . $phone );
 			<button class="profile-btn" id="g2a-profile-btn" aria-label="Account" aria-haspopup="true" aria-expanded="false">
 				<span class="av" id="g2a-profile-av"><?php
 				if ( is_user_logged_in() ) {
-					echo esc_html( strtoupper( substr( wp_get_current_user()->display_name, 0, 2 ) ) );
+					$g2a_av_user_id = get_current_user_id();
+					$g2a_av_name    = wp_get_current_user()->display_name;
+					// Member profile image: gravatar by default; the
+					// membership plugin can supply a member photo via the
+					// g2a_profile_avatar_url filter. Falls back to the
+					// 2-letter initials when no URL is available.
+					$g2a_av_url = get_avatar_url( $g2a_av_user_id, [ 'size' => 64 ] );
+					$g2a_av_url = apply_filters( 'g2a_profile_avatar_url', $g2a_av_url, $g2a_av_user_id );
+					if ( $g2a_av_url ) {
+						printf(
+							'<img class="av-img" src="%s" alt="%s" width="64" height="64" decoding="async" />',
+							esc_url( $g2a_av_url ),
+							esc_attr( $g2a_av_name )
+						);
+					} else {
+						echo esc_html( strtoupper( substr( $g2a_av_name, 0, 2 ) ) );
+					}
 				} else {
 					// Guest state: a real person icon, not an empty disc.
 					?><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="8" r="3.6"/><path d="M4.5 20c1.2-3.6 4-5.4 7.5-5.4s6.3 1.8 7.5 5.4"/></svg><?php

@@ -56,12 +56,21 @@ img[loading="lazy"] { opacity: 0; transition: opacity 480ms var(--ease-out); }
 img[loading="lazy"].is-loaded,
 img[loading="lazy"][data-loaded="1"] { opacity: 1; }
 
-/* IntersectionObserver-driven reveal */
+/* IntersectionObserver-driven reveal (chrome.js adds .is-in on entry).
+   Variants share one motion language: a 700ms ease-out settle. Groups
+   ([data-reveal-group]) get a JS-applied incremental transition-delay. */
 [data-reveal] { opacity: 0; transform: translateY(20px); transition: opacity 700ms var(--ease-out), transform 700ms var(--ease-out); }
+[data-reveal="left"]  { transform: translateX(-28px); }
+[data-reveal="right"] { transform: translateX(28px); }
+[data-reveal="scale"] { transform: scale(0.94); }
+[data-reveal="fade"]  { transform: none; }
 [data-reveal].is-in { opacity: 1; transform: none; }
+/* After the entrance completes (chrome.js adds .did-reveal) restore
+   snappy 250ms physics so hover lifts on cards don't feel sluggish. */
+[data-reveal].did-reveal { transition: opacity 250ms var(--ease-std), transform 250ms var(--ease-std); }
 @media (prefers-reduced-motion: reduce) {
   [data-reveal], .fade-up, #g2a-preloader { animation: none !important; transition: none !important; }
-  [data-reveal] { opacity: 1; transform: none; }
+  [data-reveal] { opacity: 1 !important; transform: none !important; transition-delay: 0ms !important; }
 }
 
 /* Page padding to clear fixed nav */

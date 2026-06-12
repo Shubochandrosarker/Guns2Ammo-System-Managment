@@ -15,12 +15,12 @@ $g2a_pricing_additional_text    = get_post_meta( $g2a_page_id, 'pricing_addition
 $g2a_pricing_unlimited_text     = get_post_meta( $g2a_page_id, 'pricing_unlimited_text', true );
 ?>
 <style>.ph-hero { padding: 140px 32px 60px; position:relative; overflow:hidden; background: var(--color-void); }
-  .ph-hero .photo { position:absolute; inset:0; background-image: linear-gradient(180deg, rgba(26,25,30,0.7), rgba(26,25,30,0.95)), url("/wp-content/uploads/2026/01/ChatGPT-Image-Jan-30-2026-10_10_12-PM.webp"); background-size: cover; background-position: center; }
+  .ph-hero .photo { position:absolute; inset:0; background-image: linear-gradient(180deg, var(--hero-scrim-soft), var(--hero-scrim-deep)), url("<?php echo esc_url( g2a_asset( 'img/guns2ammo-retail-floor-mesa.jpg' ) ); ?>"); background-size: cover; background-position: center; }
   .ph-hero .inner { max-width: 1100px; margin:0 auto; position:relative; text-align:center; }
-  .ph-hero h1 { font-family: var(--font-display); font-size: clamp(48px, 8vw, 96px); color: var(--color-white); letter-spacing: 0.02em; line-height: 0.92; }
-  .ph-hero h1 em { font-style: normal; color: var(--color-brass-bright); }
-  .ph-hero .sub { color: var(--color-fog); font-size: 18px; margin: 20px auto 28px; max-width: 60ch; }
-  .ph-hero .micro { font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.24em; color: var(--color-silver); text-transform:uppercase; }
+  .ph-hero h1 { font-family: var(--font-display); font-size: clamp(48px, 8vw, 96px); color: var(--ink-on-media); letter-spacing: 0.02em; line-height: 0.92; }
+  .ph-hero h1 em { font-style: normal; color: var(--brass-on-media); }
+  .ph-hero .sub { color: var(--ink-on-media-dim); font-size: 18px; margin: 20px auto 28px; max-width: 60ch; }
+  .ph-hero .micro { font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.24em; color: var(--ink-on-media-faint); text-transform:uppercase; }
 
   .toggle-row { display:flex; justify-content:center; align-items:center; gap:18px; flex-wrap:wrap; padding: 60px 24px 20px; }
   .plans-wrap { max-width: 1280px; margin: 0 auto; padding: 32px; display:grid; grid-template-columns: repeat(3, 1fr); gap: 24px; }
@@ -34,7 +34,7 @@ $g2a_pricing_unlimited_text     = get_post_meta( $g2a_page_id, 'pricing_unlimite
 
   .ladies-card { max-width: 1100px; margin: 64px auto; padding: 32px; display:grid; grid-template-columns: 1fr 1fr; gap: 0; background: linear-gradient(135deg, rgba(201,168,76,0.08), rgba(201,168,76,0.02)); border-left: 3px solid var(--color-brass); }
   @media (max-width: 760px) { .ladies-card { grid-template-columns: 1fr; padding: 24px; } }
-  .ladies-card .photo { background-image: url("/wp-content/uploads/2024/08/one-1-a.webp"); background-size: cover; background-position: center; min-height: 240px; filter: saturate(0.9); }
+  .ladies-card .photo { background-image: url("<?php echo esc_url( g2a_asset( 'img/guns2ammo-happy-customer-target.jpg' ) ); ?>"); background-size: cover; background-position: center; min-height: 240px; filter: saturate(0.9); }
   .ladies-card .inner { padding: 32px; }
   .ladies-card h3 { font-family: var(--font-display); font-size: 56px; color: var(--color-white); line-height: 0.95; }
   .ladies-card .pill { display:inline-block; background: rgba(201,168,76,0.18); color: var(--color-brass-bright); padding: 4px 12px; font-family: var(--font-mono); font-size: 10px; letter-spacing: 0.24em; text-transform:uppercase; margin-bottom: 14px; }
@@ -43,7 +43,7 @@ $g2a_pricing_unlimited_text     = get_post_meta( $g2a_page_id, 'pricing_unlimite
 
   h2.sec { font-family: var(--font-display); font-size: clamp(40px, 5vw, 64px); color: var(--color-white); letter-spacing: 0.02em; line-height: 1; }
   .sec-wrap { max-width: 1280px; margin: 0 auto; padding: 32px; }</style>
-<section class="ph-hero">
+<section class="ph-hero hero-media">
   <div class="photo"></div>
   <div class="inner">
     <div class="eyebrow fade-up" style="margin-bottom:20px;">Membership  Range Fees</div>
@@ -124,9 +124,9 @@ $g2a_pricing_unlimited_text     = get_post_meta( $g2a_page_id, 'pricing_unlimite
   <div class="eyebrow" style="text-align:center; margin-bottom:14px;">Lane Pricing  Member vs. Guest</div>
   <h2 class="sec" style="text-align:center; margin-bottom: 28px;">How lane pricing works</h2>
   <div style="overflow-x:auto;">
-    <table style="width:100%; border-collapse: collapse; font-size: 15px; background:#1A1F26; border:1px solid var(--color-hairline);">
+    <table style="width:100%; border-collapse: collapse; font-size: 15px; background:var(--color-gunmetal); border:1px solid var(--color-hairline);">
       <thead>
-        <tr style="background:#11161D; color: var(--color-white); text-transform: uppercase; font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.18em;">
+        <tr style="background:var(--color-surface-2); color: var(--color-white); text-transform: uppercase; font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.18em;">
           <th style="padding:14px 16px; text-align:left; border-bottom:1px solid var(--color-hairline);">Plan</th>
           <th style="padding:14px 16px; text-align:left; border-bottom:1px solid var(--color-hairline);">Primary Member</th>
           <th style="padding:14px 16px; text-align:left; border-bottom:1px solid var(--color-hairline);">Per Extra Shooter</th>
@@ -142,21 +142,21 @@ $g2a_pricing_unlimited_text     = get_post_meta( $g2a_page_id, 'pricing_unlimite
         </tr>
         <tr>
           <td style="padding:14px 16px; border-bottom:1px solid var(--color-hairline);"><strong style="color:var(--color-white);">Defender</strong></td>
-          <td style="padding:14px 16px; border-bottom:1px solid var(--color-hairline); color:#9DE05B;">1 hr FREE</td>
+          <td style="padding:14px 16px; border-bottom:1px solid var(--color-hairline); color:var(--color-active);">1 hr FREE</td>
           <td style="padding:14px 16px; border-bottom:1px solid var(--color-hairline);">$15/hr each</td>
-          <td style="padding:14px 16px; border-bottom:1px solid var(--color-hairline);"><strong style="color:#9DE05B;">$30</strong> (you free + 2  $15)</td>
+          <td style="padding:14px 16px; border-bottom:1px solid var(--color-hairline);"><strong style="color:var(--color-active);">$30</strong> (you free + 2  $15)</td>
         </tr>
         <tr>
           <td style="padding:14px 16px; border-bottom:1px solid var(--color-hairline);"><strong style="color:var(--color-white);">Patriot</strong></td>
-          <td style="padding:14px 16px; border-bottom:1px solid var(--color-hairline); color:#9DE05B;">1 hr FREE</td>
+          <td style="padding:14px 16px; border-bottom:1px solid var(--color-hairline); color:var(--color-active);">1 hr FREE</td>
           <td style="padding:14px 16px; border-bottom:1px solid var(--color-hairline);">$10/hr each</td>
-          <td style="padding:14px 16px; border-bottom:1px solid var(--color-hairline);"><strong style="color:#9DE05B;">$20</strong> (you free + 2  $10)</td>
+          <td style="padding:14px 16px; border-bottom:1px solid var(--color-hairline);"><strong style="color:var(--color-active);">$20</strong> (you free + 2  $10)</td>
         </tr>
         <tr>
           <td style="padding:14px 16px;"><strong style="color:var(--color-white);">Guardian</strong></td>
-          <td style="padding:14px 16px; color:#9DE05B;">1 hr FREE</td>
+          <td style="padding:14px 16px; color:var(--color-active);">1 hr FREE</td>
           <td style="padding:14px 16px;">$10/hr each</td>
-          <td style="padding:14px 16px;"><strong style="color:#9DE05B;">$20</strong> (you free + 2  $10)</td>
+          <td style="padding:14px 16px;"><strong style="color:var(--color-active);">$20</strong> (you free + 2  $10)</td>
         </tr>
       </tbody>
     </table>

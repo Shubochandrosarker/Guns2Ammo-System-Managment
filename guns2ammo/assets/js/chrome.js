@@ -302,17 +302,69 @@
       setInterval(update, 60000);
     }
 
-    /* ===== Reveal on scroll ===== */
-    if ('IntersectionObserver' in window) {
+    /* ===== Reveal on scroll =====
+     * [data-reveal] fades/slides in when scrolled into view. Variants:
+     *   data-reveal="left" | "right" | "scale" | "fade" (CSS in app.css).
+     * Stagger: [data-reveal] children of a [data-reveal-group] get an
+     * incremental transition-delay (capped at 6 steps) so card grids
+     * cascade as one motion. After the entrance finishes, the inline
+     * delay is cleared and .did-reveal restores snappy hover physics.
+     */
+    var reduceMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    var REVEAL_STEP = 90, REVEAL_CAP = 5;
+    if (!reduceMotion) {
+      document.querySelectorAll('[data-reveal-group]').forEach(function (group) {
+        group.querySelectorAll('[data-reveal]').forEach(function (el, i) {
+          el.style.transitionDelay = (Math.min(i, REVEAL_CAP) * REVEAL_STEP) + 'ms';
+        });
+      });
+    }
+    var revealDone = function (el) {
+      var delay = parseInt(el.style.transitionDelay, 10) || 0;
+      setTimeout(function () {
+        el.style.transitionDelay = '';
+        el.classList.add('did-reveal');
+      }, delay + 750);
+    };
+    if ('IntersectionObserver' in window && !reduceMotion) {
       var io = new IntersectionObserver(function (entries) {
         entries.forEach(function (en) {
-          if (en.isIntersecting) { en.target.classList.add('is-in'); io.unobserve(en.target); }
+          if (en.isIntersecting) {
+            en.target.classList.add('is-in');
+            revealDone(en.target);
+            io.unobserve(en.target);
+          }
         });
       }, { threshold: 0.12, rootMargin: '0px 0px -40px 0px' });
       document.querySelectorAll('[data-reveal]').forEach(function (el) { io.observe(el); });
     } else {
-      document.querySelectorAll('[data-reveal]').forEach(function (el) { el.classList.add('is-in'); });
+      document.querySelectorAll('[data-reveal]').forEach(function (el) { el.classList.add('is-in', 'did-reveal'); });
     }
+
+    /* ===== FAQ accordion (homepage "Common Questions") =====
+     * Delegated click on [data-faq-toggle] buttons — keyboard accessible
+     * for free (real <button>s), aria-expanded kept in sync, one item
+     * open at a time per list. Height animates via grid-template-rows
+     * (see .home-faq .faq-a in front-page.css).
+     */
+    document.addEventListener('click', function (e) {
+      var btn = e.target.closest('[data-faq-toggle]');
+      if (!btn) return;
+      var item = btn.closest('.faq-item');
+      if (!item) return;
+      var list = item.parentElement;
+      var wasOpen = item.classList.contains('open');
+      if (list) {
+        list.querySelectorAll('.faq-item.open').forEach(function (other) {
+          if (other === item) return;
+          other.classList.remove('open');
+          var b = other.querySelector('[data-faq-toggle]');
+          if (b) b.setAttribute('aria-expanded', 'false');
+        });
+      }
+      item.classList.toggle('open', !wasOpen);
+      btn.setAttribute('aria-expanded', wasOpen ? 'false' : 'true');
+    });
 
     /* ===== Lazy image fade-in ===== */
     document.querySelectorAll('img[loading="lazy"]').forEach(function (img) {

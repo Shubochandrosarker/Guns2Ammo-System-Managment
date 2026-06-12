@@ -272,3 +272,45 @@
       font-size: 10px !important; }
     .hero-scroll-wrap { display: none !important; }
   }
+
+  /* ============ LIGHT-MODE softening for decorative photo layers ============
+     These photos are background texture behind token-colored text (which
+     flips dark in light mode), so we fade the dark imagery back instead
+     of forcing on-media ink. */
+  html[data-theme="light"] .ca-band::before { opacity: 0.32; }
+  html[data-theme="light"] .story::before { opacity: 0.26; }
+
+  /* ============ COMMON QUESTIONS (homepage FAQ) ============ */
+  .home-faq { padding: 120px 32px; background: linear-gradient(180deg, var(--color-void) 0%, var(--color-surface-1) 100%); border-top: 1px solid var(--color-hairline); }
+  .home-faq .wrap { max-width: 880px; margin: 0 auto; }
+  .home-faq .head { text-align: center; margin-bottom: 48px; }
+  .home-faq .head h2 { font-family: var(--font-display); font-size: clamp(44px, 6vw, 80px); line-height: 0.95; letter-spacing: 0.01em; color: var(--color-white); margin: 20px 0 0; }
+  .home-faq .head h2 .a { color: var(--color-ember); }
+  .home-faq .head p { color: var(--color-fog); max-width: 52ch; margin: 18px auto 0; font-size: 15px; line-height: 1.7; }
+  .home-faq .faq-list { border-top: 1px solid var(--color-hairline-bright); }
+  .home-faq .faq-item { border-bottom: 1px solid var(--color-hairline-bright); transition: background 250ms var(--ease-std); }
+  .home-faq .faq-item.open { background: rgba(201,168,76,0.04); }
+  .home-faq .faq-q {
+    width: 100%; display: flex; align-items: center; justify-content: space-between; gap: 24px;
+    background: transparent; border: 0; cursor: pointer; text-align: left;
+    padding: 22px 8px;
+    font-family: var(--font-condensed); font-weight: 600; font-size: 18px;
+    color: var(--color-white); letter-spacing: 0.02em; text-transform: uppercase;
+    transition: color 200ms var(--ease-std);
+  }
+  .home-faq .faq-q:hover { color: var(--color-brass-bright); }
+  .home-faq .faq-q .chev { flex: 0 0 auto; width: 16px; height: 16px; color: var(--color-brass-bright); transition: transform 320ms var(--ease-out); }
+  .home-faq .faq-item.open .faq-q .chev { transform: rotate(180deg); }
+  /* Smooth open/close via animatable grid rows (no max-height hacks) */
+  .home-faq .faq-a { display: grid; grid-template-rows: 0fr; transition: grid-template-rows 360ms var(--ease-out); }
+  .home-faq .faq-item.open .faq-a { grid-template-rows: 1fr; }
+  .home-faq .faq-a > div { overflow: hidden; }
+  .home-faq .faq-a p { color: var(--color-fog); font-size: 15px; line-height: 1.7; margin: 0; padding: 0 8px 24px; max-width: 75ch; }
+  .home-faq .all-link { display: flex; justify-content: center; margin-top: 36px; }
+  @media (max-width: 600px) {
+    .home-faq { padding: 72px 16px; }
+    .home-faq .faq-q { font-size: 16px; padding: 18px 4px; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .home-faq .faq-a, .home-faq .faq-q .chev, .home-faq .faq-item { transition: none; }
+  }
