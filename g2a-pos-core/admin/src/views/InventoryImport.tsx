@@ -44,10 +44,18 @@ export default function InventoryImport() {
   const [markup, setMarkup] = useState(0);
   const [result, setResult] = useState<ImportResult | null>(null);
   const [err, setErr] = useState('');
+  const [loadErr, setLoadErr] = useState('');
 
-  useEffect(() => {
-    get<{ adapters: Adapter[] }>('/inventory/import/adapters').then((r) => setAdapters(r.adapters || []));
-  }, []);
+  const loadAdapters = async () => {
+    setLoadErr('');
+    try {
+      const r = await get<{ adapters: Adapter[] }>('/inventory/import/adapters');
+      setAdapters(r.adapters || []);
+    } catch (e) {
+      setLoadErr(errorMessage(e, 'Could not load distributor adapters'));
+    }
+  };
+  useEffect(() => { loadAdapters(); }, []); // eslint-disable-line
 
   async function readBase64(f: File): Promise<string> {
     return new Promise((resolve, reject) => {
@@ -114,6 +122,12 @@ export default function InventoryImport() {
         subtitle="Upload a distributor CSV. Auto-detects Lipsey's, RSR, Davidson's, Sports South. Dedupes by source + UPC + manufacturer SKU."
       />
 
+      {loadErr && (
+        <div className="mb-4 flex items-center justify-between rounded-lg border border-rose-300 bg-rose-50 px-4 py-3 text-sm text-rose-700 dark:border-rose-900 dark:bg-rose-900/20 dark:text-rose-300">
+          <span>{loadErr}</span>
+          <button className="btn-sm" onClick={loadAdapters}>Retry</button>
+        </div>
+      )}
       {err && <div className="mb-4 rounded-lg border border-rose-300 bg-rose-50 px-4 py-3 text-sm text-rose-700 dark:border-rose-900 dark:bg-rose-900/20 dark:text-rose-300">{err}</div>}
 
       <div className="card mb-4 p-5 space-y-4">

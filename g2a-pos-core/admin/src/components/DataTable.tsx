@@ -51,7 +51,7 @@ export default function DataTable<T extends object>({
   };
 
   return (
-    <div className="card overflow-hidden">
+    <div className="card w-full overflow-hidden">
       <div className="flex min-h-12 items-center justify-between border-b border-zinc-100 px-4 dark:border-zinc-800">
         <div className="text-sm font-medium text-zinc-700 dark:text-zinc-200">{caption || 'Records'}</div>
         <div className="badge-zinc">{loading ? 'Loading' : `${rows.length} ${rows.length === 1 ? 'record' : 'records'}`}</div>

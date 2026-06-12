@@ -21,6 +21,25 @@
     width: 100%;
     max-width: 100%;
   }
+  /* Full-width guard: every view root (direct child of <main>) and the React
+     root itself must span the whole content column. WP admin ships element
+     rules (and cached stale bundles shipped narrower layouts) that can leave
+     records tables at ~half width on wide screens; these ID-scoped rules make
+     the layout deterministic without affecting inner cards/grids. */
+  #g2a-pos-dashboard > div,
+  #g2a-pos-dashboard main {
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+  }
+  /* View roots are plain block divs and must not shrink-to-fit; keep
+     intentional inner caps (e.g. the Dashboard's centered max width). */
+  #g2a-pos-dashboard main > div {
+    min-width: 0;
+  }
+  #g2a-pos-dashboard main table {
+    width: 100%;
+  }
   /* WordPress admin forces #1d2327 (near-black) text on h1–h6 inside .wrap
      and on form controls, which makes our titles + input text unreadable in
      dark mode. Use ID-prefixed selectors so we beat WP's element selectors
