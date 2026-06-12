@@ -26,11 +26,19 @@ $g2a_mg4_desc           = get_post_meta( $g2a_page_id, 'mg_fourth_weapon_desc', 
   <div class="inner">
     <span class="eb-pill">Arizona's Premier Indoor Range  Mesa, AZ</span>
     <h1 class="hl-display">
-      SHOOT SMART.<br>
-      CARRY SAFE.<br>
-      <span class="a">TRAIN LIKE A PRO.</span>
+      <?php echo g2a_content( // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- g2a_content() returns wp_kses_post-escaped HTML.
+        'home_hero_headline',
+        'SHOOT SMART.<br>CARRY SAFE.<br><span class="a">TRAIN LIKE A PRO.</span>',
+        'textarea',
+        'Homepage — Hero headline'
+      ); ?>
     </h1>
-    <p class="lead">6-lane climate-controlled indoor range, FFL-licensed firearm sales, and NRA-certified training  all under one roof in Mesa. Walk in, book a lane, or shop Mesa's most-trusted arsenal.</p>
+    <p class="lead"><?php echo g2a_content( // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- esc_html applied inside g2a_content().
+      'home_hero_lead',
+      "6-lane climate-controlled indoor range, FFL-licensed firearm sales, and NRA-certified training  all under one roof in Mesa. Walk in, book a lane, or shop Mesa's most-trusted arsenal.",
+      'text',
+      'Homepage — Hero lead paragraph'
+    ); ?></p>
     <div class="ctas">
       <a class="btn btn-ember btn-arrow" href="<?php echo esc_url( home_url( "/book-a-lane/" ) ); ?>">Book A Lane</a>
       <a class="btn btn-ghost" href="<?php echo esc_url( home_url( "/shop/" ) ); ?>">Shop Collections</a>
@@ -122,7 +130,13 @@ $g2a_mg4_desc           = get_post_meta( $g2a_page_id, 'mg_fourth_weapon_desc', 
     </div>
     <div class="right">
       <div class="photo-card">
-        <div class="ph"></div>
+        <?php
+        // Editable photo slot — real arsenal-wall photo by default; if the
+        // client clears the URL the original CSS placeholder background in
+        // front-page.css still renders, so the card never looks broken.
+        $g2a_mg_photo = g2a_content( 'home_mg_photo', g2a_asset( 'img/gallery/guns2ammo-arsenal-wall.jpg' ), 'image', 'Homepage — Machine gun section photo' );
+        ?>
+        <div class="ph"<?php if ( $g2a_mg_photo ) : ?> style="background-image:linear-gradient(180deg, rgba(0,0,0,0.1), rgba(0,0,0,0.4)), url('<?php echo esc_url( $g2a_mg_photo ); ?>');"<?php endif; ?>></div>
         <span class="cap"> The Arsenal </span>
       </div>
       <div class="arsenal-grid">
@@ -312,7 +326,12 @@ $g2a_week_order = array( 1, 2, 3, 4, 5, 6, 0 );
         <a class="btn btn-ghost" href="<?php echo esc_url( g2a_biz_tel_href() ); ?>"><?php printf( esc_html__( 'Call %s', 'guns2ammo' ), esc_html( $g2a_biz['phone'] ) ); ?></a>
       </div>
     </div>
-    <div class="visit-photo">
+    <?php
+    // Editable photo slot — real retail-floor photo by default; falls back
+    // to the stock background baked into front-page.css when cleared.
+    $g2a_visit_photo = g2a_content( 'home_visit_photo', g2a_asset( 'img/gallery/guns2ammo-retail-floor.jpg' ), 'image', 'Homepage — Visit section photo' );
+    ?>
+    <div class="visit-photo"<?php if ( $g2a_visit_photo ) : ?> style="background-image:linear-gradient(180deg, rgba(0,0,0,0.1), rgba(0,0,0,0.5)), url('<?php echo esc_url( $g2a_visit_photo ); ?>');"<?php endif; ?>>
       <span class="badge"> Main Floor</span>
     </div>
   </div>
@@ -433,8 +452,18 @@ $g2a_week_order = array( 1, 2, 3, 4, 5, 6, 0 );
 <section class="final">
   <div class="wrap">
     <span class="eb-pill" style="margin: 0 auto;">Mesa's Most-Trusted Range</span>
-    <h2>READY TO<br><span class="a">SHOOT?</span></h2>
-    <p>Book a lane, enroll in a course, or stop by the shop. We're open seven days a week and there's always an RSO on duty.</p>
+    <h2><?php echo g2a_content( // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- g2a_content() returns wp_kses_post-escaped HTML.
+      'home_final_cta_heading',
+      'READY TO<br><span class="a">SHOOT?</span>',
+      'textarea',
+      'Homepage — Final CTA heading'
+    ); ?></h2>
+    <p><?php echo g2a_content( // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- esc_html applied inside g2a_content().
+      'home_final_cta_text',
+      "Book a lane, enroll in a course, or stop by the shop. We're open seven days a week and there's always an RSO on duty.",
+      'text',
+      'Homepage — Final CTA paragraph'
+    ); ?></p>
     <div class="ctas">
       <a class="btn btn-ember btn-arrow" href="<?php echo esc_url( home_url( "/book-a-lane/" ) ); ?>">Book A Lane</a>
       <a class="btn btn-ghost" href="<?php echo esc_url( home_url( "/memberships/" ) ); ?>">Become a Member</a>

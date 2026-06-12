@@ -148,6 +148,9 @@ require_once G2A_DIR . '/inc/woocommerce.php';
 /* ---------- Customizer image fields (light) ---------- */
 require_once G2A_DIR . '/inc/customizer.php';
 
+/* ---------- Client content editing (Appearance → Site Content) ---------- */
+require_once G2A_DIR . '/inc/site-content.php';
+
 /* ---------- AEO / GEO layer (schema + llms.txt) ---------- */
 require_once G2A_DIR . '/inc/aeo.php';
 

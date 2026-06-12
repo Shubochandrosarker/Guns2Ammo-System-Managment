@@ -86,7 +86,12 @@ get_header();
   <div class="c">
     <span class="eyebrow"> Since 2014  Mesa, AZ</span>
     <h1 style="margin-top: 22px;">MORE THAN<br>A RANGE.<br>A TRAINING <span class="a">INSTITUTION.</span></h1>
-    <p>What started as one couple's range  opened with a simple promise that every shooter, beginner or veteran, would be treated with the same respect  has grown into Mesa's premier indoor facility. We've trained 5,000+ students, served church security teams, certified law enforcement, and helped first-time buyers walk out confident.</p>
+    <p><?php echo g2a_content( // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- esc_html applied inside g2a_content().
+      'about_story',
+      "What started as one couple's range  opened with a simple promise that every shooter, beginner or veteran, would be treated with the same respect  has grown into Mesa's premier indoor facility. We've trained 5,000+ students, served church security teams, certified law enforcement, and helped first-time buyers walk out confident.",
+      'text',
+      'About — Story paragraph'
+    ); ?></p>
   </div>
 </header>
 
@@ -157,8 +162,24 @@ get_header();
     <div class="team-grid" data-reveal-stagger>
       <?php foreach ( $g2a_team as $g2a_member ) : ?>
         <div class="member g2a-lift">
-          <?php if ( ! empty( $g2a_member['photo'] ) ) : ?>
-            <div class="photo" style="background-image:url('<?php echo esc_url( $g2a_member['photo'] ); ?>');background-size:cover;background-position:center;"></div>
+          <?php
+          /* Per-member editable headshot slot (Appearance → Site Content).
+             Priority: roster photo from inc/instructors.php → client
+             override → the original data-pl placeholder. No stock default
+             here on purpose: a range photo is not a headshot. */
+          $g2a_member_photo = ! empty( $g2a_member['photo'] ) ? $g2a_member['photo'] : '';
+          $g2a_member_slot  = g2a_content(
+            'about_team_photo_' . sanitize_title( $g2a_member['name'] ),
+            '',
+            'image',
+            'About — Team photo: ' . $g2a_member['name']
+          );
+          if ( ! $g2a_member_photo && $g2a_member_slot ) {
+            $g2a_member_photo = $g2a_member_slot;
+          }
+          ?>
+          <?php if ( $g2a_member_photo ) : ?>
+            <div class="photo" style="background-image:url('<?php echo esc_url( $g2a_member_photo ); ?>');background-size:cover;background-position:center;"></div>
           <?php else : ?>
             <div class="photo" data-pl="<?php echo esc_attr( strtoupper( $g2a_member['name'] ) ); ?>"></div>
           <?php endif; ?>
@@ -178,12 +199,25 @@ get_header();
     <span class="eyebrow"> Facility</span>
     <h2>BUILT FOR PRECISION.</h2>
     <p style="color: var(--color-fog); max-width:64ch; margin: 0 0 32px;">Six 25-yard climate-controlled lanes. Smart ventilation rated for 12 air changes per hour. A retail floor stocked like a working operator's closet, not a sporting goods aisle.</p>
+    <?php
+    /* Facility tour — real brand photos, each one editable from
+       Appearance → Site Content. Clearing a URL gracefully falls back to
+       the original striped placeholder defined in the .photo CSS above. */
+    $g2a_tour_slots = array(
+      array( 'about_tour_01', g2a_asset( 'img/gallery/guns2ammo-range-lanes-mesa.jpg' ),  'About — Tour photo 01 (The Line)',  '01  The Line',  'Six 25-yard climate-controlled lanes' ),
+      array( 'about_tour_02', g2a_asset( 'img/gallery/guns2ammo-handgun-counter.jpg' ),   'About — Tour photo 02 (Retail)',    '02  Retail',    'Curated handguns &amp; rifles' ),
+      array( 'about_tour_03', g2a_asset( 'img/gallery/guns2ammo-training-class.jpg' ),    'About — Tour photo 03 (Classroom)', '03  Classroom', 'CCW &amp; safety courses' ),
+      array( 'about_tour_04', g2a_asset( 'img/gallery/guns2ammo-rifle-wall.jpg' ),        'About — Tour photo 04 (Armory)',    '04  Armory',    'The rental machine guns' ),
+      array( 'about_tour_05', g2a_asset( 'img/gallery/guns2ammo-retail-floor.jpg' ),      'About — Tour photo 05 (Lounge)',    '05  Lounge',    'Members &amp; guests' ),
+    );
+    ?>
     <div class="tour-grid">
-      <div class="photo"><div class="cap"><small>01  The Line</small>Six 25-yard climate-controlled lanes</div></div>
-      <div class="photo"><div class="cap"><small>02  Retail</small>Curated handguns &amp; rifles</div></div>
-      <div class="photo"><div class="cap"><small>03  Classroom</small>CCW &amp; safety courses</div></div>
-      <div class="photo"><div class="cap"><small>04  Armory</small>The rental machine guns</div></div>
-      <div class="photo"><div class="cap"><small>05  Lounge</small>Members &amp; guests</div></div>
+      <?php foreach ( $g2a_tour_slots as $g2a_slot ) :
+        list( $g2a_slot_key, $g2a_slot_default, $g2a_slot_label, $g2a_slot_small, $g2a_slot_cap ) = $g2a_slot;
+        $g2a_slot_url = g2a_content( $g2a_slot_key, $g2a_slot_default, 'image', $g2a_slot_label );
+      ?>
+      <div class="photo"<?php if ( $g2a_slot_url ) : ?> style="background-image:linear-gradient(180deg, rgba(26,25,30,0.25), rgba(26,25,30,0.75)), url('<?php echo esc_url( $g2a_slot_url ); ?>');background-size:cover;background-position:center;"<?php endif; ?>><div class="cap"><small><?php echo esc_html( $g2a_slot_small ); ?></small><?php echo wp_kses_post( $g2a_slot_cap ); ?></div></div>
+      <?php endforeach; ?>
     </div>
   </div>
 </section>
