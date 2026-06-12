@@ -231,7 +231,7 @@ final class WooProductScanner {
 	 * Upsert one WC product into identity graph + barcode index + inventory
 	 * snapshot. Idempotent — re-running is a no-op unless data changed.
 	 *
-	 * @param \WC_Product $product
+	 * @param object $product WC_Product instance (untyped — WooCommerce may be absent).
 	 */
 	public static function sync_product( $product ): array {
 		$pid  = (int) $product->get_id();

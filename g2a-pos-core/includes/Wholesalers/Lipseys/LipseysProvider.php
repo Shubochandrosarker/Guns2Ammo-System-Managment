@@ -35,6 +35,89 @@ final class LipseysProvider extends AbstractWholesalerProvider {
 		return $importer->import( $wholesalerId, $absoluteFilePath, $options );
 	}
 
+	/**
+	 * Full catalog sync over the API (GET /api/Integration/Items/CatalogFeed)
+	 * — no CSV upload required. Upserts every item into wholesaler_products
+	 * using the same normalized mapping as the CSV importer.
+	 */
+	public function importCatalogApi( int $wholesalerId, array $options = array() ): array {
+		$client = $this->client( $wholesalerId );
+		if ( ! $client ) {
+			return array(
+				'ok'    => false,
+				'error' => 'credentials_missing',
+			);
+		}
+		try {
+			$feed = $client->fetchCatalog();
+		} catch ( \Throwable $e ) {
+			return array(
+				'ok'    => false,
+				'error' => $e->getMessage(),
+			);
+		}
+		if ( (int) ( $feed['_status'] ?? 200 ) !== 200 ) {
+			return array(
+				'ok'    => false,
+				'error' => 'catalog_feed_http_' . (int) $feed['_status'],
+			);
+		}
+		$items = $feed['data'] ?? $feed['Items'] ?? $feed['items'] ?? array();
+		if ( ! is_array( $items ) ) {
+			return array(
+				'ok'    => false,
+				'error' => 'unexpected_response_shape',
+			);
+		}
+
+		$productRepo = new WholesalerProductRepository();
+		$now         = current_time( 'mysql' );
+		$stats       = array(
+			'rows_total'   => 0,
+			'rows_created' => 0,
+			'rows_updated' => 0,
+			'rows_skipped' => 0,
+			'rows_failed'  => 0,
+			'errors'       => array(),
+		);
+
+		foreach ( $items as $item ) {
+			if ( ! is_array( $item ) ) {
+				continue;
+			}
+			++$stats['rows_total'];
+			try {
+				$mapped = LipseysCatalogMapper::mapApiItem( $item );
+				$sku    = (string) ( $mapped['vendor_sku'] ?? '' );
+				if ( $sku === '' ) {
+					++$stats['rows_skipped'];
+					continue;
+				}
+				$mapped['wholesaler_id'] = $wholesalerId;
+				$mapped['last_seen_at']  = $now;
+
+				$result = $productRepo->upsert( $mapped );
+				if ( $result === 'created' ) {
+					++$stats['rows_created'];
+				} elseif ( $result === 'updated' ) {
+					++$stats['rows_updated'];
+				} else {
+					++$stats['rows_skipped'];
+				}
+			} catch ( \Throwable $e ) {
+				++$stats['rows_failed'];
+				if ( count( $stats['errors'] ) < 20 ) {
+					$stats['errors'][] = $e->getMessage();
+				}
+			}
+		}
+
+		return array(
+			'ok'    => true,
+			'stats' => $stats,
+		);
+	}
+
 	public function syncInventory( int $wholesalerId, array $options = array() ): array {
 		$client = $this->client( $wholesalerId );
 		if ( ! $client ) {

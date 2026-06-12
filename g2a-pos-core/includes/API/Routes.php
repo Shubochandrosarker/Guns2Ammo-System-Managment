@@ -53,6 +53,35 @@ final class Routes {
 			)
 		);
 
+		// --- v3.1.0 — WooCommerce product backfill scanner ---
+		register_rest_route(
+			'g2a-pos/v1',
+			'/woo/scan',
+			array(
+				'methods'             => 'POST',
+				'callback'            => array( WooScanController::class, 'scan' ),
+				'permission_callback' => static fn() => current_user_can( 'g2a_pos_manage_inventory' ),
+			)
+		);
+		register_rest_route(
+			'g2a-pos/v1',
+			'/woo/scan',
+			array(
+				'methods'             => 'GET',
+				'callback'            => array( WooScanController::class, 'status' ),
+				'permission_callback' => static fn() => current_user_can( 'g2a_pos_manage_inventory' ),
+			)
+		);
+		register_rest_route(
+			'g2a-pos/v1',
+			'/woo/scan/status',
+			array(
+				'methods'             => 'GET',
+				'callback'            => array( WooScanController::class, 'status' ),
+				'permission_callback' => static fn() => current_user_can( 'g2a_pos_manage_inventory' ),
+			)
+		);
+
 		register_rest_route(
 			'g2a-pos/v1',
 			'/orders',
@@ -1137,6 +1166,15 @@ final class Routes {
 		);
 		register_rest_route(
 			'g2a-pos/v1',
+			'/wholesalers/(?P<wholesaler_id>\d+)/catalog/api-sync',
+			array(
+				'methods'             => 'POST',
+				'callback'            => array( WholesalerController::class, 'sync_catalog_api' ),
+				'permission_callback' => static fn() => current_user_can( 'g2a_pos_manage_wholesalers' ) || current_user_can( 'g2a_pos_manage_inventory' ),
+			)
+		);
+		register_rest_route(
+			'g2a-pos/v1',
 			'/wholesalers/(?P<wholesaler_id>\d+)/inventory/sync',
 			array(
 				'methods'             => 'POST',
@@ -1389,6 +1427,15 @@ final class Routes {
 		);
 
 		// --- v0.9.0 — CRM ---
+		register_rest_route(
+			'g2a-pos/v1',
+			'/crm/export',
+			array(
+				'methods'             => 'GET',
+				'callback'            => array( CrmController::class, 'export' ),
+				'permission_callback' => static fn() => current_user_can( 'g2a_pos_manage_crm' ),
+			)
+		);
 		register_rest_route(
 			'g2a-pos/v1',
 			'/crm/search',
@@ -2630,6 +2677,15 @@ final class Routes {
 				'methods'             => 'DELETE',
 				'callback'            => array( AiController::class, 'brain_delete' ),
 				'permission_callback' => static fn() => current_user_can( 'g2a_pos_manage_ai' ),
+			)
+		);
+		register_rest_route(
+			'g2a-pos/v1',
+			'/ai/knowledge/refresh',
+			array(
+				'methods'             => 'POST',
+				'callback'            => array( AiController::class, 'knowledge_refresh' ),
+				'permission_callback' => static fn() => current_user_can( 'g2a_pos_manage_ai' ) || current_user_can( 'g2a_pos_manage_settings' ),
 			)
 		);
 		register_rest_route(

@@ -34,8 +34,9 @@
 - **Newsletter welcome email** (WPistic CF): premium branded shell (logo header, brass rules, ember CTA, preheader) on `wpcf_newsletter_subscribed`, deduped, toggle + subject settings, reusable `WPISTIC_CF_Emails::wrap()` for future emails.
 - **Redirects**: 2023 cannibal post 301, contact.html/shop.html legacy fixes, ~20-entry guessed-URL → money-page map.
 
-## Still open (next round)
-- POS: WooCommerce product backfill/scan, customer CSV export, Lipsey's API audit, AI default knowledge seeding, FFL/waiver data on customer profiles.
-- Full per-page titles/metas + AZ CCW page 1,200-word rebuild + Ladies Tuesday copy rewrite (facts are fixed; the long-form copy build-out from 04OPT1.MD remains).
-- Booking plugin frontend calendar glass-polish pass and banner art directions per event type.
-- Theme dynamic content editing system (client-editable sections).
+## Round 2 completion (same day, follow-up commits)
+- **POS 3.1.0**: batched WooCommerce product scanner → identity graph + barcode index + inventory ledger (REST `POST /woo/scan`, daily cron, save-hooks, runs on upgrade); customer profile payload now carries membership, bookings, waiver status, and FFL transfers; `GET /crm/export` streams a full customer CSV; Lipsey's API verified correct and the unused CatalogFeed endpoint wired into a new `POST /wholesalers/{id}/catalog/api-sync`; AI brain seeded by default with the complete business knowledge (5 static + 3 dynamic docs, weekly refresh + `POST /ai/knowledge/refresh`) so the agent answers grounded questions with any model from first install. 196/196 unit tests pass.
+- **SEO**: per-page titles + metas for 24 URLs from the content plan; boilerplate fallback removed; author meta = Guns 2 Ammo.
+- **AZ CCW page**: rebuilt to ~2,000 words — two-course structure ($85 classroom / $149.99 live-fire), §13-3112 explainer, DPS timeline, instructors, FAQ + Course/HowTo/FAQPage schema, reservation form.
+- **Ladies Tuesday**: every internal/CYA line and CMS leak removed, free-hour H1, weekly Event schema, first-timer steps.
+- **Client content editing**: Appearance → Site Content admin page; self-registering `g2a_content()` text/image slots wired across homepage/about/machine-gun; 10 real brand photos shipped as editable defaults.

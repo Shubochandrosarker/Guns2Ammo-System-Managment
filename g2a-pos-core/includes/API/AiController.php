@@ -173,6 +173,11 @@ final class AiController {
 		);
 	}
 
+	/** POST /ai/knowledge/refresh — re-sync the site-default knowledge documents. */
+	public static function knowledge_refresh( WP_REST_Request $request ) {
+		return \G2A\POS\Ai\DefaultKnowledgeSeeder::refresh();
+	}
+
 	public static function audit_recent( WP_REST_Request $request ) {
 		return array( 'items' => ( new AiAuditRepository() )->recent( (int) ( $request->get_param( 'limit' ) ?: 100 ) ) );
 	}

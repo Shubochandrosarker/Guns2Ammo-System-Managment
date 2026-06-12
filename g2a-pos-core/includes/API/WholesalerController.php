@@ -145,6 +145,36 @@ final class WholesalerController {
 		return new WP_REST_Response( $result );
 	}
 
+	/**
+	 * POST /wholesalers/{id}/catalog/api-sync — full catalog pull over the
+	 * provider's API (currently Lipsey's CatalogFeed), no CSV upload needed.
+	 */
+	public static function sync_catalog_api( WP_REST_Request $req ) {
+		$wholesalerId = (int) $req->get_param( 'wholesaler_id' );
+		$repoW        = new WholesalerRepository();
+		$w            = $repoW->find( $wholesalerId );
+		if ( ! $w ) {
+			return new WP_Error( 'not_found', 'Wholesaler not found', array( 'status' => 404 ) );
+		}
+		$provider = WholesalerRegistry::get( (string) $w['provider_code'] );
+		if ( ! $provider || ! $provider->supportsApi() || ! method_exists( $provider, 'importCatalogApi' ) ) {
+			return new WP_Error( 'unsupported', 'Provider does not support API catalog sync', array( 'status' => 400 ) );
+		}
+		$result = $provider->importCatalogApi( $wholesalerId );
+		if ( empty( $result['ok'] ) ) {
+			return new WP_Error(
+				'catalog_sync_failed',
+				(string) ( $result['error'] ?? 'unknown' ),
+				array(
+					'status' => 502,
+					'detail' => $result,
+				)
+			);
+		}
+		$repoW->markSyncedNow( $wholesalerId );
+		return new WP_REST_Response( $result );
+	}
+
 	public static function sync_inventory( WP_REST_Request $req ) {
 		$wholesalerId = (int) $req->get_param( 'wholesaler_id' );
 		$repoW        = new WholesalerRepository();
