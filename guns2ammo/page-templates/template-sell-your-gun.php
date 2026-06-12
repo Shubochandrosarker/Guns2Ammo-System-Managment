@@ -51,16 +51,16 @@ if ( function_exists( 'g2a_faq_schema' ) && function_exists( 'g2a_emit_jsonld' )
 ?>
 <style>
 .sg-hero { padding:140px 32px 80px; position:relative; overflow:hidden; }
-.sg-hero::before { content:""; position:absolute; inset:0; pointer-events:none; background-image: linear-gradient(180deg, rgba(26,25,30,0.82), rgba(26,25,30,0.97)), url('<?php echo esc_url( $img . '2025/06/Sig-Suer-P320-Custom-works-Guns2ammo-mesa-az.JPG-rotated.webp' ); ?>'); background-size:cover; background-position:center; }
+.sg-hero::before { content:""; position:absolute; inset:0; pointer-events:none; background-image: linear-gradient(180deg, var(--hero-scrim), var(--hero-scrim-deep)), url('<?php echo esc_url( g2a_asset( 'img/guns2ammo-handgun-counter-mesa.jpg' ) ); ?>'); background-size:cover; background-position:center; }
 .sg-hero::after { content:""; position:absolute; inset:0; pointer-events:none; background: radial-gradient(ellipse at 75% 35%, rgba(201,168,76,0.14), transparent 60%); }
 .sg-hero .c { position:relative; max-width:1180px; margin:0 auto; }
-.sg-hero h1 { font-family: var(--font-display); font-size: clamp(56px,9vw,128px); line-height:0.88; color: var(--color-white); margin:14px 0 0; }
-.sg-hero h1 .a { color: var(--color-brass-bright); }
-.sg-hero .lead { color: var(--color-fog); max-width:58ch; margin:22px 0 0; font-size:17px; line-height:1.7; }
+.sg-hero h1 { font-family: var(--font-display); font-size: clamp(56px,9vw,128px); line-height:0.88; color: var(--ink-on-media); margin:14px 0 0; }
+.sg-hero h1 .a { color: var(--brass-on-media); }
+.sg-hero .lead { color: var(--ink-on-media-dim); max-width:58ch; margin:22px 0 0; font-size:17px; line-height:1.7; }
 .sg-hero .ctas { display:flex; gap:12px; margin-top:30px; flex-wrap:wrap; }
 .sg-hero .trust { display:flex; gap:28px; flex-wrap:wrap; margin-top:36px; padding-top:28px; border-top:1px solid var(--color-hairline); }
-.sg-hero .trust .it { font-family: var(--font-mono); font-size:11px; letter-spacing:0.18em; text-transform:uppercase; color: var(--color-silver); }
-.sg-hero .trust .it strong { display:block; font-family: var(--font-display); font-size:32px; color: var(--color-brass-bright); letter-spacing:0.03em; margin-bottom:2px; }
+.sg-hero .trust .it { font-family: var(--font-mono); font-size:11px; letter-spacing:0.18em; text-transform:uppercase; color: var(--ink-on-media-faint); }
+.sg-hero .trust .it strong { display:block; font-family: var(--font-display); font-size:32px; color: var(--brass-on-media); letter-spacing:0.03em; margin-bottom:2px; }
 .sg-sec { max-width:1180px; margin:0 auto; padding:80px 32px; }
 .sg-sec h2 { font-family: var(--font-display); font-size: clamp(36px,5.5vw,72px); color: var(--color-white); line-height:0.98; letter-spacing:0.01em; }
 .sg-sec .intro { color: var(--color-fog); font-size:15px; line-height:1.8; max-width:66ch; margin-top:16px; }
@@ -91,7 +91,7 @@ if ( function_exists( 'g2a_faq_schema' ) && function_exists( 'g2a_emit_jsonld' )
 .sg-hp { position:absolute; left:-9999px; width:1px; height:1px; overflow:hidden; }
 </style>
 
-<header class="sg-hero">
+<header class="sg-hero hero-media">
   <div class="c">
     <span class="eyebrow">Sell Your Firearm  Mesa, Arizona</span>
     <h1>SELL YOUR GUN.<br>GET PAID <span class="a">FAIR.</span></h1>

@@ -122,8 +122,11 @@ html[data-theme="light"] .grid-bg {
 .hero-media.hero-media .eyebrow,
 .hero-media.hero-media .eb { color: var(--brass-on-media); }
 .hero-media.hero-media .eyebrow::before { background: var(--brass-on-media); }
-.hero-media.hero-media .eb-pill {
-  color: var(--brass-on-media);
+.hero-media.hero-media .eb-pill { color: var(--brass-on-media); }
+/* Light mode only: give the pill a translucent dark plate + visible
+   border so it separates from the photo (dark mode stays unchanged). */
+html[data-theme="light"] .hero-media .eb-pill,
+html[data-theme="light"] .hero-media .b-pill {
   border-color: rgba(220, 180, 95, 0.45);
   background: rgba(20, 19, 23, 0.35);
 }
@@ -136,8 +139,7 @@ html[data-theme="light"] .grid-bg {
 .hero-media.hero-media .bk-trust .it::before { color: var(--brass-on-media); }
 .hero-media.hero-media :is(.trust, .meta) .it { color: var(--ink-on-media-faint); }
 .hero-media.hero-media :is(.trust, .meta) .it strong { color: var(--brass-on-media); }
-.hero-media.hero-media .micro,
-.hero-media.hero-media .fine { color: var(--ink-on-media-faint); }
+.hero-media.hero-media .micro { color: var(--ink-on-media-faint); }
 /* Buttons over media: outline buttons keep light ink + visible borders */
 .hero-media.hero-media .btn { color: var(--ink-on-media); border-color: rgba(245, 244, 240, 0.38); }
 .hero-media.hero-media .btn-ghost { color: var(--ink-on-media); border-color: rgba(245, 244, 240, 0.45); }
@@ -591,7 +593,7 @@ html[data-theme="light"] .foot-map { border-color: var(--color-hairline); }
 .qv-backdrop.open .qv-modal { transform: scale(1) translateY(0); }
 @media (max-width:780px){ .qv-modal { grid-template-columns:1fr; } }
 .qv-image { aspect-ratio:1; background-image: linear-gradient(180deg, rgba(10,10,10,0.3), rgba(10,10,10,0.6)), repeating-linear-gradient(135deg, #1f1f23 0 14px, #18181b 14px 28px); position:relative; }
-.qv-image::after { content: attr(data-pl); position:absolute; bottom:14px; left:14px; font-family: var(--font-mono); font-size:10px; letter-spacing:0.22em; color: var(--color-silver); text-transform: uppercase; }
+.qv-image::after { content: attr(data-pl); position:absolute; bottom:14px; left:14px; font-family: var(--font-mono); font-size:10px; letter-spacing:0.22em; color: var(--ink-on-media-faint); text-transform: uppercase; }
 .qv-body { padding:36px; position:relative; }
 .qv-close { position:absolute; top:14px; right:14px; width:36px; height:36px; background:transparent; border:1px solid var(--color-hairline-bright); color: var(--color-white); cursor:pointer; font-size:18px; }
 .qv-brand { font-family: var(--font-mono); font-size:11px; letter-spacing:0.24em; color: var(--color-brass-bright); text-transform: uppercase; }

@@ -38,8 +38,8 @@ $g2a_ladies_events_shortcode    = get_post_meta( $g2a_page_id, 'ladies_upcoming_
   .lt-hero .badge-row { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 24px; }
   .lt-hero .b-pill {
     display: inline-flex; align-items: center; gap: 8px;
-    padding: 6px 12px; border: 1px solid rgba(220,180,95,0.45);
-    background: rgba(20,19,23,0.35);
+    padding: 6px 12px; border: 1px solid var(--color-brass-dim);
+    background: rgba(201,168,76,0.06);
     font-family: var(--font-mono); font-size: 10px; letter-spacing: 0.24em; color: var(--brass-on-media); text-transform: uppercase;
   }
   .lt-hero h1 { font-family: var(--font-display); font-size: clamp(64px, 9vw, 124px); line-height: 0.92; letter-spacing: 0.005em; color: var(--ink-on-media); margin: 0 0 22px; }

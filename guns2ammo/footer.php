@@ -147,8 +147,7 @@ $founded   = (int) $biz['founded_year'];
 				<iframe src="<?php echo esc_url( $g2a_map_src ); ?>"
 				        title="<?php echo esc_attr( sprintf( __( 'Map to Guns 2 Ammo, %1$s, %2$s', 'guns2ammo' ), $addr1, $addr2 ) ); ?>"
 				        loading="lazy"
-				        referrerpolicy="no-referrer-when-downgrade"
-				        aria-hidden="false"></iframe>
+				        referrerpolicy="no-referrer-when-downgrade"></iframe>
 				<span class="foot-map__ring" aria-hidden="true"></span>
 				<span class="foot-map__pin" aria-hidden="true">
 					<svg viewBox="0 0 30 38" fill="currentColor" stroke="rgba(20,19,23,0.55)" stroke-width="1" aria-hidden="true"><path d="M15 1C7.8 1 2 6.8 2 14c0 9.6 13 23 13 23s13-13.4 13-23C28 6.8 22.2 1 15 1z"/><circle cx="15" cy="14" r="5" fill="#1A191E" stroke="none"/></svg>
