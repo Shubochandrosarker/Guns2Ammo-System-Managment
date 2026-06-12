@@ -22,7 +22,7 @@ $g2a_lane_membership_pitch   = get_post_meta( $g2a_page_id, 'lane_membership_pit
       <span class="it">6 Lanes</span>
       <span class="it">RSO On Duty</span>
       <span class="it">Smart Ventilation</span>
-      <span class="it"><span class="dot-live"></span> 4 of 6 lanes open now</span>
+      <span class="it" data-lane-status hidden><span class="dot-live"></span> <span data-lane-status-label>Live lane status</span></span>
     </div>
   </div>
 </header>

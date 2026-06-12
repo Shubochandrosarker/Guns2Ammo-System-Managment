@@ -211,11 +211,11 @@ get_header();
     <span class="eyebrow"> FAQ</span>
     <h2 style="margin-top:18px;">QUESTIONS.</h2>
 
-    <details class="q"><summary>How long does a transfer take?<span class="ex">+</span></summary><div class="a">From when the seller ships, typically 35 business days for the firearm to arrive. Once it's here, the on-site portion takes about 15 minutes  most customers walk out the same visit.</div></details>
+    <details class="q"><summary>How long does a transfer take?<span class="ex">+</span></summary><div class="a">From when the seller ships, typically 3–5 business days for the firearm to arrive. Once it's here, the on-site portion takes about 15 minutes  most customers walk out the same visit.</div></details>
     <details class="q"><summary>What if my background check is delayed?<span class="ex">+</span></summary><div class="a">By federal law, we can transfer the firearm after 3 business days even without a NICS response  though we recommend waiting for a clear "proceed" before taking possession.</div></details>
     <details class="q"><summary>Do I need an appointment?<span class="ex">+</span></summary><div class="a">No. Walk in any time during business hours. We'll text you when your firearm arrives so you can plan.</div></details>
     <details class="q"><summary>Can I ship from any seller?<span class="ex">+</span></summary><div class="a">Almost always  we accept from major retailers, GunBroker, and private sellers nationwide. We do reserve the right to refuse a transfer at our discretion (e.g., suspect chain of custody).</div></details>
-    <details class="q"><summary>Do you do NFA transfers?<span class="ex">+</span></summary><div class="a">Yes  suppressors, SBRs, full-auto. NFA transfers carry a $100 service fee and require additional ATF paperwork. Plan on 69 months for the ATF to approve your tax stamp.</div></details>
+    <details class="q"><summary>Do you do NFA transfers?<span class="ex">+</span></summary><div class="a">Yes  suppressors, SBRs, full-auto. NFA transfers run $95 for suppressors/SBRs and $295 for full-auto and require additional ATF paperwork. Plan on 6–9 months for the ATF to approve your tax stamp.</div></details>
     <details class="q"><summary>What if I'm not from Arizona?<span class="ex">+</span></summary><div class="a">By federal law, handguns can only be transferred to residents of the state where the FFL is located. Long guns can transfer to most out-of-state residents  call us to confirm based on your home state.</div></details>
   </div>
 </section>

@@ -119,7 +119,7 @@ get_header();
         <div class="top"><div class="lvl"> Level 01  Beginner</div><div class="price">$95</div></div>
         <h3><a href="<?php echo esc_url( home_url( '/training/basic-handgun/' ) ); ?>" style="color:inherit;text-decoration:none;">BASIC HANDGUN</a></h3>
         <div class="lead">First-time shooters welcome. Grip, stance, sight alignment, trigger control, and your first 50 rounds on the range under 1:1 instruction.</div>
-        <div class="specs"><div class="s">Duration<strong>4 Hours</strong></div><div class="s">Class Size<strong>16</strong></div><div class="s">Prereq<strong>None</strong></div></div>
+        <div class="specs"><div class="s">Duration<strong>4 Hours</strong></div><div class="s">Class Size<strong>1–6</strong></div><div class="s">Prereq<strong>None</strong></div></div>
         <div class="acts"><a class="btn btn-brass btn-sm" href="<?php echo esc_url( home_url( '/training/basic-handgun/' ) ); ?>">View Course </a><span class="form-help">Member: $71.25</span></div>
       </div>
 
@@ -127,15 +127,15 @@ get_header();
         <div class="top"><div class="lvl"> Level 02  Certification</div><div class="price">$120</div></div>
         <h3><a href="<?php echo esc_url( home_url( '/arizona-ccw-certification/' ) ); ?>" style="color:inherit;text-decoration:none;">ARIZONA CCW</a></h3>
         <div class="lead">Full 8-hour state-approved certification course covering AZ statute, use-of-force, draw-from-concealment, and live-fire qualification.</div>
-        <div class="specs"><div class="s">Duration<strong>8 Hours</strong></div><div class="s">Class Size<strong>410</strong></div><div class="s">Prereq<strong>Basic</strong></div></div>
+        <div class="specs"><div class="s">Duration<strong>8 Hours</strong></div><div class="s">Class Size<strong>4–10</strong></div><div class="s">Prereq<strong>Basic</strong></div></div>
         <div class="acts"><a class="btn btn-brass btn-sm" href="<?php echo esc_url( home_url( '/arizona-ccw-certification/' ) ); ?>">View Course </a><span class="form-help">Member: $90.00</span></div>
       </div>
 
       <div class="course" data-reveal>
         <div class="top"><div class="lvl"> Level 03  Multi-State</div><div class="price">$175</div></div>
         <h3><a href="<?php echo esc_url( home_url( '/training/california-ccw/' ) ); ?>" style="color:inherit;text-decoration:none;">CALIFORNIA CCW</a></h3>
-        <div class="lead">CA non-resident certification meeting all California Penal Code 26165 training requirements. Bundle with AZ for 30+ states reciprocity.</div>
-        <div class="specs"><div class="s">Duration<strong>16 Hours</strong></div><div class="s">Class Size<strong>48</strong></div><div class="s">Prereq<strong>AZ CCW</strong></div></div>
+        <div class="lead">CA non-resident certification with live-fire qualification practice and preparation support — verify your county’s instructor-certification requirements with the CA DOJ first. Bundle with AZ for 37-state reciprocity.</div>
+        <div class="specs"><div class="s">Duration<strong>16 Hours</strong></div><div class="s">Class Size<strong>4–8</strong></div><div class="s">Prereq<strong>AZ CCW</strong></div></div>
         <div class="acts"><a class="btn btn-brass btn-sm" href="<?php echo esc_url( home_url( '/training/california-ccw/' ) ); ?>">View Course </a><span class="form-help">Member: $131.25</span></div>
       </div>
 
@@ -143,7 +143,7 @@ get_header();
         <div class="top"><div class="lvl"> Level 03  Specialty</div><div class="price">$249</div></div>
         <h3><a href="<?php echo esc_url( home_url( '/training/church-security/' ) ); ?>" style="color:inherit;text-decoration:none;">CHURCH SECURITY</a></h3>
         <div class="lead">Faith-based facility protection: threat assessment, plain-clothes carry, congregation safety planning, and coordinated team response.</div>
-        <div class="specs"><div class="s">Duration<strong>12 Hours</strong></div><div class="s">Class Size<strong>612</strong></div><div class="s">Prereq<strong>CCW</strong></div></div>
+        <div class="specs"><div class="s">Duration<strong>12 Hours</strong></div><div class="s">Class Size<strong>6–12</strong></div><div class="s">Prereq<strong>CCW</strong></div></div>
         <div class="acts"><a class="btn btn-brass btn-sm" href="<?php echo esc_url( home_url( '/training/church-security/' ) ); ?>">View Course </a><span class="form-help">Member: $186.75</span></div>
       </div>
 
@@ -159,7 +159,7 @@ get_header();
         <div class="top"><div class="lvl"> Level 04  Advanced</div><div class="price">$295</div></div>
         <h3><a href="<?php echo esc_url( home_url( '/training/defensive-pistol/' ) ); ?>" style="color:inherit;text-decoration:none;">DEFENSIVE PISTOL</a></h3>
         <div class="lead">Stress-fire drills, multiple targets, low-light, malfunction clearance, and force-on-force scenarios with airsoft conversions.</div>
-        <div class="specs"><div class="s">Duration<strong>10 Hours</strong></div><div class="s">Class Size<strong>48</strong></div><div class="s">Prereq<strong>CCW</strong></div></div>
+        <div class="specs"><div class="s">Duration<strong>10 Hours</strong></div><div class="s">Class Size<strong>4–8</strong></div><div class="s">Prereq<strong>CCW</strong></div></div>
         <div class="acts"><a class="btn btn-brass btn-sm" href="<?php echo esc_url( home_url( '/training/defensive-pistol/' ) ); ?>">View Course </a><span class="form-help">Member: $221.25</span></div>
       </div>
 
@@ -167,7 +167,7 @@ get_header();
         <div class="top"><div class="lvl"> Level 02  Beginner</div><div class="price">$115</div></div>
         <h3><a href="<?php echo esc_url( home_url( '/training/rifle-fundamentals/' ) ); ?>" style="color:inherit;text-decoration:none;">RIFLE FUNDAMENTALS</a></h3>
         <div class="lead">Master the AR-15 platform from the ground up  zeroing, marksmanship positions, reloads, and safe long-gun handling.</div>
-        <div class="specs"><div class="s">Duration<strong>5 Hours</strong></div><div class="s">Class Size<strong>16</strong></div><div class="s">Prereq<strong>None</strong></div></div>
+        <div class="specs"><div class="s">Duration<strong>5 Hours</strong></div><div class="s">Class Size<strong>1–6</strong></div><div class="s">Prereq<strong>None</strong></div></div>
         <div class="acts"><a class="btn btn-brass btn-sm" href="<?php echo esc_url( home_url( '/training/rifle-fundamentals/' ) ); ?>">View Course </a><span class="form-help">Member: $86.25</span></div>
       </div>
 
@@ -183,7 +183,7 @@ get_header();
         <div class="top"><div class="lvl"> Level 01  Youth</div><div class="price">$45</div></div>
         <h3><a href="<?php echo esc_url( home_url( '/training/youth-firearm-safety/' ) ); ?>" style="color:inherit;text-decoration:none;">YOUTH FIREARM SAFETY</a></h3>
         <div class="lead">An age-appropriate firearm-safety class for young people  what to do if they ever encounter a gun, with parents involved throughout.</div>
-        <div class="specs"><div class="s">Duration<strong>2 Hours</strong></div><div class="s">Class Size<strong>16</strong></div><div class="s">Prereq<strong>Guardian</strong></div></div>
+        <div class="specs"><div class="s">Duration<strong>2 Hours</strong></div><div class="s">Class Size<strong>1–6</strong></div><div class="s">Prereq<strong>Guardian</strong></div></div>
         <div class="acts"><a class="btn btn-brass btn-sm" href="<?php echo esc_url( home_url( '/training/youth-firearm-safety/' ) ); ?>">View Course </a><span class="form-help">Member: $33.75</span></div>
       </div>
     </div>
@@ -196,7 +196,7 @@ get_header();
     <div>
       <div class="ph2"> Featured Pathway</div>
       <h2>FROM NEW SHOOTER<br>TO <span class="a">DUAL-STATE</span> CARRIER</h2>
-      <p>Stack Basic Handgun  Arizona CCW  California Non-Resident in three weekends and walk away with reciprocity in 38 states. Members save $97 across the bundle.</p>
+      <p>Stack Basic Handgun  Arizona CCW  California Non-Resident in three weekends and walk away with reciprocity in 37 states. Members save $97 across the bundle.</p>
       <div style="display:flex; gap:10px; flex-wrap: wrap;">
         <a class="btn btn-brass" href="<?php echo esc_url( home_url( "/arizona-ccw-certification/" ) ); ?>">View CCW Pathway </a>
         <a class="btn btn-ghost" href="<?php echo esc_url( home_url( "/memberships/" ) ); ?>">Become A Member First</a>

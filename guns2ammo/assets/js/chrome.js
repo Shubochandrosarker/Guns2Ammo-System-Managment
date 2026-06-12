@@ -461,3 +461,25 @@
     });
   });
 })();
+
+/* Live lane status — replaces the old hard-coded "4 of 6 lanes open now"
+   badge with real data from the booking engine. Badges stay hidden unless
+   the endpoint answers successfully, so nothing fake is ever shown. */
+(function () {
+  var els = document.querySelectorAll('[data-lane-status]');
+  if (!els.length || !window.fetch) return;
+  fetch('/wp-json/g2a-booking/v1/lane-status', { headers: { Accept: 'application/json' } })
+    .then(function (r) { if (!r.ok) throw new Error('http ' + r.status); return r.json(); })
+    .then(function (j) {
+      var d = j && j.data;
+      if (!d || !d.label) return;
+      els.forEach(function (el) {
+        var label = el.querySelector('[data-lane-status-label]');
+        if (label) label.textContent = d.label;
+        var dot = el.querySelector('.dot-live');
+        if (dot && !d.is_open_now) dot.style.opacity = '0.35';
+        el.hidden = false;
+      });
+    })
+    .catch(function () { /* endpoint unavailable — badges stay hidden */ });
+})();

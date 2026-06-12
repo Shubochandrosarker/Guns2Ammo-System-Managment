@@ -118,16 +118,12 @@ function g2a_robots_body() {
 	}
 
 	$lines[] = '';
-	$lines[] = 'Crawl-delay: 1';
-	$lines[] = '';
 	$lines[] = '# Sitemap (theme-owned — NOT RankMath\'s sitemap_index.xml).';
 	$lines[] = 'Sitemap: ' . $site . '/sitemap.xml';
 	$lines[] = '';
 	$lines[] = '# AI grounding files (read by GPTBot, ClaudeBot, PerplexityBot…).';
-	$lines[] = '# Short index:';
-	$lines[] = $site . '/llms.txt';
-	$lines[] = '# Full text dump:';
-	$lines[] = $site . '/llms-full.txt';
+	$lines[] = '# Short index:    ' . $site . '/llms.txt';
+	$lines[] = '# Full text dump: ' . $site . '/llms-full.txt';
 
 	$extra = (array) apply_filters( 'g2a_robots_extra_lines', array() );
 	foreach ( $extra as $l ) {

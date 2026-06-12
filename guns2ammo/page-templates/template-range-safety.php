@@ -235,8 +235,8 @@ get_header();
       <div class="am-row"><div class="nm">FMJ Brass-Cased</div><div class="v">.22  .338 Lapua</div><div class="v">Preferred. Available at counter.</div><div class="ok"> Allowed</div></div>
       <div class="am-row"><div class="nm">JHP / Defense</div><div class="v">All standard pistol</div><div class="v">No problem on public range.</div><div class="ok"> Allowed</div></div>
       <div class="am-row"><div class="nm">Lead Round Nose</div><div class="v">.22, .38, .45 Cowboy</div><div class="v">Limit to pistol calibers.</div><div class="ok"> Allowed</div></div>
-      <div class="am-row"><div class="nm">Steel-Cased (Tula/Wolf)</div><div class="v">9mm, 7.6239</div><div class="v">Magnet test at counter.</div><div class="no"> Prohibited</div></div>
-      <div class="am-row"><div class="nm">Steel-Core / M855</div><div class="v">5.56, 7.6239</div><div class="v">Penetrates backstop.</div><div class="no"> Prohibited</div></div>
+      <div class="am-row"><div class="nm">Steel-Cased (Tula/Wolf)</div><div class="v">9mm, 7.62×39</div><div class="v">Magnet test at counter.</div><div class="no"> Prohibited</div></div>
+      <div class="am-row"><div class="nm">Steel-Core / M855</div><div class="v">5.56, 7.62×39</div><div class="v">Penetrates backstop.</div><div class="no"> Prohibited</div></div>
       <div class="am-row"><div class="nm">Tracer / API</div><div class="v">Any caliber</div><div class="v">Fire hazard. No exceptions.</div><div class="no"> Prohibited</div></div>
       <div class="am-row"><div class="nm">Reloads (Personal)</div><div class="v">Any caliber</div><div class="v">RO inspection required.</div><div class="ok"> With RO Approval</div></div>
     </div>

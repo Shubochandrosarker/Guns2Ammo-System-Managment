@@ -228,7 +228,7 @@ get_header();
         </div>
         <div class="contact-card">
           <div class="label">Range Status</div>
-          <div class="val"><span class="dot-live" style="margin-right:8px;"></span>OPEN  4 lanes free</div>
+          <div class="val" data-lane-status hidden><span class="dot-live" style="margin-right:8px;"></span><span data-lane-status-label>Live lane status</span></div>
         </div>
       </div>
       <div style="display:flex; gap:14px; margin-top: 32px; flex-wrap:wrap;">

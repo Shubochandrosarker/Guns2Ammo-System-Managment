@@ -90,7 +90,7 @@ get_header();
     <div class="nums">
       <div class="it">FFL Number<strong style="font-size: 22px; font-family: var(--font-mono); letter-spacing: 0.1em;">Available In Store</strong></div>
       <div class="it">SOT Class<strong>03</strong></div>
-      <div class="it">Active Since<strong>2018</strong></div>
+      <div class="it">Active Since<strong>2014</strong></div>
       <div class="it">Transfers Processed<strong>4,200+</strong></div>
     </div>
   </div>
@@ -203,12 +203,12 @@ get_header();
         <label class="form-label">Destination State</label>
         <select class="field"><option>Texas</option><option>California</option><option>Florida</option><option>New York</option><option>Other</option></select>
         <label class="form-label">Service</label>
-        <select class="field"><option>Ground (35 days)  $45</option><option>Express (Next Day)  $95</option></select>
+        <select class="field"><option>Ground (3–5 days)  $45</option><option>Express (Next Day)  $95</option></select>
         <div style="background: var(--color-gunmetal); padding: 14px 18px; margin-top: 14px; display:flex; justify-content: space-between; align-items: center;">
           <span style="font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.2em; color: var(--color-silver); text-transform: uppercase;">Estimated Total</span>
           <span style="font-family: var(--font-display); font-size: 28px; color: var(--color-brass-bright);">$45.00</span>
         </div>
-        <a class="btn btn-brass" style="width: 100%; margin-top: 16px;" href="contact.html?service=ship">Schedule Drop-Off </a>
+        <a class="btn btn-brass" style="width: 100%; margin-top: 16px;" href="<?php echo esc_url( home_url( '/contact/?service=ship' ) ); ?>">Schedule Drop-Off </a>
       </div>
     </div>
   </div>
@@ -222,8 +222,8 @@ get_header();
         <h2 style="margin-top: 8px;">CONSIGNMENT<br><span class="a">SALES</span></h2>
         <p>Bring in any firearm or accessory in working condition. We display, photograph, list across our network, and handle the sale + transfer. You keep 80% of the listed price.</p>
         <div style="display: flex; gap: 10px; flex-wrap: wrap;">
-          <a class="btn btn-brass" href="contact.html?service=consign">Request Appraisal</a>
-          <a class="btn btn-ghost" href="shop.html?filter=used">Browse Consignment Inventory</a>
+          <a class="btn btn-brass" href="<?php echo esc_url( home_url( '/contact/?service=consign' ) ); ?>">Request Appraisal</a>
+          <a class="btn btn-ghost" href="<?php echo esc_url( home_url( '/shop/' ) ); ?>">Browse Consignment Inventory</a>
         </div>
       </div>
       <div class="split-rate">

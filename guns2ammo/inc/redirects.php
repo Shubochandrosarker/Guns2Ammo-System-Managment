@@ -117,6 +117,8 @@ function g2a_redirect_map() {
 		'/memberistic-login/'        => '/login/',
 		'/memberistic-thank-you/'    => '/thank-you/',
 		'/memberistic-renewal/'      => '/renewal/',
+		// Old "best indoor range" post cannibalizes the new canonical asset.
+		'/explore-the-best-indoor-shooting-range-in-mesa-a-shooters-haven/' => '/shooting-range/best-indoor-shooting-range-in-mesa-az/',
 	) );
 }
 
@@ -143,6 +145,20 @@ function g2a_redirect_patterns() {
 		array(
 			'pattern' => '#^/hello-world(-\d+)?/?$#i',
 			'to'      => '/blog/',
+		),
+		// RankMath-style sitemap URL kept alive for old GSC submissions.
+		array(
+			'pattern' => '#^/sitemap_index\.xml$#i',
+			'to'      => '/sitemap.xml',
+		),
+		// Static-HTML leftovers from the original design files.
+		array(
+			'pattern' => '#^/contact\.html$#i',
+			'to'      => '/contact/',
+		),
+		array(
+			'pattern' => '#^/shop\.html$#i',
+			'to'      => '/shop/',
 		),
 	) );
 }

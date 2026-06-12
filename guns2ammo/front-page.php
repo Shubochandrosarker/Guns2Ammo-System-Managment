@@ -218,7 +218,7 @@ $g2a_mg4_desc           = get_post_meta( $g2a_page_id, 'mg_fourth_weapon_desc', 
         <div class="bg" style="background-image: linear-gradient(180deg, rgba(26,25,30,0.3), rgba(26,25,30,0.85)), url('<?php echo esc_url( g2a_asset( 'img/guns2ammo-store-counter-staff.jpg' ) ); ?>');"></div>
         <div class="scrim"></div>
         <div class="body">
-          <div class="cat">$25 Flat Fee</div>
+          <div class="cat">$35 Flat Fee</div>
           <h3>TRANSFERS</h3>
           <span class="more">Start </span>
         </div>
@@ -405,7 +405,7 @@ $g2a_week_order = array( 1, 2, 3, 4, 5, 6, 0 );
   <div class="wrap" data-reveal>
     <span class="eb-pill" style="margin: 0 auto;">Mesa's Most-Trusted Range</span>
     <h2>READY TO<br><span class="a">SHOOT?</span></h2>
-    <p>Book a lane, enroll in a course, or stop by the shop. We're open six days a week  Friday closed  and there's always an RSO on duty.</p>
+    <p>Book a lane, enroll in a course, or stop by the shop. We're open seven days a week and there's always an RSO on duty.</p>
     <div class="ctas">
       <a class="btn btn-ember btn-arrow" href="<?php echo esc_url( home_url( "/book-a-lane/" ) ); ?>">Book A Lane</a>
       <a class="btn btn-ghost" href="<?php echo esc_url( home_url( "/memberships/" ) ); ?>">Become a Member</a>

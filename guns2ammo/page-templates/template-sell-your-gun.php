@@ -104,7 +104,7 @@ if ( function_exists( 'g2a_faq_schema' ) && function_exists( 'g2a_emit_jsonld' )
       <div class="it"><strong>FFL</strong>Licensed Dealer</div>
       <div class="it"><strong>Same Day</strong>Offer Turnaround</div>
       <div class="it"><strong>Cash</strong>Or Boosted Trade Credit</div>
-      <div class="it"><strong>4.7</strong>449+ Mesa Reviews</div>
+      <div class="it"><strong><?php $b = g2a_biz(); echo esc_html( number_format( (float) $b['review_rating'], 1 ) ); ?></strong><?php echo esc_html( number_format_i18n( (int) $b['review_count'] ) ); ?> Mesa Reviews</div>
     </div>
   </div>
 </header>

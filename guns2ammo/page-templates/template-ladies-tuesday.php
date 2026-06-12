@@ -189,15 +189,15 @@ $g2a_ladies_events_shortcode    = get_post_meta( $g2a_page_id, 'ladies_upcoming_
             <span class="b-pill">No Membership Required</span>
             <span class="b-pill">Walk-Ins Welcome</span>
           </div>
-          <h1>Ladies <em>Tuesday.</em><br />Half Off The Lane.</h1>
-          <p class="sub"><?php echo esc_html( $g2a_ladies_hero_subtitle ? $g2a_ladies_hero_subtitle : 'Every Tuesday, women receive one free hour of lane time. No female RSO is advertised for this promotion. Whether it is your first time or your hundredth, this is your day.' ); ?></p>
+          <h1>Ladies <em>Tuesday.</em><br />Free Lane Hour, Every Tuesday.</h1>
+          <p class="sub"><?php echo esc_html( $g2a_ladies_hero_subtitle ? $g2a_ladies_hero_subtitle : 'Every Tuesday, women shoot free for one hour at Guns 2 Ammo. No membership needed, beginners welcome, and a Range Safety Officer is always on duty. Whether it is your first time or your hundredth, this is your day.' ); ?></p>
           <div class="actions">
             <a class="btn btn-ember btn-lg" href="#reserve">Reserve A Tuesday Lane </a>
             <a class="btn btn-brass btn-lg" href="#schedule">View Schedule</a>
           </div>
         </div>
         <aside class="lt-disc">
-          <div class="day">Tuesdays  All Day  10a6p</div>
+          <div class="day">Tuesdays · All Day · 10a–6p</div>
           <div class="pct"><em>FREE</em></div>
           <div class="lbl"><?php echo esc_html( $g2a_ladies_offer_text ? $g2a_ladies_offer_text : 'Free 1 Hour Lane Time For Women On Tuesdays' ); ?></div>
           <div class="fine">One free hour of lane time for women every Tuesday during open hours</div>
@@ -374,7 +374,7 @@ $g2a_ladies_events_shortcode    = get_post_meta( $g2a_page_id, 'ladies_upcoming_
           <details open><summary>Do I need to be a member?</summary><div class="answer">No. Ladies Tuesday is open to everyone  walk-ins and members. Members still get their member rate on rentals (the deeper discount applies).</div></details>
           <details><summary>Can my husband or boyfriend join me?</summary><div class="answer">Yes  your +1 gets the same Ladies Tuesday rate as long as you check in together. We don't gatekeep the discount.</div></details>
           <details><summary>I've never fired a gun. Is this for me?</summary><div class="answer"><?php echo esc_html( $g2a_ladies_no_female_rso_note ? $g2a_ladies_no_female_rso_note : 'Yes. First-time onboarding is available from on-duty range staff each Tuesday. We do not advertise a dedicated female RSO for this day.' ); ?></div></details>
-          <details><summary>Are there themed classes too?</summary><div class="answer">Upcoming Tuesday events are managed by staff and can be published through the events shortcode field in the page settings.</div></details>
+          <details><summary>Are there themed classes too?</summary><div class="answer">Yes — we regularly run women-focused intro clinics and themed Tuesday events. Check the schedule above or follow us on social for upcoming dates.</div></details>
           <details><summary>Can I book the whole range for a private group?</summary><div class="answer">Yes. Six-lane buyouts run $360 for a 90-minute window with a dedicated RSO. <a href="<?php echo esc_url( home_url( "/contact/" ) ); ?>" style="color: var(--color-brass-bright);">Email us</a> for bachelorette and birthday packages.</div></details>
           <details><summary>What should I wear?</summary><div class="answer">Closed-toe shoes, high-neck shirt (hot brass policy), no loose jewelry. Bring a hat if you have one. We have loaners for everything else.</div></details>
         </div>
@@ -411,7 +411,7 @@ $g2a_ladies_events_shortcode    = get_post_meta( $g2a_page_id, 'ladies_upcoming_
     <section class="lt-final">
       <div class="wrap">
         <div class="eyebrow" style="justify-content: center; margin-bottom: 8px;">See You Tuesday</div>
-        <h2>Half off the lane.<br />All of the <em>welcome.</em></h2>
+        <h2>A free hour on the lane.<br />All of the <em>welcome.</em></h2>
         <p>Every Tuesday is yours. Walk in, reserve ahead, or message us to set up a private group. We'll have your eye and ear set out.</p>
         <div class="row">
           <a class="btn btn-ember btn-lg" href="#reserve">Reserve A Tuesday Lane </a>

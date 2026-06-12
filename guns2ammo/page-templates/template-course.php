@@ -97,7 +97,7 @@ $courses = [
 		'audience'=> 'Women who are new to firearms, or returning after a bad first experience elsewhere.',
 		'faq'     => [
 			[ 'q' => 'Is the instructor a woman?', 'a' => 'Yes. This course is taught by our Women\'s Lead, who built our Tuesday Ladies program from a handful of students to 200+ active shooters.' ],
-			[ 'q' => 'Can I bring a friend?', 'a' => 'Please do. Class size is 14, so you and friends can train together in the same supportive group.' ],
+			[ 'q' => 'Can I bring a friend?', 'a' => 'Please do. Class size is 1–4, so you and friends can train together in the same supportive group.' ],
 			[ 'q' => 'What if I have never held a gun?', 'a' => 'That is exactly who this is for. We start at the very beginning and never make you feel rushed.' ],
 		],
 	],

@@ -166,7 +166,7 @@ $g2a_pricing_unlimited_text     = get_post_meta( $g2a_page_id, 'pricing_unlimite
 
 <div class="trust-row">
   <div class="ti"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="4" y="11" width="16" height="10" rx="1"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg><div><div class="t">Cancel Anytime</div><div class="s">No commitment</div></div></div>
-  <div class="ti"><svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2 L14.5 8.5 L21.5 9 L16 13.5 L17.7 20.5 L12 16.7 L6.3 20.5 L8 13.5 L2.5 9 L9.5 8.5 Z"/></svg><div><div class="t">4.7 Stars</div><div class="s">449+ reviews</div></div></div>
+  <div class="ti"><svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2 L14.5 8.5 L21.5 9 L16 13.5 L17.7 20.5 L12 16.7 L6.3 20.5 L8 13.5 L2.5 9 L9.5 8.5 Z"/></svg><div><div class="t"><?php $b = g2a_biz(); echo esc_html( number_format( (float) $b['review_rating'], 1 ) ); ?> Stars</div><div class="s"><?php echo esc_html( number_format_i18n( (int) $b['review_count'] ) ); ?> reviews</div></div></div>
   <div class="ti"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M3 12 L9 18 L21 6"/></svg><div><div class="t">No Lock-In</div><div class="s">Stop or pause</div></div></div>
   <div class="ti"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="3" y="5" width="18" height="16" rx="1"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="8" y1="3" x2="8" y2="7"/><line x1="16" y1="3" x2="16" y2="7"/></svg><div><div class="t">Book Online</div><div class="s">24/7 reservations</div></div></div>
 </div>

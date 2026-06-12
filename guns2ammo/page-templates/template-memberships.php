@@ -51,26 +51,26 @@ get_header();
   <p class="sub fade-up d2">Pick a plan, create your account, and shoot today. No contracts. No drama.</p>
 </section>
 
-<div class="toggle-state">
-  <div class="pill-set">
-    <button class="on" onclick="toggleState(false)">Visitor View</button>
-    <button onclick="toggleState(true)">Logged-In Preview</button>
-  </div>
-</div>
-
-<div class="lin" id="lin-block">
+<?php
+// Member hub strip — only for logged-in users with a real active
+// membership (no demo/preview data is ever shown to visitors).
+$g2a_member_active = is_user_logged_in()
+	&& ( ( function_exists( 'memberistic_user_has_active_membership' ) && memberistic_user_has_active_membership( get_current_user_id() ) )
+		|| ( function_exists( 'memberistic_is_active_member' ) && memberistic_is_active_member( get_current_user_id() ) ) );
+if ( $g2a_member_active ) : ?>
+<div class="lin show" id="lin-block">
   <div class="lin-card">
     <div>
       <div class="badge active no-dot" style="margin-bottom: 10px;"><span class="dot-live"></span> &nbsp;Active Member</div>
-      <div class="who">You're on the PATRIOT plan</div>
-      <div class="meta">Renews May 15, 2026  Visa  4242  2 people</div>
+      <div class="who"><?php esc_html_e( "You're an active member", 'guns2ammo' ); ?></div>
+      <div class="meta"><?php esc_html_e( 'Manage your plan, billing and linked members from your account.', 'guns2ammo' ); ?></div>
     </div>
     <div class="actions">
       <a class="btn btn-brass btn-sm" href="<?php echo esc_url( home_url( "/account/" ) ); ?>">Manage Plan</a>
-      <a class="btn btn-ember btn-sm" href="<?php echo esc_url( home_url( '/checkout/?memberistic_plan=guardian&upgrade=1' ) ); ?>">Upgrade To Guardian</a>
     </div>
   </div>
 </div>
+<?php endif; ?>
 
 <div class="toggle-row fade-up">
   <span style="font-family: var(--font-mono); font-size:11px; letter-spacing:0.24em; color: var(--color-silver); text-transform: uppercase;">Billing</span>
@@ -189,7 +189,7 @@ get_header();
 
 <div class="trust-strip">
   <span><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="4" y="11" width="16" height="10" rx="1"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg> Cancel Anytime</span>
-  <span><svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2 L14.5 8.5 L21.5 9 L16 13.5 L17.7 20.5 L12 16.7 L6.3 20.5 L8 13.5 L2.5 9 L9.5 8.5 Z"/></svg> 4.7 Stars  449+ Reviews</span>
+  <span><svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2 L14.5 8.5 L21.5 9 L16 13.5 L17.7 20.5 L12 16.7 L6.3 20.5 L8 13.5 L2.5 9 L9.5 8.5 Z"/></svg> <?php $b = g2a_biz(); echo esc_html( number_format( (float) $b['review_rating'], 1 ) ); ?> Stars · <?php echo esc_html( number_format_i18n( (int) $b['review_count'] ) ); ?> Reviews</span>
   <span><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 12 L9 18 L21 6"/></svg> No Lock-In</span>
   <span><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="5" width="18" height="16" rx="1"/><line x1="3" y1="9" x2="21" y2="9"/></svg> Book Online</span>
 </div>
@@ -226,10 +226,5 @@ get_header();
     document.querySelectorAll('.plan .btn').forEach(b => { b.textContent = annual ? 'Select Annual Plan' : 'Select Monthly Plan'; });
   }
   radios.forEach(r => r.addEventListener('change', updatePrices));
-
-  function toggleState(loggedIn) {
-    document.getElementById('lin-block').classList.toggle('show', loggedIn);
-    document.querySelectorAll('.toggle-state .pill-set button').forEach((b,i) => b.classList.toggle('on', i === (loggedIn ? 1 : 0)));
-  }
 </script>
 <?php get_footer();

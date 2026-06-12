@@ -64,7 +64,7 @@ $nav = [
 		[ 'label' => 'Knowledge Hub',      'href' => home_url( '/blog/' ),                          'meta' => 'ALL' ],
 		[ 'label' => 'CCW & Carry Laws',   'href' => home_url( '/category/ccw/' ),                  'meta' => '04' ],
 		[ 'label' => 'Range Safety',       'href' => home_url( '/category/safety/' ),               'meta' => '06' ],
-		[ 'label' => 'Beginner Guides',    'href' => home_url( '/category/beginners/' ),            'meta' => '03' ],
+		[ 'label' => 'Beginner Guides',    'href' => home_url( '/blog/' ),            'meta' => '03' ],
 		[ 'label' => 'Gear Reviews',       'href' => home_url( '/category/gear/' ),                 'meta' => '05' ],
 	] ],
 	[ 'label' => 'About',      'href' => home_url( '/about/' ), 'sub' => [
