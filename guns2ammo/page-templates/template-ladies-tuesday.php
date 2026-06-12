@@ -264,7 +264,7 @@ $g2a_ladies_events_shortcode = get_post_meta( $g2a_page_id, 'ladies_upcoming_eve
           <h1>Ladies <em>Tuesday</em> —<br />Free Lane Time,<br />Every Tuesday.</h1>
           <p class="sub"><?php echo esc_html( $g2a_ladies_hero_subtitle ? $g2a_ladies_hero_subtitle : 'Every Tuesday at our Mesa gun range, women shoot free for one hour. No membership needed, rentals are 25% off, and beginners are always welcome — a range safety officer walks first-timers through safety, grip, and stance at your pace.' ); ?></p>
           <div class="actions">
-            <a class="btn btn-ember btn-lg" href="#reserve">Reserve A Tuesday Lane </a>
+            <a class="btn btn-ember btn-lg" href="#reserve">Reserve A Tuesday Lane</a>
             <a class="btn btn-brass btn-lg" href="#schedule">View Schedule</a>
           </div>
         </div>
@@ -526,13 +526,13 @@ $g2a_ladies_events_shortcode = get_post_meta( $g2a_page_id, 'ladies_upcoming_eve
     <section class="lt-final">
       <div class="wrap">
         <div class="eyebrow" style="justify-content: center; margin-bottom: 8px;">See You Tuesday</div>
-        <h2>Half off the lane.<br />All of the <em>welcome.</em></h2>
+        <h2>A free hour on us.<br />All of the <em>welcome.</em></h2>
         <p>Every Tuesday is yours. Walk in, reserve ahead, or message us to set up a private group. We'll have your eye and ear set out.</p>
         <div class="row">
-          <a class="btn btn-ember btn-lg" href="#reserve">Reserve A Tuesday Lane </a>
+          <a class="btn btn-ember btn-lg" href="#reserve">Reserve A Tuesday Lane</a>
           <a class="btn btn-brass btn-lg" href="<?php echo esc_url( home_url( "/contact/" ) ); ?>">Group &amp; Private Bookings</a>
         </div>
-        <div class="micro">Walk-Ins Welcome  Mesa, AZ  6030 E Main St</div>
+        <div class="micro">Walk-Ins Welcome · Mesa, AZ · 6030 E Main St Ste 103</div>
       </div>
     </section>
   </main>

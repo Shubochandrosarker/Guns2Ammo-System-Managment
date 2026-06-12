@@ -178,12 +178,28 @@ final class ItemIdentityController {
 			}
 			++$linked;
 		}
+
+		// Also walk a batch of published Woo products through the scanner so
+		// the identity graph covers the shelf catalog, not just vendors.
+		$woo = null;
+		if ( function_exists( 'wc_get_product' ) ) {
+			$woo_result = \G2A\POS\Integrations\WooProductScanner::scan_batch( min( 200, $limit ) );
+			$woo_state  = $woo_result['state'] ?? array();
+			$woo        = array(
+				'processed' => (int) ( $woo_result['processed'] ?? 0 ),
+				'created'   => (int) ( $woo_state['created'] ?? 0 ),
+				'matched'   => (int) ( $woo_state['matched'] ?? 0 ),
+				'status'    => (string) ( $woo_state['status'] ?? '' ),
+			);
+		}
+
 		return array(
 			'ok'        => true,
 			'processed' => count( $rows ),
 			'created'   => $created,
 			'matched'   => $matched,
 			'linked'    => $linked,
+			'woo'       => $woo,
 		);
 	}
 }
