@@ -35,6 +35,25 @@ return [
 	'front-page.php' => [
 		'Hero' => [
 			[ 'id' => 'hero_trust_items', 'label' => 'Hero Trust Items (comma separated)', 'type' => 'text' ],
+			[ 'id' => 'fp_hero_line1', 'label' => 'Hero Headline Line 1', 'type' => 'text' ],
+			[ 'id' => 'fp_hero_line2', 'label' => 'Hero Headline Line 2', 'type' => 'text' ],
+			[ 'id' => 'fp_hero_line3', 'label' => 'Hero Headline Line 3 (accent)', 'type' => 'text' ],
+			[ 'id' => 'fp_hero_lead',  'label' => 'Hero Lead Paragraph', 'type' => 'textarea' ],
+			[ 'id' => 'fp_hero_image', 'label' => 'Hero Background Image', 'type' => 'image' ],
+			[ 'id' => 'fp_cta1_text',  'label' => 'Primary CTA Text', 'type' => 'text' ],
+			[ 'id' => 'fp_cta1_url',   'label' => 'Primary CTA URL',  'type' => 'text', 'sanitize' => 'url' ],
+			[ 'id' => 'fp_cta2_text',  'label' => 'Secondary CTA Text', 'type' => 'text' ],
+			[ 'id' => 'fp_cta2_url',   'label' => 'Secondary CTA URL',  'type' => 'text', 'sanitize' => 'url' ],
+		],
+		'Story' => [
+			[ 'id' => 'fp_story_heading', 'label' => 'Story Section Heading', 'type' => 'text' ],
+			[ 'id' => 'fp_story_body',    'label' => 'Story Section Body', 'type' => 'textarea' ],
+			[ 'id' => 'fp_story_image',   'label' => 'Story Section Image', 'type' => 'image' ],
+		],
+		'Final CTA' => [
+			[ 'id' => 'fp_final_heading', 'label' => 'Final CTA Heading', 'type' => 'text' ],
+			[ 'id' => 'fp_final_sub',     'label' => 'Final CTA Subtext', 'type' => 'textarea' ],
+			[ 'id' => 'fp_final_image',   'label' => 'Final CTA Background Image', 'type' => 'image' ],
 		],
 		'Content' => [
 			[ 'id' => 'ca_ccw_clarity_text', 'label' => 'California CCW Clarity Text', 'type' => 'textarea' ],
@@ -49,6 +68,7 @@ return [
 	'page-templates/template-book-a-lane.php' => [
 		'Hero' => [
 			[ 'id' => 'lane_hero_title', 'label' => 'Hero Title', 'type' => 'text' ],
+			[ 'id' => 'hero_image', 'label' => 'Hero Background Image', 'type' => 'image' ],
 		],
 		'Content' => [
 			[ 'id' => 'lane_member_discount_label', 'label' => 'Member Discount Label', 'type' => 'text' ],
@@ -88,6 +108,7 @@ return [
 	'page-templates/template-ladies-tuesday.php' => [
 		'Hero' => [
 			[ 'id' => 'ladies_hero_subtitle', 'label' => 'Hero Subtitle', 'type' => 'textarea' ],
+			[ 'id' => 'hero_image', 'label' => 'Hero Background Image', 'type' => 'image' ],
 		],
 		'Content' => [
 			[ 'id' => 'ladies_offer_text', 'label' => 'Offer Text', 'type' => 'text' ],

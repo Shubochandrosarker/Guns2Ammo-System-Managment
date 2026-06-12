@@ -175,7 +175,7 @@ $g2a_pricing_unlimited_text     = get_post_meta( $g2a_page_id, 'pricing_unlimite
   <div class="sec-wrap">
     <div class="eyebrow" style="margin-bottom: 16px;">Walk-In Range Fees</div>
     <h2 class="sec">NON-MEMBER PRICING</h2>
-    <p style="color: var(--color-fog); margin: 16px 0 32px; max-width: 60ch;">Members save up to 40% on these rates. Walk-ins always welcome  no appointment required for solo lane rental.</p>
+    <p style="color: var(--color-fog); margin: 16px 0 32px; max-width: 60ch;">Members save up to 25% on these rates. Walk-ins always welcome  no appointment required for solo lane rental.</p>
     <table class="dtable">
       <thead><tr><th>Service</th><th>Walk-In</th><th>Member</th><th>Savings</th></tr></thead>
       <tbody>

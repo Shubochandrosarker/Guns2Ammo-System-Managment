@@ -20,20 +20,26 @@ $g2a_mg_callout_text    = get_post_meta( $g2a_page_id, 'mg_callout_text', true )
 $g2a_mg4_name           = get_post_meta( $g2a_page_id, 'mg_fourth_weapon_name', true );
 $g2a_mg4_caliber        = get_post_meta( $g2a_page_id, 'mg_fourth_weapon_caliber', true );
 $g2a_mg4_desc           = get_post_meta( $g2a_page_id, 'mg_fourth_weapon_desc', true );
+$g2a_fp = function ( $key, $default = '' ) use ( $g2a_page_id ) {
+	$v = get_post_meta( $g2a_page_id, $key, true );
+	return ( '' !== trim( (string) $v ) ) ? $v : $default;
+};
 ?>
 <!-- HERO -->
-<section class="hero hero-media">
+<?php $g2a_fp_hero_img = $g2a_fp( 'fp_hero_image', '' ); ?>
+<section class="hero hero-media"<?php if ( $g2a_fp_hero_img ) : ?> style="background-image: var(--hero-scrim-stack, linear-gradient(180deg, var(--hero-scrim-soft), var(--hero-scrim-deep))), url('<?php echo esc_url( $g2a_fp_hero_img ); ?>'); background-size: cover; background-position: center;"<?php endif; ?>>
   <div class="inner">
     <span class="eb-pill">Arizona's Premier Indoor Range  Mesa, AZ</span>
     <h1 class="hl-display">
-      SHOOT SMART.<br>
-      CARRY SAFE.<br>
-      <span class="a">TRAIN LIKE A PRO.</span>
+      <?php echo esc_html( $g2a_fp( 'fp_hero_line1', 'SHOOT SMART.' ) ); ?><br>
+      <?php echo esc_html( $g2a_fp( 'fp_hero_line2', 'CARRY SAFE.' ) ); ?><br>
+      <span class="a"><?php echo esc_html( $g2a_fp( 'fp_hero_line3', 'TRAIN LIKE A PRO.' ) ); ?></span>
     </h1>
-    <p class="lead">6-lane climate-controlled indoor range, FFL-licensed firearm sales, and NRA-certified training  all under one roof in Mesa. Walk in, book a lane, or shop Mesa's most-trusted arsenal.</p>
+    <p class="hero-subhead" style="font-family:var(--font-mono);font-size:12px;letter-spacing:0.18em;text-transform:uppercase;color:var(--ink-on-media-dim);margin:6px 0 0;">Mesa, Arizona's Indoor Shooting Range, Gun Store &amp; Training Academy</p>
+    <p class="lead"><?php echo esc_html( $g2a_fp( 'fp_hero_lead', "6-lane climate-controlled indoor range, FFL-licensed firearm sales, and NRA-certified training — all under one roof in Mesa. Lane rental is $20/hour, gun rentals start at $15, and the 4-hour Arizona CCW class is $85." ) ); ?></p>
     <div class="ctas">
-      <a class="btn btn-ember btn-arrow" href="<?php echo esc_url( home_url( "/book-a-lane/" ) ); ?>">Book A Lane</a>
-      <a class="btn btn-ghost" href="<?php echo esc_url( home_url( "/shop/" ) ); ?>">Shop Collections</a>
+      <a class="btn btn-ember btn-arrow" href="<?php echo esc_url( $g2a_fp( 'fp_cta1_url', home_url( '/book-a-lane/' ) ) ); ?>"><?php echo esc_html( $g2a_fp( 'fp_cta1_text', 'Book A Lane' ) ); ?></a>
+      <a class="btn btn-ghost" href="<?php echo esc_url( $g2a_fp( 'fp_cta2_url', home_url( '/shop/' ) ) ); ?>"><?php echo esc_html( $g2a_fp( 'fp_cta2_text', 'Shop Collections' ) ); ?></a>
     </div>
     <div class="hero-trust">
       <div class="trust-strip">
@@ -232,8 +238,8 @@ $g2a_mg4_desc           = get_post_meta( $g2a_page_id, 'mg_fourth_weapon_desc', 
   <div class="wrap">
     <div data-reveal="left">
       <span class="eb-pill">Mesa's Training Academy</span>
-      <h2 style="margin-top: 22px;">TRAINED HERE.<br>READY <span class="a">ANYWHERE.</span></h2>
-      <p>From your first range visit to multi-state CCW certification, our NRA &amp; USCCA instructors take you through it patiently  and properly. Built by operators who've trained law enforcement, military, and church security teams.</p>
+      <h2 style="margin-top: 22px;"><?php echo wp_kses_post( $g2a_fp( 'fp_story_heading', 'TRAINED HERE.<br>READY <span class="a">ANYWHERE.</span>' ) ); ?></h2>
+      <p><?php echo esc_html( $g2a_fp( 'fp_story_body', "From your first range visit to multi-state CCW certification, our NRA & USCCA instructors take you through it patiently — and properly. Built by operators who've trained law enforcement, military, and church security teams." ) ); ?></p>
       <div style="display: flex; gap: 12px; flex-wrap: wrap;">
         <a class="btn btn-ember btn-arrow" href="<?php echo esc_url( home_url( "/training/" ) ); ?>">Browse Training</a>
         <a class="btn btn-ghost" href="<?php echo esc_url( home_url( "/arizona-ccw-certification/" ) ); ?>">CCW Pathway</a>
@@ -404,8 +410,8 @@ $g2a_week_order = array( 1, 2, 3, 4, 5, 6, 0 );
 <section class="final hero-media">
   <div class="wrap" data-reveal>
     <span class="eb-pill" style="margin: 0 auto;">Mesa's Most-Trusted Range</span>
-    <h2>READY TO<br><span class="a">SHOOT?</span></h2>
-    <p>Book a lane, enroll in a course, or stop by the shop. We're open seven days a week and there's always an RSO on duty.</p>
+    <h2><?php echo wp_kses_post( $g2a_fp( 'fp_final_heading', 'READY TO<br><span class="a">SHOOT?</span>' ) ); ?></h2>
+    <p><?php echo esc_html( $g2a_fp( 'fp_final_sub', "Book a lane, enroll in a course, or stop by the shop. We're open seven days a week and there's always an RSO on duty." ) ); ?></p>
     <div class="ctas">
       <a class="btn btn-ember btn-arrow" href="<?php echo esc_url( home_url( "/book-a-lane/" ) ); ?>">Book A Lane</a>
       <a class="btn btn-ghost" href="<?php echo esc_url( home_url( "/memberships/" ) ); ?>">Become a Member</a>

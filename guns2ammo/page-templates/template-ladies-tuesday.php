@@ -23,7 +23,7 @@ $g2a_ladies_events_shortcode    = get_post_meta( $g2a_page_id, 'ladies_upcoming_
     content: ""; position: absolute; inset: 0;
     background-image:
       linear-gradient(180deg, var(--hero-scrim-soft) 0%, var(--hero-scrim-deep) 60%, var(--color-void) 100%),
-      url("<?php echo esc_url( g2a_asset( 'img/guns2ammo-happy-customer-target.jpg' ) ); ?>");
+      url("<?php $g2a_lt_hero_img = get_post_meta( get_the_ID(), 'hero_image', true ); echo esc_url( $g2a_lt_hero_img ? $g2a_lt_hero_img : g2a_asset( 'img/guns2ammo-happy-customer-target.jpg' ) ); ?>");
     background-size: cover; background-position: center 30%;
     filter: saturate(0.85) contrast(1.05);
   }
@@ -373,7 +373,7 @@ $g2a_ladies_events_shortcode    = get_post_meta( $g2a_page_id, 'ladies_upcoming_
         <div class="acc">
           <details open><summary>Do I need to be a member?</summary><div class="answer">No. Ladies Tuesday is open to everyone  walk-ins and members. Members still get their member rate on rentals (the deeper discount applies).</div></details>
           <details><summary>Can my husband or boyfriend join me?</summary><div class="answer">Yes  your +1 gets the same Ladies Tuesday rate as long as you check in together. We don't gatekeep the discount.</div></details>
-          <details><summary>I've never fired a gun. Is this for me?</summary><div class="answer"><?php echo esc_html( $g2a_ladies_no_female_rso_note ? $g2a_ladies_no_female_rso_note : 'Yes. First-time onboarding is available from on-duty range staff each Tuesday. We do not advertise a dedicated female RSO for this day.' ); ?></div></details>
+          <details><summary>I've never fired a gun. Is this for me?</summary><div class="answer"><?php echo esc_html( $g2a_ladies_no_female_rso_note ? $g2a_ladies_no_female_rso_note : 'Yes — Ladies Tuesday is built for first-timers. A Range Safety Officer walks you through safety, stance and your first shots at your pace. No experience or equipment needed.' ); ?></div></details>
           <details><summary>Are there themed classes too?</summary><div class="answer">Yes — we regularly run women-focused intro clinics and themed Tuesday events. Check the schedule above or follow us on social for upcoming dates.</div></details>
           <details><summary>Can I book the whole range for a private group?</summary><div class="answer">Yes. Six-lane buyouts run $360 for a 90-minute window with a dedicated RSO. <a href="<?php echo esc_url( home_url( "/contact/" ) ); ?>" style="color: var(--color-brass-bright);">Email us</a> for bachelorette and birthday packages.</div></details>
           <details><summary>What should I wear?</summary><div class="answer">Closed-toe shoes, high-neck shirt (hot brass policy), no loose jewelry. Bring a hat if you have one. We have loaners for everything else.</div></details>
