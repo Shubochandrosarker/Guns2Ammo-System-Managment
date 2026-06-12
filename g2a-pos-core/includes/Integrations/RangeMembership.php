@@ -2,6 +2,7 @@
 
 namespace G2A\POS\Integrations;
 
+use G2A\POS\Integrations\Membership\MemberisticProvider;
 use G2A\POS\Integrations\Membership\MemberPressProvider;
 use G2A\POS\Integrations\Membership\PmproProvider;
 use G2A\POS\Integrations\Membership\Provider;
@@ -31,6 +32,10 @@ final class RangeMembership {
 	public static function providers(): array {
 		if ( self::$providers === null ) {
 			self::$providers = array(
+				// Memberistic first: it's the membership system this site
+				// actually runs, so auto-detect must prefer it over stale
+				// PMPro/MemberPress tables left from earlier migrations.
+				'memberistic'    => new MemberisticProvider(),
 				'wc_memberships' => new WooMembershipsProvider(),
 				'pmpro'          => new PmproProvider(),
 				'memberpress'    => new MemberPressProvider(),

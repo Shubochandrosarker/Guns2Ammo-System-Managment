@@ -229,7 +229,18 @@ get_header();
         </div>
         <div class="contact-card">
           <div class="label">Range Status</div>
-          <div class="val"><span class="dot-live" style="margin-right:8px;"></span>OPEN  4 lanes free</div>
+          <div class="val" id="g2a-about-lanes"><span class="dot-live" style="margin-right:8px;"></span><span id="g2a-about-lanes-label">6 lanes</span></div>
+          <script>
+          (function(){
+            fetch('<?php echo esc_url_raw( rest_url( 'g2a-booking/v1/lanes-status' ) ); ?>', { cache: 'no-store', headers: { 'Accept': 'application/json' } })
+              .then(function(r){ return r.json(); })
+              .then(function(j){
+                if (!j || !j.success || !j.data || !j.data.total) return;
+                var lb = document.getElementById('g2a-about-lanes-label');
+                if (lb) lb.textContent = j.data.label;
+              }).catch(function(){});
+          })();
+          </script>
         </div>
       </div>
       <div style="display:flex; gap:14px; margin-top: 32px; flex-wrap:wrap;">

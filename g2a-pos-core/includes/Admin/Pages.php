@@ -407,6 +407,20 @@ final class Pages
             . 'body.g2a-pos-fullwidth #wpbody-content > .wrap{margin:0!important;padding:0!important;max-width:none!important;width:auto!important;}'
             . 'body.g2a-pos-fullwidth #wpfooter{display:none!important;}'
             . 'body.g2a-pos-fullwidth #g2a-pos-dashboard{width:100%;max-width:100%;}'
+            // WP core admin CSS ships its own `.card { max-width: 520px;
+            // margin-top: 20px; padding: .7em 2em 1em }` (common.css). The
+            // SPA's Tailwind `.card` never resets max-width/margin, so EVERY
+            // card + records table in the POS was silently capped at 520px —
+            // the "half-width blocks" bug. Neutralize the core rule inside
+            // the app root; Tailwind's own p-*/m-* utilities still apply.
+            . 'body.g2a-pos-fullwidth #g2a-pos-dashboard .card{max-width:none!important;min-width:0!important;margin-top:0!important;padding:0!important;}'
+            // Restore the Tailwind padding utilities the !important reset
+            // above would otherwise defeat (p-3/p-4/p-5/p-6 are the sizes
+            // the SPA uses on cards).
+            . 'body.g2a-pos-fullwidth #g2a-pos-dashboard .card.p-3{padding:.75rem!important;}'
+            . 'body.g2a-pos-fullwidth #g2a-pos-dashboard .card.p-4{padding:1rem!important;}'
+            . 'body.g2a-pos-fullwidth #g2a-pos-dashboard .card.p-5{padding:1.25rem!important;}'
+            . 'body.g2a-pos-fullwidth #g2a-pos-dashboard .card.p-6{padding:1.5rem!important;}'
             . '</style>';
         echo '<div class="wrap" style="margin:0;padding:0">';
         echo '<script>window.G2A_POS_ADMIN = ' . wp_json_encode($cfg) . ';';

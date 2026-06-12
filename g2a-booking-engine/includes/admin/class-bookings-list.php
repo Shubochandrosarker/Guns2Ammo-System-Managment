@@ -161,14 +161,15 @@ final class G2AB_Admin_Bookings_List {
 			<div class="g2ab-mod__detail">
 				<header class="g2ab-mod__detail-head">
 					<div>
-						<h1><span class="g2ab-mod__stencil"><?php esc_html_e( 'MISSION BRIEF', 'g2a-booking' ); ?></span></h1>
-						<div class="g2ab-mod__detail-uuid">CONFIRMATION: <code><?php echo esc_html( $b->uuid ); ?></code></div>
+						<div class="g2ab-mod__detail-kicker"><?php esc_html_e( 'Booking Detail', 'g2a-booking' ); ?></div>
+						<h1 class="g2ab-mod__detail-title"><?php echo esc_html( $b->customer_name ?: __( 'Guest booking', 'g2a-booking' ) ); ?></h1>
+						<div class="g2ab-mod__detail-uuid"><?php esc_html_e( 'Confirmation:', 'g2a-booking' ); ?> <code><?php echo esc_html( $b->uuid ); ?></code></div>
 					</div>
 					<span class="g2ab-mod__badge g2ab-mod__badge--<?php echo esc_attr( $b->status ); ?> g2ab-mod__badge--xl"><?php echo esc_html( strtoupper( str_replace( '_', ' ', $b->status ) ) ); ?></span>
 				</header>
 				<div class="g2ab-mod__detail-grid">
 					<div class="g2ab-mod__panel">
-						<h3>TARGET</h3>
+						<h3><?php esc_html_e( 'Customer', 'g2a-booking' ); ?></h3>
 						<dl>
 							<dt>Name</dt><dd><?php echo esc_html( $b->customer_name ); ?></dd>
 							<dt>Email</dt><dd><a href="mailto:<?php echo esc_attr( $b->customer_email ); ?>"><?php echo esc_html( $b->customer_email ); ?></a></dd>
@@ -177,7 +178,7 @@ final class G2AB_Admin_Bookings_List {
 						</dl>
 					</div>
 					<div class="g2ab-mod__panel">
-						<h3>OPERATION</h3>
+						<h3><?php esc_html_e( 'Booking', 'g2a-booking' ); ?></h3>
 						<dl>
 							<dt>Type</dt><dd><?php echo esc_html( $b->type_name ?: '—' ); ?></dd>
 							<dt>Resource</dt><dd><?php echo esc_html( $b->resource_name ?: '—' ); ?></dd>
@@ -189,7 +190,7 @@ final class G2AB_Admin_Bookings_List {
 						</dl>
 					</div>
 					<div class="g2ab-mod__panel">
-						<h3>SUPPLY</h3>
+						<h3><?php esc_html_e( 'Payment', 'g2a-booking' ); ?></h3>
 						<dl>
 							<dt>Total</dt><dd>$<?php echo esc_html( number_format( (float) $b->total_amount, 2 ) ); ?></dd>
 							<dt>Paid</dt><dd>$<?php echo esc_html( number_format( (float) $b->paid_amount, 2 ) ); ?></dd>
@@ -202,7 +203,7 @@ final class G2AB_Admin_Bookings_List {
 				</div>
 				<?php if ( $form_data ) : ?>
 				<div class="g2ab-mod__panel">
-					<h3>FORM SUBMISSION</h3>
+					<h3><?php esc_html_e( 'Form Submission', 'g2a-booking' ); ?></h3>
 					<dl class="g2ab-mod__formdata">
 						<?php foreach ( $form_data as $k => $v ) : ?>
 							<dt><?php echo esc_html( ucwords( str_replace( '_', ' ', $k ) ) ); ?></dt>
@@ -212,7 +213,7 @@ final class G2AB_Admin_Bookings_List {
 				</div>
 				<?php endif; ?>
 				<div class="g2ab-mod__panel">
-					<h3>STATUS CONTROL</h3>
+					<h3><?php esc_html_e( 'Status', 'g2a-booking' ); ?></h3>
 					<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" class="g2ab-mod__statusform">
 						<?php wp_nonce_field( 'g2ab_change_status_' . $b->id, '_g2ab_nonce' ); ?>
 						<input type="hidden" name="action" value="g2ab_change_status" />
@@ -232,7 +233,7 @@ final class G2AB_Admin_Bookings_List {
 					</form>
 				</div>
 				<div class="g2ab-mod__panel">
-					<h3>AUDIT LOG</h3>
+					<h3><?php esc_html_e( 'Audit Log', 'g2a-booking' ); ?></h3>
 					<?php if ( empty( $logs ) ) : ?><p><em>No log entries.</em></p><?php else : ?>
 						<ul class="g2ab-mod__log">
 							<?php foreach ( $logs as $log ) : ?>
@@ -419,7 +420,7 @@ final class G2AB_Admin_Bookings_List {
 .g2ab-mod__empty{background:#fff;padding:60px 20px;text-align:center;border:1px dashed #d0d4d9;}
 .g2ab-mod__empty-icon{font-size:48px;color:#8A95A5;margin-bottom:12px;}
 .g2ab-mod__detail{background:#fff;border:1px solid #d0d4d9;}
-.g2ab-mod__detail-head{display:flex;justify-content:space-between;align-items:center;padding:24px 28px;background:linear-gradient(135deg,#0F1115 0%,#1A1F26 100%);color:#fff;border-bottom:4px solid #D2691E;}
+.g2ab-mod__detail-head{display:flex;justify-content:space-between;align-items:center;gap:16px;padding:22px 28px;background:#fff;border-bottom:3px solid #D2691E;}.g2ab-mod__detail-kicker{font-size:11px;font-weight:700;letter-spacing:.16em;text-transform:uppercase;color:#8A95A5;margin-bottom:2px;}.g2ab-mod__detail-head h1.g2ab-mod__detail-title{margin:0;padding:0;font-size:26px;line-height:1.2;font-weight:700;color:#1d2327;}
 .g2ab-mod__detail-uuid{font-size:11px;color:#8A95A5;letter-spacing:.08em;margin-top:6px;}
 .g2ab-mod__detail-uuid code{background:rgba(255,255,255,.1);color:#D2691E;padding:2px 8px;}
 .g2ab-mod__detail-back{margin:14px 0 8px;}

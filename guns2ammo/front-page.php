@@ -369,12 +369,72 @@ $g2a_week_order = array( 1, 2, 3, 4, 5, 6, 0 );
   </div>
 </section>
 
+<!-- FAQ — answer-engine ready, animated accordion -->
+<section class="home-faq" style="padding: 96px 32px; background: var(--color-surface-1);">
+  <div style="max-width: 880px; margin: 0 auto;">
+    <div style="text-align:center; margin-bottom: 40px;" data-reveal>
+      <span class="eyebrow">Before You Visit</span>
+      <h2 class="sec" style="font-family: var(--font-display); font-size: clamp(40px, 5vw, 60px); color: var(--color-white); letter-spacing: 0.02em; line-height: 1; margin: 14px 0 0;"><span class="g2a-underline">QUESTIONS, ANSWERED.</span></h2>
+    </div>
+    <?php
+    $g2a_home_faqs = array(
+      array(
+        'q' => 'How much does the shooting range cost?',
+        'a' => 'Lane rental is $20 per hour and each extra shooter on your lane is $15. Gun rentals start at $15, eye and ear protection is $3 combined, and members shoot on included lane time. Walk-ins are welcome seven days a week.',
+      ),
+      array(
+        'q' => 'Do I need to bring my own gun?',
+        'a' => 'No — we have a rental wall with 40+ pistols and rifles starting at $15, plus range ammo for sale at the counter. A Range Safety Officer will set you up and walk you through anything unfamiliar.',
+      ),
+      array(
+        'q' => 'Can complete beginners come?',
+        'a' => 'Absolutely. First-timers are our favorite guests: an RSO covers safety, grip, and stance before you shoot, and our $95 Basic Handgun class or $140/hr private instruction can take you further whenever you\'re ready.',
+      ),
+      array(
+        'q' => 'What are the age requirements?',
+        'a' => 'Shooters 8 and older are welcome with a parent or guardian on the lane; you must be 18+ to shoot solo. Bring a valid government-issued photo ID for check-in.',
+      ),
+      array(
+        'q' => 'Do you offer Arizona CCW classes?',
+        'a' => 'Yes — the $85 classroom CCW course runs Saturdays (4 hours, covers A.R.S. §13-3112, reciprocity in 37 states, and DPS paperwork) and a $149.99 CCW + Live Fire course adds an hour on the range.',
+      ),
+      array(
+        'q' => 'Can I really shoot a machine gun?',
+        'a' => 'Yes. We run Mesa\'s only indoor full-auto experience — MP5, M16, and AK-47 packages from $249 with a one-on-one RSO, ammo and targets included. No experience needed; book 4–6 weeks ahead.',
+      ),
+    );
+    ?>
+    <div class="g2a-faq" data-reveal-stagger>
+      <?php foreach ( $g2a_home_faqs as $i => $f ) : ?>
+        <details<?php echo 0 === $i ? ' open' : ''; ?>>
+          <summary><?php echo esc_html( $f['q'] ); ?></summary>
+          <div class="faq-a"><?php echo esc_html( $f['a'] ); ?></div>
+        </details>
+      <?php endforeach; ?>
+    </div>
+    <script type="application/ld+json"><?php
+      $g2a_faq_ld = array(
+        '@context'   => 'https://schema.org',
+        '@type'      => 'FAQPage',
+        'mainEntity' => array_map( function ( $f ) {
+          return array(
+            '@type'          => 'Question',
+            'name'           => $f['q'],
+            'acceptedAnswer' => array( '@type' => 'Answer', 'text' => $f['a'] ),
+          );
+        }, $g2a_home_faqs ),
+      );
+      echo wp_json_encode( $g2a_faq_ld, JSON_UNESCAPED_SLASHES );
+    ?></script>
+  </div>
+</section>
+
 <!-- FINAL CTA -->
 <section class="final">
   <div class="wrap">
     <span class="eb-pill" style="margin: 0 auto;">Mesa's Most-Trusted Range</span>
     <h2>READY TO<br><span class="a">SHOOT?</span></h2>
-    <p>Book a lane, enroll in a course, or stop by the shop. We're open six days a week  Friday closed  and there's always an RSO on duty.</p>
+    <p>Book a lane, enroll in a course, or stop by the shop. We're open seven days a week and there's always an RSO on duty.</p>
     <div class="ctas">
       <a class="btn btn-ember btn-arrow" href="<?php echo esc_url( home_url( "/book-a-lane/" ) ); ?>">Book A Lane</a>
       <a class="btn btn-ghost" href="<?php echo esc_url( home_url( "/memberships/" ) ); ?>">Become a Member</a>

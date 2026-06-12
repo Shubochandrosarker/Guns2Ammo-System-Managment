@@ -54,6 +54,7 @@ require_once WPISTIC_CF_PATH . 'includes/class-wpcf-settings.php';
 require_once WPISTIC_CF_PATH . 'includes/class-wpistic-cf-ai.php';
 require_once WPISTIC_CF_PATH . 'includes/class-wpcf-admin.php';
 require_once WPISTIC_CF_PATH . 'includes/class-wpcf-newsletter.php';
+require_once WPISTIC_CF_PATH . 'includes/class-wpcf-emails.php';
 require_once WPISTIC_CF_PATH . 'includes/class-wpcf-ajax.php';
 require_once WPISTIC_CF_PATH . 'includes/class-wpcf-plugin.php';
 

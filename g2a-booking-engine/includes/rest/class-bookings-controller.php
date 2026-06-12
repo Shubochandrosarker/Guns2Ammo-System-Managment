@@ -69,6 +69,13 @@ final class G2AB_REST_Bookings_Controller {
 			'callback' => array( $this, 'get_session' ),
 			'permission_callback' => array( $this, 'permission_public_read' ),
 		) );
+		// Live lane occupancy — replaces the theme's old static
+		// "4 of 6 lanes open now" placeholder with real data.
+		register_rest_route( G2AB_REST_NAMESPACE, '/lanes-status', array(
+			'methods' => WP_REST_Server::READABLE,
+			'callback' => array( $this, 'get_lanes_status' ),
+			'permission_callback' => array( $this, 'permission_public_read' ),
+		) );
 		register_rest_route( G2AB_REST_NAMESPACE, '/bookings', array(
 			'methods' => WP_REST_Server::CREATABLE,
 			'callback' => array( $this, 'create_booking' ),
@@ -196,6 +203,46 @@ final class G2AB_REST_Bookings_Controller {
 		$response->header( 'Cache-Control', 'no-cache, no-store, must-revalidate, max-age=0' );
 		$response->header( 'Pragma', 'no-cache' );
 		$response->header( 'Expires', 'Thu, 01 Jan 1970 00:00:00 GMT' );
+		return $response;
+	}
+
+	/**
+	 * Live lane occupancy: how many active lane resources have NO active
+	 * booking covering the current moment. Cached for 60s; never page-cached.
+	 */
+	public function get_lanes_status() {
+		$data = get_transient( 'g2ab_lanes_status' );
+		if ( ! is_array( $data ) ) {
+			global $wpdb;
+			$now   = current_time( 'mysql' );
+			$total = (int) $wpdb->get_var(
+				"SELECT COUNT(*) FROM {$wpdb->prefix}g2ab_resources WHERE is_active = 1 AND type = 'lane'"
+			);
+			if ( 0 === $total ) {
+				// Some installs label lanes differently — fall back to all active resources.
+				$total = (int) $wpdb->get_var( "SELECT COUNT(*) FROM {$wpdb->prefix}g2ab_resources WHERE is_active = 1" );
+			}
+			$busy = (int) $wpdb->get_var( $wpdb->prepare(
+				"SELECT COUNT(DISTINCT b.resource_id)
+				 FROM {$wpdb->prefix}g2ab_bookings b
+				 INNER JOIN {$wpdb->prefix}g2ab_resources r ON r.id = b.resource_id AND r.is_active = 1
+				 WHERE b.status IN ('pending','reserved','confirmed','paid','checked_in')
+				   AND b.start_at <= %s AND b.end_at > %s",
+				$now,
+				$now
+			) );
+			$available = max( 0, $total - $busy );
+			$data      = array(
+				'total'     => $total,
+				'busy'      => $busy,
+				'available' => $available,
+				/* translators: 1: available lanes, 2: total lanes */
+				'label'     => sprintf( __( '%1$d of %2$d lanes open now', 'g2a-booking' ), $available, $total ),
+			);
+			set_transient( 'g2ab_lanes_status', $data, MINUTE_IN_SECONDS );
+		}
+		$response = rest_ensure_response( array( 'success' => true, 'data' => $data ) );
+		$response->header( 'Cache-Control', 'no-cache, no-store, must-revalidate, max-age=0' );
 		return $response;
 	}
 

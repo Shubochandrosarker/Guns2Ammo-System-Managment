@@ -91,7 +91,7 @@ function g2a_biz() {
 		// Reviews — manually maintained by the client in Customizer.
 		// Defaults intentionally match the GBP rating + count at
 		// the time this module shipped. NEVER auto-increment.
-		'review_count'  => (int)   get_theme_mod( 'g2a_review_count',  449 ),
+		'review_count'  => (int)   get_theme_mod( 'g2a_review_count',  556 ),
 		'review_rating' => (float) get_theme_mod( 'g2a_review_rating', 4.7 ),
 		'review_source' => trim( (string) get_theme_mod( 'g2a_review_source', 'Google' ) ),
 

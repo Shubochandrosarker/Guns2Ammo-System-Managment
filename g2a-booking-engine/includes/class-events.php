@@ -309,16 +309,16 @@ final class G2AB_Events {
 		?>
 		<style>
 		.g2ab-events-shortcode{display:grid;gap:16px;max-width:980px}
-		.g2ab-events-shortcode-item{background:#1e1f29;border:1px solid rgba(255,255,255,.1);padding:20px;border-radius:4px}
-		.g2ab-events-shortcode-item h3{margin:0 0 12px;color:#fff;font-family:"Bebas Neue","Oswald",sans-serif;letter-spacing:.03em;font-size:34px;line-height:1}
+		.g2ab-events-shortcode-item{background:var(--color-gunmetal,#1e1f29);border:1px solid var(--color-hairline,rgba(255,255,255,.1));padding:20px;border-radius:4px}
+		.g2ab-events-shortcode-item h3{margin:0 0 12px;color:var(--color-white,#fff);font-family:"Bebas Neue","Oswald",sans-serif;letter-spacing:.03em;font-size:34px;line-height:1}
 		.g2ab-events-shortcode-item p{margin:8px 0;color:#d5d8e3;font-size:20px}
 		.g2ab-events-shortcode-item a{display:inline-block;margin-top:8px;background:#e8802f;color:#fff!important;text-decoration:none;padding:10px 16px;border-radius:2px;font-family:"Barlow Condensed","Oswald",sans-serif;letter-spacing:.08em;text-transform:uppercase}
 		.g2ab-events-shortcode-item a:hover{background:#f3974f}
-		.g2ab-event-countdown{background:#1e1f29;border:1px solid rgba(255,255,255,.12);padding:24px;border-radius:4px;max-width:980px}
-		.g2ab-event-countdown h3{margin:0 0 10px;color:#fff;font-family:"Bebas Neue","Oswald",sans-serif;font-size:46px;line-height:1}
+		.g2ab-event-countdown{background:var(--color-gunmetal,#1e1f29);border:1px solid var(--color-hairline-bright,rgba(255,255,255,.12));padding:24px;border-radius:4px;max-width:980px}
+		.g2ab-event-countdown h3{margin:0 0 10px;color:var(--color-white,#fff);font-family:"Bebas Neue","Oswald",sans-serif;font-size:46px;line-height:1}
 		.g2ab-event-countdown p{margin:8px 0;color:#d5d8e3}
 		.g2ab-event-countdown-timer{display:flex;gap:10px;align-items:center;margin:12px 0 16px;font-family:"Rajdhani","Oswald",sans-serif;color:#f2f3f8;font-size:32px;letter-spacing:.02em}
-		.g2ab-event-countdown-timer span{display:inline-block;min-width:56px;text-align:center;background:#12131a;border:1px solid rgba(201,168,76,.45);color:#c9a84c;padding:8px 6px;border-radius:3px}
+		.g2ab-event-countdown-timer span{display:inline-block;min-width:56px;text-align:center;background:var(--color-void,#12131a);border:1px solid var(--color-brass-dim,rgba(201,168,76,.45));color:var(--color-brass-bright,#c9a84c);font-variant-numeric:tabular-nums;padding:8px 6px;border-radius:3px}
 		.g2ab-event-countdown a{display:inline-block;background:#e8802f;color:#fff!important;text-decoration:none;padding:10px 16px;border-radius:2px;font-family:"Barlow Condensed","Oswald",sans-serif;letter-spacing:.08em;text-transform:uppercase}
 		.g2ab-event-countdown a:hover{background:#f3974f}
 		@media (max-width:768px){
@@ -712,8 +712,13 @@ final class G2AB_Events {
 		$done = true;
 		?>
 		<style>
-		.g2a-ev{--ev-card:#26252C;--ev-card2:#201F26;--ev-line:rgba(255,255,255,.1);--ev-brass:#C9A84C;
-			--ev-brass2:#E3C06A;--ev-ember:#E8802F;--ev-white:#F4F4F6;--ev-fog:#CBCAD2;--ev-silver:#8E8D96;
+		/* Token-driven: inherits the host theme's palette (incl. its light/dark
+		   mode via html[data-theme]) and falls back to the original dark values
+		   on themes without the Guns2Ammo tokens. */
+		.g2a-ev{--ev-card:var(--color-gunmetal,#26252C);--ev-card2:var(--color-surface-1,#201F26);
+			--ev-line:var(--color-hairline,rgba(255,255,255,.1));--ev-brass:var(--color-brass,#C9A84C);
+			--ev-brass2:var(--color-brass-bright,#E3C06A);--ev-ember:var(--color-ember,#E8802F);
+			--ev-white:var(--color-white,#F4F4F6);--ev-fog:var(--color-fog,#CBCAD2);--ev-silver:var(--color-silver,#8E8D96);
 			font-family:var(--font-body,"DM Sans",-apple-system,Segoe UI,sans-serif);max-width:1280px;margin:0 auto;}
 		.g2a-ev *{box-sizing:border-box;}
 		.g2a-ev-heading{font-family:var(--font-display,"Bebas Neue",sans-serif);color:var(--ev-white);
@@ -778,11 +783,17 @@ final class G2AB_Events {
 		.g2a-ev-calgrid{display:grid;grid-template-columns:repeat(7,1fr);gap:6px;}
 		.g2a-ev-dow{font-family:var(--font-mono,monospace);font-size:10px;letter-spacing:.14em;
 			text-transform:uppercase;color:var(--ev-silver);text-align:center;padding:6px 0;}
-		.g2a-ev-cell{min-height:96px;background:var(--ev-card);border:1px solid var(--ev-line);
-			border-radius:3px;padding:6px;}
-		.g2a-ev-cell.is-empty{background:transparent;border-color:transparent;}
-		.g2a-ev-cell.is-today{border-color:var(--ev-brass);}
-		.g2a-ev-cell.has-events{background:var(--ev-card2);}
+		.g2a-ev-cell{min-height:96px;border:1px solid var(--ev-line);
+			border-radius:5px;padding:6px;position:relative;
+			/* Glossy glass cell: soft top sheen over the card tone */
+			background:linear-gradient(180deg, color-mix(in srgb, var(--ev-white) 4%, var(--ev-card)) 0%, var(--ev-card) 45%);
+			box-shadow:inset 0 1px 0 color-mix(in srgb, var(--ev-white) 9%, transparent);
+			transition:transform .14s ease, border-color .14s ease;}
+		.g2a-ev-cell:hover{transform:translateY(-1px);border-color:color-mix(in srgb, var(--ev-brass) 55%, var(--ev-line));}
+		.g2a-ev-cell.is-empty{background:transparent;border-color:transparent;box-shadow:none;}
+		.g2a-ev-cell.is-empty:hover{transform:none;}
+		.g2a-ev-cell.is-today{border-color:var(--ev-brass);box-shadow:inset 0 1px 0 color-mix(in srgb, var(--ev-white) 9%, transparent), 0 0 0 1px color-mix(in srgb, var(--ev-brass) 35%, transparent);}
+		.g2a-ev-cell.has-events{background:linear-gradient(180deg, color-mix(in srgb, var(--ev-ember) 8%, var(--ev-card2)) 0%, var(--ev-card2) 60%);}
 		.g2a-ev-celln{display:block;font-family:var(--font-mono,monospace);font-size:11px;
 			color:var(--ev-silver);margin-bottom:4px;}
 		.g2a-ev-cell.is-today .g2a-ev-celln{color:var(--ev-brass2);}

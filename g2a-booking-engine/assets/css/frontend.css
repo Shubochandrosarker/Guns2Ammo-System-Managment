@@ -769,3 +769,28 @@ html[data-theme="light"] .g2ab-booking.g2ab-theme-ladies {
 		margin-right: 0;
 	}
 }
+
+/* ===== Slots-availability note + support note ============================ */
+.g2ab-slots-note {
+	grid-column: 1 / -1;
+	margin: 0 0 10px;
+	font-size: 13px;
+	color: var(--g2ab-muted);
+	display: flex; align-items: center; gap: 8px;
+}
+.g2ab-slots-note::before {
+	content: ""; width: 7px; height: 7px; border-radius: 50%;
+	background: #4ADE80; box-shadow: 0 0 8px rgba(74, 222, 128, 0.7);
+}
+.g2ab-help-note {
+	display: flex; gap: 10px; align-items: flex-start;
+	margin: 18px 4px 0;
+	padding: 14px 18px;
+	border: 1px solid var(--g2ab-border);
+	border-left: 3px solid var(--g2ab-primary);
+	border-radius: calc(var(--g2ab-radius) / 2);
+	background: color-mix(in srgb, var(--g2ab-primary) 6%, transparent);
+	color: var(--g2ab-muted);
+	font-size: 13.5px; line-height: 1.6;
+}
+.g2ab-help-note a { color: var(--g2ab-primary); font-weight: 600; text-decoration: underline; }

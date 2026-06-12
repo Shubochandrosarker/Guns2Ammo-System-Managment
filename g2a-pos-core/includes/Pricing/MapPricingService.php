@@ -127,7 +127,17 @@ final class MapPricingService {
 				$sku = (string) $product->get_sku();
 				$upc = (string) $product->get_meta( '_upc' );
 				if ( $upc === '' ) {
-					$upc = (string) $product->get_meta( '_global_unique_id' );
+					// `_global_unique_id` (GTIN/UPC) is a WC-internal meta key
+					// since WooCommerce 9.1 — reading it via the generic
+					// get_meta() triggers is_internal_meta_key's doing-it-wrong
+					// notice, which rendered next to every storefront price.
+					// Use the dedicated getter; fall back to raw post meta on
+					// older WooCommerce where neither exists.
+					if ( method_exists( $product, 'get_global_unique_id' ) ) {
+						$upc = (string) $product->get_global_unique_id();
+					} else {
+						$upc = (string) get_post_meta( $productId, '_global_unique_id', true );
+					}
 				}
 			}
 		}

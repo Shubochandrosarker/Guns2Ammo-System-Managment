@@ -193,6 +193,75 @@ add_filter( 'site_transient_update_plugins', function ( $value ) {
 	return $value;
 } );
 
+/* ---------- Live Google review count ----------
+ * Hardcoded review numbers drift (449 vs 500 vs the real 556). This layer
+ * keeps ONE live number: a twice-daily cron pulls rating + count from the
+ * Google Places Details API when an API key is saved in the Customizer
+ * (g2a_places_api_key); the result transparently overrides the
+ * g2a_review_count / g2a_review_rating theme mods via their core
+ * `theme_mod_*` filters — so the footer, JSON-LD schema, and every
+ * template that already reads g2a_biz() updates automatically, no manual
+ * hardcode edits ever again. Without an API key the Customizer numbers
+ * remain the single manual source of truth.
+ */
+function g2a_reviews_live() {
+	$d = get_option( 'g2a_google_reviews_live' );
+	return is_array( $d ) ? $d : array();
+}
+function g2a_reviews_count() {
+	$live = g2a_reviews_live();
+	return ! empty( $live['count'] ) ? (int) $live['count'] : (int) get_theme_mod( 'g2a_review_count', 556 );
+}
+function g2a_reviews_rating() {
+	$live = g2a_reviews_live();
+	return ! empty( $live['rating'] ) ? (float) $live['rating'] : (float) get_theme_mod( 'g2a_review_rating', 4.7 );
+}
+function g2a_reviews_label() {
+	return number_format( g2a_reviews_rating(), 1 ) . '★ · ' . g2a_reviews_count() . ' Google reviews';
+}
+add_filter( 'theme_mod_g2a_review_count', function ( $value ) {
+	$live = g2a_reviews_live();
+	return ! empty( $live['count'] ) ? (int) $live['count'] : $value;
+} );
+add_filter( 'theme_mod_g2a_review_rating', function ( $value ) {
+	$live = g2a_reviews_live();
+	return ! empty( $live['rating'] ) ? (float) $live['rating'] : $value;
+} );
+add_action( 'init', function () {
+	if ( ! wp_next_scheduled( 'g2a_refresh_google_reviews' ) ) {
+		wp_schedule_event( time() + HOUR_IN_SECONDS, 'twicedaily', 'g2a_refresh_google_reviews' );
+	}
+} );
+add_action( 'g2a_refresh_google_reviews', function () {
+	$key      = trim( (string) get_theme_mod( 'g2a_places_api_key', '' ) );
+	$place_id = trim( (string) get_theme_mod( 'g2a_place_id', 'ChIJaSRMhpGvK4cR4kE_E-jZvKE' ) );
+	if ( '' === $key || '' === $place_id ) {
+		return; // No key configured — Customizer numbers stay authoritative.
+	}
+	$url = add_query_arg( array(
+		'place_id' => rawurlencode( $place_id ),
+		'fields'   => 'rating,user_ratings_total',
+		'key'      => rawurlencode( $key ),
+	), 'https://maps.googleapis.com/maps/api/place/details/json' );
+	$res = wp_remote_get( $url, array( 'timeout' => 15 ) );
+	if ( is_wp_error( $res ) || 200 !== wp_remote_retrieve_response_code( $res ) ) {
+		return;
+	}
+	$body = json_decode( wp_remote_retrieve_body( $res ), true );
+	if ( empty( $body['result'] ) || ! is_array( $body['result'] ) ) {
+		return;
+	}
+	$rating = isset( $body['result']['rating'] ) ? (float) $body['result']['rating'] : 0;
+	$count  = isset( $body['result']['user_ratings_total'] ) ? (int) $body['result']['user_ratings_total'] : 0;
+	if ( $rating > 0 && $count > 0 ) {
+		update_option( 'g2a_google_reviews_live', array(
+			'rating'  => $rating,
+			'count'   => $count,
+			'updated' => time(),
+		), false );
+	}
+} );
+
 /* ---------- Helpers ---------- */
 function g2a_asset( $path ) {
 	return G2A_URI . '/assets/' . ltrim( $path, '/' );

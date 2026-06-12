@@ -23,7 +23,7 @@ $founded   = (int) $biz['founded_year'];
 ?>
 </main><!-- /#g2a-main -->
 
-<section class="g2a-news" style="background:#151419; padding: 56px 32px; border-top:1px solid var(--color-hairline);">
+<section class="g2a-news" style="background: var(--color-foot, #151419); padding: 56px 32px; border-top:1px solid var(--color-hairline);">
 	<div class="newsletter-band" style="max-width: 1280px; margin: 0 auto;">
 		<div>
 			<h3>GET RANGE UPDATES</h3>
@@ -45,7 +45,7 @@ $founded   = (int) $biz['founded_year'];
 		      data-source="footer"
 		      aria-label="Newsletter signup">
 			<input type="email" name="email" placeholder="your@email.com" required aria-label="Email">
-			<button type="submit">JOIN <span style="font-size:14px;">-></span></button>
+			<button type="submit">JOIN <svg class="btn-arrow" width="15" height="12" viewBox="0 0 20 16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M1 8h17M12 2l6 6-6 6"/></svg></button>
 			<span class="g2a-newsletter-status" role="status" aria-live="polite" style="display:block; margin-top:8px; font-size:13px; color: var(--color-fog);"></span>
 		</form>
 		<script>
@@ -100,7 +100,7 @@ $founded   = (int) $biz['founded_year'];
 			<div class="brand"><span class="mark"></span>GUNS&nbsp;2&nbsp;AMMO</div>
 			<div style="color: var(--color-fog); font-size:14px; max-width:32ch; margin-bottom:22px; line-height: 1.65;"><?php echo esc_html( $biz['slogan'] ); ?> <?php /* translators: %d: founding year, e.g. 2014 */ printf( esc_html__( 'Since %d.', 'guns2ammo' ), $founded ); ?></div>
 			<div style="display:inline-flex; align-items:center; gap:12px; padding: 10px 16px; border:1px solid var(--color-hairline-bright); margin-bottom: 18px;">
-				<span style="color: var(--color-brass-bright); font-family: var(--font-mono); font-size: 14px; letter-spacing: 0.08em;">*****</span>
+				<span style="color: var(--color-brass-bright); font-size: 13px; letter-spacing: 0.12em;" aria-hidden="true">&#9733;&#9733;&#9733;&#9733;&#9733;</span>
 				<span style="font-family: var(--font-condensed); font-weight:600; font-size:18px; color: var(--color-white);"><?php echo esc_html( $rating ); ?></span>
 				<span style="font-family: var(--font-mono); font-size:11px; letter-spacing:0.16em; color: var(--color-silver); text-transform: uppercase;"><?php echo esc_html( $reviews ); ?> Google</span>
 			</div>
@@ -140,6 +140,23 @@ $founded   = (int) $biz['founded_year'];
 				<li style="font-family: var(--font-condensed); font-weight:600; font-size:15px; color: var(--color-white); line-height:1.4;"><?php echo esc_html( $addr1 ); ?><br><?php echo esc_html( $addr2 ); ?></li>
 				<li><a href="tel:<?php echo esc_attr( preg_replace( '/[^0-9+]/', '', '+1' . $phone ) ); ?>" style="color: var(--color-brass-bright); display:inline-flex; align-items:center; gap:8px;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M22 16.92V20a2 2 0 0 1-2.18 2 19.86 19.86 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6A19.86 19.86 0 0 1 2.12 4.18 2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg> <?php echo esc_html( $phone ); ?></a></li>
 				<li><a href="mailto:<?php echo esc_attr( $email ); ?>" style="color: var(--color-brass-bright); display:inline-flex; align-items:center; gap:8px;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="1"/><path d="m3 7 9 6 9-6"/></svg> <?php echo esc_html( $email ); ?></a></li>
+				<li class="g2a-foot-map">
+					<?php /* Live Google Map (keyless embed) + animated brand pin overlay.
+					       The iframe lazy-loads so it costs nothing until scrolled into view;
+					       clicking the pin opens full directions. */ ?>
+					<div class="g2a-map" aria-label="Map to Guns 2 Ammo, 6030 E Main St Ste 103, Mesa AZ">
+						<iframe
+							src="https://www.google.com/maps?q=Guns+2+Ammo,+6030+E+Main+St+%23103,+Mesa,+AZ+85205&output=embed"
+							loading="lazy" referrerpolicy="no-referrer-when-downgrade"
+							title="Guns 2 Ammo on Google Maps" allowfullscreen></iframe>
+						<a class="g2a-map__pin" target="_blank" rel="noopener"
+						   href="<?php echo esc_url( get_theme_mod( 'g2a_directions_url', 'https://www.google.com/maps/dir/?api=1&destination=Guns+2+Ammo%2C+6030+E+Main+St+%23103%2C+Mesa%2C+AZ+85205%2C+United+States&destination_place_id=ChIJaSRMhpGvK4cR4kE_E-jZvKE' ) ); ?>"
+						   aria-label="Open directions to Guns 2 Ammo">
+							<span class="ring"></span>
+							<svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M12 2C8 2 5 5 5 9c0 6 7 13 7 13s7-7 7-13c0-4-3-7-7-7z" fill="var(--color-ember, #E8802F)" stroke="none"/><circle cx="12" cy="9" r="2.6" fill="#fff"/></svg>
+						</a>
+					</div>
+				</li>
 				<li style="display:flex; gap:14px; align-items:center; flex-wrap:wrap; padding-top:8px;">
 					<a href="<?php echo esc_url( get_theme_mod( 'g2a_directions_url', 'https://www.google.com/maps/dir/?api=1&destination=Guns+2+Ammo%2C+6030+E+Main+St+%23103%2C+Mesa%2C+AZ+85205%2C+United+States&destination_place_id=ChIJaSRMhpGvK4cR4kE_E-jZvKE' ) ); ?>" target="_blank" rel="noopener" style="display:inline-flex; align-items:center; gap:6px;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 2 C8 2 5 5 5 9 c0 6 7 13 7 13 s7-7 7-13 c0-4-3-7-7-7 z"/><circle cx="12" cy="9" r="2.5"/></svg>Get Directions</a>
 					<a href="<?php echo esc_url( home_url( '/contact/' ) ); ?>" style="display:inline-flex; align-items:center; gap:6px;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18"/></svg>Contact</a>
@@ -167,7 +184,7 @@ $founded   = (int) $biz['founded_year'];
 			<div class="qv-meta" id="g2a-qv-meta"></div>
 			<div style="display:flex; gap:10px; flex-wrap:wrap;">
 				<a class="btn btn-ember" id="g2a-qv-cart">Add To Cart</a>
-				<a class="btn btn-brass" id="g2a-qv-detail">View Full Details -></a>
+				<a class="btn btn-brass" id="g2a-qv-detail">View Full Details <svg class="btn-arrow" width="15" height="12" viewBox="0 0 20 16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M1 8h17M12 2l6 6-6 6"/></svg></a>
 			</div>
 		</div>
 	</div>

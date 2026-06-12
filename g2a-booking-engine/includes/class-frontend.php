@@ -523,6 +523,27 @@ final class G2AB_Frontend {
 
 				</main>
 			</div>
+
+			<?php
+			/**
+			 * Friendly support note under the booking widget. Filterable so
+			 * the theme can localize or rewrite the tone.
+			 */
+			$help_note = apply_filters(
+				'g2ab_booking_help_note',
+				sprintf(
+					/* translators: 1: opening link tag, 2: closing link tag */
+					__( 'Hit a snag while booking? %1$sDrop us a message%2$s and our team will take care of the rest — we want every visit to start smooth. Thanks for choosing Guns 2 Ammo, your range partner.', 'g2a-booking' ),
+					'<a href="' . esc_url( home_url( '/contact/' ) ) . '">',
+					'</a>'
+				)
+			);
+			if ( $help_note ) : ?>
+				<p class="g2ab-help-note">
+					<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true" style="flex:0 0 auto;margin-top:2px;"><circle cx="12" cy="12" r="9.2"/><path d="M9.2 9.2a2.8 2.8 0 1 1 3.9 2.6c-.8.35-1.1.9-1.1 1.7"/><circle cx="12" cy="16.8" r="0.4" fill="currentColor"/></svg>
+					<span><?php echo wp_kses( $help_note, array( 'a' => array( 'href' => array() ), 'strong' => array(), 'em' => array() ) ); ?></span>
+				</p>
+			<?php endif; ?>
 		</div>
 		<?php $this->render_inline_bootstrap( $instance_id ); ?>
 		<?php
@@ -768,6 +789,9 @@ final class G2AB_Frontend {
 				'loading'  => __( 'Loading available times…', 'g2a-booking' ),
 				'no_slots' => __( 'No times available on this date.', 'g2a-booking' ),
 				'load_failed' => __( 'We couldn\'t load times just now — please refresh the page and try again.', 'g2a-booking' ),
+				/* translators: 1: open slots, 2: total slots */
+				'slots_note' => __( '%1$s of %2$s time slots still open on this date', 'g2a-booking' ),
+				'slots_note_one' => __( 'Last open time slot on this date — grab it', 'g2a-booking' ),
 				'closed'   => __( 'Closed on this date.', 'g2a-booking' ),
 				'submitting' => __( 'Reserving…', 'g2a-booking' ),
 				'failed'   => __( 'Could not complete booking. Please try again.', 'g2a-booking' ),
@@ -966,6 +990,17 @@ final class G2AB_Frontend {
 				if (hint) hint.style.display = 'none';
 				box.innerHTML = '';
 				if (!slots || !slots.length) { box.innerHTML = '<p class="g2ab-muted">' + config.i18n.no_slots + '</p>'; return; }
+				// Availability note: a clean one-liner so guests can see at a
+				// glance how booked the day already is.
+				var open = slots.filter(function(s){ return s.available; }).length;
+				if (open > 0) {
+					var note = document.createElement('p');
+					note.className = 'g2ab-slots-note';
+					note.textContent = (open === 1)
+						? config.i18n.slots_note_one
+						: config.i18n.slots_note.replace('%1$s', open).replace('%2$s', slots.length);
+					box.appendChild(note);
+				}
 				slots.forEach(function(slot){
 					var btn = document.createElement('button');
 					btn.type = 'button';
