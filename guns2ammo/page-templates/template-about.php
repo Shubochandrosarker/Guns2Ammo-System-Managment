@@ -184,14 +184,12 @@ get_header();
           <div class="label">Phone</div>
           <div class="val"><a href="tel:+16027152677">(602) 715-2677</a></div>
         </div>
+        <?php foreach ( g2a_biz_hours_rows() as $g2a_hr ) : ?>
         <div class="contact-card">
-          <div class="label">Hours  Weekdays</div>
-          <div class="val">Mon  Fri  10a  8p</div>
+          <div class="label">Hours · <?php echo esc_html( $g2a_hr['days'] ); ?></div>
+          <div class="val"><?php echo esc_html( $g2a_hr['time'] ); ?></div>
         </div>
-        <div class="contact-card">
-          <div class="label">Hours  Weekend</div>
-          <div class="val">Sat 9a8p  Sun 11a6p</div>
-        </div>
+        <?php endforeach; ?>
         <div class="contact-card">
           <div class="label">Email</div>
           <div class="val"><a href="mailto:sales@guns2ammo.com">sales@guns2ammo.com</a></div>

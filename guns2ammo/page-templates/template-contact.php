@@ -131,10 +131,9 @@ get_header();
         <div class="k"> Visit</div>
         <div class="v">6030 E Main St, Suite 103<br>Mesa, Arizona 85205</div>
         <div style="margin-top: 18px;">
-          <div class="row"><span>Mon  Thu</span><span class="vh">10am  6pm</span></div>
-          <div class="row"><span>Fri</span><span class="vh">10am   7pm</span></div>
-          <div class="row"><span>Sat</span><span class="vh">10am  7pm</span></div>
-          <div class="row"><span>Sun</span><span class="vh">12pm  6pm</span></div>
+          <?php foreach ( g2a_biz_hours_rows() as $g2a_hr ) : ?>
+          <div class="row"><span><?php echo esc_html( $g2a_hr['days'] ); ?></span><span class="vh"><?php echo esc_html( $g2a_hr['time'] ); ?></span></div>
+          <?php endforeach; ?>
         </div>
       </div>
 

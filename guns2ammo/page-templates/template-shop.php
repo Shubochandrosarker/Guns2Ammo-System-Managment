@@ -17,9 +17,13 @@ if ( ! class_exists( 'WooCommerce' ) ) {
 }
 
 $paged = max( 1, (int) get_query_var( 'paged' ), (int) ( $_GET['paged'] ?? 1 ) );
-$search = sanitize_text_field( wp_unslash( $_GET['s'] ?? '' ) );
-$order  = sanitize_text_field( wp_unslash( $_GET['orderby'] ?? 'menu_order' ) );
-$cat    = sanitize_title( wp_unslash( $_GET['product_cat'] ?? '' ) );
+// NOTE: 's', 'orderby' and 'product_cat' are reserved WordPress/Woo query
+// vars — using them as GET params on a page hijacks the main query (WP
+// serves a search/taxonomy request instead of this template), which is why
+// the filters appeared dead. The form now uses theme-prefixed params.
+$search = sanitize_text_field( wp_unslash( $_GET['shop_q'] ?? '' ) );
+$order  = sanitize_text_field( wp_unslash( $_GET['shop_orderby'] ?? ( $_GET['orderby'] ?? 'menu_order' ) ) );
+$cat    = sanitize_title( wp_unslash( $_GET['shop_cat'] ?? '' ) );
 $stock  = sanitize_text_field( wp_unslash( $_GET['stock'] ?? '' ) );
 $min    = isset( $_GET['min_price'] ) ? (float) $_GET['min_price'] : 0;
 $max    = isset( $_GET['max_price'] ) ? (float) $_GET['max_price'] : 0;
@@ -120,8 +124,8 @@ get_header();
 		<div class="head">
 			<div><span class="eyebrow">Retail Catalog</span><h1>Shop</h1></div>
 			<form method="get" class="toolbar" style="margin:0;">
-				<input type="search" name="s" value="<?php echo esc_attr( $search ); ?>" placeholder="Search products">
-				<select name="orderby">
+				<input type="search" name="shop_q" value="<?php echo esc_attr( $search ); ?>" placeholder="Search products">
+				<select name="shop_orderby">
 					<option value="menu_order" <?php selected( $order, 'menu_order' ); ?>>Default</option>
 					<option value="date" <?php selected( $order, 'date' ); ?>>Newest</option>
 					<option value="price" <?php selected( $order, 'price' ); ?>>Price: Low to High</option>
@@ -129,7 +133,7 @@ get_header();
 					<option value="popularity" <?php selected( $order, 'popularity' ); ?>>Popularity</option>
 					<option value="rating" <?php selected( $order, 'rating' ); ?>>Top Rated</option>
 				</select>
-				<?php if ( $cat ) : ?><input type="hidden" name="product_cat" value="<?php echo esc_attr( $cat ); ?>"><?php endif; ?>
+				<?php if ( $cat ) : ?><input type="hidden" name="shop_cat" value="<?php echo esc_attr( $cat ); ?>"><?php endif; ?>
 				<?php if ( $stock ) : ?><input type="hidden" name="stock" value="<?php echo esc_attr( $stock ); ?>"><?php endif; ?>
 				<?php if ( $min > 0 ) : ?><input type="hidden" name="min_price" value="<?php echo esc_attr( $min ); ?>"><?php endif; ?>
 				<?php if ( $max > 0 ) : ?><input type="hidden" name="max_price" value="<?php echo esc_attr( $max ); ?>"><?php endif; ?>
@@ -141,18 +145,18 @@ get_header();
 				<h5>Categories</h5>
 				<div class="cat-list">
 					<?php
-					$all_url = remove_query_arg( [ 'product_cat', 'paged' ] );
+					$all_url = remove_query_arg( [ 'shop_cat', 'product_cat', 'paged' ] );
 					echo '<a class="' . ( '' === $cat ? 'active' : '' ) . '" href="' . esc_url( $all_url ) . '"><span>All</span><span>' . (int) wp_count_posts( 'product' )->publish . '</span></a>';
 					foreach ( $cats as $term ) {
-						$url = add_query_arg( 'product_cat', $term->slug, remove_query_arg( 'paged' ) );
+						$url = add_query_arg( 'shop_cat', $term->slug, remove_query_arg( 'paged' ) );
 						echo '<a class="' . ( $cat === $term->slug ? 'active' : '' ) . '" href="' . esc_url( $url ) . '"><span>' . esc_html( $term->name ) . '</span><span>' . (int) $term->count . '</span></a>';
 					}
 					?>
 				</div>
 				<form method="get" class="filters" style="margin-top:16px;">
-					<?php if ( $search ) : ?><input type="hidden" name="s" value="<?php echo esc_attr( $search ); ?>"><?php endif; ?>
-					<?php if ( $cat ) : ?><input type="hidden" name="product_cat" value="<?php echo esc_attr( $cat ); ?>"><?php endif; ?>
-					<?php if ( $order ) : ?><input type="hidden" name="orderby" value="<?php echo esc_attr( $order ); ?>"><?php endif; ?>
+					<?php if ( $search ) : ?><input type="hidden" name="shop_q" value="<?php echo esc_attr( $search ); ?>"><?php endif; ?>
+					<?php if ( $cat ) : ?><input type="hidden" name="shop_cat" value="<?php echo esc_attr( $cat ); ?>"><?php endif; ?>
+					<?php if ( $order ) : ?><input type="hidden" name="shop_orderby" value="<?php echo esc_attr( $order ); ?>"><?php endif; ?>
 					<div><label for="stock">Stock</label><select id="stock" name="stock"><option value="">Any</option><option value="in" <?php selected( $stock, 'in' ); ?>>In stock</option><option value="out" <?php selected( $stock, 'out' ); ?>>Out of stock</option></select></div>
 					<div><label for="min_price">Min price</label><input id="min_price" type="number" step="0.01" min="0" name="min_price" value="<?php echo esc_attr( $min > 0 ? $min : '' ); ?>"></div>
 					<div><label for="max_price">Max price</label><input id="max_price" type="number" step="0.01" min="0" name="max_price" value="<?php echo esc_attr( $max > 0 ? $max : '' ); ?>"></div>

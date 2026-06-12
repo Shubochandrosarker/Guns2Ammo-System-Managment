@@ -309,3 +309,45 @@ function g2a_google_live_reviews() {
 	}
 	return null;
 }
+
+/**
+ * Hours as display rows with consecutive identical days grouped
+ * (e.g. "Mon – Thu" => "10am – 6pm"). Used by contact/about so their
+ * tables can never disagree with g2a_biz()['hours'].
+ *
+ * @return array[] [ [ 'days' => 'Mon – Thu', 'time' => '10am – 6pm' ], … ]
+ */
+function g2a_biz_hours_rows() {
+	$biz   = g2a_biz();
+	$names = array( 1 => 'Mon', 2 => 'Tue', 3 => 'Wed', 4 => 'Thu', 5 => 'Fri', 6 => 'Sat', 0 => 'Sun' );
+	$fmt   = function ( $mins ) {
+		$h = intdiv( (int) $mins, 60 );
+		$m = (int) $mins % 60;
+		$ampm = $h < 12 ? 'am' : 'pm';
+		$h12  = $h % 12 ?: 12;
+		return $h12 . ( $m ? ':' . str_pad( (string) $m, 2, '0', STR_PAD_LEFT ) : '' ) . $ampm;
+	};
+	$rows = array();
+	$prev = null;
+	foreach ( array_keys( $names ) as $dow ) {
+		$h    = $biz['hours'][ $dow ] ?? null;
+		$time = $h ? $fmt( $h['open'] ) . ' – ' . $fmt( $h['close'] ) : __( 'Closed', 'guns2ammo' );
+		if ( $prev && $prev['time'] === $time ) {
+			$prev['end'] = $names[ $dow ];
+		} else {
+			if ( $prev ) {
+				$rows[] = $prev;
+			}
+			$prev = array( 'start' => $names[ $dow ], 'end' => $names[ $dow ], 'time' => $time );
+		}
+	}
+	if ( $prev ) {
+		$rows[] = $prev;
+	}
+	return array_map( function ( $r ) {
+		return array(
+			'days' => $r['start'] === $r['end'] ? $r['start'] : $r['start'] . ' – ' . $r['end'],
+			'time' => $r['time'],
+		);
+	}, $rows );
+}
