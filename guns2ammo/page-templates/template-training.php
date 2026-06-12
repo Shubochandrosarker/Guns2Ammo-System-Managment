@@ -97,7 +97,7 @@ get_header();
   <div class="c">
     <div class="eb">Section 02  Education</div>
     <h1>TRAINING<br>& <span class="a">CERTIFICATION</span></h1>
-    <p>Six pathway courses from new-shooter fundamentals to multi-state CCW certification  taught by NRA, USCCA, and former law-enforcement instructors with 60,000+ student-hours of experience.</p>
+    <p>Pathway courses from new-shooter fundamentals to multi-state CCW certification — taught by NRA-certified instructors with military and law-enforcement backgrounds.</p>
     <div class="meta">
       <div class="it">Active Courses<strong>09</strong></div>
       <div class="it">Annual Graduates<strong>1,400+</strong></div>
@@ -124,11 +124,19 @@ get_header();
       </div>
 
       <div class="course" data-reveal>
-        <div class="top"><div class="lvl"> Level 02  Certification</div><div class="price">$120</div></div>
+        <div class="top"><div class="lvl"> Level 02  Certification</div><div class="price">$85</div></div>
         <h3><a href="<?php echo esc_url( home_url( '/arizona-ccw-certification/' ) ); ?>" style="color:inherit;text-decoration:none;">ARIZONA CCW</a></h3>
-        <div class="lead">Full 8-hour state-approved certification course covering AZ statute, use-of-force, draw-from-concealment, and live-fire qualification.</div>
-        <div class="specs"><div class="s">Duration<strong>8 Hours</strong></div><div class="s">Class Size<strong>4–10</strong></div><div class="s">Prereq<strong>Basic</strong></div></div>
-        <div class="acts"><a class="btn btn-brass btn-sm" href="<?php echo esc_url( home_url( '/arizona-ccw-certification/' ) ); ?>">View Course </a><span class="form-help">Member: $90.00</span></div>
+        <div class="lead">4-hour classroom certification: Arizona carry law (A.R.S. §13-3112), legal use of force, safe handling, and fingerprints/paperwork. No shooting required — Saturdays 11:30 AM.</div>
+        <div class="specs"><div class="s">Duration<strong>4 Hours</strong></div><div class="s">Class Size<strong>4–10</strong></div><div class="s">Prereq<strong>None</strong></div></div>
+        <div class="acts"><a class="btn btn-brass btn-sm" href="<?php echo esc_url( home_url( '/arizona-ccw-certification/' ) ); ?>">View Course </a></div>
+      </div>
+
+      <div class="course" data-reveal>
+        <div class="top"><div class="lvl"> Level 02  Certification + Range</div><div class="price">$149.99</div></div>
+        <h3><a href="<?php echo esc_url( home_url( '/arizona-ccw-certification/' ) ); ?>" style="color:inherit;text-decoration:none;">ARIZONA CCW + LIVE FIRE</a></h3>
+        <div class="lead">Everything in the classroom course plus a supervised live-fire session on our lanes to build real-world confidence. 5 hours — Monday evenings.</div>
+        <div class="specs"><div class="s">Duration<strong>5 Hours</strong></div><div class="s">Class Size<strong>4–10</strong></div><div class="s">Prereq<strong>None</strong></div></div>
+        <div class="acts"><a class="btn btn-brass btn-sm" href="<?php echo esc_url( home_url( '/arizona-ccw-certification/' ) ); ?>#live-fire">View Course </a></div>
       </div>
 
       <div class="course" data-reveal>
@@ -223,29 +231,10 @@ get_header();
       <h2>The Instructors</h2>
       <p>1:1 ratios on advanced courses. No assistants, no shortcuts.</p>
     </div>
-    <div class="ig">
-      <div class="inst">
-        <div class="av">RM</div>
-        <div class="nm">RAY MENDOZA</div>
-        <div class="role">Lead Instructor  Owner</div>
-        <p>22 years Maricopa County Sheriff's Office. AZ DPS-certified CCW instructor since 2009. Trained over 4,000 carriers.</p>
-        <div class="creds"><span>NRA RSO</span><span>USCCA Cert</span><span>AZ DPS</span></div>
-      </div>
-      <div class="inst">
-        <div class="av">SK</div>
-        <div class="nm">SARAH KELLY</div>
-        <div class="role">Women's Lead</div>
-        <p>USCCA-certified Women's Defensive Shooting instructor. Built our Tuesday Ladies program from 6 students to 200+ active.</p>
-        <div class="creds"><span>USCCA WDS</span><span>NRA Pistol</span><span>Refuse-To-Be</span></div>
-      </div>
-      <div class="inst">
-        <div class="av">DT</div>
-        <div class="nm">DAVID TRAN</div>
-        <div class="role">Advanced Tactics</div>
-        <p>Former Marine Corps Scout Sniper. Specializes in defensive pistol, low-light, and force-on-force scenario training.</p>
-        <div class="creds"><span>USMC SS</span><span>FoF Cert</span><span>NRA RSO</span></div>
-      </div>
+    <div class="ig" data-reveal-group>
+      <?php g2a_render_instructors( 'inst' ); ?>
     </div>
+    <?php g2a_instructors_schema(); ?>
   </div>
 </section>
 

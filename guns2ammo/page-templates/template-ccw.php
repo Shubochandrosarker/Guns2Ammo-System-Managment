@@ -132,9 +132,9 @@ get_header();
       <a class="btn btn-ember btn-lg" href="#registration">Ask About Registration</a>
     </div>
     <div class="ccw-meta">
-      <div><div class="v">4 Hours</div><div class="l">Duration</div></div>
-      <div><div class="v">Classroom</div><div class="l">Format</div></div>
-      <div><div class="v">$85</div><div class="l">Cost</div></div>
+      <div><div class="v">$85 · 4 Hrs</div><div class="l">Classroom Course</div></div>
+      <div><div class="v">$149.99 · 5 Hrs</div><div class="l">+ Live Fire</div></div>
+      <div><div class="v">Saturdays / Mon Eve</div><div class="l">Schedule</div></div>
       <div><div class="v">21+ Years</div><div class="l">Eligibility</div></div>
     </div>
   </div>
@@ -162,6 +162,31 @@ get_header();
         <li>Proper holster selection &amp; draw technique overview</li>
         <li>Secure home storage to prevent unauthorized access</li>
         <li>Transporting firearms legally in Arizona</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<section class="cols" id="live-fire">
+  <div class="c ccw-course-grid">
+    <div class="col">
+      <span class="eyebrow">Option 1 · Classroom</span>
+      <h2 style="font-family:var(--font-display); font-size:32px; color:var(--color-white); margin:14px 0 18px;">ARIZONA CCW — $85</h2>
+      <ul>
+        <li>4 hours, no shooting component required</li>
+        <li>Arizona carry law, regulations &amp; training concepts (~3.5 hrs)</li>
+        <li>Fingerprints &amp; DPS application paperwork (~30 min)</li>
+        <li>Saturdays at 11:30 AM</li>
+      </ul>
+    </div>
+    <div class="col">
+      <span class="eyebrow">Option 2 · Classroom + Range</span>
+      <h2 style="font-family:var(--font-display); font-size:32px; color:var(--color-white); margin:14px 0 18px;">CCW + LIVE FIRE — $149.99</h2>
+      <ul>
+        <li>5 hours — the full classroom course plus supervised live fire</li>
+        <li>Shoot on our climate-controlled indoor lanes with an instructor</li>
+        <li>Ideal for first-time carriers who want range confidence</li>
+        <li>Monday evenings — quieter range, better coaching time</li>
       </ul>
     </div>
   </div>

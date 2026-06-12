@@ -26,6 +26,8 @@ add_action( 'customize_register', function ( $wp_customize ) {
 		'g2a_meta_home'    => [ 'label' => 'Home meta description', 'default' => '' ],
 		'g2a_og_image'     => [ 'label' => 'Default OG image URL',  'default' => '' ],
 		'g2a_ffl_license'  => [ 'label' => 'FFL License #',         'default' => '' ],
+		'g2a_google_places_api_key' => [ 'label' => 'Google Places API Key (live reviews)', 'default' => '' ],
+		'g2a_google_place_id'       => [ 'label' => 'Google Place ID (live reviews)',       'default' => '' ],
 	];
 
 	foreach ( $fields as $id => $f ) {

@@ -93,7 +93,7 @@ get_header();
   <div class="c">
     <span class="eyebrow" style="justify-content:center;"> Our Philosophy</span>
     <blockquote>"A safe shooter is a <em>disciplined</em> shooter. A disciplined shooter is a <em>trained</em> shooter. We are not in the business of selling guns. We are in the business of <em>training people</em> to handle them correctly  for life."</blockquote>
-    <div class="sig"> Robert &amp; Diane Halsey  Owners</div>
+    <div class="sig">— The Guns 2 Ammo Family · Veteran- &amp; Family-Owned</div>
   </div>
 </section>
 
@@ -146,41 +146,11 @@ get_header();
   <div class="c">
     <span class="eyebrow"> The Team</span>
     <h2>OPERATORS,<br>TEACHERS, FAMILY.</h2>
-    <p style="color: var(--color-fog); max-width:64ch; margin: 0 0 32px;">Decades of combined experience from law enforcement, military, and competitive shooting. The team you train with is the team that owns the building.</p>
+    <p style="color: var(--color-fog); max-width:64ch; margin: 0 0 32px;">Decades of combined experience from law enforcement, military, and competitive shooting. The team you train with is the team that runs the building.</p>
     <div class="team-grid" data-reveal-group>
-      <div class="member" data-reveal>
-        <div class="photo" data-pl="EDITORIAL  ROBERT"></div>
-        <div class="body">
-          <div class="role">Owner  Lead Instructor</div>
-          <h4>ROBERT HALSEY</h4>
-          <p>22 years USAF security forces. NRA Pistol &amp; Rifle. AZ DPS approved.</p>
-        </div>
-      </div>
-      <div class="member" data-reveal>
-        <div class="photo" data-pl="EDITORIAL  DIANE"></div>
-        <div class="body">
-          <div class="role">Owner  Operations</div>
-          <h4>DIANE HALSEY</h4>
-          <p>Built the curriculum. Runs the shop. Probably the reason you came back.</p>
-        </div>
-      </div>
-      <div class="member" data-reveal>
-        <div class="photo" data-pl="EDITORIAL  MARCUS"></div>
-        <div class="body">
-          <div class="role">Senior RSO</div>
-          <h4>MARCUS CRUZ</h4>
-          <p>14 years Mesa PD SWAT. USPSA Master Class. Quietest man on the line.</p>
-        </div>
-      </div>
-      <div class="member" data-reveal>
-        <div class="photo" data-pl="EDITORIAL  SARAH"></div>
-        <div class="body">
-          <div class="role">CCW Instructor</div>
-          <h4>SARAH OKAFOR</h4>
-          <p>USMC veteran. Specializes in first-time owners and women's-only classes.</p>
-        </div>
-      </div>
+      <?php g2a_render_instructors( 'member' ); ?>
     </div>
+    <?php g2a_instructors_schema(); ?>
   </div>
 </section>
 

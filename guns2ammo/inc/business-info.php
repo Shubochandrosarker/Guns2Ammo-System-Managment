@@ -69,6 +69,8 @@ function g2a_biz() {
 	$phone     = trim( (string) get_theme_mod( 'g2a_phone', '(602) 715-2677' ) );
 	$phone_tel = '+1' . preg_replace( '/[^0-9]/', '', $phone );
 
+	$g2a_live_reviews = g2a_google_live_reviews();
+
 	$cache = array(
 		'name'         => trim( (string) get_theme_mod( 'g2a_business_name', 'Guns 2 Ammo' ) ),
 		'legal_name'   => trim( (string) get_theme_mod( 'g2a_legal_name',    'Guns 2 Ammo — Arizona Shooting Range' ) ),
@@ -88,11 +90,12 @@ function g2a_biz() {
 		'founded_year' => $founded_year,
 		'founded'      => trim( (string) get_theme_mod( 'g2a_founded_string', 'Since ' . $founded_year ) ),
 
-		// Reviews — manually maintained by the client in Customizer.
-		// Defaults intentionally match the GBP rating + count at
-		// the time this module shipped. NEVER auto-increment.
-		'review_count'  => (int)   get_theme_mod( 'g2a_review_count',  449 ),
-		'review_rating' => (float) get_theme_mod( 'g2a_review_rating', 4.7 ),
+		// Reviews — live from the Google Places API when an API key +
+		// Place ID are configured in the Customizer (12h cache,
+		// stale-on-error), otherwise the manually maintained numbers.
+		// NEVER auto-increment.
+		'review_count'  => (int)   ( $g2a_live_reviews['count'] ?? get_theme_mod( 'g2a_review_count', 449 ) ),
+		'review_rating' => (float) ( $g2a_live_reviews['rating'] ?? get_theme_mod( 'g2a_review_rating', 4.7 ) ),
 		'review_source' => trim( (string) get_theme_mod( 'g2a_review_source', 'Google' ) ),
 
 		'hours'         => $hours,
@@ -253,3 +256,56 @@ add_action( 'wp_enqueue_scripts', function () {
 		'before'
 	);
 }, 30 );
+
+/**
+ * Live Google rating + review count via the Places Details API.
+ *
+ * Requires Customizer settings g2a_google_places_api_key and
+ * g2a_google_place_id. Cached 12 hours; the last good response is kept
+ * in an option so a failed refresh never blanks the numbers (stale
+ * beats wrong). Returns array{rating:float,count:int}|null.
+ */
+function g2a_google_live_reviews() {
+	$key      = trim( (string) get_theme_mod( 'g2a_google_places_api_key', '' ) );
+	$place_id = trim( (string) get_theme_mod( 'g2a_google_place_id', '' ) );
+	if ( '' === $key || '' === $place_id ) {
+		return null;
+	}
+
+	$cached = get_transient( 'g2a_google_reviews' );
+	if ( is_array( $cached ) && isset( $cached['rating'], $cached['count'] ) ) {
+		return $cached;
+	}
+
+	$url = add_query_arg(
+		array(
+			'place_id' => rawurlencode( $place_id ),
+			'fields'   => 'rating,user_ratings_total',
+			'key'      => rawurlencode( $key ),
+		),
+		'https://maps.googleapis.com/maps/api/place/details/json'
+	);
+	$res  = wp_remote_get( $url, array( 'timeout' => 8 ) );
+	$body = ( ! is_wp_error( $res ) && 200 === wp_remote_retrieve_response_code( $res ) )
+		? json_decode( wp_remote_retrieve_body( $res ), true )
+		: null;
+
+	if ( isset( $body['status'], $body['result']['rating'], $body['result']['user_ratings_total'] )
+		&& 'OK' === $body['status'] ) {
+		$fresh = array(
+			'rating' => round( (float) $body['result']['rating'], 1 ),
+			'count'  => (int) $body['result']['user_ratings_total'],
+		);
+		set_transient( 'g2a_google_reviews', $fresh, 12 * HOUR_IN_SECONDS );
+		update_option( 'g2a_google_reviews_last_good', $fresh, false );
+		return $fresh;
+	}
+
+	// Fetch failed — serve the last good numbers and retry in an hour.
+	$stale = get_option( 'g2a_google_reviews_last_good' );
+	if ( is_array( $stale ) && isset( $stale['rating'], $stale['count'] ) ) {
+		set_transient( 'g2a_google_reviews', $stale, HOUR_IN_SECONDS );
+		return $stale;
+	}
+	return null;
+}

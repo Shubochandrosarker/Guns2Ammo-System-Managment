@@ -161,7 +161,7 @@ if ( function_exists( 'g2a_faq_schema' ) && function_exists( 'g2a_emit_jsonld' )
   <div class="ar-ccw">
     <div>
       <h3>Includes A FREE Arizona CCW Class</h3>
-      <p>A $75 value  same-day certificate, carry legally across 37+ reciprocal states.</p>
+      <p>An $85 value — same-day certificate, carry legally across 37 reciprocal states.</p>
     </div>
     <a class="btn btn-brass btn-arrow" href="<?php echo esc_url( home_url( '/free-ccw-class/' ) ); ?>">Read CCW Details</a>
   </div>

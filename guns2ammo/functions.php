@@ -155,6 +155,7 @@ require_once G2A_DIR . '/inc/plugins.php';
 require_once G2A_DIR . '/inc/login.php';
 require_once G2A_DIR . '/inc/redirects.php';
 require_once G2A_DIR . '/inc/faqs.php';
+require_once G2A_DIR . '/inc/instructors.php';
 require_once G2A_DIR . '/inc/sitemap.php';
 require_once G2A_DIR . '/inc/llms.php';
 require_once G2A_DIR . '/inc/robots.php';

@@ -96,11 +96,64 @@ function g2a_current_url() {
 	return home_url( $path ? $path : '/' );
 }
 
+/**
+ * Curated per-page titles + descriptions for the money pages (2026-06 SEO
+ * audit). Used as defaults: a manual excerpt or an SEO-plugin override
+ * still wins. Keyed by page slug.
+ */
+function g2a_seo_meta_map() {
+	return apply_filters( 'g2a_seo_meta_map', array(
+		'book-a-lane'         => array( 'title' => 'Book a Shooting Lane in Mesa — $20/hr, Walk-Ins OK | G2A', 'desc' => 'Reserve your lane at Guns 2 Ammo in Mesa: $20/hr, extra shooters $15, gun rentals from $15. Climate-controlled, RSO on duty, open 7 days. Instant confirmation.' ),
+		'machine-gun'         => array( 'title' => 'Shoot a Machine Gun in Mesa, AZ — Packages From $249 | G2A', 'desc' => 'Mesa\'s only indoor full-auto experience. Fire an MP5, M16 or AK-47 with a 1-on-1 RSO — no experience needed. Packages from $249, ammo included. Book today.' ),
+		'training'            => array( 'title' => 'Firearms Training in Mesa, AZ — NRA & USCCA Classes | G2A', 'desc' => 'NRA & USCCA certified firearms training in Mesa: basic handgun, Arizona CCW ($85), defensive pistol & private instruction. Real instructors, weekly classes.' ),
+		'memberships'         => array( 'title' => 'Gun Range Memberships in Mesa From $29.99/mo | G2A', 'desc' => 'Unlimited range time at Mesa\'s Guns 2 Ammo from $29.99/mo. Free lane time, discounted rentals & training, guest passes. No contracts — cancel anytime.' ),
+		'pricing'             => array( 'title' => 'Range Pricing in Mesa, AZ — Lanes From $20/hr | G2A', 'desc' => 'Transparent range pricing at Guns 2 Ammo Mesa: lanes $20/hr, rentals from $15, eye & ear protection available, 9mm from $22/box. Member discounts up to 25%.' ),
+		'about'               => array( 'title' => 'About Guns 2 Ammo — Mesa\'s Range Since 2014 | G2A', 'desc' => 'Veteran- and family-owned. Guns 2 Ammo has run Mesa\'s most-trusted indoor range, gun store & training academy since 2014. Meet the team & tour the facility.' ),
+		'contact'             => array( 'title' => 'Contact Guns 2 Ammo — Mesa, AZ | (602) 715-2677', 'desc' => 'Visit Guns 2 Ammo at 6030 E Main St, Ste 103, Mesa, AZ 85205. Open 7 days. Call (602) 715-2677 or send a message — range, training, transfers & sales.' ),
+		'sell-your-gun'       => array( 'title' => 'Sell Your Gun in Mesa, AZ — Fair Cash Offers | G2A', 'desc' => 'Sell your firearm to Mesa\'s Guns 2 Ammo: free valuation, fair cash offer, all ATF paperwork handled in-store. Handguns, rifles, NFA & collections welcome.' ),
+		'transfers'           => array( 'title' => 'FFL Transfers in Mesa, AZ — $35 Flat Fee | Guns 2 Ammo', 'desc' => '$35 flat FFL transfers in Mesa with same-day pickup when your firearm arrives. NFA/Class III handled. Ship to our E Main St shop — here\'s exactly how it works.' ),
+		'ladies-tuesday'      => array( 'title' => 'Ladies Tuesday — Free 1-Hour Lane for Women | G2A Mesa', 'desc' => 'Every Tuesday, women shoot free for one hour at Guns 2 Ammo in Mesa. No membership needed, beginners welcome. Book your Tuesday lane.' ),
+		'range-safety'        => array( 'title' => 'Range Safety Rules — Guns 2 Ammo Indoor Range, Mesa', 'desc' => 'The four universal gun safety rules plus G2A house rules: required eye/ear protection, ammo policy, age limits & first-visit checklist for our Mesa range.' ),
+		'ffl-services'        => array( 'title' => 'NFA Transfers, Shipping & Consignment — Mesa FFL | G2A', 'desc' => 'Suppressor & SBR transfers ($95), full-auto ($295), firearm shipping and 80/20 consignment sales at Mesa\'s Guns 2 Ammo. Federally licensed, ATF compliant.' ),
+		'private-instruction' => array( 'title' => 'Private Firearms Instruction in Mesa, AZ — $140/hr | G2A', 'desc' => 'One-on-one firearms coaching at Guns 2 Ammo in Mesa. $140/hr for up to 2 shooters — range time, targets & eye/ear included. Book your private session.' ),
+		'basic-handgun'       => array( 'title' => 'Basic Handgun Class in Mesa, AZ — $95, Beginners | G2A', 'desc' => '4-hour beginner handgun course in Mesa: safety, grip, stance & 50 rounds of live fire. $95, small classes (1–6), no experience needed. Reserve your seat.' ),
+		'defensive-pistol'    => array( 'title' => 'Defensive Pistol Course in Mesa, AZ — 10 Hours | G2A', 'desc' => 'Advanced defensive pistol training in Mesa: draw from holster, move-and-shoot, low light. 10 hours, $295, CCW prerequisite. Train with NRA instructors.' ),
+		'california-ccw'      => array( 'title' => 'California CCW Live-Fire Qualification in Mesa, AZ | G2A', 'desc' => 'Preparing for a California CCW? Complete live-fire qualification practice at our Mesa indoor range. Verify county requirements with the CA DOJ first.' ),
+	) );
+}
+
+/** Curated map entry for the current page, or null. */
+function g2a_seo_meta_for_page() {
+	if ( ! is_page() ) {
+		return null;
+	}
+	$post = get_queried_object();
+	if ( ! $post || empty( $post->post_name ) ) {
+		return null;
+	}
+	$map = g2a_seo_meta_map();
+	return isset( $map[ $post->post_name ] ) ? $map[ $post->post_name ] : null;
+}
+
+// Curated titles as the default when no SEO plugin manages titles.
+add_filter( 'pre_get_document_title', function ( $title ) {
+	if ( $title || g2a_seo_plugin_active() ) {
+		return $title;
+	}
+	$meta = g2a_seo_meta_for_page();
+	return ( $meta && ! empty( $meta['title'] ) ) ? $meta['title'] : $title;
+}, 5 );
+
 function g2a_seo_description() {
 	if ( is_singular() ) {
 		$post = get_queried_object();
 		if ( $post && ! empty( $post->post_excerpt ) ) {
 			return wp_strip_all_tags( $post->post_excerpt );
+		}
+		// Curated audit copy beats the generic content trim on money pages.
+		$curated = g2a_seo_meta_for_page();
+		if ( $curated && ! empty( $curated['desc'] ) ) {
+			return $curated['desc'];
 		}
 		if ( $post && ! empty( $post->post_content ) ) {
 			return wp_trim_words( wp_strip_all_tags( strip_shortcodes( $post->post_content ) ), 32 );
