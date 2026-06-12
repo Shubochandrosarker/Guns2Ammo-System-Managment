@@ -135,8 +135,8 @@ final class G2AB_Frontend {
 	 */
 	public static function default_support_notice() {
 		return 'Having trouble booking your lane? Send us a quick message and our team will take care of the rest '
-			. '&mdash; we want your experience at Guns 2 Ammo to be effortless from the first click to the firing line. '
-			. 'Thanks for choosing Guns 2 Ammo &mdash; your range partner. '
+			. '— we want your experience at Guns 2 Ammo to be effortless from the first click to the firing line. '
+			. 'Thanks for choosing Guns 2 Ammo — your range partner. '
 			. '<a href="/contact/">Contact Us</a>';
 	}
 
