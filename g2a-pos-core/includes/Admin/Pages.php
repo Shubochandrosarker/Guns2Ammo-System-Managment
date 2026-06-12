@@ -395,6 +395,14 @@ final class Pages
         ];
         $base = G2A_POS_CORE_URL . 'assets/admin/';
         $version = defined('G2A_POS_CORE_VERSION') ? G2A_POS_CORE_VERSION : '0';
+        // Cache-bust on the bundle mtime too: rebuilding assets without a
+        // plugin-version bump previously kept serving stale admin.js/admin.css
+        // (?v= stayed identical), which left users on old layouts (narrow
+        // half-width panels) and views missing newer error handling.
+        $bundle = G2A_POS_CORE_PATH . 'assets/admin/admin.js';
+        if (is_readable($bundle)) {
+            $version .= '.' . (string) filemtime($bundle);
+        }
         // Mark body so the SPA can override WordPress admin chrome (margins,
         // max-widths, .wrap padding) without using :has() which isn't
         // universally supported. Set BEFORE the React bundle loads so there's

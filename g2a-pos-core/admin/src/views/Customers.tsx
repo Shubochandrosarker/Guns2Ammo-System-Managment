@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { get, post } from '../api';
+import { download, errorMessage, get, post } from '../api';
 import PageHeader from '../components/PageHeader';
 import DataTable, { type Column } from '../components/DataTable';
 
@@ -25,6 +25,13 @@ interface Profile {
   internal_notes?: string;
 }
 
+interface Integrations {
+  membership?: { active: boolean; plan: string; expires_at?: string | null; source: string } | null;
+  waiver?: { source: string; status: string; waiver_date?: string | null; valid_until?: string | null } | null;
+  bookings?: { id: number; title: string; starts_at: string; status: string; party: number }[];
+  ffl_transfer_count?: number;
+}
+
 interface CustomerDetail {
   id: number;
   name: string;
@@ -33,6 +40,7 @@ interface CustomerDetail {
   profile: Profile;
   loyalty: { points: number; credit_cents: number; tier?: string };
   history: { id: number; grand_total: string; payment_status: string; created_at: string; line_count: number }[];
+  integrations?: Integrations;
 }
 
 export default function Customers() {
@@ -40,6 +48,20 @@ export default function Customers() {
   const [rows, setRows] = useState<CustomerRow[]>([]);
   const [loading, setLoading] = useState(false);
   const [selected, setSelected] = useState<CustomerDetail | null>(null);
+  const [exporting, setExporting] = useState(false);
+  const [exportErr, setExportErr] = useState('');
+
+  const exportCsv = async () => {
+    setExporting(true);
+    setExportErr('');
+    try {
+      await download('/crm/export.csv', `g2a-customers-${new Date().toISOString().slice(0, 10)}.csv`);
+    } catch (e) {
+      setExportErr(errorMessage(e, 'Export failed'));
+    } finally {
+      setExporting(false);
+    }
+  };
 
   const search = async () => {
     setLoading(true);
@@ -75,7 +97,16 @@ export default function Customers() {
 
   return (
     <div>
-      <PageHeader title="Customers (CRM)" subtitle="Purchase history, lifetime value, marketing consent, denied-buyer flag." />
+      <PageHeader
+        title="Customers (CRM)"
+        subtitle="Purchase history, lifetime value, marketing consent, denied-buyer flag."
+        actions={
+          <button className="btn-secondary" onClick={exportCsv} disabled={exporting}>
+            {exporting ? 'Exporting…' : '⬇ Export CSV'}
+          </button>
+        }
+      />
+      {exportErr && <div className="mb-4 rounded-lg border border-rose-300 bg-rose-50 px-4 py-3 text-sm text-rose-700 dark:border-rose-900 dark:bg-rose-900/20 dark:text-rose-300">{exportErr}</div>}
       <div className="card mb-4 flex items-center gap-2 p-3">
         <input className="input flex-1" placeholder="Search name / email…" value={q}
           onChange={(e) => setQ(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && search()} />
@@ -119,6 +150,47 @@ export default function Customers() {
               <textarea className="input w-full" placeholder="Internal notes" rows={3} value={selected.profile.internal_notes ?? ''}
                 onChange={(e) => setSelected({...selected, profile: {...selected.profile, internal_notes: e.target.value}})} />
               <button className="btn-primary w-full" onClick={saveProfile}>Save profile</button>
+            </div>
+
+            <div className="mt-4 rounded-lg border border-zinc-200 p-3 dark:border-zinc-800">
+              <h4 className="text-sm font-semibold mb-2">Integrations</h4>
+              <div className="space-y-2 text-xs">
+                <div className="flex items-center justify-between">
+                  <span className="text-zinc-500">Membership</span>
+                  {selected.integrations?.membership ? (
+                    <span className={selected.integrations.membership.active ? 'badge-green' : 'badge-amber'}>
+                      {selected.integrations.membership.plan || 'member'} · {selected.integrations.membership.active ? 'active' : 'inactive'}
+                      {selected.integrations.membership.expires_at ? ` · until ${String(selected.integrations.membership.expires_at).slice(0, 10)}` : ''}
+                    </span>
+                  ) : <span className="text-zinc-400">none</span>}
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-zinc-500">Waiver</span>
+                  {selected.integrations?.waiver ? (
+                    <span className="badge-green">
+                      {selected.integrations.waiver.status} · {selected.integrations.waiver.source}
+                      {selected.integrations.waiver.waiver_date ? ` · ${String(selected.integrations.waiver.waiver_date).slice(0, 10)}` : ''}
+                    </span>
+                  ) : <span className="badge-red">none on file</span>}
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-zinc-500">FFL transfers</span>
+                  <span className="badge-zinc">{selected.integrations?.ffl_transfer_count ?? 0}</span>
+                </div>
+                <div>
+                  <div className="text-zinc-500 mb-1">Upcoming bookings</div>
+                  {(selected.integrations?.bookings?.length ?? 0) > 0 ? (
+                    <ul className="space-y-1">
+                      {(selected.integrations?.bookings ?? []).map((b) => (
+                        <li key={b.id} className="flex justify-between">
+                          <span>{b.title} · party {b.party}</span>
+                          <span className="text-zinc-500">{String(b.starts_at).slice(0, 16)} · {b.status}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  ) : <span className="text-zinc-400">none</span>}
+                </div>
+              </div>
             </div>
 
             <div className="mt-4">

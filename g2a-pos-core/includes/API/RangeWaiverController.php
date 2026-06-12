@@ -3,6 +3,7 @@
 namespace G2A\POS\API;
 
 use G2A\POS\Database\RangeWaiverRepository;
+use G2A\POS\Integrations\VerifyisticWaivers;
 use G2A\POS\Range\OtterWaiverCsvImporter;
 use G2A\POS\Wholesalers\Media\VendorImageMirror;
 use WP_Error;
@@ -12,25 +13,50 @@ use WP_REST_Response;
 final class RangeWaiverController {
 
 	public static function index( WP_REST_Request $req ): WP_REST_Response {
-		$repo = new RangeWaiverRepository();
-		$rows = array_map(
-			array( self::class, 'present' ),
-			$repo->search(
-				array(
-					'q'      => $req->get_param( 'q' ),
-					'email'  => $req->get_param( 'email' ),
-					'phone'  => $req->get_param( 'phone' ),
-					'from'   => $req->get_param( 'from' ),
-					'to'     => $req->get_param( 'to' ),
-					'limit'  => (int) ( $req->get_param( 'limit' ) ?: 50 ),
-					'offset' => (int) ( $req->get_param( 'offset' ) ?: 0 ),
-				)
-			)
+		$repo   = new RangeWaiverRepository();
+		$params = array(
+			'q'      => $req->get_param( 'q' ),
+			'email'  => $req->get_param( 'email' ),
+			'phone'  => $req->get_param( 'phone' ),
+			'from'   => $req->get_param( 'from' ),
+			'to'     => $req->get_param( 'to' ),
+			'limit'  => (int) ( $req->get_param( 'limit' ) ?: 50 ),
+			'offset' => (int) ( $req->get_param( 'offset' ) ?: 0 ),
 		);
+		// source filter: '' = all sources, 'pos' = locally stored waivers
+		// (OtterWaiver imports), 'verifyistic' / 'memberistic' = the read-only
+		// sibling-plugin sources surfaced by VerifyisticWaivers.
+		$source = sanitize_key( (string) ( $req->get_param( 'source' ) ?: '' ) );
+
+		$rows = array();
+		if ( $source === '' || ! in_array( $source, array( 'verifyistic', 'memberistic' ), true ) ) {
+			$rows = array_map( array( self::class, 'present' ), $repo->search( $params ) );
+			if ( $source !== '' && $source !== 'pos' ) {
+				$rows = array_values( array_filter( $rows, static fn( $r ) => ( $r['source'] ?? '' ) === $source ) );
+			}
+		}
+		$external = array();
+		try {
+			if ( $source === '' || $source === 'verifyistic' ) {
+				$external = array_merge( $external, VerifyisticWaivers::verifyistic_records( $params ) );
+			}
+			if ( $source === '' || $source === 'memberistic' ) {
+				$external = array_merge( $external, VerifyisticWaivers::memberistic_records( $params ) );
+			}
+		} catch ( \Throwable ) { // phpcs:ignore Generic.CodeAnalysis.EmptyStatement
+			$external = array();
+		}
+		$external = array_map( array( self::class, 'present' ), $external );
+
 		return new WP_REST_Response(
 			array(
 				'ok'      => true,
-				'waivers' => $rows,
+				'waivers' => array_merge( $rows, $external ),
+				'sources' => array(
+					'pos'         => true,
+					'verifyistic' => VerifyisticWaivers::verifyistic_active(),
+					'memberistic' => VerifyisticWaivers::memberistic_active(),
+				),
 			)
 		);
 	}

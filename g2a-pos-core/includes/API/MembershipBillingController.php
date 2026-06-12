@@ -4,6 +4,7 @@ namespace G2A\POS\API;
 
 use G2A\POS\Database\LaneReservationRepository;
 use G2A\POS\Database\MembershipRepository;
+use G2A\POS\Integrations\BookingEngineSync;
 use WP_REST_Request;
 
 final class MembershipBillingController {
@@ -26,9 +27,21 @@ final class MembershipBillingController {
 	public static function lanes_for_day( WP_REST_Request $request ) {
 		$date     = sanitize_text_field( (string) $request->get_param( 'date' ) ) ?: date( 'Y-m-d' );
 		$location = (int) $request->get_param( 'location_id' );
+
+		// Read-only merge: g2a-booking-engine bookings for the same day, when
+		// that plugin is installed, so the cashier sees web bookings alongside
+		// POS-native reservations.
+		$engine = array();
+		try {
+			$engine = BookingEngineSync::bookings_for_day( $date );
+		} catch ( \Throwable ) { // phpcs:ignore Generic.CodeAnalysis.EmptyStatement
+		}
+
 		return array(
-			'date'         => $date,
-			'reservations' => ( new LaneReservationRepository() )->list_for_day( $date, $location ),
+			'date'            => $date,
+			'reservations'    => ( new LaneReservationRepository() )->list_for_day( $date, $location ),
+			'engine_active'   => BookingEngineSync::is_active(),
+			'engine_bookings' => $engine,
 		);
 	}
 
