@@ -1,2 +1,28 @@
 # Extracted plugin/theme archives used for audit only (originals are zipped at repo root)
 _audit/
+
+# Node build deps (POS admin SPA)
+g2a-pos-core/admin/node_modules/
+
+# POS composer dev dependencies (tests/linting only; production vendor = setasign + autoloader)
+g2a-pos-core/vendor/antecedent/
+g2a-pos-core/vendor/bin/
+g2a-pos-core/vendor/brain/
+g2a-pos-core/vendor/dealerdirect/
+g2a-pos-core/vendor/hamcrest/
+g2a-pos-core/vendor/mockery/
+g2a-pos-core/vendor/myclabs/
+g2a-pos-core/vendor/nikic/
+g2a-pos-core/vendor/phar-io/
+g2a-pos-core/vendor/php-stubs/
+g2a-pos-core/vendor/phpcsstandards/
+g2a-pos-core/vendor/phpstan/
+g2a-pos-core/vendor/phpunit/
+g2a-pos-core/vendor/sebastian/
+g2a-pos-core/vendor/squizlabs/
+g2a-pos-core/vendor/symfony/
+g2a-pos-core/vendor/szepeviktor/
+g2a-pos-core/vendor/theseer/
+g2a-pos-core/vendor/wp-coding-standards/
+g2a-pos-core/.phpunit.cache/
+g2a-pos-core/vendor/composer/autoload_files.php

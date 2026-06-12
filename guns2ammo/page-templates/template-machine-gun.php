@@ -13,7 +13,7 @@ $g2a_page_id             = get_the_ID();
 $g2a_mg_hero_intro       = get_post_meta( $g2a_page_id, 'mg_hero_intro', true );
 $g2a_mg_ccw_replace      = get_post_meta( $g2a_page_id, 'mg_ccw_remove_text', true );
 ?>
-<header class="mg-hero">
+<header class="mg-hero hero-media">
   <div class="c">
     <span class="eyebrow" style="color: var(--color-ember);">Signature Experience  Booked 46 weeks out</span>
     <h1 style="margin-top:18px;"><span class="thin">FIRE THE</span>UNTHINKABLE<span class="ember">.</span></h1>

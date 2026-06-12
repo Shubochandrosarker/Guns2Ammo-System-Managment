@@ -4,8 +4,10 @@ import PageHeader from '../components/PageHeader';
 import DataTable, { type Column } from '../components/DataTable';
 
 interface Waiver {
-  id: number;
+  id: number | string;
   source: string;
+  read_only?: boolean;
+  title?: string;
   unique_ref?: string;
   first_name: string;
   last_name: string;
@@ -36,22 +38,25 @@ interface ImportResult {
 export default function Waivers() {
   const [rows, setRows] = useState<Waiver[]>([]);
   const [loading, setLoading] = useState(true);
-  const [filter, setFilter] = useState({ q: '', email: '', phone: '', from: '', to: '' });
+  const [filter, setFilter] = useState({ q: '', email: '', phone: '', from: '', to: '', source: '' });
+  const [sources, setSources] = useState<{ pos?: boolean; verifyistic?: boolean; memberistic?: boolean }>({});
   const [busy, setBusy] = useState<string | null>(null);
   const [importResult, setImportResult] = useState<ImportResult | null>(null);
 
   const load = async () => {
     setLoading(true);
     try {
-      const r = await get<{ ok: boolean; waivers: Waiver[] }>('/range/waivers', {
+      const r = await get<{ ok: boolean; waivers: Waiver[]; sources?: { pos?: boolean; verifyistic?: boolean; memberistic?: boolean } }>('/range/waivers', {
         q: filter.q,
         email: filter.email,
         phone: filter.phone,
         from: filter.from || undefined,
         to: filter.to || undefined,
+        source: filter.source || undefined,
         limit: 100,
       });
       setRows(r.waivers || []);
+      setSources(r.sources || {});
     } finally {
       setLoading(false);
     }
@@ -111,6 +116,11 @@ export default function Waivers() {
         </div>
       ),
     },
+    { key: 'source', label: 'Source', render: (r) => (
+      r.source === 'verifyistic' ? <span className="badge-amber">verifyistic</span>
+        : r.source === 'memberistic' ? <span className="badge-green">memberistic</span>
+        : <span className="badge-zinc">{r.source || 'pos'}</span>
+    ) },
     { key: 'participant_type', label: 'Type' },
     { key: 'waiver_date', label: 'Signed', render: (r) => (r.waiver_date ? r.waiver_date.replace('T', ' ').substring(0, 16) : '—') },
     {
@@ -119,13 +129,15 @@ export default function Waivers() {
       ),
     },
     {
-      key: 'actions', label: '', render: (r) => (
+      key: 'actions', label: '', render: (r) => r.read_only ? (
+        <span className="text-xs text-zinc-400" title={r.title}>read-only</span>
+      ) : (
         <div className="flex items-center gap-2">
-          <button className="btn-secondary text-xs" disabled={busy === `checkin-${r.id}`} onClick={() => checkin(r.id)}>
+          <button className="btn-secondary text-xs" disabled={busy === `checkin-${r.id}`} onClick={() => checkin(Number(r.id))}>
             {busy === `checkin-${r.id}` ? '…' : '✓ Check in'}
           </button>
           {r.certificate_url && !r.certificate_attachment_id && (
-            <button className="btn-secondary text-xs" disabled={busy === `pdf-${r.id}`} onClick={() => mirrorPdf(r.id)}>
+            <button className="btn-secondary text-xs" disabled={busy === `pdf-${r.id}`} onClick={() => mirrorPdf(Number(r.id))}>
               {busy === `pdf-${r.id}` ? '…' : '📄 Save PDF'}
             </button>
           )}
@@ -172,6 +184,12 @@ export default function Waivers() {
           <input className="input" placeholder="Phone exact" value={filter.phone} onChange={(e) => setFilter({ ...filter, phone: e.target.value })} />
           <input className="input" type="date" value={filter.from} onChange={(e) => setFilter({ ...filter, from: e.target.value })} />
           <input className="input" type="date" value={filter.to} onChange={(e) => setFilter({ ...filter, to: e.target.value })} />
+          <select className="input" value={filter.source} onChange={(e) => setFilter({ ...filter, source: e.target.value })}>
+            <option value="">All sources</option>
+            <option value="pos">POS / OtterWaiver</option>
+            {sources.verifyistic !== false && <option value="verifyistic">Verifyistic</option>}
+            {sources.memberistic !== false && <option value="memberistic">Memberistic</option>}
+          </select>
           <div className="md:col-span-6 flex justify-end">
             <button className="btn-primary" onClick={load}>Apply</button>
           </div>

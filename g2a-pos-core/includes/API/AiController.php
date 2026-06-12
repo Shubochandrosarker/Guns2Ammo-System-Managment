@@ -161,6 +161,11 @@ final class AiController {
 		return array( 'ok' => $ok );
 	}
 
+	/** POST /ai/brain/refresh-site — re-ingest the Guns 2 Ammo website knowledge pack. */
+	public static function brain_refresh_site( WP_REST_Request $request ) {
+		return \G2A\POS\Ai\WebsiteKnowledgeSeeder::refresh();
+	}
+
 	public static function brain_search( WP_REST_Request $request ) {
 		$q = (string) $request->get_param( 'q' );
 		if ( $q === '' ) {

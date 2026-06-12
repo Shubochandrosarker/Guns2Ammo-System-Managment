@@ -7,7 +7,10 @@ use G2A\POS\Admin\Assets;
 use G2A\POS\Admin\Menu;
 use G2A\POS\Auth\JWT;
 use G2A\POS\Compliance\ATF\NICS;
+use G2A\POS\Ai\WebsiteKnowledgeSeeder;
 use G2A\POS\Database\Migrator;
+use G2A\POS\Integrations\BookingEngineSync;
+use G2A\POS\Integrations\WooCatalogSync;
 use G2A\POS\Integrations\WooSync;
 use G2A\POS\Inventory\SyncService;
 use G2A\POS\Messaging\MessagingService;
@@ -35,6 +38,8 @@ final class Plugin {
 	private const LAYAWAY_REMINDER_HOOK     = 'g2a_pos_layaway_reminders_daily';
 	private const COMPLIANCE_CALENDAR_HOOK  = 'g2a_pos_compliance_calendar_daily';
 	private const VENDOR_PRICE_CAPTURE_HOOK = 'g2a_pos_vendor_price_capture_weekly';
+	private const WOO_CATALOG_SYNC_HOOK     = WooCatalogSync::CRON_HOOK;
+	private const BRAIN_SITE_REFRESH_HOOK   = WebsiteKnowledgeSeeder::CRON_HOOK;
 
 	private static ?self $instance = null;
 
@@ -94,6 +99,9 @@ final class Plugin {
 		add_action( 'admin_menu', array( Menu::class, 'register' ) );
 		add_action( 'admin_enqueue_scripts', array( Assets::class, 'enqueue' ) );
 		WooSync::boot();
+		WooCatalogSync::boot();
+		BookingEngineSync::boot();
+		WebsiteKnowledgeSeeder::boot();
 		WholesalerRegistry::boot();
 		MapPricingService::boot();
 		CarrierRegistry::boot();
@@ -211,6 +219,10 @@ final class Plugin {
 	}
 
 	private static function maybe_upgrade(): void {
+		// Seed the default website knowledge pack once per pack version
+		// (guarded internally by option g2a_pos_brain_seeded_version).
+		WebsiteKnowledgeSeeder::maybe_seed();
+
 		if ( get_option( 'g2a_pos_core_db_version' ) === G2A_POS_CORE_VERSION ) {
 			return;
 		}
@@ -258,6 +270,16 @@ final class Plugin {
 		if ( ! wp_next_scheduled( self::VENDOR_PRICE_CAPTURE_HOOK ) ) {
 			wp_schedule_event( time() + 6 * HOUR_IN_SECONDS, 'weekly', self::VENDOR_PRICE_CAPTURE_HOOK );
 		}
+		if ( ! wp_next_scheduled( self::WOO_CATALOG_SYNC_HOOK ) ) {
+			// Nightly full WooCommerce catalog re-scan.
+			wp_schedule_event( time() + 2 * HOUR_IN_SECONDS, 'daily', self::WOO_CATALOG_SYNC_HOOK );
+		}
+		if ( ! wp_next_scheduled( self::BRAIN_SITE_REFRESH_HOOK ) ) {
+			// Weekly website-knowledge refresh for the AI brain.
+			wp_schedule_event( time() + 12 * HOUR_IN_SECONDS, 'weekly', self::BRAIN_SITE_REFRESH_HOOK );
+		}
+
+		WebsiteKnowledgeSeeder::maybe_seed();
 	}
 
 	public static function deactivate(): void {
@@ -272,5 +294,7 @@ final class Plugin {
 		wp_clear_scheduled_hook( self::LAYAWAY_REMINDER_HOOK );
 		wp_clear_scheduled_hook( self::COMPLIANCE_CALENDAR_HOOK );
 		wp_clear_scheduled_hook( self::VENDOR_PRICE_CAPTURE_HOOK );
+		wp_clear_scheduled_hook( self::WOO_CATALOG_SYNC_HOOK );
+		wp_clear_scheduled_hook( self::BRAIN_SITE_REFRESH_HOOK );
 	}
 }

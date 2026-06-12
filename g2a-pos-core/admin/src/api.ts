@@ -82,3 +82,34 @@ export const get = <T = unknown>(path: string, query?: Record<string, QueryValue
   api<T>('GET', path, { query });
 export const post = <T = unknown>(path: string, body?: unknown) => api<T>('POST', path, { body });
 export const del = <T = unknown>(path: string) => api<T>('DELETE', path);
+
+/** Fetch a file endpoint (CSV export etc.) with nonce auth and trigger a browser download. */
+export async function download(path: string, filename: string, query?: Record<string, QueryValue>) {
+  const { restBase, nonce } = cfg();
+  let url = restBase + path;
+  if (query) {
+    const qs = new URLSearchParams();
+    Object.entries(query).forEach(([k, v]) => {
+      if (v !== undefined && v !== null && v !== '') qs.set(k, String(v));
+    });
+    const q = qs.toString();
+    if (q) url += (url.includes('?') ? '&' : '?') + q;
+  }
+  const res = await fetch(url, {
+    method: 'GET',
+    headers: { 'X-WP-Nonce': nonce },
+    credentials: 'same-origin',
+  });
+  if (!res.ok) {
+    const text = await res.text();
+    throw new ApiError(res.status, `Download failed (HTTP ${res.status})`, { error: text });
+  }
+  const blob = await res.blob();
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(a.href);
+}

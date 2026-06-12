@@ -2,6 +2,7 @@
 
 namespace G2A\POS\Integrations;
 
+use G2A\POS\Integrations\Membership\MemberisticProvider;
 use G2A\POS\Integrations\Membership\MemberPressProvider;
 use G2A\POS\Integrations\Membership\PmproProvider;
 use G2A\POS\Integrations\Membership\Provider;
@@ -16,8 +17,8 @@ use G2A\POS\Integrations\Membership\WooMembershipsProvider;
  *      — if the host theme/plugin (WPistic) returns a non-null array, use it.
  *      Same for 'g2a_pos_membership_bookings'.
  *   2. Adapter pinned via option g2a_pos_membership_provider (slug).
- *   3. Auto-detect: try WooCommerce Memberships → PMPro → MemberPress
- *      → custom user-meta map.
+ *   3. Auto-detect: try Memberistic → WooCommerce Memberships → PMPro
+ *      → MemberPress → custom user-meta map.
  *
  * Detection results are cached per-request.
  */
@@ -31,6 +32,7 @@ final class RangeMembership {
 	public static function providers(): array {
 		if ( self::$providers === null ) {
 			self::$providers = array(
+				'memberistic'    => new MemberisticProvider(),
 				'wc_memberships' => new WooMembershipsProvider(),
 				'pmpro'          => new PmproProvider(),
 				'memberpress'    => new MemberPressProvider(),

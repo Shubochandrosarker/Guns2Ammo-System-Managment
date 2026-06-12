@@ -25,13 +25,13 @@ if ( function_exists( 'g2a_faq_schema' ) && function_exists( 'g2a_emit_jsonld' )
 ?>
 <style>
 .pi-hero { padding:140px 32px 72px; position:relative; overflow:hidden; }
-.pi-hero::before { content:""; position:absolute; inset:0; pointer-events:none; background-image: linear-gradient(180deg, rgba(26,25,30,0.82), rgba(26,25,30,0.96)), url('<?php echo esc_url( $img . '2025/03/IMG_20250317_085324.webp' ); ?>'); background-size:cover; background-position:center; }
+.pi-hero::before { content:""; position:absolute; inset:0; pointer-events:none; background-image: linear-gradient(180deg, var(--hero-scrim), var(--hero-scrim-deep)), url('<?php echo esc_url( g2a_asset( 'img/guns2ammo-range-training-session.jpg' ) ); ?>'); background-size:cover; background-position:center; }
 .pi-hero .c { position:relative; max-width:1180px; margin:0 auto; }
-.pi-hero .crumbs { font-family: var(--font-mono); font-size:11px; letter-spacing:0.2em; text-transform:uppercase; color: var(--color-silver); }
-.pi-hero .crumbs a { color: var(--color-brass-bright); text-decoration:none; }
-.pi-hero h1 { font-family: var(--font-display); font-size: clamp(52px,8.5vw,124px); line-height:0.9; margin:14px 0 0; color: var(--color-white); }
-.pi-hero h1 .a { color: var(--color-ember); }
-.pi-hero .lead { color: var(--color-fog); max-width:58ch; margin:20px 0 0; font-size:16px; line-height:1.7; }
+.pi-hero .crumbs { font-family: var(--font-mono); font-size:11px; letter-spacing:0.2em; text-transform:uppercase; color: var(--ink-on-media-faint); }
+.pi-hero .crumbs a { color: var(--brass-on-media); text-decoration:none; }
+.pi-hero h1 { font-family: var(--font-display); font-size: clamp(52px,8.5vw,124px); line-height:0.9; margin:14px 0 0; color: var(--ink-on-media); }
+.pi-hero h1 .a { color: var(--ember-on-media); }
+.pi-hero .lead { color: var(--ink-on-media-dim); max-width:58ch; margin:20px 0 0; font-size:16px; line-height:1.7; }
 .pi-hero .ctas { display:flex; gap:12px; margin-top:28px; flex-wrap:wrap; }
 .pi-sec { max-width:1180px; margin:0 auto; padding:72px 32px; }
 .pi-sec h2 { font-family: var(--font-display); font-size: clamp(34px,5vw,60px); color: var(--color-white); letter-spacing:0.01em; }
@@ -48,7 +48,7 @@ if ( function_exists( 'g2a_faq_schema' ) && function_exists( 'g2a_emit_jsonld' )
 .pi-rate .lbl { font-family: var(--font-mono); font-size:11px; letter-spacing:0.2em; color: var(--color-silver); text-transform:uppercase; margin-top:10px; }
 </style>
 
-<header class="pi-hero">
+<header class="pi-hero hero-media">
   <div class="c">
     <div class="crumbs"><a href="<?php echo esc_url( home_url( '/' ) ); ?>">Home</a>  <a href="<?php echo esc_url( home_url( '/training/' ) ); ?>">Training</a>  Private Instruction</div>
     <span class="eyebrow" style="margin-top:14px;">Training  One-on-One</span>

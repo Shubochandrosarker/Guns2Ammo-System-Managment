@@ -45,6 +45,7 @@ export type NavKey =
   | 'compliance_calendar'
   | 'ace_audit'
   | 'ffl_routing'
+  | 'ffl_transfers'
   | 'shipping'
   | 'messaging'
   | 'ai_settings'
@@ -78,6 +79,7 @@ export const NAV_GROUPS: NavGroup[] = [
     { key: 'range_safety',      label: 'Range Safety', icon: '🚨' },
     { key: 'classes',           label: 'Classes',      icon: '🎓' },
     { key: 'waivers',           label: 'Waivers',      icon: '✍️' },
+    { key: 'ffl_transfers',     label: 'FFL Transfers',icon: '🤝' },
     { key: 'repairs',           label: 'Gunsmithing',  icon: '🔧' },
   ] },
   { label: 'Inventory', items: [

@@ -22,7 +22,7 @@ $g2a_mg4_caliber        = get_post_meta( $g2a_page_id, 'mg_fourth_weapon_caliber
 $g2a_mg4_desc           = get_post_meta( $g2a_page_id, 'mg_fourth_weapon_desc', true );
 ?>
 <!-- HERO -->
-<section class="hero">
+<section class="hero hero-media">
   <div class="inner">
     <span class="eb-pill">Arizona's Premier Indoor Range  Mesa, AZ</span>
     <h1 class="hl-display">
@@ -55,23 +55,23 @@ $g2a_mg4_desc           = get_post_meta( $g2a_page_id, 'mg_fourth_weapon_desc', 
 
 <!-- VALUE PROPS -->
 <section class="props">
-  <div class="wrap">
-    <div class="prop">
+  <div class="wrap" data-reveal-group>
+    <div class="prop" data-reveal>
       <div class="ic"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2" fill="currentColor"/></svg></div>
       <h3>6-Lane Indoor Range</h3>
       <p>Climate-controlled, 25-yard, pistol &amp; rifle approved. Lanes 1 and 2 ADA-accessible.</p>
     </div>
-    <div class="prop">
+    <div class="prop" data-reveal>
       <div class="ic"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M12 2 L20 5 V12 C20 17 16 21 12 22 C8 21 4 17 4 12 V5 Z"/><path d="M9 12 L11 14 L15 10"/></svg></div>
       <h3>NRA Certified Training</h3>
       <p>State-approved CCW, women's intro, defensive pistol  taught by NRA instructors.</p>
     </div>
-    <div class="prop">
+    <div class="prop" data-reveal>
       <div class="ic"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="4" y="6" width="16" height="14"/><path d="M8 6 V4 H16 V6"/><circle cx="12" cy="13" r="2"/></svg></div>
       <h3>FFL-Licensed Sales</h3>
       <p>Handguns, rifles, NFA. Out-of-state transfers $35 flat. Same-day in stock.</p>
     </div>
-    <div class="prop">
+    <div class="prop" data-reveal>
       <div class="ic"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="12" r="10"/><path d="M8 12 L10.5 14.5 L16 9"/></svg></div>
       <h3>Member Pricing</h3>
       <p>Unlimited range time from $29.99/mo. Cancel anytime. No contracts.</p>
@@ -82,12 +82,12 @@ $g2a_mg4_desc           = get_post_meta( $g2a_page_id, 'mg_fourth_weapon_desc', 
 <!-- CALIFORNIA CCW BAND -->
 <section class="ca-band">
   <div class="wrap">
-    <div>
+    <div data-reveal="left">
       <div class="eb">For California Residents</div>
       <h2>CALIFORNIA CCW<br>SHOOTING QUALIFICATION<br><span class="a">IN MESA, AZ</span></h2>
       <p>This is the live-fire qualification component only for California CCW applicants. It does not replace California-required classroom education or training modules.</p>
     </div>
-    <div class="actions">
+    <div class="actions" data-reveal="right">
       <a class="btn btn-ghost btn-arrow" href="<?php echo esc_url( home_url( "/arizona-ccw-certification/" ) ); ?>#ca">Reserve Your Time</a>
       <a class="btn btn-ghost" href="<?php echo esc_url( home_url( "/arizona-ccw-certification/" ) ); ?>#ca">Course Details</a>
     </div>
@@ -97,7 +97,7 @@ $g2a_mg4_desc           = get_post_meta( $g2a_page_id, 'mg_fourth_weapon_desc', 
 <!-- MACHINE GUN BAND  MATCHES REFERENCE -->
 <section class="mg">
   <div class="wrap">
-    <div class="left">
+    <div class="left" data-reveal="left">
       <span class="eb-pill">Exclusive  Limited Availability</span>
       <h2>SHOOT A<br>MACHINE GUN<br><span class="a">IN MESA.</span></h2>
       <p class="lead">Live fire. Select fire. No prior experience needed. Walk in as a first-timer, walk out with the story of your life.</p>
@@ -120,7 +120,7 @@ $g2a_mg4_desc           = get_post_meta( $g2a_page_id, 'mg_fourth_weapon_desc', 
         <div class="meta"><?php printf( esc_html__( '%1$d %2$s reviews', 'guns2ammo' ), (int) $g2a_biz['review_count'], esc_html( $g2a_biz['review_source'] ) ); ?><small><?php echo esc_html( $g2a_biz['slogan'] ); ?> <?php printf( esc_html__( 'Since %d.', 'guns2ammo' ), (int) $g2a_biz['founded_year'] ); ?></small></div>
       </div>
     </div>
-    <div class="right">
+    <div class="right" data-reveal="right">
       <div class="photo-card">
         <div class="ph"></div>
         <span class="cap"> The Arsenal </span>
@@ -154,7 +154,7 @@ $g2a_mg4_desc           = get_post_meta( $g2a_page_id, 'mg_fourth_weapon_desc', 
 <!-- COLLECTIONS -->
 <section class="cols">
   <div class="wrap">
-    <div class="head">
+    <div class="head" data-reveal>
       <div class="l">
         <span class="eb-pill">Mesa's Most-Trusted Arsenal</span>
         <h2 style="margin-top: 22px;">SHOP THE<br>COLLECTIONS<span class="a">.</span></h2>
@@ -177,9 +177,9 @@ $g2a_mg4_desc           = get_post_meta( $g2a_page_id, 'mg_fourth_weapon_desc', 
         return $fallback;
     };
     ?>
-    <div class="col-grid">
-      <a class="col-tile feat" href="<?php echo esc_url( home_url( "/collections/handguns/" ) ); ?>">
-        <div class="bg" style="background-image: linear-gradient(180deg, rgba(26,25,30,0.3), rgba(26,25,30,0.9)), url('<?php echo esc_url( content_url( '/uploads/2026/04/15.webp' ) ); ?>');"></div>
+    <div class="col-grid" data-reveal-group>
+      <a class="col-tile feat" data-reveal="scale" href="<?php echo esc_url( home_url( "/collections/handguns/" ) ); ?>">
+        <div class="bg" style="background-image: linear-gradient(180deg, rgba(26,25,30,0.3), rgba(26,25,30,0.9)), url('<?php echo esc_url( g2a_asset( 'img/guns2ammo-handgun-case-display.jpg' ) ); ?>');"></div>
         <div class="scrim"></div>
         <div class="body">
           <div class="cat"><?php echo esc_html( trim( __( 'Featured Collection', 'guns2ammo' ) . '  ' . $g2a_cat_label( 'handguns' ) ) ); ?></div>
@@ -187,8 +187,8 @@ $g2a_mg4_desc           = get_post_meta( $g2a_page_id, 'mg_fourth_weapon_desc', 
           <span class="more">Shop Handguns </span>
         </div>
       </a>
-      <a class="col-tile" href="<?php echo esc_url( home_url( "/collections/rifles/" ) ); ?>">
-        <div class="bg" style="background-image: linear-gradient(180deg, rgba(26,25,30,0.3), rgba(26,25,30,0.85)), url('<?php echo esc_url( content_url( '/uploads/2025/06/noveske-gen4-556-sbr-bazooka-green-guns2ammo-mesa-az.webp' ) ); ?>');"></div>
+      <a class="col-tile" data-reveal="scale" href="<?php echo esc_url( home_url( "/collections/rifles/" ) ); ?>">
+        <div class="bg" style="background-image: linear-gradient(180deg, rgba(26,25,30,0.3), rgba(26,25,30,0.85)), url('<?php echo esc_url( g2a_asset( 'img/guns2ammo-rifles-rack.jpg' ) ); ?>');"></div>
         <div class="scrim"></div>
         <div class="body">
           <div class="cat"><?php echo esc_html( $g2a_cat_label( 'rifles', __( 'Shop Rifles', 'guns2ammo' ) ) ); ?></div>
@@ -196,8 +196,8 @@ $g2a_mg4_desc           = get_post_meta( $g2a_page_id, 'mg_fourth_weapon_desc', 
           <span class="more">Shop </span>
         </div>
       </a>
-      <a class="col-tile" href="<?php echo esc_url( home_url( "/collections/ammunition/" ) ); ?>">
-        <div class="bg" style="background-image: linear-gradient(180deg, rgba(26,25,30,0.3), rgba(26,25,30,0.85)), url('<?php echo esc_url( content_url( '/uploads/2026/04/Gun-Rental-Near-Me-What-to-Expect.webp' ) ); ?>');"></div>
+      <a class="col-tile" data-reveal="scale" href="<?php echo esc_url( home_url( "/collections/ammunition/" ) ); ?>">
+        <div class="bg" style="background-image: linear-gradient(180deg, rgba(26,25,30,0.3), rgba(26,25,30,0.85)), url('<?php echo esc_url( g2a_asset( 'img/guns2ammo-ammo-shelves.jpg' ) ); ?>');"></div>
         <div class="scrim"></div>
         <div class="body">
           <div class="cat"><?php echo esc_html( $g2a_cat_label( 'ammunition', __( 'Shop Ammo', 'guns2ammo' ) ) ); ?></div>
@@ -205,8 +205,8 @@ $g2a_mg4_desc           = get_post_meta( $g2a_page_id, 'mg_fourth_weapon_desc', 
           <span class="more">Shop </span>
         </div>
       </a>
-      <a class="col-tile" href="<?php echo esc_url( home_url( "/collections/magazines/" ) ); ?>">
-        <div class="bg" style="background-image: linear-gradient(180deg, rgba(26,25,30,0.3), rgba(26,25,30,0.85)), url('<?php echo esc_url( content_url( '/uploads/2026/04/2025-03-23.webp' ) ); ?>');"></div>
+      <a class="col-tile" data-reveal="scale" href="<?php echo esc_url( home_url( "/collections/magazines/" ) ); ?>">
+        <div class="bg" style="background-image: linear-gradient(180deg, rgba(26,25,30,0.3), rgba(26,25,30,0.85)), url('<?php echo esc_url( g2a_asset( 'img/guns2ammo-gear-case.jpg' ) ); ?>');"></div>
         <div class="scrim"></div>
         <div class="body">
           <div class="cat"><?php echo esc_html( $g2a_cat_label( 'magazines', __( 'Shop Magazines', 'guns2ammo' ) ) ); ?></div>
@@ -214,8 +214,8 @@ $g2a_mg4_desc           = get_post_meta( $g2a_page_id, 'mg_fourth_weapon_desc', 
           <span class="more">Shop </span>
         </div>
       </a>
-      <a class="col-tile" href="<?php echo esc_url( home_url( "/ffl-services/" ) ); ?>">
-        <div class="bg" style="background-image: linear-gradient(180deg, rgba(26,25,30,0.3), rgba(26,25,30,0.85)), url('<?php echo esc_url( content_url( '/uploads/2024/08/one-1-a.webp' ) ); ?>');"></div>
+      <a class="col-tile" data-reveal="scale" href="<?php echo esc_url( home_url( "/ffl-services/" ) ); ?>">
+        <div class="bg" style="background-image: linear-gradient(180deg, rgba(26,25,30,0.3), rgba(26,25,30,0.85)), url('<?php echo esc_url( g2a_asset( 'img/guns2ammo-store-counter-staff.jpg' ) ); ?>');"></div>
         <div class="scrim"></div>
         <div class="body">
           <div class="cat">$25 Flat Fee</div>
@@ -230,7 +230,7 @@ $g2a_mg4_desc           = get_post_meta( $g2a_page_id, 'mg_fourth_weapon_desc', 
 <!-- STORY / TRAINING ACADEMY -->
 <section class="story">
   <div class="wrap">
-    <div>
+    <div data-reveal="left">
       <span class="eb-pill">Mesa's Training Academy</span>
       <h2 style="margin-top: 22px;">TRAINED HERE.<br>READY <span class="a">ANYWHERE.</span></h2>
       <p>From your first range visit to multi-state CCW certification, our NRA &amp; USCCA instructors take you through it patiently  and properly. Built by operators who've trained law enforcement, military, and church security teams.</p>
@@ -239,7 +239,7 @@ $g2a_mg4_desc           = get_post_meta( $g2a_page_id, 'mg_fourth_weapon_desc', 
         <a class="btn btn-ghost" href="<?php echo esc_url( home_url( "/arizona-ccw-certification/" ) ); ?>">CCW Pathway</a>
       </div>
     </div>
-    <div class="stats">
+    <div class="stats" data-reveal="right">
       <div class="stat">
         <div class="v">5,000<span style="color:var(--color-brass-bright);">+</span></div>
         <div class="l">Students Trained</div>
@@ -291,7 +291,7 @@ $g2a_week_order = array( 1, 2, 3, 4, 5, 6, 0 );
 ?>
 <section class="visit">
   <div class="wrap">
-    <div class="visit-info">
+    <div class="visit-info" data-reveal="left">
       <span class="eb-pill"><?php esc_html_e( 'Visit Us', 'guns2ammo' ); ?></span>
       <h2 style="margin-top: 20px;"><?php echo esc_html( $g2a_biz['addr1'] ); ?></h2>
       <p class="addr"><?php echo esc_html( $g2a_biz['addr2'] ); ?></p>
@@ -312,7 +312,7 @@ $g2a_week_order = array( 1, 2, 3, 4, 5, 6, 0 );
         <a class="btn btn-ghost" href="<?php echo esc_url( g2a_biz_tel_href() ); ?>"><?php printf( esc_html__( 'Call %s', 'guns2ammo' ), esc_html( $g2a_biz['phone'] ) ); ?></a>
       </div>
     </div>
-    <div class="visit-photo">
+    <div class="visit-photo" data-reveal="right">
       <span class="badge"> Main Floor</span>
     </div>
   </div>
@@ -321,15 +321,15 @@ $g2a_week_order = array( 1, 2, 3, 4, 5, 6, 0 );
 <!-- REVIEWS -->
 <section class="reviews">
   <div class="wrap">
-    <div class="head">
+    <div class="head" data-reveal>
       <h2><?php echo (int) $g2a_biz['review_count']; ?> REVIEWS.<br><?php echo esc_html( number_format( (float) $g2a_biz['review_rating'], 1 ) ); ?> <span class="a">STARS.</span></h2>
       <div class="stars-meta">
         <span class="num"><?php echo esc_html( number_format( (float) $g2a_biz['review_rating'], 1 ) ); ?></span>
         <span class="stars"></span>  <?php printf( esc_html__( '%1$d verified %2$s reviews', 'guns2ammo' ), (int) $g2a_biz['review_count'], esc_html( $g2a_biz['review_source'] ) ); ?>
       </div>
     </div>
-    <div class="rv-grid">
-      <article class="rv">
+    <div class="rv-grid" data-reveal-group>
+      <article class="rv" data-reveal>
         <div class="quote">"</div>
         <div class="stars">    </div>
         <p>My wife and I came in nervous and left certified. The instructors took the time to explain everything, never made us feel stupid, and the lanes were spotless. This is how every range should run.</p>
@@ -341,7 +341,7 @@ $g2a_week_order = array( 1, 2, 3, 4, 5, 6, 0 );
           </div>
         </div>
       </article>
-      <article class="rv" style="border-color: var(--color-brass-dim);">
+      <article class="rv" data-reveal style="border-color: var(--color-brass-dim);">
         <div class="quote">"</div>
         <div class="stars">    </div>
         <p>As a retired LEO I'm picky about training environments. Guns 2 Ammo runs the floor with the kind of discipline I expect. The RSO program is genuinely best-in-class for the East Valley.</p>
@@ -353,7 +353,7 @@ $g2a_week_order = array( 1, 2, 3, 4, 5, 6, 0 );
           </div>
         </div>
       </article>
-      <article class="rv">
+      <article class="rv" data-reveal>
         <div class="quote">"</div>
         <div class="stars">    </div>
         <p>Booked the MP5 package for my son's 21st. The RSO walked us through everything, made it feel safe and serious, and we left with a certificate and a story. Worth every dollar.</p>
@@ -369,9 +369,40 @@ $g2a_week_order = array( 1, 2, 3, 4, 5, 6, 0 );
   </div>
 </section>
 
-<!-- FINAL CTA -->
-<section class="final">
+<!-- COMMON QUESTIONS (curated home FAQ — full list lives at /faqs/) -->
+<?php if ( function_exists( 'g2a_home_faqs' ) ) :
+	$g2a_home_faqs = g2a_home_faqs();
+	if ( ! empty( $g2a_home_faqs ) ) : ?>
+<section class="home-faq" id="faq" aria-labelledby="home-faq-title">
   <div class="wrap">
+    <div class="head" data-reveal>
+      <span class="eb-pill"><?php esc_html_e( 'Straight Answers', 'guns2ammo' ); ?></span>
+      <h2 id="home-faq-title">COMMON<br><span class="a">QUESTIONS.</span></h2>
+      <p><?php esc_html_e( 'No fine print, no runaround. Here is what first-timers and regulars ask us most.', 'guns2ammo' ); ?></p>
+    </div>
+    <div class="faq-list" data-reveal-group>
+      <?php foreach ( $g2a_home_faqs as $g2a_faq_i => $g2a_faq ) : ?>
+      <div class="faq-item" data-reveal>
+        <button class="faq-q" type="button" aria-expanded="false" aria-controls="home-faq-a-<?php echo (int) $g2a_faq_i; ?>" data-faq-toggle>
+          <span><?php echo esc_html( $g2a_faq['q'] ); ?></span>
+          <svg class="chev" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6l5 5 5-5"/></svg>
+        </button>
+        <div class="faq-a" id="home-faq-a-<?php echo (int) $g2a_faq_i; ?>">
+          <div><p><?php echo esc_html( $g2a_faq['a'] ); ?></p></div>
+        </div>
+      </div>
+      <?php endforeach; ?>
+    </div>
+    <div class="all-link" data-reveal>
+      <a class="btn btn-brass btn-arrow" href="<?php echo esc_url( home_url( '/faqs/' ) ); ?>"><?php esc_html_e( 'View All FAQs', 'guns2ammo' ); ?></a>
+    </div>
+  </div>
+</section>
+<?php endif; endif; ?>
+
+<!-- FINAL CTA -->
+<section class="final hero-media">
+  <div class="wrap" data-reveal>
     <span class="eb-pill" style="margin: 0 auto;">Mesa's Most-Trusted Range</span>
     <h2>READY TO<br><span class="a">SHOOT?</span></h2>
     <p>Book a lane, enroll in a course, or stop by the shop. We're open six days a week  Friday closed  and there's always an RSO on duty.</p>

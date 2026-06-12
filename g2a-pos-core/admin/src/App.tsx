@@ -47,6 +47,7 @@ import Hardware from './views/Hardware';
 import ComplianceCalendar from './views/ComplianceCalendar';
 import AceAudit from './views/AceAudit';
 import FflRouting from './views/FflRouting';
+import FflTransfers from './views/FflTransfers';
 import Messaging from './views/Messaging';
 import AiSettings from './views/AiSettings';
 import AiBrain from './views/AiBrain';
@@ -100,6 +101,7 @@ const VIEWS: Record<NavKey, () => JSX.Element> = {
   compliance_calendar: ComplianceCalendar,
   ace_audit: AceAudit,
   ffl_routing: FflRouting,
+  ffl_transfers: FflTransfers,
   messaging: Messaging,
   ai_settings: AiSettings,
   ai_brain: AiBrain,

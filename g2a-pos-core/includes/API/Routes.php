@@ -1425,6 +1425,53 @@ final class Routes {
 				'permission_callback' => static fn() => current_user_can( 'g2a_pos_manage_crm' ) || current_user_can( 'g2a_pos_manage_settings' ),
 			)
 		);
+		register_rest_route(
+			'g2a-pos/v1',
+			'/crm/export\.csv',
+			array(
+				'methods'             => 'GET',
+				'callback'            => array( CrmController::class, 'export_csv' ),
+				'permission_callback' => static fn() => current_user_can( 'g2a_pos_manage_crm' ) || current_user_can( 'g2a_pos_manage_settings' ) || current_user_can( 'manage_woocommerce' ),
+			)
+		);
+		register_rest_route(
+			'g2a-pos/v1',
+			'/orders/export\.csv',
+			array(
+				'methods'             => 'GET',
+				'callback'            => array( OrderController::class, 'export_csv' ),
+				'permission_callback' => static fn() => current_user_can( 'g2a_pos_manage_settings' ) || current_user_can( 'manage_woocommerce' ),
+			)
+		);
+
+		// --- v3.1.0 — Sibling-plugin integrations (Woo catalog scan, FFL checkout bridge) ---
+		register_rest_route(
+			'g2a-pos/v1',
+			'/integrations/woo/scan',
+			array(
+				'methods'             => 'POST',
+				'callback'            => array( IntegrationsController::class, 'woo_scan' ),
+				'permission_callback' => static fn() => current_user_can( 'g2a_pos_manage_inventory' ) || current_user_can( 'g2a_pos_manage_settings' ) || current_user_can( 'manage_woocommerce' ),
+			)
+		);
+		register_rest_route(
+			'g2a-pos/v1',
+			'/integrations/woo/scan',
+			array(
+				'methods'             => 'GET',
+				'callback'            => array( IntegrationsController::class, 'woo_scan_status' ),
+				'permission_callback' => static fn() => current_user_can( 'g2a_pos_manage_inventory' ) || current_user_can( 'g2a_pos_manage_settings' ) || current_user_can( 'manage_woocommerce' ),
+			)
+		);
+		register_rest_route(
+			'g2a-pos/v1',
+			'/integrations/ffl/transfers',
+			array(
+				'methods'             => 'GET',
+				'callback'            => array( IntegrationsController::class, 'ffl_transfers' ),
+				'permission_callback' => static fn() => current_user_can( 'g2a_pos_manage_crm' ) || current_user_can( 'g2a_pos_manage_settings' ) || current_user_can( 'manage_woocommerce' ),
+			)
+		);
 
 		// --- v0.9.0 — Repair / Gunsmith tickets ---
 		register_rest_route(
@@ -2630,6 +2677,15 @@ final class Routes {
 				'methods'             => 'DELETE',
 				'callback'            => array( AiController::class, 'brain_delete' ),
 				'permission_callback' => static fn() => current_user_can( 'g2a_pos_manage_ai' ),
+			)
+		);
+		register_rest_route(
+			'g2a-pos/v1',
+			'/ai/brain/refresh-site',
+			array(
+				'methods'             => 'POST',
+				'callback'            => array( AiController::class, 'brain_refresh_site' ),
+				'permission_callback' => static fn() => current_user_can( 'g2a_pos_manage_ai' ) || current_user_can( 'g2a_pos_manage_settings' ),
 			)
 		);
 		register_rest_route(

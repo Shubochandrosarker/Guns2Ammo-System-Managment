@@ -176,7 +176,15 @@ final class Email_Service {
 			$message['subject'] = '[REROUTED -> ' . $person['email'] . '] ' . $message['subject'];
 		}
 
-		$sent = wp_mail( $recipient, $message['subject'], $message['body'], self::headers() );
+		// Branded HTML mode (default on): wrap the rendered plain-text body
+		// in the shared 600px shell. Plain-text sending stays fully intact
+		// when the email_html_enabled setting is switched off.
+		$html_mode = self::html_enabled();
+		$body      = $html_mode
+			? self::wrap_html( $message['body'], $message['subject'], $context )
+			: $message['body'];
+
+		$sent = wp_mail( $recipient, $message['subject'], $body, self::headers( $html_mode ) );
 
 		Email_Logs_Repository::log(
 			array(
@@ -309,7 +317,7 @@ final class Email_Service {
 		return array(
 			'membership_created'   => array(
 				'subject' => __( 'Your {brand_label} membership was started', 'memberistic' ),
-				'body'    => __( "Hi {member_name},\n\nYour {plan_name} membership ({membership_id}) was created. Once payment is confirmed, your membership becomes active automatically.\n\nView your account: {account_url}\n\n{brand_label}\n{business_phone}", 'memberistic' ),
+				'body'    => __( "Hi {member_name},\n\nGood news — your {plan_name} membership ({membership_id}) has been created. Once payment is confirmed, your membership becomes active automatically and we'll send a welcome email with everything you need.\n\nView your account: {account_url}\n\nQuestions? Just reply to this email and our team will help.\n\n{brand_label}\n{business_phone}", 'memberistic' ),
 			),
 			'membership_activated' => array(
 				'subject' => __( 'Welcome to {brand_label} — your membership is active', 'memberistic' ),
@@ -321,7 +329,7 @@ final class Email_Service {
 			),
 			'payment_receipt'      => array(
 				'subject' => __( 'Your {brand_label} payment receipt', 'memberistic' ),
-				'body'    => __( "Hi {member_name},\n\nThis confirms a payment was processed for your {plan_name} membership ({membership_id}).\n\nAmount: {amount}\nDate: {payment_date}\nPayment method: {payment_method}\nReference: {transaction_id}\n\nNext renewal: {renewal_date}\n\nView your billing history: {account_url}\n\n{brand_label}\n{business_phone}", 'memberistic' ),
+				'body'    => __( "Hi {member_name},\n\nThis confirms a payment was processed for your {plan_name} membership ({membership_id}).\n\nAmount: {amount}\nDate: {payment_date}\nPayment method: {payment_method}\nReference: {transaction_id}\n\nNext renewal: {renewal_date}\n\nKeep this email for your records. View your full billing history any time: {account_url}\n\nThanks for being a member.\n\n{brand_label}\n{business_phone}", 'memberistic' ),
 			),
 			'renewal_reminder'     => array(
 				'subject' => __( 'Your {brand_label} membership renewal is coming up', 'memberistic' ),
@@ -366,10 +374,119 @@ final class Email_Service {
 		);
 	}
 
-	private static function headers() {
+	/**
+	 * Whether outbound mail should use the branded HTML layout.
+	 *
+	 * Controlled by the email_html_enabled setting (defaults to on for new
+	 * installs). Any explicit "no"-style value falls back to plain text.
+	 */
+	private static function html_enabled() {
+		$value = memberistic_get_setting( 'email_html_enabled', 'yes' );
+		return ! in_array( strtolower( (string) $value ), array( 'no', '0', '', 'off', 'false' ), true );
+	}
+
+	/**
+	 * Resolve the header logo URL for HTML mail.
+	 *
+	 * Order: the existing logo_url setting, then the bundled guns2ammo
+	 * theme email logo when that theme is active, else empty string (a
+	 * text brand renders instead).
+	 *
+	 * @param array $context Rendered merge-tag context.
+	 */
+	private static function logo_url( $context ) {
+		$logo = (string) ( $context['{logo_url}'] ?? '' );
+		if ( '' !== $logo ) {
+			return esc_url_raw( $logo );
+		}
+		if ( function_exists( 'get_template' ) && function_exists( 'get_template_directory_uri' )
+			&& 'guns2ammo' === get_template() ) {
+			return esc_url_raw( get_template_directory_uri() . '/assets/img/guns2ammo-logo-email.png' );
+		}
+		return '';
+	}
+
+	/**
+	 * Wrap a rendered plain-text email body in the branded HTML shell.
+	 *
+	 * Bulletproof 600px table layout, fully inlined styles: dark header
+	 * band with the logo, brass top border + accent divider, white content
+	 * card, footer with the business name / phone. The plain-text body is
+	 * escaped, URLs linkified, and newlines converted so existing template
+	 * copy (and admin overrides) keep working untouched.
+	 *
+	 * @param string $body    Rendered plain-text body (merge tags applied).
+	 * @param string $subject Rendered subject (used for the <title>).
+	 * @param array  $context Rendered merge-tag context.
+	 */
+	private static function wrap_html( $body, $subject, $context ) {
+		$dark  = '#1A191E';
+		$brass = '#C9A84C';
+
+		$brand = (string) ( $context['{brand_label}'] ?? memberistic_get_brand_label() );
+		$logo  = self::logo_url( $context );
+
+		$header = $logo
+			? '<img src="' . esc_url( $logo ) . '" alt="' . esc_attr( $brand ) . '" width="220" style="display:block;width:220px;max-width:100%;height:auto;border:0;margin:0 auto;">'
+			: '<strong style="color:#ffffff;font-family:Impact,Arial,sans-serif;font-size:26px;letter-spacing:.08em;text-transform:uppercase;">' . esc_html( $brand ) . '</strong>';
+
+		// Escape → linkify → preserve line breaks. make_clickable() turns the
+		// bare URLs used throughout the plain-text templates into real links.
+		$content = esc_html( (string) $body );
+		if ( function_exists( 'make_clickable' ) ) {
+			$content = make_clickable( $content );
+		}
+		$content = nl2br( $content );
+
+		$footer_bits = array();
+		if ( ! empty( $context['{business_name}'] ) ) {
+			$footer_bits[] = esc_html( (string) $context['{business_name}'] );
+		}
+		if ( ! empty( $context['{business_phone}'] ) ) {
+			$footer_bits[] = esc_html( (string) $context['{business_phone}'] );
+		}
+		if ( empty( $footer_bits ) ) {
+			$footer_bits[] = esc_html( $brand );
+		}
+
+		$footer = '<p style="margin:0 0 6px;font-size:12px;line-height:1.6;color:#8A8894;">' . implode( ' &middot; ', $footer_bits ) . '</p>'
+			. '<p style="margin:0;font-size:12px;color:#8A8894;">&copy; ' . esc_html( gmdate( 'Y' ) ) . ' ' . esc_html( $brand ) . '</p>';
+
+		$html = '<!doctype html><html lang="en"><head><meta charset="UTF-8">'
+			. '<meta name="viewport" content="width=device-width,initial-scale=1">'
+			. '<meta http-equiv="X-UA-Compatible" content="IE=edge">'
+			. '<title>' . esc_html( $subject ) . '</title></head>'
+			. '<body style="margin:0;padding:0;background:#F4F3F0;font-family:Arial,Helvetica,sans-serif;color:' . $dark . ';-webkit-text-size-adjust:100%;">'
+			. '<table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background:#F4F3F0;">'
+			. '<tr><td align="center" style="padding:32px 16px;">'
+			. '<table role="presentation" width="600" cellspacing="0" cellpadding="0" border="0" style="background:#ffffff;max-width:600px;width:100%;border-collapse:collapse;border-top:4px solid ' . $brass . ';">'
+			. '<tr><td align="center" bgcolor="' . $dark . '" style="background:' . $dark . ';padding:28px 32px;">' . $header . '</td></tr>'
+			. '<tr><td style="font-size:0;line-height:0;height:3px;background:' . $brass . ';">&nbsp;</td></tr>'
+			. '<tr><td style="padding:32px;font-size:15px;line-height:1.7;color:' . $dark . ';">' . $content . '</td></tr>'
+			. '<tr><td style="background:#F4F3F0;padding:22px 32px;border-top:1px solid #E4E2DC;" align="center">' . $footer . '</td></tr>'
+			. '</table>'
+			. '</td></tr></table></body></html>';
+
+		/**
+		 * Filter the final branded HTML document before dispatch.
+		 *
+		 * @param string $html    Full HTML email document.
+		 * @param string $subject Rendered subject line.
+		 * @param array  $context Rendered merge-tag context.
+		 */
+		return apply_filters( 'memberistic_email_html_body', $html, $subject, $context );
+	}
+
+	/**
+	 * Build outbound mail headers.
+	 *
+	 * @param bool $html Whether the body is the branded HTML layout —
+	 *                   Content-Type switches to text/html ONLY then.
+	 */
+	private static function headers( $html = false ) {
 		$from_name  = memberistic_get_setting( 'email_from_name', memberistic_get_brand_label() );
 		$from_email = memberistic_get_setting( 'email_from_address', get_option( 'admin_email' ) );
-		$headers    = array( 'Content-Type: text/plain; charset=UTF-8' );
+		$headers    = array( $html ? 'Content-Type: text/html; charset=UTF-8' : 'Content-Type: text/plain; charset=UTF-8' );
 
 		if ( is_email( $from_email ) ) {
 			$headers[] = 'From: ' . sanitize_text_field( $from_name ) . ' <' . sanitize_email( $from_email ) . '>';

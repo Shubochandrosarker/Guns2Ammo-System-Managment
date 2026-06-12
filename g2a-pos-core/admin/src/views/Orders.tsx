@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { get } from '../api';
+import { download, get } from '../api';
 import PageHeader from '../components/PageHeader';
 import DataTable, { type Column } from '../components/DataTable';
 
@@ -20,6 +20,18 @@ export default function Orders() {
   const [rows, setRows] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
   const [status, setStatus] = useState('');
+  const [exporting, setExporting] = useState(false);
+
+  const exportCsv = async () => {
+    setExporting(true);
+    try {
+      await download('/orders/export.csv', `g2a-orders-${new Date().toISOString().slice(0, 10)}.csv`, { status });
+    } catch {
+      alert('Export failed — you may not have permission.');
+    } finally {
+      setExporting(false);
+    }
+  };
 
   const refresh = async () => {
     setLoading(true);
@@ -54,6 +66,11 @@ export default function Orders() {
       <PageHeader
         title="Sales / Orders"
         subtitle="POS tickets including firearm transactions. Status + payment + compliance state tracked independently. Click an order to tender split payments or evaluate sourcing across shelf + wholesalers."
+        actions={
+          <button className="btn-secondary" onClick={exportCsv} disabled={exporting}>
+            {exporting ? 'Exporting…' : '⬇ Export CSV'}
+          </button>
+        }
       />
       <div className="card p-3 mb-4 flex gap-2">
         <select className="input" value={status} onChange={(e) => setStatus(e.target.value)}>

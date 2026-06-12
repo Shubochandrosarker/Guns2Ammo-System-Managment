@@ -87,14 +87,51 @@ final class G2AB_Admin_Calendar {
 	private function inline_css() {
 		return '
 		.g2ab-cal-shell{display:grid;grid-template-columns:240px 1fr;gap:18px;margin-top:14px;}
-		.g2ab-cal-side{background:#fff;border:1px solid #d9e2ef;border-radius:8px;padding:16px;}
-		.g2ab-cal-side h3{margin:0 0 8px;color:#0f2044;font-size:13px;letter-spacing:.04em;text-transform:uppercase;}
-		.g2ab-cal-side select,.g2ab-cal-side input{width:100%;}
-		.g2ab-cal-side fieldset{border:0;padding:0;margin:0 0 14px;}
-		.g2ab-cal-main{background:#fff;border:1px solid #d9e2ef;border-radius:8px;padding:14px;min-height:640px;}
+		.g2ab-cal-side{background:linear-gradient(180deg,#fff 0%,#f8fbff 140%);border:1px solid #d9e2ef;border-radius:14px;padding:18px;box-shadow:0 14px 32px rgba(15,32,68,.08);height:fit-content;}
+		.g2ab-cal-side h3{margin:0 0 8px;color:#0f2044;font-size:12px;letter-spacing:.06em;text-transform:uppercase;font-weight:700;}
+		.g2ab-cal-side select,.g2ab-cal-side input{width:100%;border-radius:8px;}
+		.g2ab-cal-side fieldset{border:0;padding:0;margin:0 0 16px;}
+		.g2ab-cal-main{background:#fff;border:1px solid #d9e2ef;border-radius:14px;padding:18px;min-height:640px;box-shadow:0 18px 44px rgba(15,32,68,.10);}
 		.g2ab-cal-legend{display:flex;flex-wrap:wrap;gap:8px;font-size:11px;margin:8px 0 0;}
-		.g2ab-cal-legend span{display:inline-flex;align-items:center;gap:6px;background:#f5f7fb;padding:3px 8px;border-radius:999px;}
-		.g2ab-cal-legend i{display:inline-block;width:10px;height:10px;border-radius:2px;}
+		.g2ab-cal-legend span{display:inline-flex;align-items:center;gap:6px;background:#f5f7fb;border:1px solid #e6ecf5;padding:3px 9px;border-radius:999px;color:#3c4a63;}
+		.g2ab-cal-legend i{display:inline-block;width:10px;height:10px;border-radius:50%;box-shadow:0 0 0 2px rgba(255,255,255,.8) inset;}
+		@media (max-width:960px){.g2ab-cal-shell{grid-template-columns:1fr;}}
+
+		/* ── Glossy FullCalendar skin ─────────────────────────────────── */
+		.g2ab-cal-main .fc{--fc-border-color:#e6ecf5;--fc-today-bg-color:rgba(210,105,30,.07);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;}
+		.g2ab-cal-main .fc .fc-header-toolbar{background:linear-gradient(135deg,#10141B 0%,#1B2230 55%,#23304A 100%);border-radius:12px;padding:12px 16px;margin-bottom:16px;box-shadow:0 10px 24px rgba(15,20,30,.22);}
+		.g2ab-cal-main .fc .fc-toolbar-title{color:#fff;font-size:18px;font-weight:800;letter-spacing:.02em;text-shadow:0 1px 0 rgba(0,0,0,.4);}
+		.g2ab-cal-main .fc .fc-button{background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.16);border-radius:999px;color:#E7ECF4;font-size:12px;font-weight:600;padding:6px 14px;text-transform:capitalize;box-shadow:none;transition:background .15s ease,color .15s ease,transform .15s ease;}
+		.g2ab-cal-main .fc .fc-button:hover{background:rgba(255,255,255,.20);color:#fff;transform:translateY(-1px);}
+		.g2ab-cal-main .fc .fc-button:focus{box-shadow:0 0 0 2px rgba(210,105,30,.45);}
+		.g2ab-cal-main .fc .fc-button:disabled{opacity:.45;transform:none;}
+		.g2ab-cal-main .fc .fc-button-primary:not(:disabled).fc-button-active,
+		.g2ab-cal-main .fc .fc-button-primary:not(:disabled):active{background:#D2691E;border-color:#D2691E;color:#fff;box-shadow:0 4px 12px rgba(210,105,30,.35);}
+		.g2ab-cal-main .fc .fc-button-group{gap:4px;}
+		.g2ab-cal-main .fc .fc-button-group>.fc-button{border-radius:999px!important;}
+		.g2ab-cal-main .fc .fc-col-header-cell{background:#f6f9fc;}
+		.g2ab-cal-main .fc .fc-col-header-cell-cushion{color:#3c4a63;font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;padding:10px 4px;text-decoration:none;}
+		.g2ab-cal-main .fc .fc-daygrid-day-number{color:#1d2a42;font-size:13px;font-weight:700;padding:6px 8px;text-decoration:none;}
+		.g2ab-cal-main .fc .fc-day-other .fc-daygrid-day-number{color:#9aa6ba;font-weight:500;}
+		.g2ab-cal-main .fc .fc-day-today .fc-daygrid-day-number{background:#D2691E;color:#fff;border-radius:999px;min-width:24px;text-align:center;margin:4px;padding:3px 7px;box-shadow:0 2px 6px rgba(210,105,30,.4);}
+		.g2ab-cal-main .fc .fc-daygrid-body tr:nth-child(even) td.fc-daygrid-day:not(.fc-day-today){background:#fafcfe;}
+		.g2ab-cal-main .fc .fc-timegrid-slot{height:2em;}
+		.g2ab-cal-main .fc .fc-timegrid-slot-label-cushion{color:#6b7894;font-size:11px;font-weight:600;}
+		.g2ab-cal-main .fc .fc-timegrid-slot-minor{border-top-style:dotted;}
+		.g2ab-cal-main .fc .fc-timegrid-now-indicator-line{border-color:#D2691E;border-width:2px;}
+		.g2ab-cal-main .fc .fc-timegrid-now-indicator-arrow{border-color:#D2691E;}
+		.g2ab-cal-main .fc .fc-scrollgrid{border-radius:10px;overflow:hidden;}
+
+		/* ── Event chips ──────────────────────────────────────────────── */
+		.fc .fc-event{border:0;border-radius:8px;padding:0;font-size:11.5px;cursor:pointer;box-shadow:0 1px 3px rgba(10,14,22,.25);transition:transform .12s ease,box-shadow .12s ease;overflow:hidden;}
+		.fc .fc-event:hover{transform:translateY(-1px);box-shadow:0 7px 16px rgba(10,14,22,.32);z-index:6!important;}
+		.fc .fc-event .g2ab-evt{display:flex;align-items:center;gap:5px;padding:3px 7px;min-width:0;line-height:1.35;color:#fff;}
+		.fc .fc-event .g2ab-evt__dot{width:7px;height:7px;border-radius:50%;flex:0 0 auto;box-shadow:0 0 0 2px rgba(255,255,255,.4);}
+		.fc .fc-event .g2ab-evt__time{font-weight:800;letter-spacing:.01em;flex:0 0 auto;}
+		.fc .fc-event .g2ab-evt__name{font-weight:600;flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+		.fc .fc-event .g2ab-evt__lane{flex:0 0 auto;background:rgba(255,255,255,.24);border-radius:999px;padding:1px 7px;font-size:9.5px;font-weight:800;letter-spacing:.06em;}
+		.fc .fc-daygrid-event{margin:1px 2px;}
+		.fc .fc-event-title{font-weight:600;}
 		.g2ab-cal-modal-backdrop{position:fixed;inset:0;background:rgba(15,32,68,.55);display:none;align-items:center;justify-content:center;z-index:9999;}
 		.g2ab-cal-modal-backdrop.is-open{display:flex;}
 		.g2ab-cal-modal{background:#fff;border-radius:10px;width:min(560px,92vw);max-height:88vh;overflow:auto;box-shadow:0 30px 80px rgba(15,32,68,.25);}
@@ -308,6 +345,55 @@ final class G2AB_Admin_Calendar {
 					+ ' ' + pad(d.getHours()) + ':' + pad(d.getMinutes()) + ':' + pad(d.getSeconds());
 			}
 
+			// "Lane 3 (Rifle)" → "L03". Mirrors the staff console label logic.
+			function shortLane(name) {
+				name = String(name || '');
+				var m = name.match(/(\d+)/);
+				if (m) return 'L' + (m[1].length < 2 ? '0' + m[1] : m[1]);
+				return name.substring(0, 6);
+			}
+
+			// Custom chip body: status dot + start time + customer + lane chip.
+			function renderEventChip(arg) {
+				var props = arg.event.extendedProps || {};
+				var wrap = document.createElement('div');
+				wrap.className = 'g2ab-evt';
+				var dot = document.createElement('span');
+				dot.className = 'g2ab-evt__dot';
+				dot.style.background = arg.event.backgroundColor || '#4A5D3A';
+				wrap.appendChild(dot);
+				if (arg.timeText) {
+					var time = document.createElement('span');
+					time.className = 'g2ab-evt__time';
+					time.textContent = arg.timeText;
+					wrap.appendChild(time);
+				}
+				var name = document.createElement('span');
+				name.className = 'g2ab-evt__name';
+				name.textContent = props.customer_name || arg.event.title || '';
+				wrap.appendChild(name);
+				if (props.resource_name) {
+					var lane = document.createElement('span');
+					lane.className = 'g2ab-evt__lane';
+					lane.textContent = shortLane(props.resource_name);
+					wrap.appendChild(lane);
+				}
+				return { domNodes: [wrap] };
+			}
+
+			// Hover tooltip with the key booking facts (native title attr —
+			// works everywhere, no extra DOM to keep in sync during drags).
+			function decorateEvent(info) {
+				var p = info.event.extendedProps || {};
+				var lines = [];
+				if (p.customer_name) lines.push(p.customer_name);
+				lines.push(formatRange(info.event.start, info.event.end));
+				if (p.resource_name) lines.push(p.resource_name + (p.resource_type ? ' (' + p.resource_type + ')' : ''));
+				if (p.party_size) lines.push('Party: ' + p.party_size);
+				lines.push('Status: ' + (p.status_label || p.status || ''));
+				info.el.setAttribute('title', lines.join('\n'));
+			}
+
 			function fetchEvents(info, success, failure) {
 				var resourceId = document.getElementById('g2ab-cal-filter-resource').value;
 				var category   = document.getElementById('g2ab-cal-filter-category').value;
@@ -346,6 +432,8 @@ final class G2AB_Admin_Calendar {
 					eventTimeFormat: { hour: 'numeric', minute: '2-digit', meridiem: 'short' },
 					height: 'auto',
 					events: fetchEvents,
+					eventContent: renderEventChip,
+					eventDidMount: decorateEvent,
 					eventClick: function (info) {
 						info.jsEvent.preventDefault();
 						openModal(info.event);

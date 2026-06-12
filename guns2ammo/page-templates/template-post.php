@@ -46,7 +46,7 @@ get_header();
   }
   .post-hero .img::after {
     content: "ARTICLE COVER  ARIZONA STATE FLAG / CARRY POSE"; position: absolute; bottom: 18px; left: 18px;
-    font-family: var(--font-mono); font-size: 10px; letter-spacing: 0.3em; color: var(--color-brass-bright); text-transform: uppercase;
+    font-family: var(--font-mono); font-size: 10px; letter-spacing: 0.3em; color: var(--brass-on-media); text-transform: uppercase;
   }
   .post-hero .cap { font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.18em; color: var(--color-silver); text-transform: uppercase; padding: 12px 0 0; max-width: 760px; margin: 0 auto; font-style: italic; }
 

@@ -56,40 +56,50 @@ final class MapPricingService {
 	}
 
 	public static function filter_price_html( string $html, $product ): string {
-		if ( ! is_object( $product ) || ! method_exists( $product, 'get_id' ) ) {
-			return $html;
-		}
-		// Allow override for admin/cart/checkout contexts.
-		if ( is_admin() && ! wp_doing_ajax() ) {
-			return $html;
-		}
-		if ( function_exists( 'is_cart' ) && ( is_cart() || is_checkout() ) ) {
-			return $html;
-		}
+		try {
+			if ( ! is_object( $product ) || ! method_exists( $product, 'get_id' ) || ! method_exists( $product, 'get_price' ) ) {
+				return $html;
+			}
+			$product_id = (int) $product->get_id();
+			if ( $product_id <= 0 ) {
+				return $html;
+			}
+			// Allow override for admin/cart/checkout contexts.
+			if ( is_admin() && ! wp_doing_ajax() ) {
+				return $html;
+			}
+			if ( function_exists( 'is_cart' ) && ( is_cart() || is_checkout() ) ) {
+				return $html;
+			}
 
-		$price = (float) $product->get_price();
-		$eval  = self::evaluate( (int) $product->get_id(), $price );
-		if ( ! $eval['has_rule'] || ! $eval['below_map'] ) {
-			return $html;
-		}
+			$price = (float) $product->get_price();
+			$eval  = self::evaluate( $product_id, $price );
+			if ( ! $eval['has_rule'] || ! $eval['below_map'] ) {
+				return $html;
+			}
 
-		// Log the violation suppression (sampled by transient to avoid floods).
-		self::sampledLog( $product, $eval );
+			// Log the violation suppression (sampled by transient to avoid floods).
+			self::sampledLog( $product, $eval );
 
-		$label = $eval['override_label'] ?: __( 'See price in cart', 'g2a-pos-core' );
-		if ( $eval['display_mode'] === 'show_map' ) {
+			$label = $eval['override_label'] ?: __( 'See price in cart', 'g2a-pos-core' );
+			if ( $eval['display_mode'] === 'show_map' ) {
+				return sprintf(
+					'<span class="g2a-map-price">%s <small>(MAP)</small></span><span class="g2a-map-note">%s</span>',
+					wc_price( $eval['map_price'] ),
+					esc_html__( 'Your price is lower — see cart.', 'g2a-pos-core' )
+				);
+			}
+
 			return sprintf(
-				'<span class="g2a-map-price">%s <small>(MAP)</small></span><span class="g2a-map-note">%s</span>',
-				wc_price( $eval['map_price'] ),
-				esc_html__( 'Your price is lower — see cart.', 'g2a-pos-core' )
+				'<span class="g2a-map-hidden" data-map-product="%d">%s</span>',
+				$product_id,
+				esc_html( $label )
 			);
+		} catch ( \Throwable ) {
+			// Never break the storefront price output — fall back to the
+			// untouched WooCommerce HTML on any unexpected failure.
+			return $html;
 		}
-
-		return sprintf(
-			'<span class="g2a-map-hidden" data-map-product="%d">%s</span>',
-			(int) $product->get_id(),
-			esc_html( $label )
-		);
 	}
 
 	public static function maybe_render_reveal_widget(): void {
@@ -118,22 +128,42 @@ final class MapPricingService {
 		if ( array_key_exists( $productId, $cache ) ) {
 			return $cache[ $productId ];
 		}
-		$repo = new MapRuleRepository();
-		$sku  = null;
-		$upc  = null;
-		if ( function_exists( 'wc_get_product' ) ) {
-			$product = wc_get_product( $productId );
-			if ( $product ) {
-				$sku = (string) $product->get_sku();
-				$upc = (string) $product->get_meta( '_upc' );
-				if ( $upc === '' ) {
-					$upc = (string) $product->get_meta( '_global_unique_id' );
-				}
-			}
-		}
-		$rule                = $repo->findForProduct( $productId, $sku ?: null, $upc ?: null );
+		$ids                 = self::identifiersFor( $productId );
+		$repo                = new MapRuleRepository();
+		$rule                = $repo->findForProduct( $productId, $ids['sku'] ?: null, $ids['upc'] ?: null );
 		$cache[ $productId ] = $rule;
 		return $rule;
+	}
+
+	/**
+	 * Resolve SKU/UPC for a product without going through WC_Product->get_meta().
+	 *
+	 * '_upc' and '_global_unique_id' are treated as *internal* meta keys by
+	 * WooCommerce, so reading them via get_meta() inside the
+	 * woocommerce_get_price_html filter triggers a doing_it_wrong notice
+	 * ("is_internal_meta_key was called incorrectly") beside every price on the
+	 * shop when WP_DEBUG_DISPLAY is on. Raw get_post_meta() avoids the WC data
+	 * store entirely. Results are cached per request, keyed by product id.
+	 */
+	private static function identifiersFor( int $productId ): array {
+		static $cache = array();
+		if ( isset( $cache[ $productId ] ) ) {
+			return $cache[ $productId ];
+		}
+		$sku = '';
+		$upc = '';
+		if ( function_exists( 'get_post_meta' ) ) {
+			$sku = (string) get_post_meta( $productId, '_sku', true );
+			$upc = (string) get_post_meta( $productId, '_upc', true );
+			if ( $upc === '' ) {
+				$upc = (string) get_post_meta( $productId, '_global_unique_id', true );
+			}
+		}
+		$cache[ $productId ] = array(
+			'sku' => $sku,
+			'upc' => $upc,
+		);
+		return $cache[ $productId ];
 	}
 
 	private static function sampledLog( $product, array $evaluation ): void {

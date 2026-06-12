@@ -21,6 +21,72 @@ final class OrderController {
 		return array( 'items' => $items );
 	}
 
+	/** GET /orders/export.csv — stream orders (optionally filtered by status). */
+	public static function export_csv( WP_REST_Request $request ): void {
+		global $wpdb;
+
+		nocache_headers();
+		header( 'Content-Type: text/csv; charset=UTF-8' );
+		header( 'Content-Disposition: attachment; filename="g2a-orders-' . gmdate( 'Ymd-His' ) . '.csv"' );
+		header( 'X-Content-Type-Options: nosniff' );
+
+		$out = fopen( 'php://output', 'w' );
+		fputcsv(
+			$out,
+			array( 'order_id', 'status', 'payment_status', 'payment_method', 'compliance_state', 'subtotal', 'tax_total', 'grand_total', 'customer_id', 'employee_id', 'location_id', 'created_at' )
+		);
+
+		$t      = $wpdb->prefix . 'g2a_pos_orders';
+		$where  = array( '1=1' );
+		$args   = array();
+		$status = sanitize_key( (string) ( $request->get_param( 'status' ) ?? '' ) );
+		if ( $status !== '' ) {
+			$where[] = 'status = %s';
+			$args[]  = $status;
+		}
+		$last_id = PHP_INT_MAX;
+		$batch   = 500;
+		do {
+			$sql_args = array_merge( $args, array( $last_id, $batch ) );
+			$rows     = $wpdb->get_results(
+				$wpdb->prepare(
+					"SELECT * FROM {$t} WHERE " . implode( ' AND ', $where ) . ' AND id < %d ORDER BY id DESC LIMIT %d',
+					$sql_args
+				),
+				ARRAY_A
+			) ?: array();
+			foreach ( $rows as $r ) {
+				$last_id = (int) $r['id'];
+				fputcsv(
+					$out,
+					array_map(
+						array( CrmController::class, 'csv_cell' ),
+						array(
+							(int) $r['id'],
+							(string) ( $r['status'] ?? '' ),
+							(string) ( $r['payment_status'] ?? '' ),
+							(string) ( $r['payment_method'] ?? '' ),
+							(string) ( $r['compliance_state'] ?? '' ),
+							(string) ( $r['subtotal'] ?? '' ),
+							(string) ( $r['tax_total'] ?? '' ),
+							(string) ( $r['grand_total'] ?? '' ),
+							(string) ( $r['customer_id'] ?? '' ),
+							(string) ( $r['employee_id'] ?? '' ),
+							(string) ( $r['location_id'] ?? '' ),
+							(string) ( $r['created_at'] ?? '' ),
+						)
+					)
+				);
+			}
+			if ( function_exists( 'flush' ) ) {
+				flush();
+			}
+		} while ( count( $rows ) === $batch );
+
+		fclose( $out ); // phpcs:ignore WordPress.WP.AlternativeFunctions
+		exit;
+	}
+
 	public static function get( WP_REST_Request $request ) {
 		$order_id = (int) $request->get_param( 'id' );
 		if ( $order_id <= 0 ) {

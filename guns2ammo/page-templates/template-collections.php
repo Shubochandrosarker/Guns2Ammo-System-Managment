@@ -9,13 +9,11 @@
 if ( ! defined( 'ABSPATH' ) ) exit;
 get_header();
 
-$img_base = '/wp-content/uploads/';
-
 $tiles = [
-	[ 'slug' => 'handguns',   'name' => 'HANDGUNS',   'href' => home_url( '/collections/handguns/' ),   'img' => $img_base . '2025/06/glock-19-gen5-9mm-guns2ammo-mesa-az.jpg.webp', 'desc' => 'Carry pistols, duty guns, and range favorites fitted to your hand.' ],
-	[ 'slug' => 'rifles',     'name' => 'RIFLES',     'href' => home_url( '/collections/rifles/' ),     'img' => $img_base . '2025/06/noveske-gen4-556-sbr-bazooka-green-guns2ammo-mesa-az.webp', 'desc' => 'AR carbines, bolt guns, and SBR builds from trusted makers.' ],
-	[ 'slug' => 'ammunition', 'name' => 'AMMUNITION', 'href' => home_url( '/collections/ammunition/' ), 'img' => $img_base . '2026/02/589741689_1348201817319329_6684242787616772114_n.webp', 'desc' => 'Factory-new training rounds and premium defense loads, in bulk.' ],
-	[ 'slug' => 'magazines',  'name' => 'MAGAZINES',  'href' => home_url( '/collections/magazines/' ),  'img' => $img_base . '2025/06/Sig-Suer-P320-Custom-works-Guns2ammo-mesa-az.JPG-rotated.webp', 'desc' => 'Factory and proven aftermarket mags for pistols and rifles.' ],
+	[ 'slug' => 'handguns',   'name' => 'HANDGUNS',   'href' => home_url( '/collections/handguns/' ),   'img' => g2a_asset( 'img/guns2ammo-handgun-case-display.jpg' ), 'desc' => 'Carry pistols, duty guns, and range favorites fitted to your hand.' ],
+	[ 'slug' => 'rifles',     'name' => 'RIFLES',     'href' => home_url( '/collections/rifles/' ),     'img' => g2a_asset( 'img/guns2ammo-rifles-rack.jpg' ), 'desc' => 'AR carbines, bolt guns, and SBR builds from trusted makers.' ],
+	[ 'slug' => 'ammunition', 'name' => 'AMMUNITION', 'href' => home_url( '/collections/ammunition/' ), 'img' => g2a_asset( 'img/guns2ammo-ammo-shelves.jpg' ), 'desc' => 'Factory-new training rounds and premium defense loads, in bulk.' ],
+	[ 'slug' => 'magazines',  'name' => 'MAGAZINES',  'href' => home_url( '/collections/magazines/' ),  'img' => g2a_asset( 'img/guns2ammo-gear-case.jpg' ), 'desc' => 'Factory and proven aftermarket mags for pistols and rifles.' ],
 ];
 ?>
 <style>
@@ -32,10 +30,10 @@ $tiles = [
 .cx-tile:hover .bg { transform: scale(1.05); }
 .cx-tile .scrim { position:absolute; inset:0; background: linear-gradient(180deg, rgba(26,25,30,0.25) 0%, rgba(26,25,30,0.92) 82%); }
 .cx-tile .bd { position:absolute; left:0; right:0; bottom:0; padding:28px; }
-.cx-tile .ct { font-family: var(--font-mono); font-size:10px; letter-spacing:0.26em; color: var(--color-brass-bright); text-transform:uppercase; }
-.cx-tile h2 { font-family: var(--font-display); font-size: clamp(36px,4.5vw,60px); line-height:1; color: var(--color-white); margin:8px 0 6px; letter-spacing:0.02em; }
-.cx-tile p { color: var(--color-fog); font-size:14px; margin:0; max-width:42ch; }
-.cx-tile .more { display:inline-flex; gap:8px; margin-top:14px; font-family: var(--font-condensed); font-weight:600; font-size:12px; letter-spacing:0.16em; color: var(--color-ember); text-transform:uppercase; }
+.cx-tile .ct { font-family: var(--font-mono); font-size:10px; letter-spacing:0.26em; color: var(--brass-on-media); text-transform:uppercase; }
+.cx-tile h2 { font-family: var(--font-display); font-size: clamp(36px,4.5vw,60px); line-height:1; color: var(--ink-on-media); margin:8px 0 6px; letter-spacing:0.02em; }
+.cx-tile p { color: var(--ink-on-media-dim); font-size:14px; margin:0; max-width:42ch; }
+.cx-tile .more { display:inline-flex; gap:8px; margin-top:14px; font-family: var(--font-condensed); font-weight:600; font-size:12px; letter-spacing:0.16em; color: var(--ember-on-media); text-transform:uppercase; }
 .cx-why { background: var(--color-gunmetal); border-top:1px solid var(--color-hairline); }
 .cx-why .wrap { max-width:1280px; margin:0 auto; padding:72px 32px; }
 .cx-why h2 { font-family: var(--font-display); font-size: clamp(36px,5vw,60px); color: var(--color-white); }

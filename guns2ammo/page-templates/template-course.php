@@ -26,7 +26,7 @@ $courses = [
 		'title'   => 'BASIC HANDGUN',
 		'lead'    => 'The honest starting line for every new shooter. Grip, stance, sight alignment, trigger control  then your first 50 rounds downrange under one-on-one instruction.',
 		'price'   => '$95', 'member' => '$71.25', 'duration' => '4 Hours', 'size' => '16', 'prereq' => 'None',
-		'image'   => $img . '2024/08/woman-with-handgun-at-indoor-shooting-range.webp',
+		'image'   => g2a_asset( 'img/guns2ammo-customer-first-visit-target.jpg' ),
 		'overview'=> 'Basic Handgun is built for people who have never touched a firearm and for those who want to rebuild their fundamentals correctly. Our instructors keep the class small, the pace patient, and the range time hands-on  you will leave able to safely load, fire, and clear a handgun.',
 		'learn'   => [ 'The four universal rules of firearm safety', 'Proper grip, stance, and recoil management', 'Sight alignment and sight picture', 'Trigger control and follow-through', 'Safe loading, unloading, and malfunction clearing' ],
 		'modules' => [
@@ -46,7 +46,7 @@ $courses = [
 		'title'   => 'CALIFORNIA CCW',
 		'lead'    => 'California non-resident certification meeting all California Penal Code training requirements  completed in Arizona, paired with your AZ permit for broad reciprocity.',
 		'price'   => '$175', 'member' => '$131.25', 'duration' => '16 Hours', 'size' => '48', 'prereq' => 'Arizona CCW',
-		'image'   => $img . '2026/01/ChatGPT-Image-Jan-30-2026-10_10_12-PM.webp',
+		'image'   => g2a_asset( 'img/guns2ammo-range-training-session.jpg' ),
 		'overview'=> 'For California residents and frequent visitors, this course covers the classroom hours, legal instruction, and live-fire qualification California requires. Bundle it with your Arizona CCW and you carry legally across a large block of reciprocal states.',
 		'learn'   => [ 'California Penal Code use-of-force law', 'Safe handling, storage, and transport requirements', 'Live-fire qualification to California standards', 'Multi-state reciprocity planning', 'Documentation handled for your application' ],
 		'modules' => [
@@ -66,7 +66,7 @@ $courses = [
 		'title'   => 'CHURCH SECURITY',
 		'lead'    => 'Faith-based facility protection: threat assessment, plain-clothes carry, congregation safety planning, and coordinated response for volunteer security teams.',
 		'price'   => '$249', 'member' => '$186.75', 'duration' => '12 Hours', 'size' => '612', 'prereq' => 'CCW',
-		'image'   => $img . '2026/01/ChatGPT-Image-Jan-31-2026-01_41_20-AM.webp',
+		'image'   => g2a_asset( 'img/guns2ammo-shooter-on-lane.jpg' ),
 		'overview'=> 'Built for church safety teams and volunteer ministries, this course goes beyond marksmanship into team coordination, de-escalation, medical readiness, and protecting a congregation without disrupting worship.',
 		'learn'   => [ 'Threat assessment for places of worship', 'Discreet plain-clothes carry and positioning', 'Team communication and coordinated response', 'De-escalation and crowd management', 'Trauma-care basics and emergency planning' ],
 		'modules' => [
@@ -86,7 +86,7 @@ $courses = [
 		'title'   => "WOMEN'S INTRO",
 		'lead'    => 'A female-instructed beginner course for new women shooters  patient, supportive, and entirely judgment-free. Tuesday Ladies Day pricing applied.',
 		'price'   => '$65', 'member' => '$48.75', 'duration' => '3 Hours', 'size' => '14', 'prereq' => 'None',
-		'image'   => $img . '2024/08/woman-with-handgun-at-indoor-shooting-range.webp',
+		'image'   => g2a_asset( 'img/guns2ammo-customer-first-visit-target.jpg' ),
 		'overview'=> 'Taught by our Women\'s Lead instructor, this small-group course gives new women shooters a calm, encouraging first experience. No pressure, no ego  just clear fundamentals and supportive coaching at your pace.',
 		'learn'   => [ 'Firearm safety in plain, practical terms', 'Comfortable grip and stance for any hand size', 'Loading, firing, and clearing with confidence', 'Choosing a firearm that genuinely fits you', 'A clear next step into carry or defensive training' ],
 		'modules' => [
@@ -106,7 +106,7 @@ $courses = [
 		'title'   => 'DEFENSIVE PISTOL',
 		'lead'    => 'Stress-fire drills, multiple targets, low-light shooting, malfunction clearance, and force-on-force scenarios. The course that pressure-tests your carry skills.',
 		'price'   => '$295', 'member' => '$221.25', 'duration' => '10 Hours', 'size' => '48', 'prereq' => 'CCW',
-		'image'   => $img . '2025/03/IMG_20250317_085324.webp',
+		'image'   => g2a_asset( 'img/guns2ammo-range-lane-view.jpg' ),
 		'overview'=> 'Defensive Pistol is for carriers who want their skills tested under stress, not just on a calm range. Expect movement, decision-making, low-light work, and scenario-based training that builds real defensive competence.',
 		'learn'   => [ 'Drawing from concealment under stress', 'Engaging multiple targets and shoot/no-shoot decisions', 'Low-light and reduced-visibility shooting', 'Rapid malfunction clearance', 'Force-on-force scenario decision-making' ],
 		'modules' => [
@@ -126,7 +126,7 @@ $courses = [
 		'title'   => 'RIFLE FUNDAMENTALS',
 		'lead'    => 'Master the modern sporting rifle from the ground up  zeroing, marksmanship, reloads, and safe handling of the AR-15 platform.',
 		'price'   => '$115', 'member' => '$86.25', 'duration' => '5 Hours', 'size' => '16', 'prereq' => 'None',
-		'image'   => $img . '2025/06/noveske-gen4-556-sbr-bazooka-green-guns2ammo-mesa-az.webp',
+		'image'   => g2a_asset( 'img/guns2ammo-rifle-wall-display.jpg' ),
 		'overview'=> 'Whether you just bought your first AR-15 or want to use one confidently for home defense, Rifle Fundamentals covers zeroing, marksmanship positions, reloads, and the safe handling habits every rifle owner needs.',
 		'learn'   => [ 'AR-15 platform basics and safe handling', 'Zeroing your optic or iron sights', 'Standing, kneeling, and supported positions', 'Reloads and basic malfunction clearance', 'Home-defense considerations for rifles' ],
 		'modules' => [
@@ -146,7 +146,7 @@ $courses = [
 		'title'   => 'REFUSE TO BE A VICTIM',
 		'lead'    => 'A no-firearms personal-safety seminar  awareness, avoidance, and practical strategies to keep you and your family safer at home, online, and on the move.',
 		'price'   => '$55', 'member' => '$41.25', 'duration' => '4 Hours', 'size' => '420', 'prereq' => 'None',
-		'image'   => $img . '2026/01/ChatGPT-Image-Jan-31-2026-01_41_20-AM.webp',
+		'image'   => g2a_asset( 'img/guns2ammo-shooter-on-lane.jpg' ),
 		'overview'=> 'Not every safety decision involves a firearm. This seminar focuses on prevention  recognizing threats early, avoiding dangerous situations, and building practical security habits for your home, vehicle, travel, and digital life.',
 		'learn'   => [ 'Situational awareness and early threat recognition', 'Home and personal-property security', 'Safe travel and vehicle strategies', 'Personal and digital-safety habits', 'Building a family safety plan' ],
 		'modules' => [
@@ -166,7 +166,7 @@ $courses = [
 		'title'   => 'YOUTH FIREARM SAFETY',
 		'lead'    => 'An age-appropriate firearm-safety class for young people  teaching what to do if they ever encounter a gun, with parents involved every step.',
 		'price'   => '$45', 'member' => '$33.75', 'duration' => '2 Hours', 'size' => '16', 'prereq' => 'Parent / guardian present',
-		'image'   => $img . '2025/06/IMG_1055.webp',
+		'image'   => g2a_asset( 'img/guns2ammo-indoor-range-lanes-mesa.jpg' ),
 		'overview'=> 'Curiosity is normal  unsafe outcomes are preventable. This calm, age-appropriate class teaches young people the firearm-safety rule that matters most: stop, do not touch, leave, and tell an adult. A parent or guardian attends throughout.',
 		'learn'   => [ 'Stop  Don\'t Touch  Leave  Tell An Adult', 'Why firearms are not toys', 'What to do if a friend finds a gun', 'How to speak up to a trusted adult', 'Optional supervised intro to safe handling (older youth)' ],
 		'modules' => [
@@ -191,12 +191,12 @@ if ( function_exists( 'g2a_faq_schema' ) && function_exists( 'g2a_emit_jsonld' )
 ?>
 <style>
 .cr-hero { padding: 140px 32px 72px; position:relative; overflow:hidden; }
-.cr-hero::before { content:""; position:absolute; inset:0; pointer-events:none; background-image: linear-gradient(180deg, rgba(26,25,30,0.8), rgba(26,25,30,0.96)), url('<?php echo esc_url( $c['image'] ); ?>'); background-size:cover; background-position:center; }
+.cr-hero::before { content:""; position:absolute; inset:0; pointer-events:none; background-image: linear-gradient(180deg, var(--hero-scrim), var(--hero-scrim-deep)), url('<?php echo esc_url( $c['image'] ); ?>'); background-size:cover; background-position:center; }
 .cr-hero .c { position:relative; max-width:1180px; margin:0 auto; }
-.cr-hero .crumbs { font-family: var(--font-mono); font-size:11px; letter-spacing:0.2em; text-transform:uppercase; color: var(--color-silver); }
-.cr-hero .crumbs a { color: var(--color-brass-bright); text-decoration:none; }
-.cr-hero h1 { font-family: var(--font-display); font-size: clamp(52px,8vw,116px); line-height:0.9; margin:14px 0 0; color: var(--color-white); }
-.cr-hero .lead { color: var(--color-fog); max-width:60ch; margin:20px 0 0; font-size:16px; line-height:1.7; }
+.cr-hero .crumbs { font-family: var(--font-mono); font-size:11px; letter-spacing:0.2em; text-transform:uppercase; color: var(--ink-on-media-faint); }
+.cr-hero .crumbs a { color: var(--brass-on-media); text-decoration:none; }
+.cr-hero h1 { font-family: var(--font-display); font-size: clamp(52px,8vw,116px); line-height:0.9; margin:14px 0 0; color: var(--ink-on-media); }
+.cr-hero .lead { color: var(--ink-on-media-dim); max-width:60ch; margin:20px 0 0; font-size:16px; line-height:1.7; }
 .cr-chips { display:flex; gap:10px; flex-wrap:wrap; margin-top:26px; }
 .cr-chip { font-family: var(--font-mono); font-size:11px; letter-spacing:0.16em; text-transform:uppercase; color: var(--color-fog); border:1px solid var(--color-hairline-bright); padding:8px 12px; }
 .cr-chip strong { color: var(--color-brass-bright); }
@@ -220,7 +220,7 @@ if ( function_exists( 'g2a_faq_schema' ) && function_exists( 'g2a_emit_jsonld' )
 .cr-rel a .mt { font-family: var(--font-mono); font-size:10px; letter-spacing:0.2em; color: var(--color-brass-bright); text-transform:uppercase; }
 </style>
 
-<header class="cr-hero">
+<header class="cr-hero hero-media">
   <div class="c">
     <div class="crumbs"><a href="<?php echo esc_url( home_url( '/' ) ); ?>">Home</a>  <a href="<?php echo esc_url( home_url( '/training/' ) ); ?>">Training</a>  <?php echo esc_html( $c['title'] ); ?></div>
     <span class="eyebrow" style="margin-top:14px;"><?php echo esc_html( $c['eyebrow'] ); ?></span>

@@ -60,6 +60,10 @@ class WPISTIC_CF_Newsletter {
 		// name ends with `_newsletter` and is truthy.
 		add_action( 'WPISTIC_CF_submission_captured', [ __CLASS__, 'maybe_subscribe_from_form' ], 10, 3 );
 
+		// Branded welcome / confirmation email on every (re)subscribe.
+		add_action( 'wpcf_newsletter_subscribed',   [ __CLASS__, 'send_confirmation' ], 10, 2 );
+		add_action( 'wpcf_newsletter_resubscribed', [ __CLASS__, 'send_confirmation' ], 10, 2 );
+
 		if ( is_admin() ) {
 			add_action( 'admin_menu', [ __CLASS__, 'register_admin_page' ], 20 );
 			add_action( 'admin_post_wpcf_newsletter_export',      [ __CLASS__, 'handle_export' ] );
@@ -143,6 +147,20 @@ class WPISTIC_CF_Newsletter {
 			'args'                => [
 				'email'  => [ 'type' => 'string', 'required' => true ],
 				'source' => [ 'type' => 'string', 'required' => false ],
+			],
+		] );
+
+		// Tokenized one-click unsubscribe. GET serves the branded landing
+		// page for email-client clicks; POST satisfies RFC 8058 one-click
+		// (List-Unsubscribe-Post) handling by Gmail/Yahoo. Auth is the
+		// HMAC token itself, so permission_callback is open.
+		register_rest_route( 'wpcf/v1', '/newsletter/unsubscribe', [
+			'methods'             => [ 'GET', 'POST' ],
+			'callback'            => [ __CLASS__, 'rest_unsubscribe' ],
+			'permission_callback' => '__return_true',
+			'args'                => [
+				'email' => [ 'type' => 'string', 'required' => true ],
+				'token' => [ 'type' => 'string', 'required' => true ],
 			],
 		] );
 	}
@@ -251,6 +269,209 @@ class WPISTIC_CF_Newsletter {
 			'status'  => 'ok',
 			'message' => __( "You're on the list. Watch your inbox.", 'wpistic-contact-form' ),
 		];
+	}
+
+	/* ------------------------------------------------------------------
+	 * Confirmation email
+	 * ------------------------------------------------------------------ */
+
+	/**
+	 * Send the branded "welcome to the range list" confirmation email.
+	 *
+	 * Fired on both wpcf_newsletter_subscribed and _resubscribed. Respects
+	 * the global email kill switches, the per-feature toggle, and a
+	 * per-address throttle so a resubscribe loop can't spam one inbox.
+	 *
+	 * @param string $email  Subscriber email.
+	 * @param string $source Capture source slug.
+	 */
+	public static function send_confirmation( $email, $source = '' ) {
+		// Global kill switches shared with the auto-responder.
+		if ( ( defined( 'WPCF_EMAIL_DISABLED' ) && WPCF_EMAIL_DISABLED )
+			|| (bool) get_option( 'WPISTIC_CF_emails_disabled', false ) ) {
+			return;
+		}
+		if ( '1' !== get_option( 'WPISTIC_CF_newsletter_confirm_enabled', '1' ) ) {
+			return;
+		}
+		$email = sanitize_email( $email );
+		if ( ! $email || ! is_email( $email ) ) {
+			return;
+		}
+
+		// Per-address throttle: one confirmation per hour max.
+		$throttle_key = 'wpcf_nlc_' . md5( strtolower( $email ) );
+		if ( false !== get_transient( $throttle_key ) ) {
+			return;
+		}
+		set_transient( $throttle_key, 1, HOUR_IN_SECONDS );
+
+		$site_name = wp_specialchars_decode( get_bloginfo( 'name' ), ENT_QUOTES );
+		$subject   = (string) get_option(
+			'WPISTIC_CF_newsletter_confirm_subject',
+			__( "You're on the list — welcome to Guns 2 Ammo", 'wpistic-contact-form' )
+		);
+		$intro     = (string) get_option(
+			'WPISTIC_CF_newsletter_confirm_intro',
+			__( "You're officially on the Guns 2 Ammo range list. From now on, the good stuff lands in your inbox first.", 'wpistic-contact-form' )
+		);
+		$subject = strtr( $subject, [ '{site_name}' => $site_name ] );
+		$intro   = strtr( $intro, [ '{site_name}' => $site_name ] );
+
+		$unsubscribe = self::unsubscribe_url( $email );
+
+		// Warm, safety-forward copy: confirm, set expectations, invite action.
+		$inner  = '<h2 style="margin:0 0 16px;font-family:Arial,Helvetica,sans-serif;font-size:22px;line-height:1.3;color:' . WPISTIC_CF_Email_Template::COLOR_DARK . ';">' . esc_html__( 'Welcome to the Guns 2 Ammo range list', 'wpistic-contact-form' ) . '</h2>';
+		$inner .= '<p style="margin:0 0 16px;">' . esc_html( $intro ) . '</p>';
+		$inner .= '<p style="margin:0 0 8px;"><strong>' . esc_html__( "Here's what you'll get:", 'wpistic-contact-form' ) . '</strong></p>';
+		$inner .= '<ul style="margin:0 0 16px;padding:0 0 0 20px;">'
+			. '<li style="margin:0 0 6px;">' . esc_html__( 'New inventory drops — firearms, ammo and gear, before the floor sells through', 'wpistic-contact-form' ) . '</li>'
+			. '<li style="margin:0 0 6px;">' . esc_html__( 'Training schedules and CCW class dates', 'wpistic-contact-form' ) . '</li>'
+			. '<li style="margin:0 0 6px;">' . esc_html__( 'Member-only pricing and range specials', 'wpistic-contact-form' ) . '</li>'
+			. '<li style="margin:0;">' . esc_html__( 'Ladies Tuesday reminders', 'wpistic-contact-form' ) . '</li>'
+			. '</ul>';
+		$inner .= '<p style="margin:0 0 4px;">' . esc_html__( 'Ready to put some rounds downrange? Reserve your spot in seconds.', 'wpistic-contact-form' ) . '</p>';
+		$inner .= WPISTIC_CF_Email_Template::button( __( 'Book a Lane', 'wpistic-contact-form' ), home_url( '/book-a-lane/' ) );
+		$inner .= '<p style="margin:0 0 8px;">' . esc_html__( 'If you ever need a hand, just reply to this email — our team will take care of the rest.', 'wpistic-contact-form' ) . '</p>';
+		$inner .= '<p style="margin:0;">' . esc_html__( 'Thanks for choosing Guns 2 Ammo — your range partner.', 'wpistic-contact-form' ) . '</p>';
+
+		$body = WPISTIC_CF_Email_Template::wrap( $inner, [
+			'preheader'       => __( "You're on the Guns 2 Ammo range list — inventory drops, class dates and member pricing are headed your way.", 'wpistic-contact-form' ),
+			'unsubscribe_url' => $unsubscribe,
+			'title'           => $subject,
+		] );
+
+		// From / Reply-To reuse the plugin's existing sender options.
+		$from_name  = get_option( 'WPISTIC_CF_reply_from_name', get_bloginfo( 'name' ) );
+		$from_email = get_option( 'WPISTIC_CF_reply_from_email', get_option( 'admin_email' ) );
+		$headers    = [ 'Content-Type: text/html; charset=UTF-8' ];
+		if ( is_email( $from_email ) ) {
+			$headers[] = sprintf( 'From: %s <%s>', $from_name, $from_email );
+			$headers[] = 'Reply-To: ' . $from_email;
+		}
+		// RFC 2369 / 8058 list management headers — improves deliverability
+		// and gives Gmail/Yahoo their native unsubscribe affordance.
+		$headers[] = 'List-Unsubscribe: <' . $unsubscribe . '>';
+		$headers[] = 'List-Unsubscribe-Post: List-Unsubscribe=One-Click';
+
+		$sent = WPISTIC_CF_Capture::send_internal( $email, $subject, $body, $headers );
+		if ( ! $sent && defined( 'WP_DEBUG' ) && WP_DEBUG ) {
+			error_log( sprintf( '[WPISTIC_CF] Newsletter confirmation email failed for %s (source: %s).', $email, $source ) );
+		}
+	}
+
+	/* ------------------------------------------------------------------
+	 * Tokenized unsubscribe
+	 * ------------------------------------------------------------------ */
+
+	/**
+	 * HMAC token binding an unsubscribe link to one email address.
+	 * Stateless: derived from the auth salt, so no extra column needed.
+	 *
+	 * @param string $email Subscriber email.
+	 * @return string
+	 */
+	public static function unsubscribe_token( $email ) {
+		return hash_hmac( 'sha256', strtolower( trim( (string) $email ) ), wp_salt( 'auth' ) );
+	}
+
+	/**
+	 * Public unsubscribe URL for one subscriber.
+	 *
+	 * @param string $email Subscriber email.
+	 * @return string
+	 */
+	public static function unsubscribe_url( $email ) {
+		return add_query_arg(
+			[
+				'email' => rawurlencode( $email ),
+				'token' => self::unsubscribe_token( $email ),
+			],
+			rest_url( 'wpcf/v1/newsletter/unsubscribe' )
+		);
+	}
+
+	/**
+	 * REST handler: validate the HMAC token, flag the subscriber as
+	 * unsubscribed, then show a minimal branded confirmation page (GET)
+	 * or return JSON (POST one-click).
+	 *
+	 * @param WP_REST_Request $request Request.
+	 */
+	public static function rest_unsubscribe( $request ) {
+		$email = sanitize_email( rawurldecode( (string) $request->get_param( 'email' ) ) );
+		$token = (string) $request->get_param( 'token' );
+
+		$valid = $email && is_email( $email ) && hash_equals( self::unsubscribe_token( $email ), $token );
+
+		if ( $valid ) {
+			global $wpdb;
+			$wpdb->update(
+				self::table(),
+				[ 'status' => 'unsubscribed', 'unsubscribed_at' => current_time( 'mysql' ) ],
+				[ 'email' => $email ]
+			);
+		}
+
+		// One-click POST (Gmail/Yahoo robots): plain JSON, no HTML page.
+		if ( 'POST' === $request->get_method() ) {
+			return new WP_REST_Response( [ 'status' => $valid ? 'unsubscribed' : 'invalid' ], $valid ? 200 : 400 );
+		}
+
+		// Human GET click: render a small branded page and stop.
+		self::render_unsubscribe_page( $valid, $email );
+		exit;
+	}
+
+	/**
+	 * Output the minimal branded unsubscribe confirmation page.
+	 *
+	 * @param bool   $valid Whether the token verified and the row updated.
+	 * @param string $email Affected address (only echoed when valid).
+	 */
+	protected static function render_unsubscribe_page( $valid, $email ) {
+		$site_name = wp_specialchars_decode( get_bloginfo( 'name' ), ENT_QUOTES );
+		$title     = $valid
+			? __( "You're unsubscribed", 'wpistic-contact-form' )
+			: __( 'Link not valid', 'wpistic-contact-form' );
+		$message   = $valid
+			? sprintf(
+				/* translators: %s: email address */
+				__( '%s will no longer receive range updates from us. Changed your mind? You can re-join from the signup form any time.', 'wpistic-contact-form' ),
+				$email
+			)
+			: __( 'This unsubscribe link is invalid or has expired. Please use the link from a recent email, or reply to any of our emails and we will remove you manually.', 'wpistic-contact-form' );
+
+		if ( ! headers_sent() ) {
+			status_header( $valid ? 200 : 400 );
+			nocache_headers();
+			header( 'Content-Type: text/html; charset=UTF-8' );
+		}
+		?>
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex">
+<title><?php echo esc_html( $title . ' — ' . $site_name ); ?></title>
+</head>
+<body style="margin:0;padding:0;background:#F4F3F0;font-family:Arial,Helvetica,sans-serif;color:#1A191E;">
+	<div style="max-width:520px;margin:64px auto;padding:0 16px;">
+		<div style="background:#fff;border-top:4px solid #C9A84C;box-shadow:0 2px 12px rgba(26,25,30,.08);">
+			<div style="background:#1A191E;padding:22px 28px;text-align:center;">
+				<strong style="color:#fff;font-family:Impact,Arial,sans-serif;font-size:22px;letter-spacing:.08em;text-transform:uppercase;"><?php echo esc_html( $site_name ); ?></strong>
+			</div>
+			<div style="padding:28px;">
+				<h1 style="margin:0 0 12px;font-size:20px;"><?php echo esc_html( $title ); ?></h1>
+				<p style="margin:0 0 20px;font-size:15px;line-height:1.7;"><?php echo esc_html( $message ); ?></p>
+				<a href="<?php echo esc_url( home_url( '/' ) ); ?>" style="display:inline-block;background:#C9A84C;color:#1A191E;padding:12px 26px;text-decoration:none;font-weight:bold;letter-spacing:.06em;text-transform:uppercase;font-size:13px;border-radius:3px;"><?php esc_html_e( 'Back to the site', 'wpistic-contact-form' ); ?></a>
+			</div>
+		</div>
+	</div>
+</body>
+</html>
+		<?php
 	}
 
 	private static function client_ip() {

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { get, errorMessage } from '../api';
+import { get, post, errorMessage } from '../api';
 import PageHeader from '../components/PageHeader';
 import DataTable, { type Column } from '../components/DataTable';
 
@@ -12,11 +12,41 @@ interface Product {
   stock?: number;
 }
 
+interface WooScanStats {
+  scanned?: number;
+  linked?: number;
+  created_refs?: number;
+  updated_refs?: number;
+  barcodes?: number;
+  skipped?: number;
+  error?: string;
+}
+
 export default function Inventory() {
   const [q, setQ] = useState('');
   const [rows, setRows] = useState<Product[]>([]);
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState('');
+  const [scanning, setScanning] = useState(false);
+  const [scanMsg, setScanMsg] = useState('');
+
+  const scanWoo = async () => {
+    setScanning(true);
+    setScanMsg('Scanning WooCommerce catalog… this can take a minute on large stores.');
+    try {
+      const r = await post<{ ok: boolean; stats: WooScanStats }>('/integrations/woo/scan');
+      const s = r.stats || {};
+      setScanMsg(
+        r.ok
+          ? `Scan complete: ${s.scanned ?? 0} products scanned · ${s.created_refs ?? 0} newly linked · ${s.updated_refs ?? 0} refreshed · ${s.barcodes ?? 0} barcodes added · ${s.skipped ?? 0} skipped.`
+          : `Scan failed: ${s.error || 'unknown error'}`
+      );
+    } catch (e) {
+      setScanMsg(`Scan failed: ${errorMessage(e)}`);
+    } finally {
+      setScanning(false);
+    }
+  };
 
   const search = async () => {
     if (!q.trim()) { setRows([]); return; }
@@ -53,11 +83,17 @@ export default function Inventory() {
         subtitle="Products, ammo, accessories. Firearms appear with serial-tracked rows."
         actions={
           <>
-            <button className="btn-secondary">Import CSV</button>
+            <button className="btn-secondary" onClick={scanWoo} disabled={scanning}>
+              {scanning ? 'Scanning…' : '🔄 Scan WooCommerce Products'}
+            </button>
+            <a className="btn-secondary" href="#inventory_import">Import CSV</a>
             <button className="btn-primary">New product</button>
           </>
         }
       />
+      {scanMsg && (
+        <div className="card mb-4 border-l-4 border-brand p-4 text-sm">{scanMsg}</div>
+      )}
       <div className="card mb-4 p-4">
         <input
           className="input"

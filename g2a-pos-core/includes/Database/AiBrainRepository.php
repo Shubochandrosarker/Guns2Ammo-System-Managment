@@ -103,6 +103,23 @@ final class AiBrainRepository extends Repository {
 		) ?: array();
 	}
 
+	/** Document ids whose comma-separated tags contain $tag (exact tag match). */
+	public function document_ids_by_tag( string $tag ): array {
+		global $wpdb;
+		$like = '%' . $wpdb->esc_like( $tag ) . '%';
+		$rows = $wpdb->get_col(
+			$wpdb->prepare(
+				"SELECT id FROM {$this->table('g2a_ai_brain_documents')} WHERE tags LIKE %s",
+				$like
+			)
+		) ?: array();
+		$out  = array();
+		foreach ( $rows as $id ) {
+			$out[] = (int) $id;
+		}
+		return $out;
+	}
+
 	public function delete_document( int $id ): bool {
 		global $wpdb;
 		$wpdb->delete( $this->table( 'g2a_ai_brain_chunks' ), array( 'document_id' => $id ) );

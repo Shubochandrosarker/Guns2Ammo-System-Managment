@@ -42,9 +42,19 @@ interface SearchHit {
   text_content?: string;
 }
 
+interface SiteRefreshResult {
+  ok?: boolean;
+  default_sections?: number;
+  live_sections?: number;
+  chunks?: number;
+  live_source?: string | null;
+}
+
 export default function AiBrain() {
   const [rows, setRows] = useState<Doc[]>([]);
   const [loading, setLoading] = useState(true);
+  const [refreshingSite, setRefreshingSite] = useState(false);
+  const [siteResult, setSiteResult] = useState<string>('');
   const [tab, setTab] = useState<'text' | 'url'>('text');
   const [textForm, setTextForm] = useState<TextForm>({ scope: 'staff' });
   const [urlForm, setUrlForm] = useState<UrlForm>({ scope: 'staff' });
@@ -83,6 +93,24 @@ export default function AiBrain() {
     await refresh();
   };
 
+  const refreshSite = async () => {
+    setRefreshingSite(true);
+    setSiteResult('');
+    try {
+      const r = await post<SiteRefreshResult>('/ai/brain/refresh-site');
+      setSiteResult(
+        `Website knowledge refreshed: ${r.default_sections ?? 0} curated sections, ` +
+        `${r.live_sections ?? 0} live site sections (${r.live_source || 'llms-full.txt unavailable'}), ` +
+        `${r.chunks ?? 0} chunks. Embeddings are generated automatically when an embed endpoint is configured.`
+      );
+      await refresh();
+    } catch {
+      setSiteResult('Refresh failed — check the AI gateway settings and try again.');
+    } finally {
+      setRefreshingSite(false);
+    }
+  };
+
   const runSearch = async () => {
     if (!searchQ) return;
     const r = await get<{ hits: SearchHit[] }>('/ai/brain/search', { q: searchQ, k: 8 });
@@ -101,7 +129,19 @@ export default function AiBrain() {
 
   return (
     <div>
-      <PageHeader title="AI Brain" subtitle="Ingest documents (PDFs, URLs, store policies, ATF guides, training material) into the agent's RAG knowledge base." />
+      <PageHeader
+        title="AI Brain"
+        subtitle="Ingest documents (PDFs, URLs, store policies, ATF guides, training material) into the agent's RAG knowledge base."
+        actions={
+          <button className="btn-secondary" onClick={refreshSite} disabled={refreshingSite}>
+            {refreshingSite ? 'Refreshing…' : '↻ Refresh website knowledge'}
+          </button>
+        }
+      />
+
+      {siteResult && (
+        <div className="card mb-4 border-l-4 border-brand p-4 text-sm">{siteResult}</div>
+      )}
 
       <div className="mb-4 flex gap-2">
         <button className={tab === 'text' ? 'btn-primary' : 'btn'} onClick={() => setTab('text')}>Paste text</button>
