@@ -115,8 +115,8 @@ $gmaps    = $settings['google_maps_key']    ?? '';
 			<div class="wpistic-ffl-plugin-info">
 				<div class="wpistic-ffl-brand-block">
 					<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 50" class="wpistic-ffl-brand-logo">
-						<rect width="200" height="50" rx="8" fill="#7c5cf6"/>
-						<text x="14" y="33" font-family="system-ui,sans-serif" font-weight="700" font-size="20" fill="#ffffff">WordPressistic</text>
+						<rect width="200" height="50" rx="8" fill="#DCB45F"/>
+						<text x="14" y="33" font-family="system-ui,sans-serif" font-weight="700" font-size="20" fill="#0F0E12">Guns 2 Ammo</text>
 					</svg>
 					<p><?php esc_html_e( 'Advanced FFL Checkout Solutions', 'advanced-ffl-checkout' ); ?> v<?php echo esc_html( WPISTIC_FFL_VERSION ); ?></p>
 					<p><a href="https://wordpressistic.com" target="_blank" rel="noopener">wordpressistic.com</a></p>

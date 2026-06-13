@@ -2,7 +2,7 @@
 /**
  * WP Admin panel controller.
  *
- * Registers the top-level admin menu under the WordPressistic purple W icon,
+ * Registers the top-level admin menu under the G2A brass shield icon,
  * handles AJAX actions, and dispatches to view files.
  *
  * Menu structure:
@@ -602,9 +602,11 @@ class Admin {
 			wp_die( esc_html__( 'You do not have permission to export.', 'advanced-ffl-checkout' ), 403 );
 		}
 
+		// Nonce — required so a crafted link can't make a privileged admin
+		// trigger a large CSV dump via CSRF.
 		$nonce = isset( $_GET['_wpnonce'] ) ? sanitize_text_field( wp_unslash( $_GET['_wpnonce'] ) ) : '';
 		if ( ! wp_verify_nonce( $nonce, 'wpistic_ffl_export' ) ) {
-			wp_die( esc_html__( 'Invalid or expired export link. Please re-open the Transfers screen and try again.', 'advanced-ffl-checkout' ), 403 );
+			wp_die( esc_html__( 'Invalid or missing export nonce.', 'advanced-ffl-checkout' ), 400 );
 		}
 
 		// Optional status / date filters
@@ -955,9 +957,9 @@ class Admin {
 	// ── SVG icon ──────────────────────────────────────────────────────────────
 
 	private static function menu_icon_svg(): string {
-		// Purple W mark — WordPressistic brand icon
-		return '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" fill="#a78bf8">
-			<path d="M10 20 L28 80 L50 35 L72 80 L90 20 H78 L64 62 L50 20 L36 62 L22 20 Z"/>
+		// G2A brass shield — matches the FFL-required iconography used on checkout.
+		return '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="#DCB45F">
+			<path d="M12 1l9 4v6c0 5.55-3.84 10.74-9 12-5.16-1.26-9-6.45-9-12V5l9-4z"/>
 		</svg>';
 	}
 }

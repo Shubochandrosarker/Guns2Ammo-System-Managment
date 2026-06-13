@@ -34,12 +34,13 @@ class G2A_Bridge {
 			return;
 		}
 
+		// Only act on transfer-request forms — other G2A forms (contact, sell,
+		// reservation, support) reuse the same handler. A loose strpos('transfer')
+		// match swept those in, so we require a strict subject or an explicit form_type.
 		$subject   = strtolower( trim( sanitize_text_field( wp_unslash( $_POST['g2a_subject'] ?? '' ) ) ) );
-		$form_type = strtolower( trim( sanitize_text_field( wp_unslash( $_POST['form_type'] ?? '' ) ) ) );
-		// Strict match — the shared handler is used by contact/sell/reservation/
-		// support forms too. We only want the canonical Transfer Request form.
-		$is_transfer = ( 'ffl transfer request' === $subject ) || ( 'ffl_transfer' === $form_type );
-		if ( ! $is_transfer ) {
+		$form_type = isset( $_POST['form_type'] ) ? sanitize_key( wp_unslash( $_POST['form_type'] ) ) : '';
+		$is_transfer_form = ( 'ffl transfer request' === $subject ) || ( 'ffl_transfer' === $form_type );
+		if ( ! $is_transfer_form ) {
 			return;
 		}
 

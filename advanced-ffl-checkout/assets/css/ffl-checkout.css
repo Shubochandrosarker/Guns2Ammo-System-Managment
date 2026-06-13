@@ -1,23 +1,24 @@
 /*!
- * Advanced FFL Checkout — WC Checkout Widget Stylesheet (v1.1.1)
- * G2A brand: tactical red #C8102E + black #0F1115 + clean white surface
+ * Advanced FFL Checkout — WC Checkout Widget Stylesheet (v1.3.0 G2A Edition)
+ * G2A brand: tactical brass #DCB45F + graphite #1A191E + gunmetal surface
+ * Mirrors guns2ammo/assets/css/tokens.css so the widget feels native.
  * Scoped under .wpistic-ffl-widget so theme styles can't bleed in.
  */
 
 .wpistic-ffl-widget {
-	--wf-primary:        #C8102E;
-	--wf-primary-hover:  #A00C24;
-	--wf-primary-soft:   rgba(200, 16, 46, 0.1);
-	--wf-ink:            #0F1115;
-	--wf-ink-soft:       #1A1D24;
-	--wf-text:           #1F2937;
-	--wf-text-muted:     #6B7280;
-	--wf-surface:        #FFFFFF;
-	--wf-surface-alt:    #F9FAFB;
-	--wf-border:         #E5E7EB;
-	--wf-border-strong:  #D1D5DB;
-	--wf-success:        #16A34A;
-	--wf-warning:        #F59E0B;
+	--wf-primary:        #DCB45F;
+	--wf-primary-hover:  #C9A84C;
+	--wf-primary-soft:   rgba(220, 180, 95, 0.12);
+	--wf-ink:            #0F0E12;
+	--wf-ink-soft:       #1A191E;
+	--wf-text:           #F7F7F9;
+	--wf-text-muted:     #CBCAD2;
+	--wf-surface:        #26252C;
+	--wf-surface-alt:    #211F26;
+	--wf-border:         #38363F;
+	--wf-border-strong:  rgba(255,255,255,0.16);
+	--wf-success:        #4ADE80;
+	--wf-warning:        #C9A84C;
 	--wf-radius:         12px;
 	--wf-radius-sm:      8px;
 	--wf-shadow-sm:      0 1px 3px rgba(0,0,0,0.08);
@@ -50,7 +51,7 @@
 .wpistic-ffl-widget__heading {
 	font-size: 20px;
 	font-weight: 700;
-	color: var(--wf-ink);
+	color: var(--wf-text);
 	margin: 0 0 6px;
 	display: flex;
 	align-items: center;
@@ -58,7 +59,7 @@
 	letter-spacing: -0.01em;
 }
 .wpistic-ffl-widget__shield { color: var(--wf-primary); flex-shrink: 0; }
-.wpistic-ffl-widget__lede { font-size: 14px; color: var(--wf-text-muted); margin: 0; line-height: 1.55; }
+.wpistic-ffl-widget__lede { font-size: 14px; color: var(--wf-text-muted) !important; margin: 0; line-height: 1.55; }
 
 /* Filter tabs */
 .wpistic-ffl-tabs {
@@ -84,11 +85,11 @@
 	transition: all 0.15s ease;
 	font-family: inherit;
 }
-.wpistic-ffl-tab:hover { color: var(--wf-ink); background: rgba(255,255,255,0.5); }
+.wpistic-ffl-tab:hover { color: var(--wf-text); background: rgba(255,255,255,0.04); }
 .wpistic-ffl-tab.is-active {
-	background: var(--wf-ink);
-	color: #fff;
-	box-shadow: 0 2px 6px rgba(15,17,21,0.2);
+	background: var(--wf-primary);
+	color: var(--wf-ink);
+	box-shadow: 0 2px 6px rgba(220,180,95,0.35);
 }
 
 /* Filter panels */
@@ -150,20 +151,20 @@
 }
 .wpistic-ffl-btn--primary {
 	background: var(--wf-primary);
-	color: #fff;
-	box-shadow: 0 4px 12px -2px rgba(200,16,46,0.4);
+	color: var(--wf-ink);
+	box-shadow: 0 4px 12px -2px rgba(220,180,95,0.4);
 }
 .wpistic-ffl-btn--primary:hover {
 	background: var(--wf-primary-hover);
 	transform: translateY(-1px);
-	box-shadow: 0 6px 16px -2px rgba(200,16,46,0.5);
+	box-shadow: 0 6px 16px -2px rgba(220,180,95,0.5);
 }
 .wpistic-ffl-btn--ghost {
 	background: transparent;
 	color: var(--wf-text-muted);
 	border: 1.5px solid var(--wf-border-strong);
 }
-.wpistic-ffl-btn--ghost:hover { color: var(--wf-ink); border-color: var(--wf-ink); }
+.wpistic-ffl-btn--ghost:hover { color: var(--wf-text); border-color: var(--wf-text); }
 .wpistic-ffl-btn--small { padding: 7px 14px; font-size: 13px; min-height: 34px; }
 
 /* View toggle */
@@ -187,7 +188,7 @@
 }
 .wpistic-ffl-view-btn.is-active {
 	background: var(--wf-surface);
-	color: var(--wf-ink);
+	color: var(--wf-text);
 	box-shadow: var(--wf-shadow-sm);
 }
 
@@ -203,7 +204,7 @@
 	justify-content: space-between;
 	align-items: center;
 }
-.wpistic-ffl-resultsbar__count { font-weight: 600; color: var(--wf-ink); }
+.wpistic-ffl-resultsbar__count { font-weight: 600; color: var(--wf-text); }
 
 /* Map */
 .wpistic-ffl-map {
@@ -235,19 +236,25 @@
 	box-shadow: var(--wf-shadow-card);
 }
 .wpistic-ffl-card.is-recommended {
-	border-color: #FCD34D;
-	background: linear-gradient(180deg, #FFFBEB 0%, #FFFFFF 100%);
-	box-shadow: 0 4px 16px -4px rgba(252,211,77,0.4);
+	/* Brass-tinted card on the dark surface — keeps the "premium" feel without
+	   flipping to a white background that fights the surrounding theme. */
+	border-color: var(--wf-primary);
+	background: linear-gradient(180deg, rgba(220,180,95,0.18) 0%, var(--wf-surface) 100%);
+	box-shadow: 0 4px 16px -4px rgba(220,180,95,0.35);
 }
+.wpistic-ffl-card.is-recommended .wpistic-ffl-card__title,
+.wpistic-ffl-card.is-recommended .wpistic-ffl-card__address,
+.wpistic-ffl-card.is-recommended .wpistic-ffl-card__meta { color: var(--wf-text); }
 .wpistic-ffl-card.is-selected {
 	border-color: var(--wf-success);
-	background: #F0FDF4;
+	background: rgba(74,222,128,0.10);
 }
+.wpistic-ffl-card.is-selected .wpistic-ffl-card__title { color: var(--wf-text); }
 .wpistic-ffl-card__main { min-width: 0; }
 .wpistic-ffl-card__title {
 	font-size: 16px;
 	font-weight: 700;
-	color: var(--wf-ink);
+	color: var(--wf-text);
 	margin: 0 0 4px;
 	display: flex;
 	align-items: center;
@@ -285,7 +292,7 @@
 	gap: 12px;
 	margin-top: 4px;
 }
-.wpistic-ffl-card__meta strong { color: var(--wf-ink); font-weight: 600; }
+.wpistic-ffl-card__meta strong { color: var(--wf-text); font-weight: 600; }
 .wpistic-ffl-card__distance { color: var(--wf-primary); font-weight: 600; }
 
 .wpistic-ffl-card__actions {
@@ -321,13 +328,14 @@
 }
 @keyframes wpistic-ffl-spin { to { transform: rotate(360deg); } }
 
-/* Selected panel */
+/* Selected panel — brass-tinted on dark, mirrors is-recommended card. */
 .wpistic-ffl-selected {
 	margin-top: 16px;
 	padding: 18px;
-	background: linear-gradient(180deg, #F0FDF4 0%, #FFFFFF 100%);
+	background: linear-gradient(180deg, rgba(74,222,128,0.14) 0%, var(--wf-surface) 100%);
 	border: 2px solid var(--wf-success);
 	border-radius: var(--wf-radius);
+	color: var(--wf-text);
 }
 .wpistic-ffl-selected__header {
 	display: flex;
@@ -344,18 +352,31 @@
 	font-size: 14px;
 	color: var(--wf-text);
 	margin-bottom: 12px;
-	line-height: 1.55;
+	line-height: 1.6;
 }
 .wpistic-ffl-selected__info strong {
-	color: var(--wf-ink);
+	color: var(--wf-text);
 	display: block;
 	font-size: 16px;
 	margin-bottom: 4px;
 }
+/* Inline links rendered by JS (Directions, phone) — pin to brass so theme
+   styles can't repaint them cyan / default-link blue. */
+.wpistic-ffl-selected__info a,
+.wpistic-ffl-selected__info a:link,
+.wpistic-ffl-selected__info a:visited {
+	color: var(--wf-primary) !important;
+	text-decoration: none !important;
+	font-weight: 600;
+}
+.wpistic-ffl-selected__info a:hover {
+	color: var(--wf-primary-hover) !important;
+	text-decoration: underline !important;
+}
 
 /* InfoWindow */
 .wpistic-ffl-iw { font-family: var(--wf-font); max-width: 240px; padding: 6px 4px; }
-.wpistic-ffl-iw__name { font-weight: 700; color: var(--wf-ink); margin: 0 0 4px; font-size: 14px; }
+.wpistic-ffl-iw__name { font-weight: 700; color: var(--wf-text); margin: 0 0 4px; font-size: 14px; }
 .wpistic-ffl-iw__addr { color: var(--wf-text-muted); font-size: 12px; margin: 0 0 8px; line-height: 1.45; }
 .wpistic-ffl-iw__select {
 	display: inline-block;
@@ -381,4 +402,172 @@
 	.wpistic-ffl-card__actions .wpistic-ffl-btn { flex: 1; }
 	.wpistic-ffl-input-group--narrow { flex: 1 1 100%; }
 	.wpistic-ffl-map { height: 280px; }
+}
+
+/* G2A — Saved dealers "quick pick" strip (v1.6) */
+.wpistic-ffl-saved {
+	margin: 0 0 18px;
+	padding: 14px 16px;
+	background: var(--wf-surface-alt);
+	border: 1px solid var(--wf-border);
+	border-left: 4px solid var(--wf-primary);
+	border-radius: var(--wf-radius-sm);
+}
+.wpistic-ffl-saved__header {
+	display: flex; align-items: center; gap: 8px;
+	font-size: 12px; letter-spacing: 0.06em; text-transform: uppercase;
+	color: var(--wf-text-muted); margin: 0 0 10px;
+}
+.wpistic-ffl-saved__header svg { color: var(--wf-primary); flex-shrink: 0; }
+.wpistic-ffl-saved__header strong { color: var(--wf-text); font-weight: 700; }
+.wpistic-ffl-saved__grid {
+	display: grid;
+	grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+	gap: 10px;
+}
+.wpistic-ffl-saved__card {
+	padding: 12px 14px; background: var(--wf-surface);
+	border: 1px solid var(--wf-border); border-radius: var(--wf-radius-sm);
+	display: flex; flex-direction: column; gap: 6px;
+}
+.wpistic-ffl-saved__title { font-weight: 700; color: var(--wf-text); font-size: 14px; }
+.wpistic-ffl-saved__meta  { font-size: 12px; color: var(--wf-text-muted); }
+.wpistic-ffl-saved__pin {
+	display: inline-block; margin-left: 6px; padding: 2px 8px;
+	background: var(--wf-primary-soft); color: var(--wf-primary);
+	font-size: 10px; font-weight: 700; border-radius: 999px;
+	letter-spacing: 0.06em; text-transform: uppercase;
+}
+.wpistic-ffl-saved__use { align-self: flex-start; }
+
+/* ───────────────────────────────────────────────────────────────────────────
+   G2A v1.7.2 — Theme bleed-through guard
+   The Guns2Ammo theme paints links cyan and headings brass via .entry-content
+   descendant rules. Scope our own styles inside .wpistic-ffl-widget with one
+   level of specificity to win against them without resorting to !important
+   on everything.
+   ─────────────────────────────────────────────────────────────────────────── */
+
+.wpistic-ffl-widget a,
+.wpistic-ffl-widget a:link,
+.wpistic-ffl-widget a:visited {
+	color: var(--wf-primary);
+	text-decoration: none;
+}
+.wpistic-ffl-widget a:hover,
+.wpistic-ffl-widget a:focus {
+	color: var(--wf-primary-hover);
+	text-decoration: underline;
+}
+
+.wpistic-ffl-widget h1,
+.wpistic-ffl-widget h2,
+.wpistic-ffl-widget h3,
+.wpistic-ffl-widget h4,
+.wpistic-ffl-widget h5,
+.wpistic-ffl-widget h6 {
+	color: var(--wf-text);
+	font-family: var(--wf-font);
+	background: transparent;
+	margin: 0;
+	padding: 0;
+	border: none;
+}
+
+.wpistic-ffl-widget strong,
+.wpistic-ffl-widget b {
+	color: inherit;
+	background: transparent;
+	font-weight: 700;
+}
+
+.wpistic-ffl-widget label,
+.wpistic-ffl-widget p {
+	color: inherit;
+	background: transparent;
+}
+
+/* Buttons inside the widget — guard against theme button rules. */
+.wpistic-ffl-widget button,
+.wpistic-ffl-widget input[type="button"],
+.wpistic-ffl-widget input[type="submit"] {
+	font-family: var(--wf-font);
+	text-transform: none;
+	letter-spacing: 0;
+}
+
+/* Change-dealer ghost link — keep it visible on dark surface. */
+#wpistic-ffl-change-btn {
+	color: var(--wf-text);
+	background: transparent;
+	border: 1.5px solid var(--wf-border-strong);
+}
+#wpistic-ffl-change-btn:hover {
+	color: var(--wf-ink);
+	background: var(--wf-primary);
+	border-color: var(--wf-primary);
+}
+
+/* Loading-message variants — switch to dark-mode-friendly palette. */
+.wpistic-ffl-msg-error {
+	background: rgba(232,128,47,0.12);
+	color: var(--wf-warning);
+	border: 1px solid var(--wf-warning);
+}
+
+/* ───────────────────────────────────────────────────────────────────────────
+   Responsiveness — expanded breakpoints for tablet + narrow-phone.
+   ─────────────────────────────────────────────────────────────────────────── */
+
+@media (max-width: 980px) {
+	.wpistic-ffl-widget { padding: 20px; }
+	.wpistic-ffl-saved__grid { grid-template-columns: 1fr 1fr; }
+}
+
+@media (max-width: 720px) {
+	.wpistic-ffl-card {
+		grid-template-columns: 1fr;
+		gap: 10px;
+	}
+	.wpistic-ffl-card__actions {
+		flex-direction: row;
+		flex-wrap: wrap;
+	}
+	.wpistic-ffl-card__actions .wpistic-ffl-btn {
+		flex: 1 1 calc(50% - 6px);
+	}
+	.wpistic-ffl-saved__grid { grid-template-columns: 1fr; }
+	.wpistic-ffl-resultsbar {
+		flex-direction: column;
+		align-items: flex-start;
+		gap: 4px;
+	}
+}
+
+@media (max-width: 480px) {
+	.wpistic-ffl-widget {
+		padding: 14px;
+		border-radius: 10px;
+	}
+	.wpistic-ffl-widget__heading { font-size: 17px; }
+	.wpistic-ffl-widget__lede    { font-size: 13px; }
+	.wpistic-ffl-tabs {
+		flex-direction: column;
+		gap: 4px;
+	}
+	.wpistic-ffl-tab {
+		min-width: 100%;
+		text-align: left;
+	}
+	.wpistic-ffl-filters { gap: 8px; }
+	.wpistic-ffl-input,
+	.wpistic-ffl-select {
+		min-height: 44px; /* iOS finger target */
+		font-size: 16px;  /* prevent iOS zoom on focus */
+	}
+	.wpistic-ffl-btn {
+		min-height: 44px;
+		font-size: 14px;
+	}
+	.wpistic-ffl-map { height: 220px; }
 }

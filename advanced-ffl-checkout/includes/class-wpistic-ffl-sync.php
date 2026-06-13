@@ -111,40 +111,25 @@ class Sync {
 			return;
 		}
 
-		// Store import state. We tag the run with a unique id so we can defer the
-		// destructive "mark unseen dealers inactive" step until the import has
-		// actually completed — a mid-run failure must NOT leave every dealer
-		// inactive (which would empty the checkout selector).
-		$run_id = uniqid( 'atfsync_', true );
+		// Store import state
 		update_option( 'wpistic_ffl_atf_sync_status',      'running' );
 		update_option( 'wpistic_ffl_atf_sync_message',     '' );
 		update_option( 'wpistic_ffl_atf_sync_files',       wp_json_encode( $csv_files ) );
 		update_option( 'wpistic_ffl_atf_sync_file_index',  0 );
 		update_option( 'wpistic_ffl_atf_sync_file_offset', 0 );
 		update_option( 'wpistic_ffl_atf_sync_total_done',  0 );
-		update_option( 'wpistic_ffl_atf_sync_started_at',  current_time( 'mysql' ) );
-		update_option( 'wpistic_ffl_atf_sync_run_id',      $run_id );
+		$started_at = current_time( 'mysql' );
+		update_option( 'wpistic_ffl_atf_sync_started_at', $started_at );
+
+		// Deferred sweep: don't mass-inactivate up front (an aborted import would
+		// leave every dealer disabled). We capture the start timestamp and only
+		// inactivate rows whose last_synced is still older than this run, AFTER
+		// finish_sync succeeds.
 
 		// Schedule chunked cron if not already running
 		if ( ! wp_next_scheduled( 'wpistic_ffl_process_atf_sync' ) ) {
 			wp_schedule_event( time() + 5, 'every_minute', 'wpistic_ffl_process_atf_sync' );
 		}
-	}
-
-	/**
-	 * After a successful import, mark dealers that were NOT touched during the
-	 * current run as inactive. Compares against last_synced to avoid affecting
-	 * rows that were just upserted.
-	 */
-	public static function mark_unseen_dealers_inactive( string $run_started_at ): void {
-		if ( ! $run_started_at ) {
-			return;
-		}
-		global $wpdb;
-		$wpdb->query( $wpdb->prepare( // phpcs:ignore WordPress.DB.DirectDatabaseQuery
-			'UPDATE ' . DB::table( 'dealers' ) . ' SET is_active = 0 WHERE last_synced < %s',
-			$run_started_at
-		) );
 	}
 
 	/**
@@ -497,11 +482,11 @@ class Sync {
 	 * Mark sync complete, clean up temp files, record timestamp.
 	 */
 	private static function finish_sync( int $total_done ): void {
-		// Only collapse the active set once we know the import actually finished
-		// AND produced rows. A zero-row run almost certainly means the upstream
-		// CSV was empty/corrupt — keep the previous active set in that case.
-		if ( $total_done > 0 ) {
-			$run_started_at = (string) get_option( 'wpistic_ffl_atf_sync_started_at', '' );
+		$run_started_at = (string) get_option( 'wpistic_ffl_atf_sync_started_at', '' );
+
+		// Only sweep when we actually imported rows — otherwise an empty/failing
+		// import would still disable every dealer.
+		if ( $total_done > 0 && '' !== $run_started_at ) {
 			self::mark_unseen_dealers_inactive( $run_started_at );
 		}
 
@@ -515,6 +500,20 @@ class Sync {
 
 		// Fire action so other modules can react
 		do_action( 'wpistic_ffl_sync_complete', $total_done );
+	}
+
+	/**
+	 * Inactivate any dealer not touched (last_synced < run start) during this import.
+	 * Replaces the legacy "set all to 0 up front" pattern, which left every dealer
+	 * disabled if the import aborted mid-run.
+	 */
+	private static function mark_unseen_dealers_inactive( string $run_started_at ): int {
+		global $wpdb;
+		$wpdb->query( $wpdb->prepare( // phpcs:ignore WordPress.DB.DirectDatabaseQuery
+			'UPDATE ' . DB::table( 'dealers' ) . ' SET is_active = 0 WHERE ( last_synced IS NULL OR last_synced < %s ) AND is_active = 1',
+			$run_started_at
+		) );
+		return (int) $wpdb->rows_affected;
 	}
 
 	/**

@@ -339,28 +339,15 @@ class API {
 			$revenue = (float) ( $cur->revenue ?? 0 );
 			$orders  = (int) ( $cur->orders ?? 0 );
 			$aov     = $orders > 0 ? round( $revenue / $orders, 2 ) : 0;
-		} elseif ( class_exists( '\\Automattic\\WooCommerce\\Utilities\\OrderUtil' )
-			&& \Automattic\WooCommerce\Utilities\OrderUtil::custom_orders_table_usage_is_enabled()
-		) {
-			// HPOS path — bypass wp_posts entirely.
-			$revenue = 0.0;
-			$orders  = 0;
-			$query   = wc_get_orders( [
-				'status'       => [ 'processing', 'completed', 'on-hold' ],
-				'date_created' => '>=' . gmdate( 'Y-m-d H:i:s', strtotime( $since ) ),
-				'limit'        => -1,
-				'return'       => 'objects',
-			] );
-			foreach ( (array) $query as $o ) {
-				if ( $o instanceof \WC_Order ) {
-					$revenue += (float) $o->get_total();
-					$orders++;
-				}
-			}
+		} elseif ( self::hpos_enabled() ) {
+			// HPOS active and no wc_order_stats — query via the WC orders API so we
+			// don't blindly hit empty wp_posts (which under HPOS no longer carries orders).
+			[ $revenue, $orders ] = self::wc_orders_revenue_orders_since( $since );
+			[ $prev_revenue, $prev_orders ] = self::wc_orders_revenue_orders_since( $prev, $since );
 			$aov      = $orders > 0 ? round( $revenue / $orders, 2 ) : 0;
-			$prev_row = (object) [ 'orders' => 0, 'revenue' => 0 ];
+			$prev_row = (object) [ 'orders' => $prev_orders, 'revenue' => $prev_revenue ];
 		} else {
-			// Fallback: query wp_posts directly (legacy CPT storage).
+			// Fallback: query wp_posts directly (pre-HPOS)
 			$revenue = (float) $wpdb->get_var( $wpdb->prepare( // phpcs:ignore WordPress.DB
 				"SELECT COALESCE(SUM(pm.meta_value+0),0)
 				 FROM {$wpdb->posts} p
@@ -432,15 +419,27 @@ class API {
 		], $low_stock );
 
 		// Order status breakdown (last N days)
-		$by_status = (array) $wpdb->get_results( $wpdb->prepare( // phpcs:ignore WordPress.DB
-			"SELECT post_status AS status, COUNT(*) AS cnt
-			 FROM {$wpdb->posts}
-			 WHERE post_type = 'shop_order'
-			   AND post_date >= %s
-			 GROUP BY post_status",
-			$since
-		) );
 		$status_map = [];
+		if ( self::hpos_enabled() ) {
+			$orders_tbl = $wpdb->prefix . 'wc_orders';
+			$by_status  = (array) $wpdb->get_results( $wpdb->prepare( // phpcs:ignore WordPress.DB
+				"SELECT status, COUNT(*) AS cnt
+				 FROM {$orders_tbl}
+				 WHERE type = 'shop_order'
+				   AND date_created_gmt >= %s
+				 GROUP BY status",
+				$since
+			) );
+		} else {
+			$by_status = (array) $wpdb->get_results( $wpdb->prepare( // phpcs:ignore WordPress.DB
+				"SELECT post_status AS status, COUNT(*) AS cnt
+				 FROM {$wpdb->posts}
+				 WHERE post_type = 'shop_order'
+				   AND post_date >= %s
+				 GROUP BY post_status",
+				$since
+			) );
+		}
 		foreach ( $by_status as $r ) {
 			$status_map[ str_replace( 'wc-', '', $r->status ) ] = (int) $r->cnt;
 		}
@@ -670,6 +669,49 @@ class API {
 	private static function pct_change( float $cur, float $prev ): float {
 		if ( $prev <= 0 ) return $cur > 0 ? 1.0 : 0.0;
 		return round( ( $cur - $prev ) / $prev, 3 );
+	}
+
+	/**
+	 * True when WooCommerce HPOS (custom_order_tables) is the authoritative store.
+	 * Cached per-request because OrderUtil::custom_orders_table_usage_is_enabled()
+	 * touches the options API on every call.
+	 */
+	private static function hpos_enabled(): bool {
+		static $cached = null;
+		if ( null !== $cached ) {
+			return $cached;
+		}
+		$cached = class_exists( '\Automattic\WooCommerce\Utilities\OrderUtil' )
+			&& \Automattic\WooCommerce\Utilities\OrderUtil::custom_orders_table_usage_is_enabled();
+		return $cached;
+	}
+
+	/**
+	 * HPOS-safe revenue + order count for a date range. Uses wc_get_orders() so
+	 * we never invent SQL against the rapidly-evolving wc_orders schema.
+	 *
+	 * @return array{0: float, 1: int}
+	 */
+	private static function wc_orders_revenue_orders_since( string $since_gmt, ?string $until_gmt = null ): array {
+		if ( ! function_exists( 'wc_get_orders' ) ) {
+			return [ 0.0, 0 ];
+		}
+		$args = [
+			'limit'        => -1,
+			'status'       => [ 'processing', 'completed', 'on-hold' ],
+			'type'         => 'shop_order',
+			'date_created' => $until_gmt ? ( $since_gmt . '...' . $until_gmt ) : ( '>=' . $since_gmt ),
+			'return'       => 'objects',
+			'paginate'     => false,
+		];
+		$orders = wc_get_orders( $args );
+		$rev    = 0.0;
+		$cnt    = 0;
+		foreach ( $orders as $o ) {
+			$rev += (float) $o->get_total();
+			++$cnt;
+		}
+		return [ round( $rev, 2 ), $cnt ];
 	}
 
 	// ── Permission callbacks ──────────────────────────────────────────────────
@@ -1189,7 +1231,10 @@ class API {
 		// Send email notification
 		Mailer::send_status_update( $id, $new_status );
 
+		// G2A: fire both actions — _status_changed for email/SMS/bridge, _updated
+		// for side-effects keyed off arbitrary column changes (e.g. carrier auto-advance).
 		do_action( 'wpistic_ffl_transfer_status_changed', $id, $transfer->status, $new_status );
+		do_action( 'wpistic_ffl_transfer_updated', $id, $update );
 
 		return rest_ensure_response( [ 'success' => true, 'status' => $new_status ] );
 	}

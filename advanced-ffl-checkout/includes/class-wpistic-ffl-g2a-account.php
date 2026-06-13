@@ -76,6 +76,10 @@ class G2A_Account {
 		$accent = $theme['color_primary'];
 		$muted  = $theme['color_text_muted'];
 
+		// G2A: surface saved dealers above the transfer list so the customer
+		// can manage their quick-pick list without needing to be at checkout.
+		self::render_saved_dealers_section( $user->ID, $theme );
+
 		if ( empty( $rows ) ) {
 			echo '<p style="padding:24px;border:1px dashed ' . esc_attr( $theme['color_border'] ) . ';border-radius:8px;color:' . esc_attr( $muted ) . ';">';
 			esc_html_e( 'You don\'t have any FFL transfers yet. When you purchase a firearm, your transfer will appear here.', 'advanced-ffl-checkout' );
@@ -88,6 +92,86 @@ class G2A_Account {
 			self::render_transfer_card( $row, $accent, $muted, $theme );
 		}
 		echo '</div>';
+	}
+
+	/**
+	 * Inline saved-dealers card on the My Account tab. AJAX-driven (no full
+	 * page reload) so pin / remove feels native.
+	 */
+	private static function render_saved_dealers_section( int $user_id, array $theme ): void {
+		if ( ! class_exists( '\WpisticFFL\G2A_Saved_Dealers' ) ) {
+			return;
+		}
+		$saved = G2A_Saved_Dealers::for_user( $user_id );
+		if ( empty( $saved ) ) {
+			return;
+		}
+		$accent = $theme['color_primary'];
+		$muted  = $theme['color_text_muted'];
+		$nonce  = wp_create_nonce( 'wp_rest' );
+		$base   = esc_url( rest_url( WPISTIC_FFL_REST_NS . '/me/saved-dealers' ) );
+
+		echo '<section class="g2a-ffl-account__saved" style="margin-bottom:24px;padding:18px 20px;border:1px solid ' . esc_attr( $theme['color_border'] ) . ';border-left:4px solid ' . esc_attr( $accent ) . ';border-radius:10px;background:' . esc_attr( $theme['color_surface'] ) . ';">';
+		echo '<header style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:10px;">';
+		echo '<div><h3 style="margin:0;font-size:14px;letter-spacing:.06em;text-transform:uppercase;color:' . esc_attr( $muted ) . ';">⭐ ' . esc_html__( 'Your Saved Dealers', 'advanced-ffl-checkout' ) . '</h3></div>';
+		echo '<span style="font-size:12px;color:' . esc_attr( $muted ) . ';">' . esc_html__( 'Available at next checkout', 'advanced-ffl-checkout' ) . '</span>';
+		echo '</header>';
+
+		echo '<div class="g2a-ffl-account__saved-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:10px;">';
+		foreach ( $saved as $d ) {
+			echo '<article data-dealer-id="' . esc_attr( (string) $d['id'] ) . '" style="padding:12px 14px;border:1px solid ' . esc_attr( $theme['color_border'] ) . ';border-radius:8px;background:' . esc_attr( $theme['color_bg'] ) . ';display:flex;flex-direction:column;gap:6px;">';
+			echo '<div style="font-weight:700;font-size:14px;">' . esc_html( $d['business_name'] );
+			if ( $d['pinned'] ) {
+				echo ' <span style="padding:2px 8px;background:' . esc_attr( $accent ) . ';color:#0F0E12;border-radius:999px;font-size:10px;font-weight:700;text-transform:uppercase;">⭐ ' . esc_html__( 'Default', 'advanced-ffl-checkout' ) . '</span>';
+			}
+			echo '</div>';
+			echo '<div style="font-size:12px;color:' . esc_attr( $muted ) . ';">' . esc_html( trim( $d['premise_city'] . ', ' . $d['premise_state'] . ' ' . $d['premise_zip'], ', ' ) ) . '</div>';
+			echo '<div style="display:flex;gap:6px;margin-top:4px;">';
+			echo '<button type="button" class="g2a-ffl-pin" style="flex:1;padding:5px 8px;background:transparent;border:1px solid ' . esc_attr( $theme['color_border'] ) . ';color:' . esc_attr( $accent ) . ';border-radius:6px;cursor:pointer;font-size:11px;">' .
+				 esc_html( $d['pinned'] ? __( 'Unpin', 'advanced-ffl-checkout' ) : __( 'Set default', 'advanced-ffl-checkout' ) ) . '</button>';
+			echo '<button type="button" class="g2a-ffl-remove" style="padding:5px 10px;background:transparent;border:1px solid ' . esc_attr( $theme['color_border'] ) . ';color:' . esc_attr( $muted ) . ';border-radius:6px;cursor:pointer;font-size:11px;">' . esc_html__( 'Remove', 'advanced-ffl-checkout' ) . '</button>';
+			echo '</div>';
+			echo '</article>';
+		}
+		echo '</div>';
+		echo '</section>';
+
+		// Inline AJAX handler — no jQuery dependency, no extra build step.
+		?>
+		<script>
+		(function(){
+			const root = document.querySelector('.g2a-ffl-account__saved');
+			if ( ! root ) return;
+			const base  = <?php echo wp_json_encode( $base ); ?>;
+			const nonce = <?php echo wp_json_encode( $nonce ); ?>;
+
+			function call( method, dealerId, body ) {
+				const url = base + ( method === 'DELETE' ? '?dealer_id=' + dealerId : '' );
+				return fetch( url, {
+					method: method,
+					credentials: 'same-origin',
+					headers: { 'X-WP-Nonce': nonce, 'Content-Type': 'application/json' },
+					body: body ? JSON.stringify( body ) : null,
+				} );
+			}
+
+			root.addEventListener( 'click', function ( e ) {
+				const card = e.target.closest( '[data-dealer-id]' );
+				if ( ! card ) return;
+				const id = parseInt( card.dataset.dealerId, 10 );
+
+				if ( e.target.classList.contains( 'g2a-ffl-remove' ) ) {
+					if ( ! confirm( <?php echo wp_json_encode( __( 'Remove this dealer from your saved list?', 'advanced-ffl-checkout' ) ); ?> ) ) return;
+					call( 'DELETE', id ).then( function (){ card.remove(); } );
+				}
+				if ( e.target.classList.contains( 'g2a-ffl-pin' ) ) {
+					const isPinned = card.querySelector( '[style*="background:' ) !== null && card.innerHTML.indexOf( 'Default' ) !== -1;
+					call( 'POST', null, { dealer_id: isPinned ? 0 : id } ).then( function (){ window.location.reload(); } );
+				}
+			} );
+		})();
+		</script>
+		<?php
 	}
 
 	private static function render_transfer_card( object $row, string $accent, string $muted, array $theme ): void {
