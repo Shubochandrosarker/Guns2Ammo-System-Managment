@@ -33,12 +33,14 @@ final class Scheduler {
 	const HOOK_AUTO_EXPIRE       = 'memberistic_daily_expire_memberships';
 	const HOOK_WAIVER_FOLLOWUP   = 'memberistic_daily_waiver_followup';
 	const HOOK_PRUNE_LOGS        = 'memberistic_daily_prune_logs';
+	const HOOK_BACKFILL_RENEWALS = 'memberistic_daily_backfill_renewals';
 
 	public static function register() {
 		add_action( self::HOOK_RENEWAL_REMINDERS, array( self::class, 'run_renewal_reminders' ) );
 		add_action( self::HOOK_AUTO_EXPIRE, array( self::class, 'run_auto_expire' ) );
 		add_action( self::HOOK_WAIVER_FOLLOWUP, array( self::class, 'run_waiver_followup' ) );
 		add_action( self::HOOK_PRUNE_LOGS, array( self::class, 'run_prune_logs' ) );
+		add_action( self::HOOK_BACKFILL_RENEWALS, array( self::class, 'run_backfill_renewals' ) );
 
 		self::ensure_scheduled();
 	}
@@ -52,6 +54,7 @@ final class Scheduler {
 				self::HOOK_AUTO_EXPIRE,
 				self::HOOK_WAIVER_FOLLOWUP,
 				self::HOOK_PRUNE_LOGS,
+				self::HOOK_BACKFILL_RENEWALS,
 			) as $hook
 		) {
 			if ( ! wp_next_scheduled( $hook ) ) {
@@ -70,6 +73,16 @@ final class Scheduler {
 		Email_Logs_Repository::prune_older_than( $days );
 	}
 
+	/**
+	 * Daily safety-net: give any active/trial membership still missing a
+	 * renewal date one anchored on its plan cycle. New members get this at
+	 * create/activation time; this catches imported + legacy rows so the
+	 * dashboard, waiver card and admin table never disagree.
+	 */
+	public static function run_backfill_renewals() {
+		Memberships_Repository::backfill_missing_renewals( 200 );
+	}
+
 	public static function clear_scheduled() {
 		foreach (
 			array(
@@ -77,6 +90,7 @@ final class Scheduler {
 				self::HOOK_AUTO_EXPIRE,
 				self::HOOK_WAIVER_FOLLOWUP,
 				self::HOOK_PRUNE_LOGS,
+				self::HOOK_BACKFILL_RENEWALS,
 			) as $hook
 		) {
 			$timestamp = wp_next_scheduled( $hook );

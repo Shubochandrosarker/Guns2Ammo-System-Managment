@@ -395,6 +395,31 @@ final class Memberships_Repository {
 	}
 
 	/**
+	 * Backfill renewal dates onto active/trial memberships missing one.
+	 *
+	 * Anchors each on its start_date (or created_at) using the plan's billing
+	 * cycle. Idempotent and batched. Used by the daily scheduler and the admin
+	 * maintenance tool so existing + imported members converge on a real
+	 * next-renewal without manual editing.
+	 *
+	 * @param int $limit Max rows per run.
+	 * @return int Rows updated.
+	 */
+	public static function backfill_missing_renewals( $limit = 200 ) {
+		$rows    = self::get_active_missing_renewal( $limit );
+		$updated = 0;
+		foreach ( $rows as $row ) {
+			$cycle = ! empty( $row['billing_cycle'] ) ? (string) $row['billing_cycle'] : 'monthly';
+			$start = ! empty( $row['start_date'] ) ? (string) $row['start_date']
+				: ( ! empty( $row['created_at'] ) ? (string) $row['created_at'] : current_time( 'mysql' ) );
+			if ( self::update( (int) $row['id'], array( 'renewal_date' => self::compute_renewal_from_cycle( $cycle, $start ) ) ) ) {
+				$updated++;
+			}
+		}
+		return $updated;
+	}
+
+	/**
 	 * Count of memberships with a Stripe subscription id but no customer id.
 	 */
 	public static function count_needing_customer_backfill() {
@@ -449,6 +474,12 @@ final class Memberships_Repository {
 	public static function create( $data ) {
 		global $wpdb;
 
+		// Guest passes and manually-added members were being saved without a
+		// next-renewal, so the dashboard read "—" while the waiver/detail view
+		// derived a date on the fly — an inconsistency. Anchor a real
+		// renewal_date from the plan's billing cycle whenever an active/trial
+		// membership is created without one, so every surface agrees.
+		$data               = self::ensure_renewal_date( $data );
 		$data               = self::sanitize_data( $data );
 		$data['created_at'] = current_time( 'mysql' );
 
@@ -484,7 +515,82 @@ final class Memberships_Repository {
 	}
 
 	public static function change_status( $id, $status ) {
-		return self::update( $id, array( 'status' => memberistic_validate_status( $status, 'pending' ) ) );
+		$status = memberistic_validate_status( $status, 'pending' );
+		$update = array( 'status' => $status );
+
+		// When a guest pass / pending member is switched to active (or trial),
+		// give it a renewal date anchored on its start date + plan cycle if it
+		// doesn't already have one. Matches the "active member needs a renewal
+		// date with their plan" requirement.
+		if ( in_array( $status, array( 'active', 'trial' ), true ) ) {
+			$row = self::get( $id );
+			if ( is_array( $row ) && self::renewal_is_empty( $row['renewal_date'] ?? '' ) ) {
+				$cycle = ! empty( $row['billing_cycle'] ) ? (string) $row['billing_cycle'] : 'monthly';
+				$start = ! empty( $row['start_date'] ) ? (string) $row['start_date']
+					: ( ! empty( $row['created_at'] ) ? (string) $row['created_at'] : current_time( 'mysql' ) );
+				$update['renewal_date'] = self::compute_renewal_from_cycle( $cycle, $start );
+			}
+		}
+
+		return self::update( $id, $update );
+	}
+
+	/**
+	 * True when a renewal_date value is effectively unset.
+	 *
+	 * @param mixed $value Raw renewal_date.
+	 * @return bool
+	 */
+	private static function renewal_is_empty( $value ) {
+		$value = trim( (string) $value );
+		return '' === $value || '0000-00-00 00:00:00' === $value || '0000-00-00' === $value;
+	}
+
+	/**
+	 * Ensure an active/trial membership row carries a renewal date.
+	 *
+	 * No-op for any other status (pending/cancelled/expired) and for rows that
+	 * already have a renewal. Reads status + billing_cycle + start_date from
+	 * the supplied row and fills renewal_date from the plan's billing cycle.
+	 *
+	 * @param array $data Membership row data.
+	 * @return array
+	 */
+	private static function ensure_renewal_date( $data ) {
+		$status = isset( $data['status'] ) ? strtolower( trim( (string) $data['status'] ) ) : '';
+		if ( ! in_array( $status, array( 'active', 'trial' ), true ) ) {
+			return $data;
+		}
+		if ( ! self::renewal_is_empty( $data['renewal_date'] ?? '' ) ) {
+			return $data;
+		}
+		$cycle = isset( $data['billing_cycle'] ) && '' !== trim( (string) $data['billing_cycle'] )
+			? (string) $data['billing_cycle']
+			: 'monthly';
+		$start = ! empty( $data['start_date'] ) ? (string) $data['start_date'] : current_time( 'mysql' );
+		$data['renewal_date'] = self::compute_renewal_from_cycle( $cycle, $start );
+		return $data;
+	}
+
+	/**
+	 * Next renewal from a billing cycle, anchored on a start datetime.
+	 *
+	 * Delegates to the shared WooCommerce_Bridge helper so the Stripe,
+	 * WooCommerce, import and manual paths all agree; falls back to a local
+	 * +1 month / +1 year calculation if that class isn't loaded.
+	 *
+	 * @param string $cycle       'monthly' | 'annual' (anything else => monthly).
+	 * @param string $start_mysql Site-local mysql datetime.
+	 * @return string Site-local mysql datetime.
+	 */
+	private static function compute_renewal_from_cycle( $cycle, $start_mysql ) {
+		$bridge = '\WordPressistic\Memberistic\Integrations\WooCommerce_Bridge';
+		if ( class_exists( $bridge ) && is_callable( array( $bridge, 'compute_next_renewal' ) ) ) {
+			return $bridge::compute_next_renewal( strtolower( (string) $cycle ), $start_mysql );
+		}
+		$interval = ( in_array( strtolower( (string) $cycle ), array( 'annual', 'yearly' ), true ) ) ? '+1 year' : '+1 month';
+		$base     = strtotime( (string) $start_mysql );
+		return wp_date( 'Y-m-d H:i:s', strtotime( $interval, $base ?: time() ) );
 	}
 
 	public static function count_expiring_soon( $days = 30 ) {
