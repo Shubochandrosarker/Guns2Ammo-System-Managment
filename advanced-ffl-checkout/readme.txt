@@ -4,7 +4,7 @@ Tags: FFL, firearms, WooCommerce, dealer, checkout, ATF, transfer, NICS, guns2am
 Requires at least: 6.4
 Tested up to: 6.7
 Requires PHP: 8.1
-Stable tag: 1.7.4
+Stable tag: 1.7.5
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -127,6 +127,10 @@ Deactivation preserves all data. Data is only removed on plugin deletion IF you 
 Yes. The plugin is fully self-contained. The dashboard integration is optional.
 
 == Changelog ==
+
+= 1.7.5 — G2A Edition (Theme transfer-form bridge fix + hardening) =
+* Fix: the theme "Firearms Transfer Request" form posts g2a_subject="Firearms Transfer Request", but the bridge only matched the exact string "ffl transfer request", so the FFL transfer record was never created from the website form. Now matches any subject containing "transfer request" (or an explicit form_type).
+* Hardening: all DB work in the admin-post bridge is wrapped in try/catch so a missing table or schema drift can never blank the shared admin-post.php request — the theme handler still runs and redirects to the thank-you page.
 
 = 1.7.4 — G2A Edition (Checkout dealer-picker contrast fix) =
 * Fix: "Select Your FFL Dealer" intro paragraph (`.wpistic-ffl-widget__lede`) was rendering at low contrast / invisible on some themes — brightened the muted token and hardened it against host-theme colour bleed.

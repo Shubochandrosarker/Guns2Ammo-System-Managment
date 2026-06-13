@@ -14,7 +14,7 @@ All zips are at the repo root and can be uploaded directly via **WP Admin → Pl
 | WPistic Contact Form plugin | `wpistic-contact-form.zip` | **1.5.4** (DB schema 1.2.0) |
 | G2A Theme Control plugin | `g2a-theme-control.zip` | **1.0.0** |
 | Verifyistic (age verification) plugin | `verifyistic.zip` | **1.4.0** |
-| Advanced FFL Checkout (G2A Edition) plugin | `advanced-ffl-checkout.zip` | **1.7.4** (DB schema 1.2.0) |
+| Advanced FFL Checkout (G2A Edition) plugin | `advanced-ffl-checkout.zip` | **1.7.5** (DB schema 1.2.0) |
 | Messageistic (SMS / local gateway) plugin | `messageistic.zip` | **0.5.1** |
 | G2A POS Core plugin | `g2a-pos-core.zip` | **3.1.2** (PHP 8.1+, vendors included) |
 
