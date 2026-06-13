@@ -39,11 +39,52 @@ final class G2AB_Events {
 		add_filter( 'manage_' . self::CPT . '_posts_columns', array( $this, 'admin_columns' ) );
 		add_action( 'manage_' . self::CPT . '_posts_custom_column', array( $this, 'admin_column_value' ), 10, 2 );
 
-		add_shortcode( 'g2a_events_list', array( $this, 'render_list' ) );
-		add_shortcode( 'g2a_events_calendar', array( $this, 'render_calendar' ) );
-		add_shortcode( 'g2a_events_carousel', array( $this, 'render_carousel' ) );
-		add_shortcode( 'g2a_events', array( $this, 'render_events_shortcode' ) );
-		add_shortcode( 'g2a_event_countdown', array( $this, 'render_event_countdown' ) );
+		// Guarded so an event with malformed meta or a date-math edge case can
+		// never white-screen the Ladies Tuesday / events pages (see guard()).
+		add_shortcode( 'g2a_events_list', $this->guard( 'render_list' ) );
+		add_shortcode( 'g2a_events_calendar', $this->guard( 'render_calendar' ) );
+		add_shortcode( 'g2a_events_carousel', $this->guard( 'render_carousel' ) );
+		add_shortcode( 'g2a_events', $this->guard( 'render_events_shortcode' ) );
+		add_shortcode( 'g2a_event_countdown', $this->guard( 'render_event_countdown' ) );
+	}
+
+	/**
+	 * Wrap an event shortcode renderer so a runtime fatal degrades to an
+	 * empty string (front-end) / inline admin notice instead of blanking the
+	 * whole page. Discards any partial output buffer the renderer opened.
+	 *
+	 * @param string $method Public render method on this class.
+	 * @return callable
+	 */
+	private function guard( $method ) {
+		return function ( $atts = array(), $content = '', $tag = '' ) use ( $method ) {
+			$ob_level = ob_get_level();
+			try {
+				return $this->{$method}( $atts, $content, $tag );
+			} catch ( \Throwable $e ) {
+				while ( ob_get_level() > $ob_level ) {
+					ob_end_clean();
+				}
+				error_log( sprintf(
+					'[G2AB] event shortcode %s failed: %s @ %s:%d',
+					$method,
+					$e->getMessage(),
+					$e->getFile(),
+					$e->getLine()
+				) );
+				if ( current_user_can( 'manage_options' ) ) {
+					return '<div class="g2ab g2ab-error"><p>'
+						. esc_html( sprintf(
+							/* translators: 1: method, 2: error (admin-only) */
+							__( 'Events widget error in %1$s (admins only): %2$s', 'g2a-booking' ),
+							$method,
+							$e->getMessage()
+						) )
+						. '</p></div>';
+				}
+				return '';
+			}
+		};
 	}
 
 	/* ------------------------------------------------------------------ */
@@ -308,25 +349,42 @@ final class G2AB_Events {
 		$printed = true;
 		?>
 		<style>
-		.g2ab-events-shortcode{display:grid;gap:16px;max-width:980px}
-		.g2ab-events-shortcode-item{background:#1e1f29;border:1px solid rgba(255,255,255,.1);padding:20px;border-radius:4px}
-		.g2ab-events-shortcode-item h3{margin:0 0 12px;color:#fff;font-family:"Bebas Neue","Oswald",sans-serif;letter-spacing:.03em;font-size:34px;line-height:1}
-		.g2ab-events-shortcode-item p{margin:8px 0;color:#d5d8e3;font-size:20px}
-		.g2ab-events-shortcode-item a{display:inline-block;margin-top:8px;background:#e8802f;color:#fff!important;text-decoration:none;padding:10px 16px;border-radius:2px;font-family:"Barlow Condensed","Oswald",sans-serif;letter-spacing:.08em;text-transform:uppercase}
-		.g2ab-events-shortcode-item a:hover{background:#f3974f}
-		.g2ab-event-countdown{background:#1e1f29;border:1px solid rgba(255,255,255,.12);padding:24px;border-radius:4px;max-width:980px}
-		.g2ab-event-countdown h3{margin:0 0 10px;color:#fff;font-family:"Bebas Neue","Oswald",sans-serif;font-size:46px;line-height:1}
-		.g2ab-event-countdown p{margin:8px 0;color:#d5d8e3}
-		.g2ab-event-countdown-timer{display:flex;gap:10px;align-items:center;margin:12px 0 16px;font-family:"Rajdhani","Oswald",sans-serif;color:#f2f3f8;font-size:32px;letter-spacing:.02em}
-		.g2ab-event-countdown-timer span{display:inline-block;min-width:56px;text-align:center;background:#12131a;border:1px solid rgba(201,168,76,.45);color:#c9a84c;padding:8px 6px;border-radius:3px}
-		.g2ab-event-countdown a{display:inline-block;background:#e8802f;color:#fff!important;text-decoration:none;padding:10px 16px;border-radius:2px;font-family:"Barlow Condensed","Oswald",sans-serif;letter-spacing:.08em;text-transform:uppercase}
-		.g2ab-event-countdown a:hover{background:#f3974f}
+		/* Brand-aligned, light/dark-aware tokens. The host theme stamps
+		   <html data-theme="light|dark"> so these widgets re-skin with the
+		   rest of the site instead of staying permanently dark. */
+		.g2ab-events-shortcode,.g2ab-event-countdown{--g2cd-ink:#F4F4F6;--g2cd-dim:#CBCAD2;--g2cd-card:#1B1C26;--g2cd-card2:#23242F;--g2cd-line:rgba(255,255,255,.10);--g2cd-brass:#DCB45F;--g2cd-ember:#E8802F;--g2cd-ember2:#C25C12;--g2cd-shadow:rgba(0,0,0,.38)}
+		html[data-theme="light"] .g2ab-events-shortcode,html[data-theme="light"] .g2ab-event-countdown{--g2cd-ink:#1E1B16;--g2cd-dim:#4B4639;--g2cd-card:#FFFFFF;--g2cd-card2:#F6F1E7;--g2cd-line:rgba(26,25,30,.12);--g2cd-brass:#A8862F;--g2cd-ember:#D9711F;--g2cd-ember2:#B85A12;--g2cd-shadow:rgba(60,48,24,.16)}
+
+		/* Upcoming-events cards */
+		.g2ab-events-shortcode{display:grid;gap:16px;max-width:980px;grid-template-columns:repeat(auto-fill,minmax(280px,1fr))}
+		.g2ab-events-shortcode-item{position:relative;background:linear-gradient(160deg,var(--g2cd-card2),var(--g2cd-card));border:1px solid var(--g2cd-line);padding:22px 22px 24px 26px;border-radius:14px;box-shadow:0 6px 22px var(--g2cd-shadow);overflow:hidden;transition:transform .18s ease,box-shadow .18s ease,border-color .18s ease}
+		.g2ab-events-shortcode-item::before{content:"";position:absolute;left:0;top:0;bottom:0;width:4px;background:linear-gradient(180deg,var(--g2cd-brass),var(--g2cd-ember))}
+		.g2ab-events-shortcode-item:hover{transform:translateY(-3px);box-shadow:0 14px 32px var(--g2cd-shadow);border-color:var(--g2cd-brass)}
+		.g2ab-events-shortcode-item h3{margin:0 0 14px;color:var(--g2cd-ink);font-family:"Bebas Neue","Oswald","Barlow Condensed",sans-serif;letter-spacing:.02em;font-size:30px;line-height:1.02}
+		.g2ab-events-shortcode-item p{margin:6px 0;color:var(--g2cd-dim);font-size:15px;line-height:1.5}
+		.g2ab-events-shortcode-item p strong{color:var(--g2cd-ink);font-weight:600}
+		.g2ab-events-shortcode-item a{display:inline-flex;align-items:center;gap:8px;margin-top:14px;background:linear-gradient(135deg,var(--g2cd-ember),var(--g2cd-ember2));color:#fff!important;text-decoration:none;padding:11px 20px;border-radius:8px;font-family:"Barlow Condensed","Oswald",sans-serif;font-weight:600;letter-spacing:.1em;text-transform:uppercase;box-shadow:0 4px 12px var(--g2cd-shadow);transition:transform .15s ease,box-shadow .15s ease}
+		.g2ab-events-shortcode-item a:hover{transform:translateY(-2px);box-shadow:0 8px 20px var(--g2cd-shadow);color:#fff!important}
+
+		/* Countdown panel */
+		.g2ab-event-countdown{position:relative;background:linear-gradient(160deg,var(--g2cd-card2),var(--g2cd-card));border:1px solid var(--g2cd-line);padding:28px 28px 30px;border-radius:16px;max-width:980px;box-shadow:0 10px 34px var(--g2cd-shadow);overflow:hidden}
+		.g2ab-event-countdown::after{content:"";position:absolute;right:-60px;top:-60px;width:220px;height:220px;border-radius:50%;background:radial-gradient(circle,rgba(220,180,95,.18),transparent 70%);pointer-events:none}
+		.g2ab-event-countdown h3{margin:0 0 8px;color:var(--g2cd-ink);font-family:"Bebas Neue","Oswald","Barlow Condensed",sans-serif;font-size:40px;line-height:1;letter-spacing:.02em}
+		.g2ab-event-countdown p{margin:6px 0;color:var(--g2cd-dim);font-size:15px}
+		.g2ab-event-countdown p strong{color:var(--g2cd-brass)}
+		.g2ab-event-countdown-timer{display:flex;gap:12px;align-items:flex-start;margin:18px 0 22px;flex-wrap:wrap}
+		.g2ab-cd-unit{display:flex;flex-direction:column;align-items:center;gap:7px}
+		.g2ab-cd-num{display:grid;place-items:center;min-width:76px;padding:14px 10px;background:linear-gradient(180deg,#12131A,#1B1C26);border:1px solid rgba(220,180,95,.42);border-radius:12px;color:#E3C06A;font-family:"Rajdhani","Oswald",monospace;font-weight:700;font-size:38px;line-height:1;font-variant-numeric:tabular-nums;box-shadow:inset 0 1px 0 rgba(255,255,255,.06),0 6px 16px var(--g2cd-shadow)}
+		.g2ab-cd-lbl{font-family:"Barlow Condensed","Oswald",sans-serif;font-size:11px;font-weight:600;letter-spacing:.18em;text-transform:uppercase;color:var(--g2cd-dim)}
+		.g2ab-cd-sep{align-self:flex-start;margin-top:16px;font-family:"Rajdhani",sans-serif;font-weight:700;font-size:34px;color:var(--g2cd-brass);opacity:.55}
+		.g2ab-event-countdown a{display:inline-flex;align-items:center;gap:8px;background:linear-gradient(135deg,var(--g2cd-ember),var(--g2cd-ember2));color:#fff!important;text-decoration:none;padding:12px 22px;border-radius:8px;font-family:"Barlow Condensed","Oswald",sans-serif;font-weight:600;letter-spacing:.1em;text-transform:uppercase;box-shadow:0 4px 14px var(--g2cd-shadow);transition:transform .15s ease,box-shadow .15s ease}
+		.g2ab-event-countdown a:hover{transform:translateY(-2px);box-shadow:0 9px 22px var(--g2cd-shadow);color:#fff!important}
 		@media (max-width:768px){
-			.g2ab-events-shortcode-item h3{font-size:30px}
-			.g2ab-events-shortcode-item p{font-size:18px}
-			.g2ab-event-countdown h3{font-size:36px}
-			.g2ab-event-countdown-timer{font-size:24px;flex-wrap:wrap}
-			.g2ab-event-countdown-timer span{min-width:48px}
+			.g2ab-events-shortcode-item h3{font-size:26px}
+			.g2ab-events-shortcode-item p{font-size:14.5px}
+			.g2ab-event-countdown h3{font-size:32px}
+			.g2ab-cd-num{min-width:58px;font-size:30px;padding:12px 6px}
+			.g2ab-cd-sep{display:none}
 		}
 		</style>
 		<?php
@@ -461,11 +519,14 @@ final class G2AB_Events {
 		<div class="g2ab-event-countdown" id="<?php echo esc_attr( $countdown_id ); ?>" data-event-ts="<?php echo esc_attr( (string) $event_ts ); ?>">
 			<h3><?php echo esc_html( $atts['title'] ); ?></h3>
 			<p><strong><?php echo esc_html( $event['title'] ); ?></strong> - <?php echo esc_html( $event['datelabel'] . ' ' . $time ); ?></p>
-			<div class="g2ab-event-countdown-timer">
-				<span data-dd>00</span>d
-				<span data-hh>00</span>h
-				<span data-mm>00</span>m
-				<span data-ss>00</span>s
+			<div class="g2ab-event-countdown-timer" role="timer">
+				<div class="g2ab-cd-unit"><span class="g2ab-cd-num" data-dd>00</span><span class="g2ab-cd-lbl"><?php esc_html_e( 'Days', 'g2a-booking' ); ?></span></div>
+				<div class="g2ab-cd-sep" aria-hidden="true">:</div>
+				<div class="g2ab-cd-unit"><span class="g2ab-cd-num" data-hh>00</span><span class="g2ab-cd-lbl"><?php esc_html_e( 'Hrs', 'g2a-booking' ); ?></span></div>
+				<div class="g2ab-cd-sep" aria-hidden="true">:</div>
+				<div class="g2ab-cd-unit"><span class="g2ab-cd-num" data-mm>00</span><span class="g2ab-cd-lbl"><?php esc_html_e( 'Min', 'g2a-booking' ); ?></span></div>
+				<div class="g2ab-cd-sep" aria-hidden="true">:</div>
+				<div class="g2ab-cd-unit"><span class="g2ab-cd-num" data-ss>00</span><span class="g2ab-cd-lbl"><?php esc_html_e( 'Sec', 'g2a-booking' ); ?></span></div>
 			</div>
 			<p><a href="<?php echo $book_url; ?>"><?php echo esc_html( $atts['button_label'] ); ?></a></p>
 		</div>

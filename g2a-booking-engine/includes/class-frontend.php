@@ -33,13 +33,67 @@ final class G2AB_Frontend {
 	}
 
 	private function __construct() {
-		add_shortcode( 'g2a_lane_booking', array( $this, 'render_lane_booking' ) );
-		add_shortcode( 'g2a_ladies_tuesday_booking', array( $this, 'render_ladies_tuesday_booking' ) );
-		add_shortcode( 'g2a_classes_booking', array( $this, 'render_classes_booking' ) );
-		add_shortcode( 'g2a_resource_booking', array( $this, 'render_resource_booking' ) );
-		add_shortcode( 'g2a_booking_form', array( $this, 'render_booking_form' ) );
+		// Every booking shortcode is wrapped in guard() so a runtime fatal in
+		// the render path — a stale DB schema after an update, a malformed
+		// option, or (most often) a third-party filter callback hooked onto
+		// g2ab_booking_display_pricing / g2ab_user_is_member that throws —
+		// degrades to a small inline notice instead of white-screening the
+		// whole page. This is what made the Lane Booking + Ladies Tuesday
+		// pages render blank after a plugin update.
+		add_shortcode( 'g2a_lane_booking', $this->guard( 'render_lane_booking' ) );
+		add_shortcode( 'g2a_ladies_tuesday_booking', $this->guard( 'render_ladies_tuesday_booking' ) );
+		add_shortcode( 'g2a_classes_booking', $this->guard( 'render_classes_booking' ) );
+		add_shortcode( 'g2a_resource_booking', $this->guard( 'render_resource_booking' ) );
+		add_shortcode( 'g2a_booking_form', $this->guard( 'render_booking_form' ) );
 		add_action( 'wp_enqueue_scripts', array( $this, 'register_assets' ), 5 );
 		add_action( 'wp_enqueue_scripts', array( $this, 'maybe_enqueue_return_assets' ), 20 );
+	}
+
+	/**
+	 * Wrap a shortcode renderer in a fatal guard.
+	 *
+	 * Returns a closure suitable for add_shortcode(). Any \Throwable raised
+	 * while rendering is logged, any half-written output buffer the renderer
+	 * opened is discarded, and a friendly inline message is returned so the
+	 * surrounding page still renders. Admins see the underlying error to aid
+	 * debugging; visitors see a reassuring fallback with a call to action.
+	 *
+	 * @param string $method Public render method on this class.
+	 * @return callable
+	 */
+	private function guard( $method ) {
+		return function ( $atts = array(), $content = '', $tag = '' ) use ( $method ) {
+			$ob_level = ob_get_level();
+			try {
+				return $this->{$method}( $atts, $content, $tag );
+			} catch ( \Throwable $e ) {
+				// Drop any partial markup the renderer left buffered so the
+				// page isn't left with an unbalanced output buffer.
+				while ( ob_get_level() > $ob_level ) {
+					ob_end_clean();
+				}
+				error_log( sprintf(
+					'[G2AB] shortcode %s failed: %s @ %s:%d',
+					$method,
+					$e->getMessage(),
+					$e->getFile(),
+					$e->getLine()
+				) );
+				if ( current_user_can( 'manage_options' ) ) {
+					return '<div class="g2ab g2ab-error"><p>'
+						. esc_html( sprintf(
+							/* translators: 1: shortcode method, 2: error message (admin-only) */
+							__( 'Booking widget error in %1$s (visible to admins only): %2$s', 'g2a-booking' ),
+							$method,
+							$e->getMessage()
+						) )
+						. '</p></div>';
+				}
+				return '<div class="g2ab g2ab-error"><p>'
+					. esc_html__( 'The booking form is temporarily unavailable. Please refresh the page, or call us and our team will book you right in.', 'g2a-booking' )
+					. '</p></div>';
+			}
+		};
 	}
 
 	public function register_assets() {
