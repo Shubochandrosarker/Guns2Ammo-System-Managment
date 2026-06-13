@@ -124,6 +124,10 @@ class WPISTIC_CF_Settings {
 		register_setting( self::GROUP, 'WPISTIC_CF_capture_g2a',     [ 'sanitize_callback' => $bool, 'default' => '1' ] );
 		register_setting( self::GROUP, 'WPISTIC_CF_capture_wpmail',  [ 'sanitize_callback' => $bool, 'default' => '0' ] );
 
+		// Newsletter welcome email (sent by WPISTIC_CF_Emails on first signup).
+		register_setting( self::GROUP, 'WPISTIC_CF_nl_welcome_enabled', [ 'sanitize_callback' => $bool, 'default' => '1' ] );
+		register_setting( self::GROUP, 'WPISTIC_CF_nl_welcome_subject', [ 'sanitize_callback' => 'sanitize_text_field', 'default' => 'Welcome to the Guns 2 Ammo range list 🎯' ] );
+
 		// Safety — staging / dev controls.
 		register_setting( self::GROUP, 'WPISTIC_CF_emails_disabled', [ 'sanitize_callback' => $bool, 'default' => '0' ] );
 
@@ -162,6 +166,25 @@ class WPISTIC_CF_Settings {
 		register_setting( self::GROUP, 'WPISTIC_CF_ar_body',    [
 			'sanitize_callback' => 'sanitize_textarea_field',
 			'default'           => __( "Hi {name},\n\nThanks for your message — we received it and will get back to you shortly.\n\nFor your records, here is what you sent:\n\n{message}\n\n— {site_name}\n{site_url}", 'wpistic-contact-form' ),
+		] );
+		// Branded HTML wrapper for the auto-responder (falls back to plain
+		// text when disabled).
+		register_setting( self::GROUP, 'WPISTIC_CF_ar_html', [ 'sanitize_callback' => $bool, 'default' => '1' ] );
+
+		// Shared email branding — logo shown in the dark header band of every
+		// HTML email. Empty = use the active guns2ammo theme logo, or a text
+		// brand on other themes.
+		register_setting( self::GROUP, 'WPISTIC_CF_email_logo_url', [ 'sanitize_callback' => 'esc_url_raw', 'default' => '' ] );
+
+		// Newsletter confirmation (welcome) email.
+		register_setting( self::GROUP, 'WPISTIC_CF_newsletter_confirm_enabled', [ 'sanitize_callback' => $bool, 'default' => '1' ] );
+		register_setting( self::GROUP, 'WPISTIC_CF_newsletter_confirm_subject', [
+			'sanitize_callback' => 'sanitize_text_field',
+			'default'           => __( "You're on the list — welcome to Guns 2 Ammo", 'wpistic-contact-form' ),
+		] );
+		register_setting( self::GROUP, 'WPISTIC_CF_newsletter_confirm_intro',   [
+			'sanitize_callback' => 'sanitize_textarea_field',
+			'default'           => __( "You're officially on the Guns 2 Ammo range list. From now on, the good stuff lands in your inbox first.", 'wpistic-contact-form' ),
 		] );
 
 		// Attachments.
@@ -345,6 +368,20 @@ class WPISTIC_CF_Settings {
 					<textarea class="large-text" rows="4" id="WPISTIC_CF_reply_signature" name="WPISTIC_CF_reply_signature"><?php echo esc_textarea( get_option( 'WPISTIC_CF_reply_signature', '' ) ); ?></textarea>
 					<p class="description"><?php esc_html_e( 'Appended to the bottom of every reply you send from the dashboard.', 'wpistic-contact-form' ); ?></p>
 				</td>
+			</tr>
+			<tr>
+				<th scope="row"><?php esc_html_e( 'Newsletter welcome email', 'wpistic-contact-form' ); ?></th>
+				<td>
+					<input type="hidden" name="WPISTIC_CF_nl_welcome_enabled" value="0">
+					<label>
+						<input type="checkbox" name="WPISTIC_CF_nl_welcome_enabled" value="1" <?php checked( get_option( 'WPISTIC_CF_nl_welcome_enabled', '1' ), '1' ); ?>>
+						<?php esc_html_e( 'Send a branded welcome email when someone subscribes to the newsletter.', 'wpistic-contact-form' ); ?>
+					</label>
+				</td>
+			</tr>
+			<tr>
+				<th scope="row"><label for="WPISTIC_CF_nl_welcome_subject"><?php esc_html_e( 'Welcome email subject', 'wpistic-contact-form' ); ?></label></th>
+				<td><input type="text" class="regular-text" id="WPISTIC_CF_nl_welcome_subject" name="WPISTIC_CF_nl_welcome_subject" value="<?php echo esc_attr( get_option( 'WPISTIC_CF_nl_welcome_subject', 'Welcome to the Guns 2 Ammo range list 🎯' ) ); ?>"></td>
 			</tr>
 		</table>
 
@@ -555,6 +592,56 @@ class WPISTIC_CF_Settings {
 					<p class="description">
 						<?php esc_html_e( 'Placeholders:', 'wpistic-contact-form' ); ?>
 						<code>{name}</code>, <code>{form}</code>, <code>{message}</code>, <code>{site_name}</code>, <code>{site_url}</code>, <code>{date}</code>
+					</p>
+				</td>
+			</tr>
+			<tr>
+				<th scope="row"><?php esc_html_e( 'Branded HTML layout', 'wpistic-contact-form' ); ?></th>
+				<td>
+					<input type="hidden" name="WPISTIC_CF_ar_html" value="0">
+					<label>
+						<input type="checkbox" name="WPISTIC_CF_ar_html" value="1" <?php checked( get_option( 'WPISTIC_CF_ar_html', '1' ), '1' ); ?>>
+						<?php esc_html_e( 'Wrap the auto-responder in the branded HTML email template (uncheck for plain text)', 'wpistic-contact-form' ); ?>
+					</label>
+				</td>
+			</tr>
+		</table>
+
+		<h2 style="margin-top:32px;"><?php esc_html_e( 'Email branding', 'wpistic-contact-form' ); ?></h2>
+		<table class="form-table" role="presentation">
+			<tr>
+				<th scope="row"><label for="WPISTIC_CF_email_logo_url"><?php esc_html_e( 'Header logo URL', 'wpistic-contact-form' ); ?></label></th>
+				<td>
+					<input type="url" class="large-text" id="WPISTIC_CF_email_logo_url" name="WPISTIC_CF_email_logo_url" value="<?php echo esc_attr( get_option( 'WPISTIC_CF_email_logo_url', '' ) ); ?>" placeholder="<?php echo esc_attr( function_exists( 'get_template_directory_uri' ) ? get_template_directory_uri() . '/assets/img/guns2ammo-logo-email.png' : '' ); ?>">
+					<p class="description"><?php esc_html_e( 'Shown in the dark header band of every branded HTML email. Leave empty to use the Guns 2 Ammo theme logo automatically (or a text brand on other themes).', 'wpistic-contact-form' ); ?></p>
+				</td>
+			</tr>
+		</table>
+
+		<h2 style="margin-top:32px;"><?php esc_html_e( 'Newsletter confirmation email', 'wpistic-contact-form' ); ?></h2>
+		<p class="description" style="margin-top:0;"><?php esc_html_e( 'Branded welcome email sent automatically when someone joins the range list via the footer form, [wpcf_newsletter] shortcode, or a contact-form opt-in. Includes a tokenized unsubscribe link.', 'wpistic-contact-form' ); ?></p>
+		<table class="form-table" role="presentation">
+			<tr>
+				<th scope="row"><?php esc_html_e( 'Enable', 'wpistic-contact-form' ); ?></th>
+				<td>
+					<input type="hidden" name="WPISTIC_CF_newsletter_confirm_enabled" value="0">
+					<label>
+						<input type="checkbox" name="WPISTIC_CF_newsletter_confirm_enabled" value="1" <?php checked( get_option( 'WPISTIC_CF_newsletter_confirm_enabled', '1' ), '1' ); ?>>
+						<?php esc_html_e( 'Send a welcome confirmation to every new (and returning) subscriber', 'wpistic-contact-form' ); ?>
+					</label>
+				</td>
+			</tr>
+			<tr>
+				<th scope="row"><label for="WPISTIC_CF_newsletter_confirm_subject"><?php esc_html_e( 'Subject', 'wpistic-contact-form' ); ?></label></th>
+				<td><input type="text" class="regular-text" id="WPISTIC_CF_newsletter_confirm_subject" name="WPISTIC_CF_newsletter_confirm_subject" value="<?php echo esc_attr( get_option( 'WPISTIC_CF_newsletter_confirm_subject', __( "You're on the list — welcome to Guns 2 Ammo", 'wpistic-contact-form' ) ) ); ?>"></td>
+			</tr>
+			<tr>
+				<th scope="row"><label for="WPISTIC_CF_newsletter_confirm_intro"><?php esc_html_e( 'Intro paragraph', 'wpistic-contact-form' ); ?></label></th>
+				<td>
+					<textarea class="large-text" rows="3" id="WPISTIC_CF_newsletter_confirm_intro" name="WPISTIC_CF_newsletter_confirm_intro"><?php echo esc_textarea( get_option( 'WPISTIC_CF_newsletter_confirm_intro', __( "You're officially on the Guns 2 Ammo range list. From now on, the good stuff lands in your inbox first.", 'wpistic-contact-form' ) ) ); ?></textarea>
+					<p class="description">
+						<?php esc_html_e( 'Opening line under the welcome heading. The benefits list, "Book a Lane" button and closing lines are added automatically. Placeholder:', 'wpistic-contact-form' ); ?>
+						<code>{site_name}</code>
 					</p>
 				</td>
 			</tr>

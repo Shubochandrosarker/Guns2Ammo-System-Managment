@@ -230,12 +230,14 @@ class WPISTIC_CF_Emails {
 			return false;
 		}
 
-		// Dedupe guard — never double-send to the same address.
+		// Dedupe guard — never double-send to the same address. The guard is
+		// only set AFTER a successful send (below), so a failed wp_mail()
+		// leaves the address eligible for a retry on the next submission
+		// instead of permanently swallowing the welcome message.
 		$guard = 'wpcf_nl_welcome_' . md5( strtolower( $email ) );
 		if ( get_transient( $guard ) ) {
 			return false;
 		}
-		set_transient( $guard, 1, DAY_IN_SECONDS );
 
 		$subject = (string) get_option(
 			'WPISTIC_CF_nl_welcome_subject',
@@ -270,6 +272,12 @@ class WPISTIC_CF_Emails {
 		$html = apply_filters( 'wpcf_newsletter_welcome_html', $html, $email );
 
 		$sent = self::send( $email, $subject, $html );
+
+		// Only mark this address as welcomed once delivery actually
+		// succeeded — a failed send stays retryable on the next signup.
+		if ( $sent ) {
+			set_transient( $guard, 1, DAY_IN_SECONDS );
+		}
 
 		/**
 		 * Fires after the newsletter welcome email is dispatched.

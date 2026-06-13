@@ -17,8 +17,8 @@ use G2A\POS\Integrations\Membership\WooMembershipsProvider;
  *      — if the host theme/plugin (WPistic) returns a non-null array, use it.
  *      Same for 'g2a_pos_membership_bookings'.
  *   2. Adapter pinned via option g2a_pos_membership_provider (slug).
- *   3. Auto-detect: try WooCommerce Memberships → PMPro → MemberPress
- *      → custom user-meta map.
+ *   3. Auto-detect: try Memberistic → WooCommerce Memberships → PMPro
+ *      → MemberPress → custom user-meta map.
  *
  * Detection results are cached per-request.
  */
@@ -32,9 +32,6 @@ final class RangeMembership {
 	public static function providers(): array {
 		if ( self::$providers === null ) {
 			self::$providers = array(
-				// Memberistic first: it's the membership system this site
-				// actually runs, so auto-detect must prefer it over stale
-				// PMPro/MemberPress tables left from earlier migrations.
 				'memberistic'    => new MemberisticProvider(),
 				'wc_memberships' => new WooMembershipsProvider(),
 				'pmpro'          => new PmproProvider(),

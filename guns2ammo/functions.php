@@ -209,6 +209,12 @@ add_filter( 'site_transient_update_plugins', function ( $value ) {
  * remain the single manual source of truth.
  */
 function g2a_reviews_live() {
+	// Only honor cached live values while the integration is actually
+	// configured. If the Places API key is removed, the Customizer numbers
+	// immediately become authoritative again — no stale Google data.
+	if ( '' === trim( (string) get_theme_mod( 'g2a_places_api_key', '' ) ) ) {
+		return array();
+	}
 	$d = get_option( 'g2a_google_reviews_live' );
 	return is_array( $d ) ? $d : array();
 }
@@ -240,7 +246,11 @@ add_action( 'g2a_refresh_google_reviews', function () {
 	$key      = trim( (string) get_theme_mod( 'g2a_places_api_key', '' ) );
 	$place_id = trim( (string) get_theme_mod( 'g2a_place_id', 'ChIJaSRMhpGvK4cR4kE_E-jZvKE' ) );
 	if ( '' === $key || '' === $place_id ) {
-		return; // No key configured — Customizer numbers stay authoritative.
+		// Integration disabled — drop any cached live values so the
+		// Customizer numbers become authoritative again (otherwise stale
+		// Google data would keep overriding them indefinitely).
+		delete_option( 'g2a_google_reviews_live' );
+		return;
 	}
 	$url = add_query_arg( array(
 		'place_id' => rawurlencode( $place_id ),
@@ -305,6 +315,9 @@ function g2a_handle_reservation() {
 		'Name'             => sanitize_text_field( wp_unslash( $_POST['g2a_name'] ?? '' ) ),
 		'Email'            => sanitize_email( wp_unslash( $_POST['g2a_email'] ?? '' ) ),
 		'Phone'            => sanitize_text_field( wp_unslash( $_POST['g2a_phone'] ?? '' ) ),
+		// Read the selected course server-side so the choice is captured even
+		// if the form's JS (which copies it into the subject) is blocked.
+		'Course'           => sanitize_text_field( wp_unslash( $_POST['g2a_course'] ?? '' ) ),
 		'Preferred Date'   => sanitize_text_field( wp_unslash( $_POST['g2a_date'] ?? '' ) ),
 		'Participants'     => sanitize_text_field( wp_unslash( $_POST['g2a_count'] ?? '' ) ),
 		'Experience Level' => sanitize_text_field( wp_unslash( $_POST['g2a_experience'] ?? '' ) ),

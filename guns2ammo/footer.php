@@ -95,8 +95,8 @@ $founded   = (int) $biz['founded_year'];
 </section>
 
 <footer class="g2a-foot" role="contentinfo">
-	<div class="grid">
-		<div>
+	<div class="grid" data-reveal-group>
+		<div data-reveal>
 			<div class="brand"><span class="mark"></span>GUNS&nbsp;2&nbsp;AMMO</div>
 			<div style="color: var(--color-fog); font-size:14px; max-width:32ch; margin-bottom:22px; line-height: 1.65;"><?php echo esc_html( $biz['slogan'] ); ?> <?php /* translators: %d: founding year, e.g. 2014 */ printf( esc_html__( 'Since %d.', 'guns2ammo' ), $founded ); ?></div>
 			<div style="display:inline-flex; align-items:center; gap:12px; padding: 10px 16px; border:1px solid var(--color-hairline-bright); margin-bottom: 18px;">
@@ -111,7 +111,7 @@ $founded   = (int) $biz['founded_year'];
 				<a href="<?php echo esc_url( get_theme_mod( 'g2a_social_yt', '#' ) ); ?>" aria-label="YouTube" style="width:36px; height:36px; border:1px solid var(--color-hairline-bright); border-radius:50%; display:grid; place-items:center; color: var(--color-fog);"><svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M23.5 6.2a3 3 0 0 0-2.1-2.1C19.5 3.6 12 3.6 12 3.6s-7.5 0-9.4.5A3 3 0 0 0 .5 6.2C0 8.1 0 12 0 12s0 3.9.5 5.8a3 3 0 0 0 2.1 2.1c1.9.5 9.4.5 9.4.5s7.5 0 9.4-.5a3 3 0 0 0 2.1-2.1c.5-1.9.5-5.8.5-5.8s0-3.9-.5-5.8ZM9.6 15.6V8.4l6.2 3.6-6.2 3.6Z"/></svg></a>
 			</div>
 		</div>
-		<div>
+		<div data-reveal>
 			<h5>QUICK ACCESS</h5>
 			<ul>
 				<li><a href="<?php echo esc_url( home_url( '/book-a-lane/' ) ); ?>">Book a Lane</a></li>
@@ -123,7 +123,7 @@ $founded   = (int) $biz['founded_year'];
 				<li><a href="<?php echo esc_url( home_url( '/get-support/' ) ); ?>">Get Support</a></li>
 			</ul>
 		</div>
-		<div>
+		<div data-reveal>
 			<h5>COLLECTIONS</h5>
 			<ul>
 				<li><a href="<?php echo esc_url( home_url( '/collections/' ) ); ?>">All Collections</a></li>
@@ -134,8 +134,25 @@ $founded   = (int) $biz['founded_year'];
 				<li><a href="<?php echo esc_url( home_url( '/shop/' ) ); ?>">All Products</a></li>
 			</ul>
 		</div>
-		<div>
+		<div data-reveal>
 			<h5>VISIT US</h5>
+			<?php
+			// Compact Google Maps embed (no API key) with an animated
+			// brass pin overlaid. The address feeding the query is the
+			// same g2a_biz() NAP used everywhere else.
+			$g2a_map_q   = rawurlencode( 'Guns 2 Ammo, ' . $addr1 . ', ' . $addr2 );
+			$g2a_map_src = 'https://www.google.com/maps?q=' . $g2a_map_q . '&output=embed';
+			?>
+			<div class="foot-map" style="margin-bottom:16px;">
+				<iframe src="<?php echo esc_url( $g2a_map_src ); ?>"
+				        title="<?php echo esc_attr( sprintf( __( 'Map to Guns 2 Ammo, %1$s, %2$s', 'guns2ammo' ), $addr1, $addr2 ) ); ?>"
+				        loading="lazy"
+				        referrerpolicy="no-referrer-when-downgrade"></iframe>
+				<span class="foot-map__ring" aria-hidden="true"></span>
+				<span class="foot-map__pin" aria-hidden="true">
+					<svg viewBox="0 0 30 38" fill="currentColor" stroke="rgba(20,19,23,0.55)" stroke-width="1" aria-hidden="true"><path d="M15 1C7.8 1 2 6.8 2 14c0 9.6 13 23 13 23s13-13.4 13-23C28 6.8 22.2 1 15 1z"/><circle cx="15" cy="14" r="5" fill="#1A191E" stroke="none"/></svg>
+				</span>
+			</div>
 			<ul>
 				<li style="font-family: var(--font-condensed); font-weight:600; font-size:15px; color: var(--color-white); line-height:1.4;"><?php echo esc_html( $addr1 ); ?><br><?php echo esc_html( $addr2 ); ?></li>
 				<li><a href="tel:<?php echo esc_attr( preg_replace( '/[^0-9+]/', '', '+1' . $phone ) ); ?>" style="color: var(--color-brass-bright); display:inline-flex; align-items:center; gap:8px;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M22 16.92V20a2 2 0 0 1-2.18 2 19.86 19.86 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6A19.86 19.86 0 0 1 2.12 4.18 2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg> <?php echo esc_html( $phone ); ?></a></li>
@@ -158,7 +175,7 @@ $founded   = (int) $biz['founded_year'];
 					</div>
 				</li>
 				<li style="display:flex; gap:14px; align-items:center; flex-wrap:wrap; padding-top:8px;">
-					<a href="<?php echo esc_url( get_theme_mod( 'g2a_directions_url', 'https://www.google.com/maps/dir/?api=1&destination=Guns+2+Ammo%2C+6030+E+Main+St+%23103%2C+Mesa%2C+AZ+85205%2C+United+States&destination_place_id=ChIJaSRMhpGvK4cR4kE_E-jZvKE' ) ); ?>" target="_blank" rel="noopener" style="display:inline-flex; align-items:center; gap:6px;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 2 C8 2 5 5 5 9 c0 6 7 13 7 13 s7-7 7-13 c0-4-3-7-7-7 z"/><circle cx="12" cy="9" r="2.5"/></svg>Get Directions</a>
+					<a href="<?php echo esc_url( ! empty( $biz['directions_url'] ) ? $biz['directions_url'] : get_theme_mod( 'g2a_directions_url', 'https://www.google.com/maps/dir/?api=1&destination=Guns+2+Ammo%2C+6030+E+Main+St+%23103%2C+Mesa%2C+AZ+85205%2C+United+States&destination_place_id=ChIJaSRMhpGvK4cR4kE_E-jZvKE' ) ); ?>" target="_blank" rel="noopener" style="display:inline-flex; align-items:center; gap:6px;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 2 C8 2 5 5 5 9 c0 6 7 13 7 13 s7-7 7-13 c0-4-3-7-7-7 z"/><circle cx="12" cy="9" r="2.5"/></svg>Get Directions</a>
 					<a href="<?php echo esc_url( home_url( '/contact/' ) ); ?>" style="display:inline-flex; align-items:center; gap:6px;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18"/></svg>Contact</a>
 				</li>
 			</ul>

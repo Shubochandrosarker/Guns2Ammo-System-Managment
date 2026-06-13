@@ -183,6 +183,22 @@ final class G2AB_REST_Staff_Controller {
 	 * overlapping `now`).
 	 */
 	public function open_lanes() {
+		return rest_ensure_response( array( 'lanes' => self::lane_states() ) );
+	}
+
+	/**
+	 * Shared lane-state snapshot: every active lane resource with its
+	 * current state ('open' | 'in_use'), where in_use means a live
+	 * booking overlaps the current moment.
+	 *
+	 * Single source of truth for the overlap logic — consumed by the
+	 * staff /staff/open-lanes endpoint AND the public /lane-status
+	 * endpoint (G2AB_REST_Bookings_Controller::get_lane_status), which
+	 * only exposes the aggregate counts, never lane names.
+	 *
+	 * @return array[] [ { id:int, label:string, name:string, state:string }, … ]
+	 */
+	public static function lane_states() {
 		global $wpdb;
 		$rt  = $wpdb->prefix . 'g2ab_resources';
 		$bt  = $wpdb->prefix . 'g2ab_bookings';
@@ -209,7 +225,7 @@ final class G2AB_REST_Staff_Controller {
 				'state' => in_array( (int) $l['id'], $in_use, true ) ? 'in_use' : 'open',
 			);
 		}
-		return rest_ensure_response( array( 'lanes' => $out ) );
+		return $out;
 	}
 
 	/**

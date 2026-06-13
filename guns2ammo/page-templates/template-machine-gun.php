@@ -17,9 +17,9 @@ $g2a_mg_ccw_replace      = get_post_meta( $g2a_page_id, 'mg_ccw_remove_text', tr
 // Editable hero background photo (Appearance → Site Content). When the
 // client clears the URL, the original ember-gradient background from
 // machine-gun.css takes over — page never renders broken.
-$g2a_mg_hero_bg = g2a_content( 'mg_hero_bg', g2a_asset( 'img/gallery/guns2ammo-shooter-on-the-line.jpg' ), 'image', 'Machine Gun — Hero background photo' );
+$g2a_mg_hero_bg = function_exists( 'g2a_content' ) ? g2a_content( 'mg_hero_bg', g2a_asset( 'img/gallery/guns2ammo-shooter-on-the-line.jpg' ), 'image', 'Machine Gun — Hero background photo' ) : '';
 ?>
-<header class="mg-hero"<?php if ( $g2a_mg_hero_bg ) : ?> style="background-image:linear-gradient(100deg, rgba(13,13,15,0.95) 30%, rgba(13,13,15,0.72) 60%, rgba(42,32,32,0.55)), url('<?php echo esc_url( $g2a_mg_hero_bg ); ?>');background-size:cover;background-position:center right;"<?php endif; ?>>
+<header class="mg-hero hero-media"<?php if ( $g2a_mg_hero_bg ) : ?> style="background-image:linear-gradient(100deg, rgba(13,13,15,0.95) 30%, rgba(13,13,15,0.72) 60%, rgba(42,32,32,0.55)), url('<?php echo esc_url( $g2a_mg_hero_bg ); ?>');background-size:cover;background-position:center right;"<?php endif; ?>>
   <div class="c">
     <span class="eyebrow" style="color: var(--color-ember);">Signature Experience  Booked 4–6 weeks out</span>
     <h1 style="margin-top:18px;"><?php echo g2a_content( // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- g2a_content() returns wp_kses_post-escaped HTML.

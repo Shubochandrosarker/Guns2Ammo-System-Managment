@@ -32,6 +32,21 @@
   --color-chrome-panel: rgba(32, 31, 38, 0.97);
   --color-chrome-solid: #171620;
   --color-foot: #151419;
+  /* ON-MEDIA ink — text placed over photography / fixed-dark scrims.
+     These intentionally DO NOT flip in light mode: hero photos keep a
+     dark scrim in both themes, so the ink on top must stay light. */
+  --ink-on-media: #F5F4F0;
+  --ink-on-media-dim: rgba(245, 244, 240, 0.78);
+  --ink-on-media-faint: rgba(245, 244, 240, 0.6);
+  --brass-on-media: #DCB45F;
+  --ember-on-media: #E8802F;
+  /* Hero scrim stops — match the historical rgba(26,25,30,…) overlay
+     in dark mode; light mode softens them so photos read clearly while
+     the on-media ink stays high-contrast. */
+  --hero-scrim-soft: rgba(26, 25, 30, 0.75);
+  --hero-scrim: rgba(26, 25, 30, 0.85);
+  --hero-scrim-deep: rgba(26, 25, 30, 0.95);
+  --hero-vignette: rgba(26, 25, 30, 0.5);
   color-scheme: dark;
 }
 
@@ -67,6 +82,18 @@ html[data-theme="light"] {
   --color-chrome-panel: rgba(255, 255, 255, 0.98);
   --color-chrome-solid: #F8F6F1;
   --color-foot: #ECE9E1;
+  /* On-media ink stays light in BOTH modes (heroes keep dark scrims) */
+  --ink-on-media: #F5F4F0;
+  --ink-on-media-dim: rgba(245, 244, 240, 0.8);
+  --ink-on-media-faint: rgba(245, 244, 240, 0.62);
+  --brass-on-media: #DCB45F;
+  --ember-on-media: #E8802F;
+  /* Slightly lighter scrims in light mode: photos read clearly, white
+     hero ink stays AA-contrast against the still-dark overlay. */
+  --hero-scrim-soft: rgba(20, 19, 23, 0.62);
+  --hero-scrim: rgba(20, 19, 23, 0.74);
+  --hero-scrim-deep: rgba(20, 19, 23, 0.85);
+  --hero-vignette: rgba(20, 19, 23, 0.4);
   color-scheme: light;
 }
 html[data-theme="light"] body {
@@ -81,6 +108,49 @@ html[data-theme="light"] .grid-bg {
     linear-gradient(to right, rgba(20,18,10,0.04) 1px, transparent 1px),
     linear-gradient(to bottom, rgba(20,18,10,0.04) 1px, transparent 1px);
 }
+
+/* ====== HERO-MEDIA — photo / fixed-dark heroes ======
+   Every hero that layers text over a photograph (or a permanently dark
+   scrim) carries the .hero-media class. Inside it, ink ALWAYS uses the
+   non-flipping on-media tokens so headlines, eyebrows, leads, trust
+   badges and CTAs stay readable in light mode. The doubled class wins
+   specificity ties against per-template <style> blocks that load later. */
+.hero-media.hero-media :is(h1, h2, h3, .hl-display, .display) { color: var(--ink-on-media); }
+.hero-media.hero-media .hl-display :is(.a, em) { color: var(--ember-on-media); }
+.hero-media.hero-media .hl-display .a-brass { color: var(--brass-on-media); }
+.hero-media.hero-media :is(p, .lead, .sub, .lede) { color: var(--ink-on-media-dim); }
+.hero-media.hero-media .eyebrow,
+.hero-media.hero-media .eb { color: var(--brass-on-media); }
+.hero-media.hero-media .eyebrow::before { background: var(--brass-on-media); }
+.hero-media.hero-media .eb-pill { color: var(--brass-on-media); }
+/* Light mode only: give the pill a translucent dark plate + visible
+   border so it separates from the photo (dark mode stays unchanged). */
+html[data-theme="light"] .hero-media .eb-pill,
+html[data-theme="light"] .hero-media .b-pill {
+  border-color: rgba(220, 180, 95, 0.45);
+  background: rgba(20, 19, 23, 0.35);
+}
+.hero-media.hero-media .crumbs { color: var(--ink-on-media-faint); }
+.hero-media.hero-media .crumbs a { color: var(--brass-on-media); }
+.hero-media.hero-media .trust-strip { color: var(--ink-on-media-dim); }
+.hero-media.hero-media .trust-strip .item::before { background: var(--brass-on-media); }
+.hero-media.hero-media .trust-strip .stars { color: var(--brass-on-media); }
+.hero-media.hero-media .bk-trust .it { color: var(--ink-on-media-dim); }
+.hero-media.hero-media .bk-trust .it::before { color: var(--brass-on-media); }
+.hero-media.hero-media :is(.trust, .meta) .it { color: var(--ink-on-media-faint); }
+.hero-media.hero-media :is(.trust, .meta) .it strong { color: var(--brass-on-media); }
+.hero-media.hero-media .micro { color: var(--ink-on-media-faint); }
+/* Buttons over media: outline buttons keep light ink + visible borders */
+.hero-media.hero-media .btn { color: var(--ink-on-media); border-color: rgba(245, 244, 240, 0.38); }
+.hero-media.hero-media .btn-ghost { color: var(--ink-on-media); border-color: rgba(245, 244, 240, 0.45); }
+.hero-media.hero-media .btn-ghost::before { background: var(--ink-on-media); }
+.hero-media.hero-media .btn-ghost:hover { color: #17161A; border-color: var(--ink-on-media); }
+.hero-media.hero-media .btn-ember { color: var(--ember-on-media); border-color: var(--ember-on-media); }
+.hero-media.hero-media .btn-ember::before { background: var(--ember-on-media); }
+.hero-media.hero-media .btn-ember:hover { color: #fff; }
+.hero-media.hero-media .btn-brass { color: var(--brass-on-media); border-color: var(--brass-on-media); }
+.hero-media.hero-media .btn-brass::before { background: var(--brass-on-media); }
+.hero-media.hero-media .btn-brass:hover { color: #17161A; }
 
 /* ====== VIBES (themes) ====== */
 [data-vibe="operator"] {
@@ -161,7 +231,7 @@ body {
   pointer-events: none;
   opacity: 0.05;
   mix-blend-mode: overlay;
-  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='160' height='160'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 1  0 0 0 0 1  0 0 0 0 1  0 0 0 0.6 0'/></filter><rect width='100%25' height='100%25' filter='url(%23n)'/></svg>");
+  background-image: url("data:image/svg+xml,%3Csvg%20xmlns%3D'http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg'%20width%3D'160'%20height%3D'160'%3E%3Cfilter%20id%3D'n'%3E%3CfeTurbulence%20type%3D'fractalNoise'%20baseFrequency%3D'0.9'%20numOctaves%3D'2'%20stitchTiles%3D'stitch'%2F%3E%3CfeColorMatrix%20values%3D'0%200%200%200%201%20%200%200%200%200%201%20%200%200%200%200%201%20%200%200%200%200.6%200'%2F%3E%3C%2Ffilter%3E%3Crect%20width%3D'100%25'%20height%3D'100%25'%20filter%3D'url%28%23n%29'%2F%3E%3C%2Fsvg%3E");
 }
 
 /* Buttons  border-default with slide-fill on hover */
@@ -198,6 +268,11 @@ body {
 }
 .btn:hover::before { transform: translateY(0); }
 .btn:hover { transform: translateY(-1px); }
+.btn:active { transform: translateY(0) scale(0.98); }
+@media (prefers-reduced-motion: reduce) {
+  .btn, .btn::before, .btn-arrow::after { transition: none !important; }
+  .btn:hover, .btn:active { transform: none; }
+}
 
 @media (max-width: 480px) {
   .btn { white-space: normal; padding: 14px 18px; font-size: 13px; letter-spacing: 0.08em; }
@@ -386,10 +461,19 @@ h1, h2, h3 { color: var(--color-white); margin: 0; }
   background: rgba(201, 168, 76, 0.14);
   border: 1px solid var(--color-brass-dim);
   color: var(--color-brass-bright);
+  overflow: hidden;
 }
 .g2a-profile .profile-btn .av svg { width: 14px; height: 14px; display: block; }
 .g2a-profile .profile-btn .av img { width: 100%; height: 100%; object-fit: cover; border-radius: 50%; display: block; }
 .g2a-profile .profile-btn:hover .av { background: rgba(201, 168, 76, 0.22); }
+/* Member profile photo (gravatar / membership-plugin photo via the
+   g2a_profile_avatar_url filter) renders as a circular cover image. */
+.g2a-profile .profile-btn .av img.av-img {
+  width: 100%; height: 100%;
+  border-radius: 50%;
+  object-fit: cover;
+  display: block;
+}
 
 /* THEME TOGGLE (sun/moon) — sits beside the profile control */
 .g2a-mode {
@@ -457,6 +541,36 @@ html[data-theme="light"] .g2a-mode .ico-moon { display: none; }
 .g2a-foot .brand .mark { width:28px; height:28px; border:1.5px solid var(--color-brass); display:inline-grid; place-items:center; transform: rotate(45deg); }
 .g2a-foot .brand .mark::after { content:""; width:6px; height:6px; background: var(--color-brass); }
 .g2a-foot .strip { max-width:1280px; margin:56px auto 0; padding-top:24px; border-top:1px solid var(--color-hairline); display:flex; justify-content:space-between; flex-wrap:wrap; gap:16px; font-family: var(--font-mono); font-size:11px; letter-spacing:0.22em; color: var(--color-silver); text-transform: uppercase; }
+/* Footer link micro-interaction — brass underline slides in on hover */
+.g2a-foot .grid ul a { position: relative; }
+.g2a-foot .grid ul a::after { content:""; position:absolute; left:0; bottom:-2px; width:100%; height:1px; background: var(--color-brass); transform: scaleX(0); transform-origin: left; transition: transform 250ms var(--ease-out); }
+.g2a-foot .grid ul a:hover::after { transform: scaleX(1); }
+
+/* FOOTER MAP — compact Google embed with an animated brass pin */
+.foot-map { position: relative; width: 100%; height: 180px; border: 1px solid var(--color-hairline-bright); border-radius: 2px; overflow: hidden; background: var(--color-gunmetal); }
+.foot-map iframe { width: 100%; height: 100%; border: 0; display: block; filter: saturate(0.85) contrast(1.02); }
+html[data-theme="light"] .foot-map { border-color: var(--color-hairline); }
+.foot-map__pin { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -100%); pointer-events: none; z-index: 2; display: block; width: 30px; height: 38px; color: var(--color-brass); filter: drop-shadow(0 4px 8px rgba(0,0,0,0.45)); animation: g2a-pin-drop 3.2s var(--ease-out) infinite; }
+.foot-map__pin svg { width: 100%; height: 100%; display: block; }
+.foot-map__ring { position: absolute; left: 50%; top: 50%; width: 14px; height: 14px; margin: -7px 0 0 -7px; border: 2px solid var(--color-brass); border-radius: 50%; pointer-events: none; z-index: 1; opacity: 0; animation: g2a-pin-ripple 3.2s var(--ease-out) infinite; }
+@keyframes g2a-pin-drop {
+  0%, 100% { transform: translate(-50%, -100%); }
+  8%       { transform: translate(-50%, calc(-100% - 7px)); }
+  16%      { transform: translate(-50%, -100%); }
+  22%      { transform: translate(-50%, calc(-100% - 3px)); }
+  28%      { transform: translate(-50%, -100%); }
+}
+@keyframes g2a-pin-ripple {
+  0%, 12%  { opacity: 0; transform: scale(0.4); }
+  20%      { opacity: 0.7; }
+  55%      { opacity: 0; transform: scale(2.6); }
+  100%     { opacity: 0; transform: scale(2.6); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .foot-map__pin { animation: none; }
+  .foot-map__ring { animation: none; opacity: 0.5; transform: scale(1); }
+  .g2a-foot .grid ul a::after { transition: none; }
+}
 
 /* TWEAKS PANEL */
 .tweaks { position: fixed; right:20px; bottom:20px; z-index:300; width:300px; background: var(--color-chrome-panel); backdrop-filter: blur(14px); border:1px solid var(--color-hairline-bright); padding:18px; font-family: var(--font-ui); transform: translateY(8px); opacity:0; pointer-events:none; transition: all 220ms var(--ease-out); }
@@ -480,7 +594,7 @@ html[data-theme="light"] .g2a-mode .ico-moon { display: none; }
 .qv-backdrop.open .qv-modal { transform: scale(1) translateY(0); }
 @media (max-width:780px){ .qv-modal { grid-template-columns:1fr; } }
 .qv-image { aspect-ratio:1; background-image: linear-gradient(180deg, rgba(10,10,10,0.3), rgba(10,10,10,0.6)), repeating-linear-gradient(135deg, #1f1f23 0 14px, #18181b 14px 28px); position:relative; }
-.qv-image::after { content: attr(data-pl); position:absolute; bottom:14px; left:14px; font-family: var(--font-mono); font-size:10px; letter-spacing:0.22em; color: var(--color-silver); text-transform: uppercase; }
+.qv-image::after { content: attr(data-pl); position:absolute; bottom:14px; left:14px; font-family: var(--font-mono); font-size:10px; letter-spacing:0.22em; color: var(--ink-on-media-faint); text-transform: uppercase; }
 .qv-body { padding:36px; position:relative; }
 .qv-close { position:absolute; top:14px; right:14px; width:36px; height:36px; background:transparent; border:1px solid var(--color-hairline-bright); color: var(--color-white); cursor:pointer; font-size:18px; }
 .qv-brand { font-family: var(--font-mono); font-size:11px; letter-spacing:0.24em; color: var(--color-brass-bright); text-transform: uppercase; }
@@ -1053,7 +1167,7 @@ html[data-theme="light"] .g2a-mode .ico-moon { display: none; }
 .plan .pays { font-family: var(--font-body); font-style: italic; color: var(--color-brass-bright); font-size: 13px; }
 .plan .feats { list-style:none; padding:0; margin:0; display:grid; gap:12px; padding-top:18px; border-top:1px solid var(--color-hairline); }
 .plan .feats li { display:flex; gap:12px; font-size:14px; color: var(--color-fog); align-items: flex-start; }
-.plan .feats li::before { content:""; width:14px; height:14px; flex:0 0 14px; margin-top:3px; background: no-repeat center/contain url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 14 14' fill='none' stroke='%23C9A84C' stroke-width='2'><path d='M2 7.5 L5.5 11 L12 3.5'/></svg>"); }
+.plan .feats li::before { content:""; width:14px; height:14px; flex:0 0 14px; margin-top:3px; background: no-repeat center/contain url("data:image/svg+xml,%3Csvg%20xmlns%3D'http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg'%20viewBox%3D'0%200%2014%2014'%20fill%3D'none'%20stroke%3D'%23C9A84C'%20stroke-width%3D'2'%3E%3Cpath%20d%3D'M2%207.5%20L5.5%2011%20L12%203.5'%2F%3E%3C%2Fsvg%3E"); }
 
 /* ============ ACCORDION ============ */
 .acc { border-top:1px solid var(--color-hairline); }
@@ -1134,7 +1248,7 @@ html[data-theme="light"] .g2a-mode .ico-moon { display: none; }
 .checkbox { display:flex; gap:10px; align-items:flex-start; cursor:pointer; font-size:13px; color: var(--color-fog); }
 .checkbox input { appearance:none; width:18px; height:18px; border:1.5px solid var(--color-steel); background: var(--color-void); display:inline-grid; place-items:center; flex:0 0 18px; cursor:pointer; transition: all 180ms var(--ease-std); margin-top:1px; }
 .checkbox input:checked { background: var(--color-brass); border-color: var(--color-brass); }
-.checkbox input:checked::after { content:""; width:10px; height:10px; background: no-repeat center/contain url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 10 10' fill='none' stroke='%23111' stroke-width='2'><path d='M1 5.5 L4 8 L9 2'/></svg>"); }
+.checkbox input:checked::after { content:""; width:10px; height:10px; background: no-repeat center/contain url("data:image/svg+xml,%3Csvg%20xmlns%3D'http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg'%20viewBox%3D'0%200%2010%2010'%20fill%3D'none'%20stroke%3D'%23111'%20stroke-width%3D'2'%3E%3Cpath%20d%3D'M1%205.5%20L4%208%20L9%202'%2F%3E%3C%2Fsvg%3E"); }
 
 /* ============ PROCESS STEPPER ============ */
 .stepper { display:grid; grid-template-columns: repeat(var(--steps,3), 1fr); gap: 24px; position:relative; }
@@ -1212,9 +1326,23 @@ html[data-theme="light"] .g2a-mode .ico-moon { display: none; }
 .trust-strip .stars { color: var(--color-brass-bright); font-family: var(--font-mono); font-weight:700; }
 .trust-strip .stars::before { display:none; }
 
-/* Big CTA with arrow */
+/* Big CTA with arrow.
+   The previous raw `url("data:image/svg+xml;utf8,<svg …>")` URI used
+   unencoded `<` `>` characters which many browsers refuse to parse —
+   the arrow simply never rendered. Now: a properly URL-encoded SVG used
+   as a CSS mask + `background-color: currentColor`, so the arrow always
+   renders AND always matches the button's text color in any state. */
 .btn-arrow { position: relative; padding-right: 56px; }
-.btn-arrow::after { content:""; position:absolute; right: 22px; top:50%; transform: translateY(-50%); width: 22px; height: 12px; background: no-repeat center/contain url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 22 12' fill='none' stroke='currentColor' stroke-width='2'><path d='M1 6h19m-5-5 5 5-5 5'/></svg>"); transition: transform 250ms var(--ease-out); }
+.btn-arrow::after {
+  content: "";
+  position: absolute; right: 22px; top: 50%;
+  transform: translateY(-50%);
+  width: 22px; height: 12px;
+  background-color: currentColor;
+  -webkit-mask: url("data:image/svg+xml,%3Csvg%20xmlns%3D'http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg'%20viewBox%3D'0%200%2022%2012'%20fill%3D'none'%20stroke%3D'%23fff'%20stroke-width%3D'2'%3E%3Cpath%20d%3D'M1%206h19m-5-5%205%205-5%205'%2F%3E%3C%2Fsvg%3E") no-repeat center / contain;
+          mask: url("data:image/svg+xml,%3Csvg%20xmlns%3D'http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg'%20viewBox%3D'0%200%2022%2012'%20fill%3D'none'%20stroke%3D'%23fff'%20stroke-width%3D'2'%3E%3Cpath%20d%3D'M1%206h19m-5-5%205%205-5%205'%2F%3E%3C%2Fsvg%3E") no-repeat center / contain;
+  transition: transform 250ms var(--ease-out);
+}
 .btn-arrow:hover::after { transform: translateY(-50%) translateX(4px); }
 
 /* Image cinematic frame (used in hero / sections) */
@@ -1255,8 +1383,14 @@ html[data-theme="light"] .g2a-mode .ico-moon { display: none; }
 @media (max-width: 760px) { .newsletter-band form { min-width: 0; width: 100%; } }
 .newsletter-band input { flex: 1; background: var(--color-void); border: 1px solid var(--color-hairline-bright); color: var(--color-white); padding: 14px 16px; font-family: var(--font-body); font-size: 14px; outline: none; }
 .newsletter-band input:focus { border-color: var(--color-brass); }
-.newsletter-band button { background: var(--color-white); color: #111; border: none; padding: 14px 24px; font-family: var(--font-condensed); font-weight: 600; font-size: 13px; letter-spacing: 0.14em; text-transform: uppercase; cursor: pointer; display: inline-flex; align-items: center; gap: 8px; }
-.newsletter-band button:hover { background: var(--color-brass); }
+/* JOIN button: explicit ember fill + white text in BOTH modes (the old
+   var(--color-white) background flipped to near-black in light mode and
+   swallowed its own #111 label). Arrow comes from .btn-arrow's mask. */
+.newsletter-band button { background: var(--color-ember); color: #fff; border: none; padding: 14px 24px; font-family: var(--font-condensed); font-weight: 600; font-size: 13px; letter-spacing: 0.14em; text-transform: uppercase; cursor: pointer; display: inline-flex; align-items: center; gap: 8px; transition: background 200ms var(--ease-std), transform 150ms var(--ease-std); }
+.newsletter-band button:hover { background: var(--color-ember-dim); }
+.newsletter-band button:active { transform: scale(0.97); }
+.newsletter-band button.btn-arrow { padding-right: 52px; }
+.newsletter-band button.btn-arrow::after { right: 18px; }
 /* Phones  stack the email field and Join button so the button is full-width and legible */
 @media (max-width: 560px) {
   .newsletter-band form { flex-direction: column; gap: 10px; }
@@ -2283,10 +2417,10 @@ html[data-theme="light"] .g2a-mode .ico-moon { display: none; }
 	display: block;
 	width: 18px;
 	height: 18px;
-	background: no-repeat center/contain url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23A7A6AE' stroke-width='2'><path d='M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z'/><circle cx='12' cy='12' r='3'/></svg>");
+	background: no-repeat center/contain url("data:image/svg+xml,%3Csvg%20xmlns%3D'http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg'%20viewBox%3D'0%200%2024%2024'%20fill%3D'none'%20stroke%3D'%23A7A6AE'%20stroke-width%3D'2'%3E%3Cpath%20d%3D'M1%2012s4-8%2011-8%2011%208%2011%208-4%208-11%208-11-8-11-8z'%2F%3E%3Ccircle%20cx%3D'12'%20cy%3D'12'%20r%3D'3'%2F%3E%3C%2Fsvg%3E");
 }
 .g2a-account-shell .password-input .show-password-input.display-password::after {
-	background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23DCB45F' stroke-width='2'><path d='M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z'/><circle cx='12' cy='12' r='3'/></svg>");
+	background-image: url("data:image/svg+xml,%3Csvg%20xmlns%3D'http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg'%20viewBox%3D'0%200%2024%2024'%20fill%3D'none'%20stroke%3D'%23DCB45F'%20stroke-width%3D'2'%3E%3Cpath%20d%3D'M1%2012s4-8%2011-8%2011%208%2011%208-4%208-11%208-11-8-11-8z'%2F%3E%3Ccircle%20cx%3D'12'%20cy%3D'12'%20r%3D'3'%2F%3E%3C%2Fsvg%3E");
 }
 
 /* Account tables (orders / addresses / downloads) */
@@ -2833,7 +2967,10 @@ html[data-theme="light"] .g2a-mode .ico-moon { display: none; }
 	position: sticky;
 	bottom: 0;
 	z-index: 60;
-	background: rgba(10,10,10,0.96);
+	/* Chrome-glass token (flips with the theme) — the old fixed
+	   rgba(10,10,10,.96) kept a black bar under dark token text in
+	   light mode. */
+	background: var(--color-chrome-glass);
 	backdrop-filter: blur(14px);
 	-webkit-backdrop-filter: blur(14px);
 	border-top: 1px solid var(--color-hairline-bright);
@@ -3069,12 +3206,12 @@ body.woocommerce-account .section[data-no-hero] > .container {
 	display: block;
 	width: 20px;
 	height: 20px;
-	background: no-repeat center/contain url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23A7A6AE' stroke-width='2'><path d='M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z'/><circle cx='12' cy='12' r='3'/></svg>");
+	background: no-repeat center/contain url("data:image/svg+xml,%3Csvg%20xmlns%3D'http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg'%20viewBox%3D'0%200%2024%2024'%20fill%3D'none'%20stroke%3D'%23A7A6AE'%20stroke-width%3D'2'%3E%3Cpath%20d%3D'M1%2012s4-8%2011-8%2011%208%2011%208-4%208-11%208-11-8-11-8z'%2F%3E%3Ccircle%20cx%3D'12'%20cy%3D'12'%20r%3D'3'%2F%3E%3C%2Fsvg%3E");
 	opacity: 0.8;
 }
 .woocommerce-account .password-input .show-password-input.display-password::before,
 .g2a-account-shell .password-input .show-password-input.display-password::before {
-	background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23DCB45F' stroke-width='2'><path d='M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24'/><path d='M1 1l22 22'/></svg>");
+	background-image: url("data:image/svg+xml,%3Csvg%20xmlns%3D'http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg'%20viewBox%3D'0%200%2024%2024'%20fill%3D'none'%20stroke%3D'%23DCB45F'%20stroke-width%3D'2'%3E%3Cpath%20d%3D'M17.94%2017.94A10.07%2010.07%200%200%201%2012%2020c-7%200-11-8-11-8a18.45%2018.45%200%200%201%205.06-5.94M9.9%204.24A9.12%209.12%200%200%201%2012%204c7%200%2011%208%2011%208a18.5%2018.5%200%200%201-2.16%203.19m-6.72-1.07a3%203%200%201%201-4.24-4.24'%2F%3E%3Cpath%20d%3D'M1%201l22%2022'%2F%3E%3C%2Fsvg%3E");
 	opacity: 1;
 }
 /* Defeat Chrome autofill yellow on the entire account form */

@@ -13,7 +13,7 @@ $g2a_page_id                 = get_the_ID();
 $g2a_lane_hero_title         = get_post_meta( $g2a_page_id, 'lane_hero_title', true );
 $g2a_lane_membership_pitch   = get_post_meta( $g2a_page_id, 'lane_membership_pitch', true );
 ?>
-<header class="bk-hero">
+<header class="bk-hero hero-media">
   <div class="container">
     <span class="eyebrow"> Reservation  Live Lane Status</span>
     <h1 style="margin-top:18px;"><?php echo esc_html( $g2a_lane_hero_title ? $g2a_lane_hero_title : 'BOOK YOUR LANE.' ); ?></h1>

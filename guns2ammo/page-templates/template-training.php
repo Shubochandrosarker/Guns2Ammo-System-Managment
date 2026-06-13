@@ -49,10 +49,10 @@ get_header();
   .featured h2 { font-family: var(--font-display); font-size: clamp(48px, 7vw, 88px); line-height: 0.95; color: var(--color-white); letter-spacing: 0.02em; }
   .featured h2 .a { color: var(--color-brass-bright); }
   .featured p { color: var(--color-fog); margin: 22px 0 28px; font-size: 16px; line-height: 1.75; }
-  .featured .vis { aspect-ratio: 4/3; background: var(--color-void); border:1px solid var(--color-brass-dim); display:grid; place-items:center; position: relative; overflow:hidden; }
+  .featured .vis { aspect-ratio: 4/3; background: linear-gradient(180deg, rgba(26,25,30,0.45), rgba(26,25,30,0.75)), url("<?php echo esc_url( g2a_asset( 'img/guns2ammo-range-training-session.jpg' ) ); ?>") center / cover no-repeat, var(--color-void); border:1px solid var(--color-brass-dim); display:grid; place-items:center; position: relative; overflow:hidden; }
   .featured .vis::before { content:""; position:absolute; inset:0; background: repeating-linear-gradient(90deg, transparent 0, transparent 60px, rgba(201,168,76,0.06) 60px, rgba(201,168,76,0.06) 61px); }
-  .featured .vis .stamp { font-family: var(--font-display); font-size: clamp(80px, 14vw, 200px); color: var(--color-brass-bright); opacity: 0.18; letter-spacing: 0.06em; }
-  .featured .vis .ph-tag { position:absolute; top:14px; left:14px; font-family: var(--font-mono); font-size: 10px; letter-spacing: 0.22em; color: var(--color-silver); text-transform: uppercase; }
+  .featured .vis .stamp { font-family: var(--font-display); font-size: clamp(80px, 14vw, 200px); color: var(--brass-on-media); opacity: 0.28; letter-spacing: 0.06em; }
+  .featured .vis .ph-tag { position:absolute; top:14px; left:14px; font-family: var(--font-mono); font-size: 10px; letter-spacing: 0.22em; color: var(--ink-on-media-faint); text-transform: uppercase; }
 
   .calendar { padding: 100px 32px; }
   .calendar .c { max-width: 1280px; margin:0 auto; }
@@ -114,8 +114,8 @@ get_header();
       <p>Pick your pathway. Members save 25% on every course; bring a +1 and they save too.</p>
     </div>
 
-    <div class="courses">
-      <div class="course">
+    <div class="courses" data-reveal-group>
+      <div class="course" data-reveal>
         <div class="top"><div class="lvl"> Level 01  Beginner</div><div class="price">$95</div></div>
         <h3><a href="<?php echo esc_url( home_url( '/training/basic-handgun/' ) ); ?>" style="color:inherit;text-decoration:none;">BASIC HANDGUN</a></h3>
         <div class="lead">First-time shooters welcome. Grip, stance, sight alignment, trigger control, and your first 50 rounds on the range under 1:1 instruction.</div>
@@ -123,7 +123,7 @@ get_header();
         <div class="acts"><a class="btn btn-brass btn-sm" href="<?php echo esc_url( home_url( '/training/basic-handgun/' ) ); ?>">View Course </a><span class="form-help">Member: $71.25</span></div>
       </div>
 
-      <div class="course">
+      <div class="course" data-reveal>
         <div class="top"><div class="lvl"> Level 02  Certification</div><div class="price">$85</div></div>
         <h3><a href="<?php echo esc_url( home_url( '/arizona-ccw-certification/' ) ); ?>" style="color:inherit;text-decoration:none;">ARIZONA CCW</a></h3>
         <div class="lead">4-hour Arizona CCW certification: A.R.S. &sect;13-3112, use-of-force law, and DPS paperwork handled in class. Add the live-fire session for $149.99 (5 hours, Monday evenings).</div>
@@ -131,7 +131,7 @@ get_header();
         <div class="acts"><a class="btn btn-brass btn-sm" href="<?php echo esc_url( home_url( '/arizona-ccw-certification/' ) ); ?>">View Course </a><span class="form-help">Live-fire option: $149.99</span></div>
       </div>
 
-      <div class="course">
+      <div class="course" data-reveal>
         <div class="top"><div class="lvl"> Level 03  Multi-State</div><div class="price">$175</div></div>
         <h3><a href="<?php echo esc_url( home_url( '/training/california-ccw/' ) ); ?>" style="color:inherit;text-decoration:none;">CALIFORNIA CCW</a></h3>
         <div class="lead">CA non-resident certification meeting all California Penal Code 26165 training requirements. Bundle with AZ for 30+ states reciprocity.</div>
@@ -139,7 +139,7 @@ get_header();
         <div class="acts"><a class="btn btn-brass btn-sm" href="<?php echo esc_url( home_url( '/training/california-ccw/' ) ); ?>">View Course </a><span class="form-help">Member: $131.25</span></div>
       </div>
 
-      <div class="course">
+      <div class="course" data-reveal>
         <div class="top"><div class="lvl"> Level 03  Specialty</div><div class="price">$249</div></div>
         <h3><a href="<?php echo esc_url( home_url( '/training/church-security/' ) ); ?>" style="color:inherit;text-decoration:none;">CHURCH SECURITY</a></h3>
         <div class="lead">Faith-based facility protection: threat assessment, plain-clothes carry, congregation safety planning, and coordinated team response.</div>
@@ -147,7 +147,7 @@ get_header();
         <div class="acts"><a class="btn btn-brass btn-sm" href="<?php echo esc_url( home_url( '/training/church-security/' ) ); ?>">View Course </a><span class="form-help">Member: $186.75</span></div>
       </div>
 
-      <div class="course">
+      <div class="course" data-reveal>
         <div class="top"><div class="lvl"> Level 02  Family</div><div class="price">$65</div></div>
         <h3><a href="<?php echo esc_url( home_url( '/training/womens-intro/' ) ); ?>" style="color:inherit;text-decoration:none;">WOMEN'S INTRO</a></h3>
         <div class="lead">Female-instructed beginner course for new women shooters. Tuesday Ladies Day pricing applied  non-judgmental, patiently paced.</div>
@@ -155,7 +155,7 @@ get_header();
         <div class="acts"><a class="btn btn-brass btn-sm" href="<?php echo esc_url( home_url( '/training/womens-intro/' ) ); ?>">View Course </a><span class="form-help">Member: $48.75</span></div>
       </div>
 
-      <div class="course">
+      <div class="course" data-reveal>
         <div class="top"><div class="lvl"> Level 04  Advanced</div><div class="price">$295</div></div>
         <h3><a href="<?php echo esc_url( home_url( '/training/defensive-pistol/' ) ); ?>" style="color:inherit;text-decoration:none;">DEFENSIVE PISTOL</a></h3>
         <div class="lead">Stress-fire drills, multiple targets, low-light, malfunction clearance, and force-on-force scenarios with airsoft conversions.</div>
@@ -163,7 +163,7 @@ get_header();
         <div class="acts"><a class="btn btn-brass btn-sm" href="<?php echo esc_url( home_url( '/training/defensive-pistol/' ) ); ?>">View Course </a><span class="form-help">Member: $221.25</span></div>
       </div>
 
-      <div class="course">
+      <div class="course" data-reveal>
         <div class="top"><div class="lvl"> Level 02  Beginner</div><div class="price">$115</div></div>
         <h3><a href="<?php echo esc_url( home_url( '/training/rifle-fundamentals/' ) ); ?>" style="color:inherit;text-decoration:none;">RIFLE FUNDAMENTALS</a></h3>
         <div class="lead">Master the AR-15 platform from the ground up  zeroing, marksmanship positions, reloads, and safe long-gun handling.</div>
@@ -171,7 +171,7 @@ get_header();
         <div class="acts"><a class="btn btn-brass btn-sm" href="<?php echo esc_url( home_url( '/training/rifle-fundamentals/' ) ); ?>">View Course </a><span class="form-help">Member: $86.25</span></div>
       </div>
 
-      <div class="course">
+      <div class="course" data-reveal>
         <div class="top"><div class="lvl"> Level 01  Awareness</div><div class="price">$55</div></div>
         <h3><a href="<?php echo esc_url( home_url( '/training/refuse-to-be-a-victim/' ) ); ?>" style="color:inherit;text-decoration:none;">REFUSE TO BE A VICTIM</a></h3>
         <div class="lead">A no-firearms personal-safety seminar  awareness, avoidance, and practical strategies for home, travel, and digital life.</div>
@@ -179,7 +179,7 @@ get_header();
         <div class="acts"><a class="btn btn-brass btn-sm" href="<?php echo esc_url( home_url( '/training/refuse-to-be-a-victim/' ) ); ?>">View Course </a><span class="form-help">Member: $41.25</span></div>
       </div>
 
-      <div class="course">
+      <div class="course" data-reveal>
         <div class="top"><div class="lvl"> Level 01  Youth</div><div class="price">$45</div></div>
         <h3><a href="<?php echo esc_url( home_url( '/training/youth-firearm-safety/' ) ); ?>" style="color:inherit;text-decoration:none;">YOUTH FIREARM SAFETY</a></h3>
         <div class="lead">An age-appropriate firearm-safety class for young people  what to do if they ever encounter a gun, with parents involved throughout.</div>

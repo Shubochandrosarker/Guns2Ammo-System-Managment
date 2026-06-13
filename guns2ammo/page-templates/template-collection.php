@@ -24,7 +24,7 @@ $collections = [
 		'h1_accent' => 'HANDGUNS',
 		'cat'       => 'handguns',
 		'count'     => '24',
-		'image'     => $img_base . '2025/06/glock-19-gen5-9mm-guns2ammo-mesa-az.jpg.webp',
+		'image'     => g2a_asset( 'img/guns2ammo-handgun-case-display.jpg' ),
 		'intro'     => 'Compact carry pistols, full-size duty guns, and range-day favorites  every handgun on our floor is one our instructors would carry off-duty. Hands-on fitment, transparent pricing, and same-day pickup at our Mesa storefront.',
 		'guide_h'   => 'CHOOSING YOUR FIRST HANDGUN',
 		'guide'     => [
@@ -44,7 +44,7 @@ $collections = [
 		'h1_accent' => 'RIFLES',
 		'cat'       => 'rifles',
 		'count'     => '12',
-		'image'     => $img_base . '2025/06/noveske-gen4-556-sbr-bazooka-green-guns2ammo-mesa-az.webp',
+		'image'     => g2a_asset( 'img/guns2ammo-rifles-rack.jpg' ),
 		'intro'     => 'AR-pattern carbines, precision bolt guns, and home-defense rifles from the brands our instructors trust. Cold-hammer-forged barrels, honest fitment advice, and full Arizona &amp; federal compliance on every build.',
 		'guide_h'   => 'BUILDING THE RIGHT RIFLE',
 		'guide'     => [
@@ -64,7 +64,7 @@ $collections = [
 		'h1_accent' => 'AMMUNITION',
 		'cat'       => 'ammunition',
 		'count'     => '38',
-		'image'     => $img_base . '2026/02/589741689_1348201817319329_6684242787616772114_n.webp',
+		'image'     => g2a_asset( 'img/guns2ammo-ammo-shelves.jpg' ),
 		'intro'     => 'Factory-new training ammo and premium personal-defense loads  9mm, .223/5.56, .45 ACP and more. Stocked in bulk for members, priced for the people who actually train.',
 		'guide_h'   => 'TRAINING VS. DEFENSE AMMO',
 		'guide'     => [
@@ -84,7 +84,7 @@ $collections = [
 		'h1_accent' => 'MAGAZINES',
 		'cat'       => 'magazines',
 		'count'     => '21',
-		'image'     => $img_base . '2025/06/Sig-Suer-P320-Custom-works-Guns2ammo-mesa-az.JPG-rotated.webp',
+		'image'     => g2a_asset( 'img/guns2ammo-gear-case.jpg' ),
 		'intro'     => 'Factory and proven aftermarket magazines for pistols and AR-pattern rifles. Anti-tilt followers, hardened feed lips, and the capacities Arizona shooters actually want.',
 		'guide_h'   => 'MAGAZINE BUYING BASICS',
 		'guide'     => [
@@ -127,13 +127,13 @@ if ( function_exists( 'g2a_faq_schema' ) && function_exists( 'g2a_emit_jsonld' )
 ?>
 <style>
 .col-hero { padding: 140px 32px 72px; position:relative; overflow:hidden; }
-.col-hero::before { content:""; position:absolute; inset:0; pointer-events:none; background-image: linear-gradient(180deg, rgba(26,25,30,0.78), rgba(26,25,30,0.96)), url('<?php echo esc_url( $c['image'] ); ?>'); background-size:cover; background-position:center; filter: saturate(0.95); }
+.col-hero::before { content:""; position:absolute; inset:0; pointer-events:none; background-image: linear-gradient(180deg, var(--hero-scrim), var(--hero-scrim-deep)), url('<?php echo esc_url( $c['image'] ); ?>'); background-size:cover; background-position:center; filter: saturate(0.95); }
 .col-hero .container { position:relative; max-width:1280px; margin:0 auto; }
-.col-hero h1 { font-family: var(--font-display); font-size: clamp(56px, 9vw, 116px); line-height:0.9; letter-spacing:0.01em; margin-top:18px; }
-.col-hero h1 .a { color: var(--color-ember); }
-.col-hero .lead { color: var(--color-fog); max-width:60ch; margin:22px 0 0; font-size:16px; line-height:1.7; }
-.col-hero .crumbs { font-family: var(--font-mono); font-size:11px; letter-spacing:0.2em; text-transform:uppercase; color: var(--color-silver); }
-.col-hero .crumbs a { color: var(--color-brass-bright); text-decoration:none; }
+.col-hero h1 { font-family: var(--font-display); font-size: clamp(56px, 9vw, 116px); line-height:0.9; letter-spacing:0.01em; margin-top:18px; color: var(--ink-on-media); }
+.col-hero h1 .a { color: var(--ember-on-media); }
+.col-hero .lead { color: var(--ink-on-media-dim); max-width:60ch; margin:22px 0 0; font-size:16px; line-height:1.7; }
+.col-hero .crumbs { font-family: var(--font-mono); font-size:11px; letter-spacing:0.2em; text-transform:uppercase; color: var(--ink-on-media-faint); }
+.col-hero .crumbs a { color: var(--brass-on-media); text-decoration:none; }
 .col-hero .ctas { display:flex; gap:12px; margin-top:32px; flex-wrap:wrap; }
 
 .col-section { max-width:1280px; margin:0 auto; padding:80px 32px; }
@@ -163,7 +163,7 @@ if ( function_exists( 'g2a_faq_schema' ) && function_exists( 'g2a_emit_jsonld' )
 .col-place .pl .bd .p { font-family: var(--font-display); font-size:24px; color: var(--color-brass-bright); margin-top:6px; }
 </style>
 
-<header class="col-hero">
+<header class="col-hero hero-media">
   <div class="container">
     <div class="crumbs"><a href="<?php echo esc_url( home_url( '/' ) ); ?>">Home</a>  <a href="<?php echo esc_url( home_url( '/collections/' ) ); ?>">Collections</a>  <?php echo esc_html( $c['h1_accent'] ); ?></div>
     <h1><?php echo esc_html( $c['h1_top'] ); ?><br><span class="a"><?php echo esc_html( $c['h1_accent'] ); ?></span></h1>

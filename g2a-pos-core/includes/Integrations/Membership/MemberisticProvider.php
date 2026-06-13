@@ -3,55 +3,65 @@
 namespace G2A\POS\Integrations\Membership;
 
 /**
- * Memberistic Membership Solutions adapter — the membership system Guns 2
- * Ammo actually runs. Reads the wp_memberistic_* tables directly (1-2 SQL
- * hits per lookup) and, when the G2A Booking Engine is installed, surfaces
- * the customer's upcoming range bookings for the cashier.
+ * Memberistic Membership Solutions adapter (WPistic in-house plugin).
  *
- * Registered FIRST in RangeMembership::providers() so auto-detect prefers
- * it over PMPro/MemberPress relics that may still have stale tables.
+ * Memberistic stores memberships in {$prefix}memberistic_memberships
+ * (primary_user_id = WP user id) with linked household members in
+ * {$prefix}memberistic_people (wp_user_id). Plans live in
+ * {$prefix}memberistic_plans (name/slug/benefits JSON).
+ *
+ * Note: Memberistic also ships its own POS bridge that answers the
+ * g2a_pos_membership_lookup filter. That filter still wins (resolution
+ * order is filter → pinned provider → auto-detect); this adapter is the
+ * fallback for sites where the bridge toggle is off, and it powers
+ * provider listing/pinning in the POS Membership settings UI.
  */
 final class MemberisticProvider implements Provider {
 
+	/** Membership statuses treated as "counts at the counter". */
+	private const ACTIVE_STATUSES = array( 'active', 'past_due' );
+
 	public function slug(): string {
-		return 'memberistic'; }
+		return 'memberistic';
+	}
+
 	public function label(): string {
-		return 'Memberistic Membership Solutions'; }
+		return 'Memberistic Memberships';
+	}
 
 	public function detect(): bool {
-		if ( defined( 'MEMBERISTIC_VERSION' ) || class_exists( '\\WordPressistic\\Memberistic\\Plugin' ) ) {
+		if ( class_exists( '\\WordPressistic\\Memberistic\\Plugin' ) || defined( 'MEMBERISTIC_VERSION' ) ) {
 			return true;
 		}
-		global $wpdb;
-		$t = $wpdb->prefix . 'memberistic_memberships';
-		return (bool) $wpdb->get_var(
-			$wpdb->prepare(
-				'SELECT COUNT(1) FROM information_schema.tables WHERE table_schema = %s AND table_name = %s',
-				DB_NAME,
-				$t
-			)
-		);
+		return $this->table_exists( 'memberistic_memberships' );
 	}
 
 	public function membership( int $customer_id ): ?array {
 		global $wpdb;
-		$m  = $wpdb->prefix . 'memberistic_memberships';
-		$pl = $wpdb->prefix . 'memberistic_plans';
-		$pp = $wpdb->prefix . 'memberistic_people';
+		if ( $customer_id <= 0 || ! $this->table_exists( 'memberistic_memberships' ) ) {
+			return null;
+		}
 
-		// Owner OR linked person; active rows preferred, newest wins.
+		$memberships = $wpdb->prefix . 'memberistic_memberships';
+		$people      = $wpdb->prefix . 'memberistic_people';
+		$join_people = $this->table_exists( 'memberistic_people' );
+
+		$where = 'm.primary_user_id = %d';
+		$args  = array( $customer_id );
+		if ( $join_people ) {
+			$where  = "(m.primary_user_id = %d OR m.id IN (SELECT pp.membership_id FROM {$people} pp WHERE pp.wp_user_id = %d AND pp.status = 'active'))";
+			$args[] = $customer_id;
+		}
+
+		// Prefer an active row; fall back to the most recent one so the
+		// cashier still sees lapsed status instead of "no membership".
 		$row = $wpdb->get_row(
 			$wpdb->prepare(
-				"SELECT m.id, m.status, m.renewal_date, m.end_date,
-				        pl.name AS plan_name, pl.slug AS plan_slug, pl.benefits AS plan_benefits
-				 FROM {$m} m
-				 LEFT JOIN {$pl} pl ON pl.id = m.plan_id
-				 LEFT JOIN {$pp} pp ON pp.membership_id = m.id
-				 WHERE m.primary_user_id = %d OR pp.wp_user_id = %d
-				 ORDER BY ( m.status = 'active' ) DESC, m.id DESC
+				"SELECT m.* FROM {$memberships} m
+				 WHERE {$where}
+				 ORDER BY FIELD(m.status, 'active', 'past_due') DESC, m.id DESC
 				 LIMIT 1",
-				$customer_id,
-				$customer_id
+				...$args
 			),
 			ARRAY_A
 		);
@@ -59,73 +69,55 @@ final class MemberisticProvider implements Provider {
 			return null;
 		}
 
-		$benefits = array();
-		if ( ! empty( $row['plan_benefits'] ) ) {
-			$decoded  = json_decode( (string) $row['plan_benefits'], true );
-			$benefits = is_array( $decoded ) ? $decoded : array();
+		$plan      = $this->plan_row( (int) $row['plan_id'] );
+		$discounts = array();
+		if ( $plan && ! empty( $plan['benefits'] ) ) {
+			$decoded   = json_decode( (string) $plan['benefits'], true );
+			$discounts = is_array( $decoded ) ? $decoded : array();
 		}
 
 		return array(
-			'active'     => in_array( (string) $row['status'], array( 'active', 'past_due' ), true ),
-			'plan'       => (string) ( $row['plan_name'] ?? '' ),
-			'plan_slug'  => (string) ( $row['plan_slug'] ?? '' ),
+			'active'     => in_array( (string) $row['status'], self::ACTIVE_STATUSES, true ),
+			'plan'       => $plan ? (string) $plan['name'] : (string) $row['plan_id'],
+			'plan_slug'  => $plan ? (string) $plan['slug'] : (string) $row['plan_id'],
 			'expires_at' => $row['end_date'] ?: ( $row['renewal_date'] ?: null ),
-			'member_id'  => (string) (int) $row['id'],
-			'discounts'  => $benefits,
-			'source'     => 'memberistic',
+			'member_id'  => (string) $row['id'],
+			'discounts'  => $discounts,
+			'source'     => $this->slug(),
 		);
 	}
 
 	public function bookings( int $customer_id, int $days_ahead = 30 ): array {
+		// Bookings come from the G2A Booking Engine integration
+		// (BookingEngineSync), not from Memberistic itself.
+		return array();
+	}
+
+	private function plan_row( int $plan_id ): ?array {
 		global $wpdb;
-		$bt = $wpdb->prefix . 'g2ab_bookings';
-		$rt = $wpdb->prefix . 'g2ab_resources';
-
-		$exists = (bool) $wpdb->get_var(
-			$wpdb->prepare(
-				'SELECT COUNT(1) FROM information_schema.tables WHERE table_schema = %s AND table_name = %s',
-				DB_NAME,
-				$bt
-			)
-		);
-		if ( ! $exists ) {
-			return array();
+		if ( $plan_id <= 0 || ! $this->table_exists( 'memberistic_plans' ) ) {
+			return null;
 		}
-
-		$user  = function_exists( 'get_user_by' ) ? get_user_by( 'id', $customer_id ) : null;
-		$email = $user ? (string) $user->user_email : '';
-
-		$days = max( 1, min( 365, $days_ahead ) );
-		$rows = $wpdb->get_results(
-			$wpdb->prepare(
-				"SELECT b.uuid, b.start_at, b.end_at, b.status, r.name AS resource_name
-				 FROM {$bt} b
-				 LEFT JOIN {$rt} r ON r.id = b.resource_id
-				 WHERE ( b.user_id = %d OR ( %s <> '' AND b.customer_email = %s ) )
-				   AND b.status NOT IN ( 'cancelled', 'no_show', 'expired' )
-				   AND b.start_at BETWEEN %s AND DATE_ADD(%s, INTERVAL %d DAY)
-				 ORDER BY b.start_at ASC
-				 LIMIT 25",
-				$customer_id,
-				$email,
-				$email,
-				current_time( 'mysql' ),
-				current_time( 'mysql' ),
-				$days
-			),
+		$plans = $wpdb->prefix . 'memberistic_plans';
+		$row   = $wpdb->get_row(
+			$wpdb->prepare( "SELECT id, name, slug, benefits FROM {$plans} WHERE id = %d", $plan_id ),
 			ARRAY_A
 		);
+		return $row ?: null;
+	}
 
-		$out = array();
-		foreach ( (array) $rows as $row ) {
-			$out[] = array(
-				'id'        => (string) $row['uuid'],
-				'title'     => (string) ( $row['resource_name'] ?: 'Range booking' ),
-				'starts_at' => (string) $row['start_at'],
-				'ends_at'   => (string) $row['end_at'],
-				'status'    => (string) $row['status'],
+	private function table_exists( string $table ): bool {
+		global $wpdb;
+		static $cache = array();
+		if ( ! isset( $wpdb ) ) {
+			return false;
+		}
+		$full = $wpdb->prefix . $table;
+		if ( ! array_key_exists( $full, $cache ) ) {
+			$cache[ $full ] = (bool) $wpdb->get_var(
+				$wpdb->prepare( 'SHOW TABLES LIKE %s', $wpdb->esc_like( $full ) )
 			);
 		}
-		return $out;
+		return $cache[ $full ];
 	}
 }

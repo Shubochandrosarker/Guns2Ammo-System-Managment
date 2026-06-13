@@ -41,6 +41,7 @@ require_once WPISTIC_CF_PATH . 'includes/class-wpcf-database.php';
 require_once WPISTIC_CF_PATH . 'includes/class-wpcf-attachments.php';
 require_once WPISTIC_CF_PATH . 'includes/class-wpcf-spam.php';
 require_once WPISTIC_CF_PATH . 'includes/class-wpcf-capture.php';
+require_once WPISTIC_CF_PATH . 'includes/class-wpcf-email-template.php';
 require_once WPISTIC_CF_PATH . 'includes/class-wpcf-shortcode.php';
 require_once WPISTIC_CF_PATH . 'includes/class-wpcf-autoresponder.php';
 require_once WPISTIC_CF_PATH . 'includes/class-wpcf-export.php';

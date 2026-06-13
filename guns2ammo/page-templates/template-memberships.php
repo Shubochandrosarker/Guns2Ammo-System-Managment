@@ -10,10 +10,10 @@ if ( ! defined( 'ABSPATH' ) ) exit;
 get_header();
 ?>
 <style>.gw-hero { padding: 140px 32px 40px; text-align:center; position:relative; overflow:hidden; }
-  .gw-hero::before { content:""; position:absolute; inset:0; pointer-events:none; background-image: linear-gradient(180deg, rgba(26,25,30,0.85), var(--color-void)), url("/wp-content/uploads/2026/04/2025-03-23.webp"); background-size:cover; background-position:center; }
+  .gw-hero::before { content:""; position:absolute; inset:0; pointer-events:none; background-image: linear-gradient(180deg, var(--hero-scrim), var(--color-void)), url("<?php echo esc_url( g2a_asset( 'img/guns2ammo-store-overview.jpg' ) ); ?>"); background-size:cover; background-position:center; }
   .gw-hero > * { position:relative; }
-  .gw-hero h1 { font-family: var(--font-display); font-size: clamp(48px, 7vw, 80px); color: var(--color-white); letter-spacing: 0.02em; line-height: 0.95; max-width: 14ch; margin: 0 auto; }
-  .gw-hero .sub { color: var(--color-fog); margin: 18px auto; max-width: 50ch; }
+  .gw-hero h1 { font-family: var(--font-display); font-size: clamp(48px, 7vw, 80px); color: var(--ink-on-media); letter-spacing: 0.02em; line-height: 0.95; max-width: 14ch; margin: 0 auto; }
+  .gw-hero .sub { color: var(--ink-on-media-dim); margin: 18px auto; max-width: 50ch; }
   .signin-row { display:flex; justify-content: flex-end; align-items: center; gap:14px; max-width: 1280px; margin: 0 auto; padding: 24px 32px 0; font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.2em; color: var(--color-silver); text-transform: uppercase; }
   .signin-row a { color: var(--color-brass-bright); text-decoration: none; }
   .signin-row a:hover { color: var(--color-white); }
@@ -45,7 +45,7 @@ get_header();
   <a href="<?php echo esc_url( home_url( "/login/" ) ); ?>">Sign In </a>
 </div>
 
-<section class="gw-hero">
+<section class="gw-hero hero-media">
   <div class="eyebrow fade-up" style="margin-bottom: 20px;">Step 01  Choose Your Plan</div>
   <h1 class="fade-up d1">JOIN THE RANGE</h1>
   <p class="sub fade-up d2">Pick a plan, create your account, and shoot today. No contracts. No drama.</p>
@@ -148,9 +148,9 @@ get_header();
   <div class="eyebrow" style="text-align:center; margin-bottom:14px;">Lane Pricing  Member vs. Guest</div>
   <h2 class="sec" style="text-align:center; margin-bottom: 28px;">How lane pricing works</h2>
   <div style="overflow-x:auto;">
-    <table style="width:100%; border-collapse: collapse; font-size: 15px; background:#1A1F26; border:1px solid var(--color-hairline);">
+    <table style="width:100%; border-collapse: collapse; font-size: 15px; background:var(--color-gunmetal); border:1px solid var(--color-hairline);">
       <thead>
-        <tr style="background:#11161D; color: var(--color-white); text-transform: uppercase; font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.18em;">
+        <tr style="background:var(--color-surface-2); color: var(--color-white); text-transform: uppercase; font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.18em;">
           <th style="padding:14px 16px; text-align:left; border-bottom:1px solid var(--color-hairline);">Plan</th>
           <th style="padding:14px 16px; text-align:left; border-bottom:1px solid var(--color-hairline);">Primary Member</th>
           <th style="padding:14px 16px; text-align:left; border-bottom:1px solid var(--color-hairline);">Per Extra Shooter</th>
@@ -166,21 +166,21 @@ get_header();
         </tr>
         <tr>
           <td style="padding:14px 16px; border-bottom:1px solid var(--color-hairline);"><strong style="color:var(--color-white);">Defender</strong></td>
-          <td style="padding:14px 16px; border-bottom:1px solid var(--color-hairline); color:#9DE05B;">1 hr FREE</td>
+          <td style="padding:14px 16px; border-bottom:1px solid var(--color-hairline); color:var(--color-active);">1 hr FREE</td>
           <td style="padding:14px 16px; border-bottom:1px solid var(--color-hairline);">$15/hr each</td>
-          <td style="padding:14px 16px; border-bottom:1px solid var(--color-hairline);"><strong style="color:#9DE05B;">$30</strong> (you free + 2  $15)</td>
+          <td style="padding:14px 16px; border-bottom:1px solid var(--color-hairline);"><strong style="color:var(--color-active);">$30</strong> (you free + 2  $15)</td>
         </tr>
         <tr>
           <td style="padding:14px 16px; border-bottom:1px solid var(--color-hairline);"><strong style="color:var(--color-white);">Patriot</strong></td>
-          <td style="padding:14px 16px; border-bottom:1px solid var(--color-hairline); color:#9DE05B;">1 hr FREE</td>
+          <td style="padding:14px 16px; border-bottom:1px solid var(--color-hairline); color:var(--color-active);">1 hr FREE</td>
           <td style="padding:14px 16px; border-bottom:1px solid var(--color-hairline);">$10/hr each</td>
-          <td style="padding:14px 16px; border-bottom:1px solid var(--color-hairline);"><strong style="color:#9DE05B;">$20</strong> (you free + 2  $10)</td>
+          <td style="padding:14px 16px; border-bottom:1px solid var(--color-hairline);"><strong style="color:var(--color-active);">$20</strong> (you free + 2  $10)</td>
         </tr>
         <tr>
           <td style="padding:14px 16px;"><strong style="color:var(--color-white);">Guardian</strong></td>
-          <td style="padding:14px 16px; color:#9DE05B;">1 hr FREE</td>
+          <td style="padding:14px 16px; color:var(--color-active);">1 hr FREE</td>
           <td style="padding:14px 16px;">$10/hr each</td>
-          <td style="padding:14px 16px;"><strong style="color:#9DE05B;">$20</strong> (you free + 2  $10)</td>
+          <td style="padding:14px 16px;"><strong style="color:var(--color-active);">$20</strong> (you free + 2  $10)</td>
         </tr>
       </tbody>
     </table>

@@ -22,6 +22,14 @@ final class G2AB_Module_Email_Automation {
 	private function __construct() {
 		$this->engine = new G2AB_Email_Engine();
 
+		// One-time seed: ensure the template store carries enabled defaults
+		// for the critical lifecycle emails (created / confirmed / paid /
+		// cancelled) so confirmations send out of the box on a fresh
+		// install or upgrade. Idempotent — guarded by an option flag, and
+		// never overwrites templates an admin has already saved.
+		G2AB_Email_Engine::maybe_seed_default_templates();
+		add_action( 'g2ab_activated', array( 'G2AB_Email_Engine', 'maybe_seed_default_templates' ) );
+
 		// Booking lifecycle hooks (fired from class-bookings-controller.php).
 		add_action( 'g2ab_booking_created',   array( $this, 'on_created' ),   10, 2 );
 		add_action( 'g2ab_booking_confirmed', array( $this, 'on_confirmed' ), 10, 2 );

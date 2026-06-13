@@ -23,7 +23,7 @@ $weapons = [
 		'title'    => 'MP5',
 		'sub'      => 'The world\'s most iconic submachine gun',
 		'lead'     => 'Roller-delayed, buttery-smooth, and instantly recognizable  the MP5 is the easiest full-auto platform to control and the perfect first machine gun.',
-		'image'    => $img . '2025/06/IMG_1055.webp',
+		'image'    => g2a_asset( 'img/guns2ammo-firearm-display-wall.jpg' ),
 		'cartridge'=> '9×19mm Parabellum',
 		'specs'    => [ 'Rate of Fire' => '~800 RPM', 'Magazine' => '25 Rounds', 'Action' => 'Roller-delayed blowback', 'Caliber' => '9mm', 'Origin' => 'Germany', 'From' => '$249' ],
 		'story'    => 'Adopted by elite units and law-enforcement teams worldwide, the MP5 earned its reputation on control. Its roller-delayed action keeps recoil flat and predictable, so even a first-time shooter can hold a tight group on full auto. If you have ever seen a special-operations film, you have seen this gun.',
@@ -40,7 +40,7 @@ $weapons = [
 		'title'    => 'M16',
 		'sub'      => 'The modern American service rifle',
 		'lead'     => 'Light, fast, and accurate  the M16 is the rifle that defined a half-century of American service. Full-auto, direct-impingement, and a thrill to run.',
-		'image'    => $img . '2025/06/noveske-gen4-556-sbr-bazooka-green-guns2ammo-mesa-az.webp',
+		'image'    => g2a_asset( 'img/guns2ammo-rifles-rack.jpg' ),
 		'cartridge'=> '5.5645mm NATO',
 		'specs'    => [ 'Rate of Fire' => '~700 RPM', 'Magazine' => '30 Rounds', 'Action' => 'Direct impingement', 'Caliber' => '5.56 NATO', 'Origin' => 'United States', 'From' => '$329' ],
 		'story'    => 'In service since the 1960s, the M16 is the rifle generations of American troops carried. Its lightweight design and high-velocity 5.56 cartridge make it flat-shooting and remarkably easy to handle on full auto  a piece of living history you get to fire yourself.',
@@ -57,7 +57,7 @@ $weapons = [
 		'title'    => 'AK-47',
 		'sub'      => 'The most recognizable rifle on earth',
 		'lead'     => 'Rugged, thunderous, and unmistakable  the AK-47 delivers the raw, hard-hitting full-auto experience guests come back for.',
-		'image'    => $img . '2025/03/IMG_20250317_085324.webp',
+		'image'    => g2a_asset( 'img/guns2ammo-rifle-wall-display.jpg' ),
 		'cartridge'=> '7.62×39mm',
 		'specs'    => [ 'Rate of Fire' => '~600 RPM', 'Magazine' => '30 Rounds', 'Action' => 'Long-stroke gas piston', 'Caliber' => '7.62×39', 'Origin' => 'Russia', 'From' => '$349' ],
 		'story'    => 'Designed in 1947, the AK-47 is the most produced and most recognizable rifle in history. Its long-stroke piston action is famously reliable, and its heavier 7.62 cartridge gives every burst a deep, authoritative punch you feel in your chest.',
@@ -79,14 +79,14 @@ if ( function_exists( 'g2a_faq_schema' ) && function_exists( 'g2a_emit_jsonld' )
 ?>
 <style>
 .ar-hero { padding:140px 32px 72px; position:relative; overflow:hidden; }
-.ar-hero::before { content:""; position:absolute; inset:0; pointer-events:none; background-image: linear-gradient(180deg, rgba(26,25,30,0.74), rgba(26,25,30,0.97)), url('<?php echo esc_url( $w['image'] ); ?>'); background-size:cover; background-position:center; }
+.ar-hero::before { content:""; position:absolute; inset:0; pointer-events:none; background-image: linear-gradient(180deg, var(--hero-scrim-soft), var(--hero-scrim-deep)), url('<?php echo esc_url( $w['image'] ); ?>'); background-size:cover; background-position:center; }
 .ar-hero::after { content:""; position:absolute; inset:0; pointer-events:none; background: radial-gradient(ellipse at 70% 40%, rgba(232,128,47,0.12), transparent 60%); }
 .ar-hero .c { position:relative; max-width:1180px; margin:0 auto; }
-.ar-hero .crumbs { font-family: var(--font-mono); font-size:11px; letter-spacing:0.2em; text-transform:uppercase; color: var(--color-silver); }
-.ar-hero .crumbs a { color: var(--color-brass-bright); text-decoration:none; }
-.ar-hero h1 { font-family: var(--font-display); font-size: clamp(72px,14vw,200px); line-height:0.84; margin:10px 0 0; color: var(--color-white); }
-.ar-hero .sub { font-family: var(--font-condensed); font-weight:500; letter-spacing:0.12em; text-transform:uppercase; color: var(--color-brass-bright); font-size:clamp(14px,2.4vw,20px); margin-top:10px; }
-.ar-hero .lead { color: var(--color-fog); max-width:56ch; margin:20px 0 0; font-size:16px; line-height:1.7; }
+.ar-hero .crumbs { font-family: var(--font-mono); font-size:11px; letter-spacing:0.2em; text-transform:uppercase; color: var(--ink-on-media-faint); }
+.ar-hero .crumbs a { color: var(--brass-on-media); text-decoration:none; }
+.ar-hero h1 { font-family: var(--font-display); font-size: clamp(72px,14vw,200px); line-height:0.84; margin:10px 0 0; color: var(--ink-on-media); }
+.ar-hero .sub { font-family: var(--font-condensed); font-weight:500; letter-spacing:0.12em; text-transform:uppercase; color: var(--brass-on-media); font-size:clamp(14px,2.4vw,20px); margin-top:10px; }
+.ar-hero .lead { color: var(--ink-on-media-dim); max-width:56ch; margin:20px 0 0; font-size:16px; line-height:1.7; }
 .ar-hero .ctas { display:flex; gap:12px; margin-top:28px; flex-wrap:wrap; }
 .ar-sec { max-width:1180px; margin:0 auto; padding:72px 32px; }
 .ar-sec h2 { font-family: var(--font-display); font-size: clamp(34px,5vw,60px); color: var(--color-white); }
@@ -111,7 +111,7 @@ if ( function_exists( 'g2a_faq_schema' ) && function_exists( 'g2a_emit_jsonld' )
 .ar-rel a .mt { font-family: var(--font-mono); font-size:10px; letter-spacing:0.2em; color: var(--color-brass-bright); text-transform:uppercase; }
 </style>
 
-<header class="ar-hero">
+<header class="ar-hero hero-media">
   <div class="c">
     <div class="crumbs"><a href="<?php echo esc_url( home_url( '/' ) ); ?>">Home</a>  <a href="<?php echo esc_url( home_url( '/machine-gun/' ) ); ?>">Signature Experience</a>  <?php echo esc_html( $w['title'] ); ?></div>
     <span class="eyebrow" style="margin-top:14px; color:var(--color-ember);"><?php echo esc_html( $w['tag'] ); ?></span>

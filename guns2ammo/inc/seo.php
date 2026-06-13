@@ -158,6 +158,13 @@ function g2a_seo_request_path() {
 function g2a_seo_page_meta() {
 	$map  = g2a_seo_page_meta_map();
 	$path = g2a_seo_request_path();
+	// Once the main query is resolved, never hand mapped page metadata to
+	// search results, 404s, feeds, or paginated archives — a raw-path match
+	// would otherwise give `/?s=ammo` the homepage title and `/blog/?paged=2`
+	// the first-page blog meta. These contexts get their own (or no) meta.
+	if ( did_action( 'wp' ) && ( is_search() || is_404() || is_feed() || is_paged() ) ) {
+		return null;
+	}
 	if ( isset( $map[ $path ] ) ) {
 		return $map[ $path ];
 	}

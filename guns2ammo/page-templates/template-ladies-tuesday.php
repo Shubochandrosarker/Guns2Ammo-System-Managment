@@ -94,8 +94,8 @@ $g2a_ladies_events_shortcode = get_post_meta( $g2a_page_id, 'ladies_upcoming_eve
   .lt-hero::before {
     content: ""; position: absolute; inset: 0;
     background-image:
-      linear-gradient(180deg, rgba(26,25,30,0.7) 0%, rgba(26,25,30,0.95) 60%, var(--color-void) 100%),
-      url("/wp-content/uploads/2024/08/one-1-a.webp");
+      linear-gradient(180deg, var(--hero-scrim-soft) 0%, var(--hero-scrim-deep) 60%, var(--color-void) 100%),
+      url("<?php echo esc_url( g2a_asset( 'img/guns2ammo-happy-customer-target.jpg' ) ); ?>");
     background-size: cover; background-position: center 30%;
     filter: saturate(0.85) contrast(1.05);
   }
@@ -112,11 +112,11 @@ $g2a_ladies_events_shortcode = get_post_meta( $g2a_page_id, 'ladies_upcoming_eve
     display: inline-flex; align-items: center; gap: 8px;
     padding: 6px 12px; border: 1px solid var(--color-brass-dim);
     background: rgba(201,168,76,0.06);
-    font-family: var(--font-mono); font-size: 10px; letter-spacing: 0.24em; color: var(--color-brass-bright); text-transform: uppercase;
+    font-family: var(--font-mono); font-size: 10px; letter-spacing: 0.24em; color: var(--brass-on-media); text-transform: uppercase;
   }
-  .lt-hero h1 { font-family: var(--font-display); font-size: clamp(64px, 9vw, 124px); line-height: 0.92; letter-spacing: 0.005em; color: var(--color-white); margin: 0 0 22px; }
-  .lt-hero h1 em { font-style: normal; color: var(--color-brass-bright); }
-  .lt-hero .sub { font-size: 18px; color: var(--color-fog); max-width: 50ch; line-height: 1.6; margin: 0 0 32px; }
+  .lt-hero h1 { font-family: var(--font-display); font-size: clamp(64px, 9vw, 124px); line-height: 0.92; letter-spacing: 0.005em; color: var(--ink-on-media); margin: 0 0 22px; }
+  .lt-hero h1 em { font-style: normal; color: var(--brass-on-media); }
+  .lt-hero .sub { font-size: 18px; color: var(--ink-on-media-dim); max-width: 50ch; line-height: 1.6; margin: 0 0 32px; }
   .lt-hero .actions { display: flex; gap: 12px; flex-wrap: wrap; }
 
   /* Discount card */
@@ -253,7 +253,7 @@ $g2a_ladies_events_shortcode = get_post_meta( $g2a_page_id, 'ladies_upcoming_eve
   .lt-faq h2 { font-family: var(--font-display); font-size: clamp(40px, 6vw, 64px); line-height: 1; color: var(--color-white); letter-spacing: 0.02em; margin-bottom: 32px; }</style>
 <main>
     <!-- HERO -->
-    <section class="lt-hero">
+    <section class="lt-hero hero-media">
       <div class="wrap">
         <div>
           <div class="badge-row">

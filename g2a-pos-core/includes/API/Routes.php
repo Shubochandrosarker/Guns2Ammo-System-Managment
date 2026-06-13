@@ -53,35 +53,6 @@ final class Routes {
 			)
 		);
 
-		// --- v3.1.0 — WooCommerce product backfill scanner ---
-		register_rest_route(
-			'g2a-pos/v1',
-			'/woo/scan',
-			array(
-				'methods'             => 'POST',
-				'callback'            => array( WooScanController::class, 'scan' ),
-				'permission_callback' => static fn() => current_user_can( 'g2a_pos_manage_inventory' ),
-			)
-		);
-		register_rest_route(
-			'g2a-pos/v1',
-			'/woo/scan',
-			array(
-				'methods'             => 'GET',
-				'callback'            => array( WooScanController::class, 'status' ),
-				'permission_callback' => static fn() => current_user_can( 'g2a_pos_manage_inventory' ),
-			)
-		);
-		register_rest_route(
-			'g2a-pos/v1',
-			'/woo/scan/status',
-			array(
-				'methods'             => 'GET',
-				'callback'            => array( WooScanController::class, 'status' ),
-				'permission_callback' => static fn() => current_user_can( 'g2a_pos_manage_inventory' ),
-			)
-		);
-
 		register_rest_route(
 			'g2a-pos/v1',
 			'/orders',
@@ -1166,15 +1137,6 @@ final class Routes {
 		);
 		register_rest_route(
 			'g2a-pos/v1',
-			'/wholesalers/(?P<wholesaler_id>\d+)/catalog/api-sync',
-			array(
-				'methods'             => 'POST',
-				'callback'            => array( WholesalerController::class, 'sync_catalog_api' ),
-				'permission_callback' => static fn() => current_user_can( 'g2a_pos_manage_wholesalers' ) || current_user_can( 'g2a_pos_manage_inventory' ),
-			)
-		);
-		register_rest_route(
-			'g2a-pos/v1',
 			'/wholesalers/(?P<wholesaler_id>\d+)/inventory/sync',
 			array(
 				'methods'             => 'POST',
@@ -1429,15 +1391,6 @@ final class Routes {
 		// --- v0.9.0 — CRM ---
 		register_rest_route(
 			'g2a-pos/v1',
-			'/crm/export',
-			array(
-				'methods'             => 'GET',
-				'callback'            => array( CrmController::class, 'export' ),
-				'permission_callback' => static fn() => current_user_can( 'g2a_pos_manage_crm' ),
-			)
-		);
-		register_rest_route(
-			'g2a-pos/v1',
 			'/crm/search',
 			array(
 				'methods'             => 'GET',
@@ -1470,6 +1423,53 @@ final class Routes {
 				'methods'             => 'POST',
 				'callback'            => array( CrmController::class, 'recompute' ),
 				'permission_callback' => static fn() => current_user_can( 'g2a_pos_manage_crm' ) || current_user_can( 'g2a_pos_manage_settings' ),
+			)
+		);
+		register_rest_route(
+			'g2a-pos/v1',
+			'/crm/export\.csv',
+			array(
+				'methods'             => 'GET',
+				'callback'            => array( CrmController::class, 'export_csv' ),
+				'permission_callback' => static fn() => current_user_can( 'g2a_pos_manage_crm' ) || current_user_can( 'g2a_pos_manage_settings' ) || current_user_can( 'manage_woocommerce' ),
+			)
+		);
+		register_rest_route(
+			'g2a-pos/v1',
+			'/orders/export\.csv',
+			array(
+				'methods'             => 'GET',
+				'callback'            => array( OrderController::class, 'export_csv' ),
+				'permission_callback' => static fn() => current_user_can( 'g2a_pos_manage_settings' ) || current_user_can( 'manage_woocommerce' ),
+			)
+		);
+
+		// --- v3.1.0 — Sibling-plugin integrations (Woo catalog scan, FFL checkout bridge) ---
+		register_rest_route(
+			'g2a-pos/v1',
+			'/integrations/woo/scan',
+			array(
+				'methods'             => 'POST',
+				'callback'            => array( IntegrationsController::class, 'woo_scan' ),
+				'permission_callback' => static fn() => current_user_can( 'g2a_pos_manage_inventory' ) || current_user_can( 'g2a_pos_manage_settings' ) || current_user_can( 'manage_woocommerce' ),
+			)
+		);
+		register_rest_route(
+			'g2a-pos/v1',
+			'/integrations/woo/scan',
+			array(
+				'methods'             => 'GET',
+				'callback'            => array( IntegrationsController::class, 'woo_scan_status' ),
+				'permission_callback' => static fn() => current_user_can( 'g2a_pos_manage_inventory' ) || current_user_can( 'g2a_pos_manage_settings' ) || current_user_can( 'manage_woocommerce' ),
+			)
+		);
+		register_rest_route(
+			'g2a-pos/v1',
+			'/integrations/ffl/transfers',
+			array(
+				'methods'             => 'GET',
+				'callback'            => array( IntegrationsController::class, 'ffl_transfers' ),
+				'permission_callback' => static fn() => current_user_can( 'g2a_pos_manage_crm' ) || current_user_can( 'g2a_pos_manage_settings' ) || current_user_can( 'manage_woocommerce' ),
 			)
 		);
 
@@ -2681,10 +2681,10 @@ final class Routes {
 		);
 		register_rest_route(
 			'g2a-pos/v1',
-			'/ai/knowledge/refresh',
+			'/ai/brain/refresh-site',
 			array(
 				'methods'             => 'POST',
-				'callback'            => array( AiController::class, 'knowledge_refresh' ),
+				'callback'            => array( AiController::class, 'brain_refresh_site' ),
 				'permission_callback' => static fn() => current_user_can( 'g2a_pos_manage_ai' ) || current_user_can( 'g2a_pos_manage_settings' ),
 			)
 		);

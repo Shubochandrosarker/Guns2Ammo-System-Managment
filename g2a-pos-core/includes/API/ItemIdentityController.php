@@ -179,17 +179,16 @@ final class ItemIdentityController {
 			++$linked;
 		}
 
-		// Also walk a batch of published Woo products through the scanner so
+		// Also sweep published Woo products through the catalog scanner so
 		// the identity graph covers the shelf catalog, not just vendors.
 		$woo = null;
-		if ( function_exists( 'wc_get_product' ) ) {
-			$woo_result = \G2A\POS\Integrations\WooProductScanner::scan_batch( min( 200, $limit ) );
-			$woo_state  = $woo_result['state'] ?? array();
+		if ( function_exists( 'wc_get_products' ) ) {
+			$woo_result = \G2A\POS\Integrations\WooCatalogSync::scan();
 			$woo        = array(
-				'processed' => (int) ( $woo_result['processed'] ?? 0 ),
-				'created'   => (int) ( $woo_state['created'] ?? 0 ),
-				'matched'   => (int) ( $woo_state['matched'] ?? 0 ),
-				'status'    => (string) ( $woo_state['status'] ?? '' ),
+				'processed' => (int) ( $woo_result['scanned'] ?? 0 ),
+				'created'   => (int) ( $woo_result['created_refs'] ?? 0 ),
+				'matched'   => (int) ( $woo_result['linked'] ?? 0 ),
+				'status'    => isset( $woo_result['error'] ) ? (string) $woo_result['error'] : 'ok',
 			);
 		}
 

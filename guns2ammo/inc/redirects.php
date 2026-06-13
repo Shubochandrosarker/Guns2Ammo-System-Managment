@@ -117,9 +117,9 @@ function g2a_redirect_map() {
 		// "best indoor shooting range in Mesa" asset, legacy static-HTML
 		// leftovers, and common guessed URLs (404 → closest money page).
 		'/explore-the-best-indoor-shooting-range-in-mesa-a-shooters-haven/' => '/shooting-range/best-indoor-shooting-range-in-mesa-az/',
-		'/contact.html'              => '/contact/',
-		'/shop.html'                 => '/shop/',
-		'/index.html'                => '/',
+		'/contact.html/'             => '/contact/',
+		'/shop.html/'                => '/shop/',
+		'/index.html/'               => '/',
 		'/membership/'               => '/memberships/',
 		'/booking/'                  => '/book-a-lane/',
 		'/book/'                     => '/book-a-lane/',

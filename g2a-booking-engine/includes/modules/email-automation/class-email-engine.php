@@ -130,6 +130,38 @@ class G2AB_Email_Engine {
 	}
 
 	/**
+	 * Seed the saved-template store with ENABLED defaults for the four
+	 * critical lifecycle events (created / confirmed / paid / cancelled)
+	 * when the store has never been populated. Runs once (guarded by the
+	 * g2ab_email_templates_seeded flag) so confirmation emails work out
+	 * of the box on a fresh install or after an upgrade, and the
+	 * templates are visible + editable in Settings → Email Automation.
+	 *
+	 * Existing saved templates are never overwritten.
+	 */
+	public static function maybe_seed_default_templates() {
+		if ( get_option( 'g2ab_email_templates_seeded' ) ) {
+			return;
+		}
+		$saved = get_option( self::OPTION_TEMPLATES, array() );
+		if ( ! is_array( $saved ) ) {
+			$saved = array();
+		}
+		$engine   = new self();
+		$defaults = $engine->default_templates();
+		foreach ( array( 'booking_created', 'booking_confirmed', 'booking_paid', 'booking_cancelled' ) as $event ) {
+			if ( isset( $saved[ $event ] ) || ! isset( $defaults[ $event ] ) ) {
+				continue;
+			}
+			$tpl            = $defaults[ $event ];
+			$tpl['enabled'] = 1;
+			$saved[ $event ] = $tpl;
+		}
+		update_option( self::OPTION_TEMPLATES, $saved );
+		update_option( 'g2ab_email_templates_seeded', 1 );
+	}
+
+	/**
 	 * Save a template.
 	 */
 	public function save_template( $event, $data ) {
@@ -308,6 +340,18 @@ class G2AB_Email_Engine {
 	}
 
 	/**
+	 * Closing support line appended to the customer-facing defaults. Tone
+	 * matches the booking-form support notice (g2ab_form_support_notice).
+	 */
+	private function support_footer_html() {
+		return '<p style="margin-top:24px;font-size:13px;color:#666;line-height:1.6;">'
+			. 'Having trouble with your booking? Send us a quick message and our team will take care of the rest '
+			. '&mdash; we want your experience at {business_name} to be effortless from the first click to the firing line. '
+			. '<a href="{site_url}contact/" style="color:{brand_color};font-weight:bold;">Contact us</a> or call {business_phone}. '
+			. 'Thanks for choosing {business_name} &mdash; your range partner.</p>';
+	}
+
+	/**
 	 * Default templates per event.
 	 */
 	public function default_templates() {
@@ -328,7 +372,7 @@ class G2AB_Email_Engine {
 					. '<tr><td style="padding:8px;"><strong>Party size</strong></td><td style="padding:8px;">{party_size}</td></tr>'
 					. '</table>'
 					. '<p><a href="{pay_url}" style="display:inline-block;background:{brand_color};color:#fff;padding:14px 28px;text-decoration:none;font-weight:bold;letter-spacing:.04em;text-transform:uppercase;">Complete Payment</a></p>'
-					. '<p style="margin-top:24px;font-size:13px;color:#666;">Need to make changes? Reply to this email or call {business_phone}.</p>',
+					. $this->support_footer_html(),
 			),
 			'booking_confirmed' => array(
 				'enabled'            => 1,
@@ -342,7 +386,8 @@ class G2AB_Email_Engine {
 					. '<p><strong>{resource_name}</strong><br>{start_at} ({duration} min)</p>'
 					. '<p>Arrive 10 minutes early for safety briefing. Bring valid photo ID.</p>'
 					. '<p>Address: {business_address}</p>'
-					. '<p style="margin-top:24px;"><a href="{cancel_url}" style="color:#C62828;font-size:13px;">Cancel reservation</a></p>',
+					. '<p style="margin-top:24px;"><a href="{cancel_url}" style="color:#C62828;font-size:13px;">Cancel reservation</a></p>'
+					. $this->support_footer_html(),
 			),
 			'booking_paid' => array(
 				'enabled'            => 1,

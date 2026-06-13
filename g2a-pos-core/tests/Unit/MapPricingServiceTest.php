@@ -2,11 +2,59 @@
 
 namespace G2A\POS\Tests\Unit;
 
+use Brain\Monkey;
+use Brain\Monkey\Functions;
 use G2A\POS\Pricing\MapPricingService;
 use PHPUnit\Framework\TestCase;
 
+/**
+ * Fake WC_Product stand-in that deliberately has NO get_meta() method.
+ *
+ * Regression guard: MapPricingService must never call WC_Product->get_meta()
+ * for '_upc' / '_global_unique_id' inside the price-html filter — doing so
+ * triggers "is_internal_meta_key was called incorrectly" notices beside every
+ * shop price. If the service regresses to get_meta(), these tests fatal.
+ */
+final class FakeWcProductWithoutGetMeta
+{
+    public function __construct(private int $id, private float $price)
+    {
+    }
+
+    public function get_id(): int
+    {
+        return $this->id;
+    }
+
+    public function get_price(): float
+    {
+        return $this->price;
+    }
+
+    public function get_sku(): string
+    {
+        return 'SKU-' . $this->id;
+    }
+}
+
 final class MapPricingServiceTest extends TestCase
 {
+    protected function setUp(): void
+    {
+        parent::setUp();
+        if (!defined('ARRAY_A')) {
+            define('ARRAY_A', 'ARRAY_A');
+        }
+        Monkey\setUp();
+    }
+
+    protected function tearDown(): void
+    {
+        unset($GLOBALS['wpdb']);
+        Monkey\tearDown();
+        parent::tearDown();
+    }
+
     public function test_no_rule_means_no_suppression(): void
     {
         $r = MapPricingService::evaluateRule(null, 100.00);
@@ -76,5 +124,111 @@ final class MapPricingServiceTest extends TestCase
         $this->assertSame('manual', $r['source']);
         $this->assertNull($r['override_label']);
         $this->assertSame(0, $r['rule_id']);
+    }
+
+    public function test_filter_price_html_returns_original_html_for_invalid_product(): void
+    {
+        $html = '<span class="price">$10.00</span>';
+        $this->assertSame($html, MapPricingService::filter_price_html($html, null));
+        $this->assertSame($html, MapPricingService::filter_price_html($html, 'not-a-product'));
+        $this->assertSame($html, MapPricingService::filter_price_html($html, new \stdClass()));
+    }
+
+    public function test_filter_price_html_returns_original_html_for_zero_product_id(): void
+    {
+        $html = '<span class="price">$10.00</span>';
+        $this->assertSame($html, MapPricingService::filter_price_html($html, new FakeWcProductWithoutGetMeta(0, 10.0)));
+    }
+
+    public function test_filter_price_html_swallows_internal_failures(): void
+    {
+        Functions\when('is_admin')->justReturn(false);
+        // The repository lookup throws -> the filter must catch it and fall
+        // back to WooCommerce's own HTML instead of breaking the storefront.
+        $GLOBALS['wpdb'] = new class () {
+            public string $prefix = 'wp_';
+
+            public function prepare(string $sql, ...$args): string
+            {
+                return $sql;
+            }
+
+            public function get_row(string $sql, $output = null): never
+            {
+                throw new \RuntimeException('db exploded');
+            }
+        };
+        $html = '<span class="price">$25.00</span>';
+        $out = MapPricingService::filter_price_html($html, new FakeWcProductWithoutGetMeta(901, 25.0));
+        $this->assertSame($html, $out);
+    }
+
+    public function test_filter_price_html_reads_identifiers_via_get_post_meta_not_wc_get_meta(): void
+    {
+        Functions\when('is_admin')->justReturn(false);
+        Functions\when('get_transient')->justReturn(true); // skip violation logging
+        Functions\when('__')->returnArg();
+        Functions\when('esc_html')->returnArg();
+        Functions\expect('get_post_meta')->with(902, '_sku', true)->once()->andReturn('SKU-902');
+        Functions\expect('get_post_meta')->with(902, '_upc', true)->once()->andReturn('');
+        Functions\expect('get_post_meta')->with(902, '_global_unique_id', true)->once()->andReturn('012345678905');
+
+        $GLOBALS['wpdb'] = new class () {
+            public string $prefix = 'wp_';
+
+            public function prepare(string $sql, ...$args): string
+            {
+                return $sql;
+            }
+
+            public function get_row(string $sql, $output = ARRAY_A): array
+            {
+                return [
+                    'id' => 11,
+                    'map_price' => 50.0,
+                    'display_mode' => 'click_to_reveal',
+                    'source' => 'manual',
+                ];
+            }
+        };
+
+        $out = MapPricingService::filter_price_html(
+            '<span class="price">$25.00</span>',
+            new FakeWcProductWithoutGetMeta(902, 25.0)
+        );
+
+        $this->assertStringContainsString('g2a-map-hidden', $out);
+        $this->assertStringContainsString('data-map-product="902"', $out);
+    }
+
+    public function test_filter_price_html_per_request_cache_avoids_repeat_lookups(): void
+    {
+        Functions\when('is_admin')->justReturn(false);
+        // Identifiers + rule lookup must run exactly once for a given product id
+        // even when the filter fires multiple times in a request (shop loops).
+        Functions\expect('get_post_meta')->with(903, \Mockery::any(), true)->times(3)->andReturn('');
+
+        $GLOBALS['wpdb'] = new class () {
+            public string $prefix = 'wp_';
+            public int $queries = 0;
+
+            public function prepare(string $sql, ...$args): string
+            {
+                return $sql;
+            }
+
+            public function get_row(string $sql, $output = null)
+            {
+                ++$this->queries;
+                return null;
+            }
+        };
+
+        $html = '<span class="price">$25.00</span>';
+        $product = new FakeWcProductWithoutGetMeta(903, 25.0);
+        $this->assertSame($html, MapPricingService::filter_price_html($html, $product));
+        $this->assertSame($html, MapPricingService::filter_price_html($html, $product));
+        $this->assertSame($html, MapPricingService::filter_price_html($html, $product));
+        $this->assertSame(1, $GLOBALS['wpdb']->queries, 'rule lookup must be cached per request');
     }
 }

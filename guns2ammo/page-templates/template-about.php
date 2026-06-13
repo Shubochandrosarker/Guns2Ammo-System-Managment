@@ -43,7 +43,7 @@ get_header();
 @media(max-width:900px){ .team-grid { grid-template-columns: 1fr 1fr; } }
 .member { background: var(--color-gunmetal); border:1px solid var(--color-hairline); }
 .member .photo { aspect-ratio: 4/5; background-image: linear-gradient(180deg, rgba(26,25,30,0.4), rgba(26,25,30,0.85)), repeating-linear-gradient(135deg, #1f1f23 0 14px, #18181b 14px 28px); position:relative; }
-.member .photo::after { content: attr(data-pl); position:absolute; bottom:14px; left:14px; font-family: var(--font-mono); font-size:10px; letter-spacing:0.22em; color: var(--color-silver); text-transform: uppercase; }
+.member .photo::after { content: attr(data-pl); position:absolute; bottom:14px; left:14px; font-family: var(--font-mono); font-size:10px; letter-spacing:0.22em; color: var(--ink-on-media-faint); text-transform: uppercase; }
 .member .body { padding: 18px; }
 .member .role { font-family: var(--font-mono); font-size:10px; letter-spacing:0.24em; color: var(--color-brass-bright); text-transform: uppercase; }
 .member h4 { font-family: var(--font-display); font-size: 28px; color: var(--color-white); line-height:1; margin: 6px 0 8px; }
@@ -54,9 +54,9 @@ get_header();
 .tour h2 { font-family: var(--font-display); font-size: clamp(40px, 6vw, 72px); margin: 18px 0 48px; line-height:0.95; }
 .tour-grid { display:grid; grid-template-columns: 2fr 1fr 1fr; grid-template-rows: 1fr 1fr; gap:8px; height: 600px; }
 @media(max-width:900px){ .tour-grid { grid-template-columns: 1fr 1fr; grid-template-rows: 200px 200px 200px; height:auto; } .tour-grid .photo:nth-child(1) { grid-column: span 2; } }
-.photo { background-image: linear-gradient(180deg, rgba(26,25,30,0.3), rgba(26,25,30,0.7)), repeating-linear-gradient(135deg, #1f1f23 0 14px, #18181b 14px 28px); position:relative; overflow:hidden; }
-.photo .cap { position:absolute; bottom:14px; left:14px; right:14px; font-family: var(--font-condensed); font-weight:600; letter-spacing:0.06em; text-transform: uppercase; color: var(--color-white); font-size:14px; }
-.photo .cap small { font-family: var(--font-mono); font-size:10px; letter-spacing:0.22em; color: var(--color-brass-bright); display:block; margin-bottom:4px; }
+.photo { background-image: linear-gradient(180deg, rgba(26,25,30,0.3), rgba(26,25,30,0.7)), repeating-linear-gradient(135deg, #1f1f23 0 14px, #18181b 14px 28px); background-size: cover; background-position: center; position:relative; overflow:hidden; }
+.photo .cap { position:absolute; bottom:14px; left:14px; right:14px; font-family: var(--font-condensed); font-weight:600; letter-spacing:0.06em; text-transform: uppercase; color: var(--ink-on-media); font-size:14px; }
+.photo .cap small { font-family: var(--font-mono); font-size:10px; letter-spacing:0.22em; color: var(--brass-on-media); display:block; margin-bottom:4px; }
 .tour-grid .photo:nth-child(1) { grid-row: span 2; }
 
 .location { padding: 100px 32px; background: var(--color-gunmetal); border-top:1px solid var(--color-hairline); }
@@ -70,15 +70,14 @@ get_header();
 .contact-card .val { font-family: var(--font-condensed); font-weight:600; font-size:18px; letter-spacing:0.04em; color: var(--color-white); }
 .contact-card .val a { color: var(--color-brass-bright); text-decoration:none; }
 .map { aspect-ratio: 4/3; background:
-  linear-gradient(rgba(26,25,30,0.4), rgba(26,25,30,0.4)),
-  repeating-linear-gradient(0deg, rgba(201,168,76,0.06) 0 1px, transparent 1px 60px),
-  repeating-linear-gradient(90deg, rgba(201,168,76,0.06) 0 1px, transparent 1px 60px),
+  linear-gradient(rgba(26,25,30,0.45), rgba(26,25,30,0.45)),
+  url("<?php echo esc_url( g2a_asset( 'img/guns2ammo-storefront-sign-mesa.jpg' ) ); ?>") center / cover no-repeat,
   #0d0d0f;
   border:1px solid var(--color-hairline); position:relative; }
 .map .pin { position:absolute; left: 50%; top: 50%; transform: translate(-50%,-100%); display:grid; place-items:center; gap:6px; }
 .map .pin .dot { width:14px; height:14px; background: var(--color-ember); border:2px solid var(--color-white); border-radius:50%; box-shadow: 0 0 0 0 rgba(232,128,47,0.7); animation: pulse 1.6s var(--ease-out) infinite; }
-.map .pin .lbl { font-family: var(--font-mono); font-size:10px; letter-spacing:0.22em; color: var(--color-white); background: var(--color-void); border:1px solid var(--color-hairline-bright); padding: 4px 8px; text-transform: uppercase; white-space: nowrap; }
-.map .city { position:absolute; font-family: var(--font-mono); font-size:10px; letter-spacing:0.24em; color: var(--color-silver); text-transform: uppercase; }
+.map .pin .lbl { font-family: var(--font-mono); font-size:10px; letter-spacing:0.22em; color: var(--ink-on-media); background: rgba(26,25,30,0.85); border:1px solid rgba(245,244,240,0.25); padding: 4px 8px; text-transform: uppercase; white-space: nowrap; }
+.map .city { position:absolute; font-family: var(--font-mono); font-size:10px; letter-spacing:0.24em; color: var(--ink-on-media-faint); text-transform: uppercase; }
 
 .cta-final { padding: 100px 32px; text-align:center; background: var(--color-void); border-top:1px solid var(--color-hairline); }
 .cta-final h2 { font-family: var(--font-display); font-size: clamp(48px, 8vw, 112px); line-height:0.92; }</style>

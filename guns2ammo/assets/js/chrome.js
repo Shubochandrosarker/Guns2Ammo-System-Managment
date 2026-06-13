@@ -302,13 +302,29 @@
       setInterval(update, 60000);
     }
 
-    /* ===== Reveal on scroll (+ stagger containers + count-up stats) ===== */
-    var REVEAL_SEL = '[data-reveal], [data-reveal-stagger], [data-countup]';
+    /* ===== Reveal on scroll (unified) =====
+     * Supports both conventions used across the theme:
+     *   [data-reveal]            fade/slide in (variants left|right|scale|fade via CSS)
+     *   [data-reveal-group]      children [data-reveal] cascade with a stagger delay
+     *   [data-reveal-stagger]    container whose direct children stagger (CSS-driven)
+     *   [data-countup]           animate a number up to data-countup when revealed
+     * All honor prefers-reduced-motion. After entrance, the inline delay is
+     * cleared and .did-reveal restores snappy hover physics.
+     */
+    var reduceMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    var REVEAL_STEP = 90, REVEAL_CAP = 5;
+    if (!reduceMotion) {
+      document.querySelectorAll('[data-reveal-group]').forEach(function (group) {
+        group.querySelectorAll('[data-reveal]').forEach(function (el, i) {
+          el.style.transitionDelay = (Math.min(i, REVEAL_CAP) * REVEAL_STEP) + 'ms';
+        });
+      });
+    }
     var startCountup = function (el) {
       var target = parseFloat(el.dataset.countup);
       if (isNaN(target) || el.dataset.countupDone) return;
       el.dataset.countupDone = '1';
-      if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+      if (reduceMotion) { el.textContent = (el.dataset.countupSuffix ? target + el.dataset.countupSuffix : target); return; }
       var suffix = el.dataset.countupSuffix || '';
       var decimals = (String(el.dataset.countup).split('.')[1] || '').length;
       var dur = 1400, t0 = null;
@@ -321,19 +337,51 @@
       };
       requestAnimationFrame(step);
     };
-    if ('IntersectionObserver' in window) {
+    var revealDone = function (el) {
+      var delay = parseInt(el.style.transitionDelay, 10) || 0;
+      setTimeout(function () { el.style.transitionDelay = ''; el.classList.add('did-reveal'); }, delay + 750);
+    };
+    var REVEAL_SEL = '[data-reveal], [data-reveal-stagger], [data-countup]';
+    if ('IntersectionObserver' in window && !reduceMotion) {
       var io = new IntersectionObserver(function (entries) {
         entries.forEach(function (en) {
           if (!en.isIntersecting) return;
           en.target.classList.add('is-in');
           if (en.target.hasAttribute('data-countup')) startCountup(en.target);
+          revealDone(en.target);
           io.unobserve(en.target);
         });
       }, { threshold: 0.12, rootMargin: '0px 0px -40px 0px' });
       document.querySelectorAll(REVEAL_SEL).forEach(function (el) { io.observe(el); });
     } else {
-      document.querySelectorAll(REVEAL_SEL).forEach(function (el) { el.classList.add('is-in'); });
+      document.querySelectorAll(REVEAL_SEL).forEach(function (el) { el.classList.add('is-in', 'did-reveal'); });
+      document.querySelectorAll('[data-countup]').forEach(startCountup);
     }
+
+    /* ===== FAQ accordion (homepage "Common Questions") =====
+     * Delegated click on [data-faq-toggle] buttons — keyboard accessible
+     * for free (real <button>s), aria-expanded kept in sync, one item
+     * open at a time per list. Height animates via grid-template-rows
+     * (see .home-faq .faq-a in front-page.css).
+     */
+    document.addEventListener('click', function (e) {
+      var btn = e.target.closest('[data-faq-toggle]');
+      if (!btn) return;
+      var item = btn.closest('.faq-item');
+      if (!item) return;
+      var list = item.parentElement;
+      var wasOpen = item.classList.contains('open');
+      if (list) {
+        list.querySelectorAll('.faq-item.open').forEach(function (other) {
+          if (other === item) return;
+          other.classList.remove('open');
+          var b = other.querySelector('[data-faq-toggle]');
+          if (b) b.setAttribute('aria-expanded', 'false');
+        });
+      }
+      item.classList.toggle('open', !wasOpen);
+      btn.setAttribute('aria-expanded', wasOpen ? 'false' : 'true');
+    });
 
     /* ===== Lazy image fade-in ===== */
     document.querySelectorAll('img[loading="lazy"]').forEach(function (img) {

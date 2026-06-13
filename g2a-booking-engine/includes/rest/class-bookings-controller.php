@@ -59,6 +59,13 @@ final class G2AB_REST_Bookings_Controller {
 			'callback' => array( $this, 'list_payment_methods' ),
 			'permission_callback' => array( $this, 'permission_public_read' ),
 		) );
+		// Public lane-status counter for the theme's "X of 6 lanes open now"
+		// hero badge. Aggregate counts only — no lane names, no PII.
+		register_rest_route( G2AB_REST_NAMESPACE, '/lane-status', array(
+			'methods' => WP_REST_Server::READABLE,
+			'callback' => array( $this, 'get_lane_status' ),
+			'permission_callback' => array( $this, 'permission_public_read' ),
+		) );
 		// Fresh-nonce endpoint. Booking pages are frequently served from a
 		// page cache, so the wp_rest nonce baked into the HTML can be hours
 		// or days old — guests then fail every nonce-checked request. The
@@ -215,17 +222,24 @@ final class G2AB_REST_Bookings_Controller {
 		if ( ! is_array( $data ) ) {
 			global $wpdb;
 			$now   = current_time( 'mysql' );
+			// Count lane resources only — but if this install labels lanes
+			// differently, fall back to all active resources. The "busy"
+			// query below MUST use the same scope, otherwise a concurrent
+			// class/training-room booking would shrink the lane count and
+			// the widget could show no availability while lanes are open.
+			$lane_only = true;
 			$total = (int) $wpdb->get_var(
 				"SELECT COUNT(*) FROM {$wpdb->prefix}g2ab_resources WHERE is_active = 1 AND type = 'lane'"
 			);
 			if ( 0 === $total ) {
-				// Some installs label lanes differently — fall back to all active resources.
+				$lane_only = false;
 				$total = (int) $wpdb->get_var( "SELECT COUNT(*) FROM {$wpdb->prefix}g2ab_resources WHERE is_active = 1" );
 			}
+			$lane_predicate = $lane_only ? "AND r.type = 'lane'" : '';
 			$busy = (int) $wpdb->get_var( $wpdb->prepare(
 				"SELECT COUNT(DISTINCT b.resource_id)
 				 FROM {$wpdb->prefix}g2ab_bookings b
-				 INNER JOIN {$wpdb->prefix}g2ab_resources r ON r.id = b.resource_id AND r.is_active = 1
+				 INNER JOIN {$wpdb->prefix}g2ab_resources r ON r.id = b.resource_id AND r.is_active = 1 {$lane_predicate}
 				 WHERE b.status IN ('pending','reserved','confirmed','paid','checked_in')
 				   AND b.start_at <= %s AND b.end_at > %s",
 				$now,
@@ -255,6 +269,87 @@ final class G2AB_REST_Bookings_Controller {
 		}
 		if ( empty( $out ) ) $out[] = array( 'id' => 'pay_in_store', 'label' => 'Pay In Store' );
 		return rest_ensure_response( array( 'success' => true, 'data' => $out ) );
+	}
+
+	/**
+	 * GET /lane-status — public, cached 60s.
+	 *
+	 * Returns aggregate lane availability for the current moment:
+	 *   { success:true, data:{ open:int, total:int, label:string, is_open_now:bool } }
+	 *
+	 * total       = count of active lane-type resources.
+	 * open        = lanes with no booking overlapping `now` (shares the exact
+	 *               overlap logic the staff /staff/open-lanes endpoint uses —
+	 *               see G2AB_REST_Staff_Controller::lane_states()).
+	 * is_open_now = whether the range is inside today's business hours and
+	 *               not blacked out.
+	 *
+	 * No lane names, no booking data, no PII — counts and a display label only.
+	 */
+	public function get_lane_status() {
+		$cached = get_transient( 'g2ab_lane_status' );
+		if ( is_array( $cached ) && isset( $cached['open'], $cached['total'] ) ) {
+			return rest_ensure_response( array( 'success' => true, 'data' => $cached ) );
+		}
+
+		// Lane occupancy — shared with the staff console (same overlap math).
+		$lanes = class_exists( 'G2AB_REST_Staff_Controller' )
+			? G2AB_REST_Staff_Controller::lane_states()
+			: array();
+		$total = count( $lanes );
+		$open  = 0;
+		foreach ( $lanes as $lane ) {
+			if ( isset( $lane['state'] ) && 'open' === $lane['state'] ) {
+				$open++;
+			}
+		}
+
+		// Business hours: is the range open right now?
+		global $wpdb;
+		$rules_table = $wpdb->prefix . 'g2ab_availability_rules';
+		$now         = $this->now_site();
+		$today       = $now->format( 'Y-m-d' );
+		$dow         = (int) $now->format( 'w' );
+
+		$is_open_now = false;
+		$blackout = $wpdb->get_var( $wpdb->prepare(
+			"SELECT id FROM {$rules_table} WHERE rule_type = 'blackout' AND is_active = 1 AND start_date <= %s AND end_date >= %s LIMIT 1",
+			$today, $today
+		) );
+		if ( ! $blackout ) {
+			$hours = $wpdb->get_row( $wpdb->prepare(
+				"SELECT start_time, end_time FROM {$rules_table} WHERE rule_type = 'business_hours' AND day_of_week = %d AND is_active = 1 ORDER BY priority DESC LIMIT 1",
+				$dow
+			) );
+			if ( $hours ) {
+				$open_dt  = $this->parse_site_datetime( $today . ' ' . substr( (string) $hours->start_time, 0, 8 ) );
+				$close_dt = $this->parse_site_datetime( $today . ' ' . substr( (string) $hours->end_time, 0, 8 ) );
+				$is_open_now = $open_dt && $close_dt && $now >= $open_dt && $now < $close_dt;
+			}
+		}
+
+		if ( $is_open_now ) {
+			$label = sprintf(
+				/* translators: 1: open lane count, 2: total lane count */
+				__( '%1$d of %2$d lanes open now', 'g2a-booking' ),
+				$open,
+				$total
+			);
+		} else {
+			$label = __( 'Range closed right now — book your lane online', 'g2a-booking' );
+		}
+
+		$data = array(
+			'open'        => (int) $open,
+			'total'       => (int) $total,
+			'label'       => sanitize_text_field( $label ),
+			'is_open_now' => (bool) $is_open_now,
+		);
+		set_transient( 'g2ab_lane_status', $data, MINUTE_IN_SECONDS );
+
+		$response = rest_ensure_response( array( 'success' => true, 'data' => $data ) );
+		$response->header( 'Cache-Control', 'public, max-age=60' );
+		return $response;
 	}
 
 	/**

@@ -7,7 +7,10 @@ use G2A\POS\Admin\Assets;
 use G2A\POS\Admin\Menu;
 use G2A\POS\Auth\JWT;
 use G2A\POS\Compliance\ATF\NICS;
+use G2A\POS\Ai\WebsiteKnowledgeSeeder;
 use G2A\POS\Database\Migrator;
+use G2A\POS\Integrations\BookingEngineSync;
+use G2A\POS\Integrations\WooCatalogSync;
 use G2A\POS\Integrations\WooSync;
 use G2A\POS\Inventory\SyncService;
 use G2A\POS\Messaging\MessagingService;
@@ -35,9 +38,8 @@ final class Plugin {
 	private const LAYAWAY_REMINDER_HOOK     = 'g2a_pos_layaway_reminders_daily';
 	private const COMPLIANCE_CALENDAR_HOOK  = 'g2a_pos_compliance_calendar_daily';
 	private const VENDOR_PRICE_CAPTURE_HOOK = 'g2a_pos_vendor_price_capture_weekly';
-	private const WOO_SCAN_HOOK             = \G2A\POS\Integrations\WooProductScanner::CRON_HOOK;
-	private const WOO_SCAN_CONTINUE_HOOK    = \G2A\POS\Integrations\WooProductScanner::CONTINUE_HOOK;
-	private const AI_KNOWLEDGE_HOOK         = \G2A\POS\Ai\DefaultKnowledgeSeeder::CRON_HOOK;
+	private const WOO_CATALOG_SYNC_HOOK     = WooCatalogSync::CRON_HOOK;
+	private const BRAIN_SITE_REFRESH_HOOK   = WebsiteKnowledgeSeeder::CRON_HOOK;
 
 	private static ?self $instance = null;
 
@@ -90,9 +92,6 @@ final class Plugin {
 				( new KpiService() )->persist_snapshot();
 			}
 		);
-		add_action( self::WOO_SCAN_HOOK, array( \G2A\POS\Integrations\WooProductScanner::class, 'cron_daily' ) );
-		add_action( self::WOO_SCAN_CONTINUE_HOOK, array( \G2A\POS\Integrations\WooProductScanner::class, 'cron_continue' ) );
-		add_action( self::AI_KNOWLEDGE_HOOK, array( \G2A\POS\Ai\DefaultKnowledgeSeeder::class, 'cron_refresh' ) );
 		add_action( self::MEMBERSHIP_BILLING_HOOK, array( self::class, 'cron_membership_billing' ) );
 		add_action( self::LAYAWAY_REMINDER_HOOK, array( self::class, 'cron_layaway_reminders' ) );
 		add_action( self::COMPLIANCE_CALENDAR_HOOK, array( self::class, 'cron_compliance_calendar' ) );
@@ -100,7 +99,9 @@ final class Plugin {
 		add_action( 'admin_menu', array( Menu::class, 'register' ) );
 		add_action( 'admin_enqueue_scripts', array( Assets::class, 'enqueue' ) );
 		WooSync::boot();
-		\G2A\POS\Integrations\WooProductScanner::boot();
+		WooCatalogSync::boot();
+		BookingEngineSync::boot();
+		WebsiteKnowledgeSeeder::boot();
 		WholesalerRegistry::boot();
 		MapPricingService::boot();
 		CarrierRegistry::boot();
@@ -218,41 +219,16 @@ final class Plugin {
 	}
 
 	private static function maybe_upgrade(): void {
+		// Seed the default website knowledge pack once per pack version
+		// (guarded internally by option g2a_pos_brain_seeded_version).
+		WebsiteKnowledgeSeeder::maybe_seed();
+
 		if ( get_option( 'g2a_pos_core_db_version' ) === G2A_POS_CORE_VERSION ) {
 			return;
 		}
 		Migrator::run();
 		Roles::register_roles();
 		Roles::register_caps();
-		self::schedule_v310_events();
-
-		// v3.1.0 — refresh the AI default knowledge set and kick off a Woo
-		// product scan batch so upgraded installs backfill immediately.
-		try {
-			\G2A\POS\Ai\DefaultKnowledgeSeeder::refresh();
-		} catch ( \Throwable $e ) {
-			Logger::exception( 'Knowledge seed on upgrade failed', $e );
-		}
-		try {
-			if ( function_exists( 'wc_get_product' ) ) {
-				\G2A\POS\Integrations\WooProductScanner::scan_batch();
-				if ( ! wp_next_scheduled( self::WOO_SCAN_CONTINUE_HOOK ) ) {
-					wp_schedule_single_event( time() + 2 * MINUTE_IN_SECONDS, self::WOO_SCAN_CONTINUE_HOOK );
-				}
-			}
-		} catch ( \Throwable $e ) {
-			Logger::exception( 'Woo scan on upgrade failed', $e );
-		}
-	}
-
-	/** Schedules added in 3.1.0 — called from both activate() and upgrade. */
-	private static function schedule_v310_events(): void {
-		if ( ! wp_next_scheduled( self::WOO_SCAN_HOOK ) ) {
-			wp_schedule_event( time() + 2 * HOUR_IN_SECONDS, 'daily', self::WOO_SCAN_HOOK );
-		}
-		if ( ! wp_next_scheduled( self::AI_KNOWLEDGE_HOOK ) ) {
-			wp_schedule_event( time() + HOUR_IN_SECONDS, 'weekly', self::AI_KNOWLEDGE_HOOK );
-		}
 	}
 
 	public static function activate(): void {
@@ -294,18 +270,16 @@ final class Plugin {
 		if ( ! wp_next_scheduled( self::VENDOR_PRICE_CAPTURE_HOOK ) ) {
 			wp_schedule_event( time() + 6 * HOUR_IN_SECONDS, 'weekly', self::VENDOR_PRICE_CAPTURE_HOOK );
 		}
-		self::schedule_v310_events();
+		if ( ! wp_next_scheduled( self::WOO_CATALOG_SYNC_HOOK ) ) {
+			// Nightly full WooCommerce catalog re-scan.
+			wp_schedule_event( time() + 2 * HOUR_IN_SECONDS, 'daily', self::WOO_CATALOG_SYNC_HOOK );
+		}
+		if ( ! wp_next_scheduled( self::BRAIN_SITE_REFRESH_HOOK ) ) {
+			// Weekly website-knowledge refresh for the AI brain.
+			wp_schedule_event( time() + 12 * HOUR_IN_SECONDS, 'weekly', self::BRAIN_SITE_REFRESH_HOOK );
+		}
 
-		// Seed the AI brain with site-default knowledge on first activation
-		// and queue the initial Woo product backfill.
-		try {
-			\G2A\POS\Ai\DefaultKnowledgeSeeder::refresh();
-		} catch ( \Throwable $e ) {
-			Logger::exception( 'Knowledge seed on activation failed', $e );
-		}
-		if ( ! wp_next_scheduled( self::WOO_SCAN_CONTINUE_HOOK ) ) {
-			wp_schedule_single_event( time() + 2 * MINUTE_IN_SECONDS, self::WOO_SCAN_CONTINUE_HOOK );
-		}
+		WebsiteKnowledgeSeeder::maybe_seed();
 	}
 
 	public static function deactivate(): void {
@@ -320,8 +294,7 @@ final class Plugin {
 		wp_clear_scheduled_hook( self::LAYAWAY_REMINDER_HOOK );
 		wp_clear_scheduled_hook( self::COMPLIANCE_CALENDAR_HOOK );
 		wp_clear_scheduled_hook( self::VENDOR_PRICE_CAPTURE_HOOK );
-		wp_clear_scheduled_hook( self::WOO_SCAN_HOOK );
-		wp_clear_scheduled_hook( self::WOO_SCAN_CONTINUE_HOOK );
-		wp_clear_scheduled_hook( self::AI_KNOWLEDGE_HOOK );
+		wp_clear_scheduled_hook( self::WOO_CATALOG_SYNC_HOOK );
+		wp_clear_scheduled_hook( self::BRAIN_SITE_REFRESH_HOOK );
 	}
 }

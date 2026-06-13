@@ -171,6 +171,45 @@ function g2a_faqs_data() {
 }
 
 /**
+ * Curated, high-value Q&As for the homepage "Common Questions" section.
+ * Kept separate from g2a_faqs_data() so the homepage stays a tight,
+ * conversion-focused six — and filterable so plugins/customizations can
+ * swap questions without touching the template.
+ *
+ * @return array<int, array{q:string,a:string}>
+ */
+function g2a_home_faqs() {
+	$faqs = array(
+		array(
+			'q' => 'How much does it cost to shoot?',
+			'a' => 'Walk-in lane rental is $20 per shooter per hour. Members get included lane time on every visit, with plans starting at $29.99/month — cancel anytime, no contracts.',
+		),
+		array(
+			'q' => 'Do I need my own gun?',
+			'a' => 'No. Handgun rentals start at $15 and long-gun rentals at $25 (members save 25% on rentals). Range ammunition is required for rental firearms — factory new only, available on-site.',
+		),
+		array(
+			'q' => 'I have never shot before — am I welcome?',
+			'a' => 'Absolutely. A certified range safety officer is on duty whenever the range is hot, and we offer free first-time-shooter orientation plus regular New Shooter classes. Just ask at the front desk.',
+		),
+		array(
+			'q' => 'What are your hours?',
+			'a' => 'Mon–Thu 10am–6pm, Fri 10am–7pm, Sat 10am–7pm, Sun 12pm–6pm. All times Arizona / MST — Arizona does not observe Daylight Saving Time.',
+		),
+		array(
+			'q' => 'How much is the CCW class?',
+			'a' => 'Our Arizona CCW certification class is $85 and includes classroom instruction plus live-fire qualification with NRA-certified instructors. The Arizona permit is honored in 37 states.',
+		),
+		array(
+			'q' => 'Are walk-ins okay, or do I need a reservation?',
+			'a' => 'Walk-ins are welcome any time during open hours. Online lane reservations are available 24/7 if you want a guaranteed lane — recommended on weekends.',
+		),
+	);
+
+	return apply_filters( 'g2a_home_faqs', $faqs );
+}
+
+/**
  * Emit FAQPage JSON-LD only on the dedicated FAQs page so we don't
  * confuse search engines with multiple FAQPage entities on other
  * pages that already carry their own contextual schema.
@@ -190,4 +229,25 @@ function g2a_faqs_emit_schema() {
 		}
 	}
 	g2a_emit_jsonld( g2a_faq_schema( $flat ) );
+}
+
+/**
+ * FAQPage JSON-LD for the homepage "Common Questions" section ONLY.
+ * The dedicated /faqs/ page carries its own (full) FAQPage entity via
+ * g2a_faqs_emit_schema() above; nothing else on the site emits FAQPage,
+ * so the front page stays a single, non-duplicated FAQPage entity.
+ */
+add_action( 'wp_head', 'g2a_home_faqs_emit_schema', 12 );
+function g2a_home_faqs_emit_schema() {
+	if ( ! is_front_page() ) {
+		return;
+	}
+	if ( ! function_exists( 'g2a_faq_schema' ) || ! function_exists( 'g2a_emit_jsonld' ) ) {
+		return; // requires inc/seo.php
+	}
+	$faqs = g2a_home_faqs();
+	if ( empty( $faqs ) ) {
+		return;
+	}
+	g2a_emit_jsonld( g2a_faq_schema( $faqs ) );
 }

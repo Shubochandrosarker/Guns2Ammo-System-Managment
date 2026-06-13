@@ -63,7 +63,7 @@ get_header();
   .kh-feat .ph::after {
     content: "FEATURED  CCW 2025"; position: absolute; bottom: 16px; left: 16px;
     font-family: var(--font-mono); font-size: 10px; letter-spacing: 0.3em;
-    color: var(--color-brass-bright); text-transform: uppercase;
+    color: var(--brass-on-media); text-transform: uppercase;
   }
   .kh-feat .lab { position: absolute; top: 20px; left: 20px; z-index: 2;
     background: var(--color-brass); color: #111; padding: 6px 14px;
@@ -76,7 +76,7 @@ get_header();
 
   /* ============ CATEGORY BAR ============ */
   .kh-cats { position: sticky; top: 80px; z-index: 50;
-    background: rgba(26,25,30,0.92); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
+    background: var(--color-chrome-glass); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
     border-top: 1px solid var(--color-hairline);
     border-bottom: 1px solid var(--color-hairline);
     padding: 18px 32px;
@@ -139,13 +139,13 @@ get_header();
   }
   .article-card .thumb::after {
     content: attr(data-thumb); position: absolute; bottom: 14px; left: 14px;
-    font-family: var(--font-mono); font-size: 9px; letter-spacing: 0.3em; color: var(--color-silver); text-transform: uppercase;
+    font-family: var(--font-mono); font-size: 9px; letter-spacing: 0.3em; color: var(--ink-on-media-faint); text-transform: uppercase;
   }
   .article-card .badge-cat {
     position: absolute; top: 14px; left: 14px;
     background: rgba(26,25,30,0.85); backdrop-filter: blur(8px);
-    border: 1px solid var(--color-hairline-bright);
-    color: var(--color-brass-bright);
+    border: 1px solid rgba(245,244,240,0.25);
+    color: var(--brass-on-media);
     font-family: var(--font-mono); font-size: 10px; letter-spacing: 0.22em; text-transform: uppercase;
     padding: 5px 10px;
   }

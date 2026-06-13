@@ -114,17 +114,30 @@ $phone_tel = preg_replace( '/[^0-9+]/', '', '+1' . $phone );
 			<button class="profile-btn" id="g2a-profile-btn" aria-label="Account" aria-haspopup="true" aria-expanded="false">
 				<span class="av" id="g2a-profile-av"><?php
 				if ( is_user_logged_in() ) {
-					// Member's real profile photo (uploaded via the Memberistic
-					// account dashboard) → initials fallback when none is set.
+					$g2a_av_user_id = get_current_user_id();
+					$g2a_av_name    = wp_get_current_user()->display_name;
+					// Member profile image: the Memberistic account dashboard
+					// upload (memberistic_profile_image_id) wins; otherwise a
+					// membership plugin can supply one via the
+					// g2a_profile_avatar_url filter, then gravatar, then the
+					// 2-letter initials.
 					$g2a_av_url = '';
-					$g2a_img_id = (int) get_user_meta( get_current_user_id(), 'memberistic_profile_image_id', true );
+					$g2a_img_id = (int) get_user_meta( $g2a_av_user_id, 'memberistic_profile_image_id', true );
 					if ( $g2a_img_id ) {
 						$g2a_av_url = (string) wp_get_attachment_image_url( $g2a_img_id, 'thumbnail' );
 					}
+					if ( ! $g2a_av_url ) {
+						$g2a_av_url = get_avatar_url( $g2a_av_user_id, [ 'size' => 64 ] );
+					}
+					$g2a_av_url = apply_filters( 'g2a_profile_avatar_url', $g2a_av_url, $g2a_av_user_id );
 					if ( $g2a_av_url ) {
-						?><img src="<?php echo esc_url( $g2a_av_url ); ?>" alt="" loading="lazy" decoding="async" /><?php
+						printf(
+							'<img class="av-img" src="%s" alt="%s" width="64" height="64" loading="lazy" decoding="async" />',
+							esc_url( $g2a_av_url ),
+							esc_attr( $g2a_av_name )
+						);
 					} else {
-						echo esc_html( strtoupper( substr( wp_get_current_user()->display_name, 0, 2 ) ) );
+						echo esc_html( strtoupper( substr( $g2a_av_name, 0, 2 ) ) );
 					}
 				} else {
 					// Guest state: a real person icon, not an empty disc.
