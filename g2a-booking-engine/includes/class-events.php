@@ -58,10 +58,23 @@ final class G2AB_Events {
 	 */
 	private function guard( $method ) {
 		return function ( $atts = array(), $content = '', $tag = '' ) use ( $method ) {
-			$ob_level = ob_get_level();
+			$ob_level    = ob_get_level();
+			$has_net     = class_exists( 'G2AB_Frontend' );
+			if ( $has_net ) {
+				// Share the Frontend safety net: raised memory/time limits + the
+				// shutdown catcher for non-catchable fatals (OOM/timeout).
+				G2AB_Frontend::begin_render( $tag ? $tag : $method );
+			}
 			try {
-				return $this->{$method}( $atts, $content, $tag );
+				$html = $this->{$method}( $atts, $content, $tag );
+				if ( $has_net ) {
+					G2AB_Frontend::end_render();
+				}
+				return $html;
 			} catch ( \Throwable $e ) {
+				if ( $has_net ) {
+					G2AB_Frontend::end_render();
+				}
 				while ( ob_get_level() > $ob_level ) {
 					ob_end_clean();
 				}
@@ -72,17 +85,12 @@ final class G2AB_Events {
 					$e->getFile(),
 					$e->getLine()
 				) );
-				if ( current_user_can( 'manage_options' ) ) {
-					return '<div class="g2ab g2ab-error"><p>'
-						. esc_html( sprintf(
-							/* translators: 1: method, 2: error (admin-only) */
-							__( 'Events widget error in %1$s (admins only): %2$s', 'g2a-booking' ),
-							$method,
-							$e->getMessage()
-						) )
-						. '</p></div>';
+				if ( $has_net ) {
+					return G2AB_Frontend::error_box( $method, $e->getMessage() . ' @ ' . basename( $e->getFile() ) . ':' . $e->getLine() );
 				}
-				return '';
+				return ( function_exists( 'current_user_can' ) && current_user_can( 'manage_options' ) )
+					? '<div class="g2ab g2ab-error"><p>' . esc_html( $method . ': ' . $e->getMessage() ) . '</p></div>'
+					: '';
 			}
 		};
 	}
