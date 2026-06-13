@@ -18,7 +18,10 @@ return array(
 	'category'       => 'integrations',
 	'icon'           => 'M',
 	'color'          => '#5B7BFF',
-	'default_active' => false,
+	// Active by default in the G2A bundle so member pricing / members-only
+	// gating works out of the box. Safe no-op when Memberistic isn't installed
+	// (the bootstrap checks memberistic_active() before doing anything).
+	'default_active' => true,
 	'bootstrap'      => 'G2AB_Module_Memberistic',
 	'configure'      => 'admin.php?page=g2ab-settings&tab=memberistic',
 );

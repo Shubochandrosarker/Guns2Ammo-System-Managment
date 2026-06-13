@@ -46,7 +46,9 @@ export default function InventoryImport() {
   const [err, setErr] = useState('');
 
   useEffect(() => {
-    get<{ adapters: Adapter[] }>('/inventory/import/adapters').then((r) => setAdapters(r.adapters || []));
+    get<{ adapters: Adapter[] }>('/inventory/import/adapters')
+      .then((r) => setAdapters(r?.adapters || []))
+      .catch((e) => setErr(errorMessage(e, 'Could not load import adapters')));
   }, []);
 
   async function readBase64(f: File): Promise<string> {

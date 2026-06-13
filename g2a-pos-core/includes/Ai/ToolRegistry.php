@@ -94,5 +94,7 @@ final class ToolRegistry {
 		Tools\RangeWaiverLookupTool::register();
 		Tools\AgentLearnTool::register();
 		Tools\CatalogMatchTool::register();
+		Tools\MembershipLookupTool::register();
+		Tools\BookingLookupTool::register();
 	}
 }

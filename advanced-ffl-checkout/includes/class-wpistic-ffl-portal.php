@@ -138,6 +138,21 @@ class Portal {
 					'dealer_id'   => (int) $row->dealer_id,
 					'token_id'    => (int) $row->id,
 				] );
+
+				// v1.6 — auto-issue an email OTP the first time this token's
+				// portal page is loaded under the email_otp method. A repeat
+				// view within the 10-min window reuses the same code.
+				if ( 'email_otp' === $view['two_factor'] ) {
+					if ( isset( $_GET['resend_otp'] ) ) {
+						self::resend_email_otp( (int) $row->id, (int) $row->transfer_id );
+						// Clean URL — redirect back without the query so a
+						// page refresh doesn't keep resending.
+						wp_safe_redirect( Token::build_url( $view['token_raw'] ) );
+						exit;
+					}
+					self::issue_email_otp( (int) $row->id, (int) $row->transfer_id );
+					$view['otp_sent_to'] = self::mask_email( Mailer::resolve_dealer_email_public( $transfer ) );
+				}
 			}
 		}
 
@@ -163,6 +178,7 @@ class Portal {
 		$raw_token = isset( $_POST['token'] ) ? sanitize_text_field( wp_unslash( $_POST['token'] ) ) : '';
 		$action    = isset( $_POST['portal_action'] ) ? sanitize_key( wp_unslash( $_POST['portal_action'] ) ) : '';
 		$last4     = isset( $_POST['last4'] ) ? preg_replace( '/[^0-9A-Za-z]/', '', (string) wp_unslash( $_POST['last4'] ) ) : '';
+		$otp_code  = isset( $_POST['otp_code'] ) ? preg_replace( '/[^0-9]/', '', (string) wp_unslash( $_POST['otp_code'] ) ) : '';
 		$notes     = isset( $_POST['notes'] ) ? sanitize_textarea_field( wp_unslash( $_POST['notes'] ) ) : '';
 
 		$valid_actions = [ 'mark_received', 'report_issue', 'not_my_shipment' ];
@@ -195,8 +211,19 @@ class Portal {
 				self::redirect_with_error( $raw_token, 'two_factor_failed' );
 				exit;
 			}
+		} elseif ( 'email_otp' === $method ) {
+			if ( ! self::verify_email_otp( $token_id, $otp_code ) ) {
+				Analytics::log( 'two_factor_failed', [
+					'transfer_id' => $tid,
+					'dealer_id'   => $did,
+					'token_id'    => $token_id,
+					'metadata'    => [ 'method' => 'email_otp' ],
+				] );
+				self::redirect_with_error( $raw_token, 'two_factor_failed' );
+				exit;
+			}
 		}
-		// email_otp method reserved for v1.2.0 — currently behaves as "none" if selected without implementation.
+		// method === 'none' — proceed (admin opted out of 2FA explicitly).
 
 		// Consume token (single-use)
 		Token::consume( $token_id, $action );
@@ -466,6 +493,128 @@ class Portal {
 			'zip'            => $transfer->dealer_zip ?? '',
 			'phone'          => $transfer->dealer_phone ?? '',
 		];
+	}
+
+	/**
+	 * j***@example.com — keeps the domain visible, masks the local-part
+	 * after the first char. Shown on the OTP form so the dealer knows
+	 * which inbox to look in without leaking the full address publicly.
+	 */
+	private static function mask_email( string $email ): string {
+		if ( ! $email || false === strpos( $email, '@' ) ) {
+			return '';
+		}
+		[ $local, $domain ] = explode( '@', $email, 2 );
+		if ( strlen( $local ) <= 1 ) {
+			return $local . '***@' . $domain;
+		}
+		return $local[0] . str_repeat( '*', max( 3, strlen( $local ) - 1 ) ) . '@' . $domain;
+	}
+
+	// ── Email-OTP 2FA helpers (v1.6) ────────────────────────────────────────
+
+	/** Transient key for the OTP hash bound to a portal token row. */
+	private static function otp_transient_key( int $token_id ): string {
+		return 'wpistic_ffl_otp_' . $token_id;
+	}
+
+	/** Transient key for OTP resend throttling. */
+	private static function otp_resend_key( int $token_id ): string {
+		return 'wpistic_ffl_otp_resend_' . $token_id;
+	}
+
+	/**
+	 * Generate a 6-digit OTP, persist its hash + expiry (10 min) in a
+	 * transient, and email it to the dealer. Returns true if mail sent.
+	 */
+	public static function issue_email_otp( int $token_id, int $transfer_id ): bool {
+		$key      = self::otp_transient_key( $token_id );
+		$existing = get_transient( $key );
+
+		// Reuse an OTP that is still valid — keeps the same code if user
+		// refreshes the page within the window.
+		if ( is_array( $existing ) && ! empty( $existing['hash'] ) && ! empty( $existing['expires'] ) && (int) $existing['expires'] > time() ) {
+			// Same code already in flight — don't send a duplicate email unless explicitly resending.
+			return true;
+		}
+
+		// New OTP — cryptographic-grade random.
+		try {
+			$code = str_pad( (string) random_int( 0, 999999 ), 6, '0', STR_PAD_LEFT );
+		} catch ( \Throwable $e ) {
+			return false;
+		}
+
+		$expires_in = 10 * MINUTE_IN_SECONDS;
+		set_transient( $key, [
+			'hash'    => hash_hmac( 'sha256', $code, Token::secret() ),
+			'expires' => time() + $expires_in,
+			'misses'  => 0,
+		], $expires_in );
+
+		$transfer = self::get_transfer_with_dealer( $transfer_id );
+		if ( ! $transfer ) {
+			return false;
+		}
+
+		$sent = Mailer::send_dealer_otp_email( $transfer_id, $code );
+
+		if ( $sent ) {
+			Analytics::log( 'otp_issued', [
+				'transfer_id' => $transfer_id,
+				'token_id'    => $token_id,
+			] );
+		}
+		return (bool) $sent;
+	}
+
+	/**
+	 * Verify a 6-digit OTP against the stored hash. Constant-time, bounded
+	 * miss counter, single-use on success.
+	 */
+	private static function verify_email_otp( int $token_id, string $code ): bool {
+		if ( strlen( $code ) !== 6 ) {
+			return false;
+		}
+		$key  = self::otp_transient_key( $token_id );
+		$data = get_transient( $key );
+		if ( ! is_array( $data ) || empty( $data['hash'] ) ) {
+			return false;
+		}
+		if ( ! empty( $data['expires'] ) && (int) $data['expires'] < time() ) {
+			delete_transient( $key );
+			return false;
+		}
+		// 5-miss cap per OTP to defeat brute-force on the 6-digit space.
+		$misses = (int) ( $data['misses'] ?? 0 );
+		if ( $misses >= 5 ) {
+			delete_transient( $key );
+			return false;
+		}
+		$expected = hash_hmac( 'sha256', $code, Token::secret() );
+		if ( ! hash_equals( (string) $data['hash'], $expected ) ) {
+			$data['misses'] = $misses + 1;
+			set_transient( $key, $data, max( 1, (int) $data['expires'] - time() ) );
+			return false;
+		}
+		// Success — burn the OTP.
+		delete_transient( $key );
+		return true;
+	}
+
+	/**
+	 * Public re-send entry point — used by both the GET-resend link and the
+	 * "request a new code" form. Throttled to one resend per 60 seconds.
+	 */
+	public static function resend_email_otp( int $token_id, int $transfer_id ): bool {
+		$throttle_key = self::otp_resend_key( $token_id );
+		if ( get_transient( $throttle_key ) ) {
+			return false;
+		}
+		set_transient( $throttle_key, 1, MINUTE_IN_SECONDS );
+		// Invalidate the prior OTP so the new one is genuinely fresh.
+		delete_transient( self::otp_transient_key( $token_id ) );
+		return self::issue_email_otp( $token_id, $transfer_id );
 	}
 
 	private static function verify_last4( int $dealer_id, string $last4 ): bool {

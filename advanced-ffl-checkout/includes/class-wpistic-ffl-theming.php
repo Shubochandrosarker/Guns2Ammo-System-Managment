@@ -213,6 +213,11 @@ class Theming {
 			'{store_ffl_license}'   => $theme['ffl_license'] ?? '',
 		];
 
+		// G2A: auto-resolve {tracking_url} from a transfer_ref in context.
+		if ( ! empty( $context['{transfer_ref}'] ) && empty( $context['{tracking_url}'] ) && class_exists( '\WpisticFFL\G2A_Customer_Tracking' ) ) {
+			$context['{tracking_url}'] = G2A_Customer_Tracking::url_for( (string) $context['{transfer_ref}'] );
+		}
+
 		$out = strtr( $template, $store + $context );
 		return $out;
 	}

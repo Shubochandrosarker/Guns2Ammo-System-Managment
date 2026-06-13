@@ -37,27 +37,29 @@ class G2A_SMS {
 
 	public function __construct() {
 		add_action( 'wpistic_ffl_transfer_status_changed', [ $this, 'dispatch' ], 20, 3 );
-		add_action( 'admin_notices',                       [ $this, 'maybe_warn_missing_verifyistic' ] );
+		add_action( 'admin_notices', [ __CLASS__, 'maybe_missing_dep_notice' ] );
 	}
 
 	/**
-	 * Surface a visible warning when SMS is enabled but Verifyistic is absent —
-	 * otherwise dispatches silently no-op and admins assume SMS is working.
+	 * Surface a one-time admin notice when an admin enables SMS but Verifyistic
+	 * (the actual webhook dispatcher) isn't loaded. Otherwise dispatch() silently
+	 * no-ops and the admin assumes SMS is working.
 	 */
-	public function maybe_warn_missing_verifyistic(): void {
-		if ( ! current_user_can( 'manage_woocommerce' ) ) {
+	public static function maybe_missing_dep_notice(): void {
+		// SMS is on whenever this class is loaded; warn loudly on FFL admin pages
+		// when the actual dispatcher (Verifyistic_Webhooks) is missing — otherwise
+		// dispatch() silently no-ops and admins assume customer SMS is wired up.
+		if ( class_exists( '\Verifyistic_Webhooks' ) ) {
 			return;
 		}
-		$portal = get_option( 'wpistic_ffl_portal_settings', [] );
-		$sms_enabled = ! empty( $portal['sms_enabled'] )
-			|| (bool) apply_filters( 'wpistic_ffl_sms_enabled', true );
-		if ( ! $sms_enabled ) {
+		if ( get_option( 'wpistic_ffl_sms_dep_notice_dismissed' ) ) {
 			return;
 		}
-		if ( class_exists( '\\Verifyistic_Webhooks' ) ) {
+		$screen = function_exists( 'get_current_screen' ) ? get_current_screen() : null;
+		if ( ! $screen || strpos( (string) $screen->id, 'wpistic-ffl' ) === false ) {
 			return;
 		}
-		echo '<div class="notice notice-warning"><p><strong>Advanced FFL Checkout —</strong> SMS notifications are enabled but the Verifyistic plugin is not active. SMS will not be sent.</p></div>';
+		echo '<div class="notice notice-warning"><p><strong>FFL SMS:</strong> The <code>Verifyistic_Webhooks</code> dispatcher class is not loaded — customer SMS notifications for transfer status updates will silently no-op until the Verifyistic plugin is active.</p></div>';
 	}
 
 	public function dispatch( int $transfer_id, string $old_status, string $new_status ): void {

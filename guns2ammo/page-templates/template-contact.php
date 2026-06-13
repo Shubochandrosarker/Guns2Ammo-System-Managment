@@ -46,7 +46,9 @@ get_header();
 
   .map-wrap { aspect-ratio: 4/3; background: var(--color-void); border: 1px solid var(--color-brass-dim); position: relative; overflow: hidden; }
   .map-wrap svg { width: 100%; height: 100%; display: block; }
-  .map-wrap .pin { position:absolute; top: 50%; left: 50%; transform: translate(-50%, -100%); display: flex; flex-direction: column; align-items: center; gap: 6px; }
+  .map-wrap iframe { width: 100%; height: 100%; display: block; border: 0; filter: grayscale(0.25) contrast(1.05); }
+  html[data-theme="light"] .map-wrap iframe { filter: none; }
+  .map-wrap .pin { position:absolute; top: 50%; left: 50%; transform: translate(-50%, -100%); display: flex; flex-direction: column; align-items: center; gap: 6px; pointer-events: none; }
   .map-wrap .pin .lbl { font-family: var(--font-mono); font-size: 10px; letter-spacing: 0.22em; color: var(--color-brass-bright); background: var(--color-gunmetal); padding: 4px 10px; border:1px solid var(--color-brass-dim); text-transform: uppercase; }
   .map-wrap .pin .dot { width: 18px; height: 18px; border-radius: 50%; background: var(--color-brass); position: relative; }
   .map-wrap .pin .dot::after { content:""; position: absolute; inset:-8px; border-radius: 50%; border:2px solid var(--color-brass); opacity: 0.5; animation: ring 2s ease-out infinite; }
@@ -139,28 +141,16 @@ get_header();
       </div>
 
       <div class="map-wrap">
-        <svg viewBox="0 0 400 300" preserveAspectRatio="xMidYMid slice">
-          <rect width="400" height="300" fill="rgba(255,255,255,0.02)"/>
-          <!-- Stylized grid -->
-          <g stroke="rgba(201,168,76,0.12)" stroke-width="1">
-            <line x1="0" y1="60" x2="400" y2="60"/>
-            <line x1="0" y1="120" x2="400" y2="120"/>
-            <line x1="0" y1="180" x2="400" y2="180"/>
-            <line x1="0" y1="240" x2="400" y2="240"/>
-            <line x1="60" y1="0" x2="60" y2="300"/>
-            <line x1="140" y1="0" x2="140" y2="300"/>
-            <line x1="260" y1="0" x2="260" y2="300"/>
-            <line x1="340" y1="0" x2="340" y2="300"/>
-          </g>
-          <!-- Roads -->
-          <path d="M0 150 L400 150" stroke="rgba(201,168,76,0.35)" stroke-width="3"/>
-          <path d="M200 0 L200 300" stroke="rgba(201,168,76,0.25)" stroke-width="2"/>
-          <path d="M0 80 L400 80" stroke="rgba(201,168,76,0.15)" stroke-width="1.5"/>
-          <text x="20" y="142" font-family="ui-monospace,monospace" font-size="9" fill="#94908A" letter-spacing="2">E MAIN ST</text>
-          <text x="208" y="20" font-family="ui-monospace,monospace" font-size="9" fill="#94908A" letter-spacing="2">CRISMON</text>
-          <text x="20" y="290" font-family="ui-monospace,monospace" font-size="8" fill="#5A5651" letter-spacing="2">6030 E MAIN ST  MESA AZ</text>
-        </svg>
-        <div class="pin"><span class="lbl">G2A  6030 E Main</span><span class="dot"></span></div>
+        <?php /* Live keyless Google Maps embed (same source as the footer
+                 map) with the animated brand pin overlaid — replaces the old
+                 stylised schematic so the contact page shows the real
+                 location and stays interactive. */ ?>
+        <iframe
+          src="https://www.google.com/maps?q=Guns+2+Ammo,+6030+E+Main+St+%23103,+Mesa,+AZ+85205&output=embed"
+          loading="lazy" referrerpolicy="no-referrer-when-downgrade"
+          title="<?php esc_attr_e( 'Guns 2 Ammo on Google Maps — 6030 E Main St Suite 103, Mesa AZ', 'guns2ammo' ); ?>"
+          allowfullscreen></iframe>
+        <div class="pin" aria-hidden="true"><span class="lbl">G2A — 6030 E Main</span><span class="dot"></span></div>
       </div>
 
       <div class="info-card">

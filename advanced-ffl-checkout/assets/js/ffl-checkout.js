@@ -77,6 +77,63 @@
 
 		// Sync billing ZIP → FFL ZIP
 		watchBillingZip();
+
+		// G2A: render the saved-dealer "quick pick" strip for logged-in repeat customers.
+		renderSavedDealers();
+	}
+
+	/** Render the saved-dealer quick-pick section above the search tabs. */
+	function renderSavedDealers() {
+		const root  = el( 'wpistic-ffl-saved' );
+		const data  = ( window.wpistic_ffl && Array.isArray( window.wpistic_ffl.saved_dealers ) ) ? window.wpistic_ffl.saved_dealers : [];
+		const i18n  = ( window.wpistic_ffl && window.wpistic_ffl.saved_dealers_i18n ) || {};
+		if ( ! root || ! data.length ) { return; }
+
+		const heading = escapeHtml( i18n.heading || 'Your saved dealers' );
+		const cards = data.map( function ( d ) {
+			const addr = [ d.premise_city, d.premise_state ].filter( Boolean ).join( ', ' );
+			const fee  = d.transfer_fee > 0 ? '$' + Number( d.transfer_fee ).toFixed( 2 ) : '';
+			const pinned = d.pinned ? '<span class="wpistic-ffl-saved__pin">⭐ ' + escapeHtml( i18n.pinned || 'Default' ) + '</span>' : '';
+			return ''
+				+ '<div class="wpistic-ffl-saved__card" data-dealer-id="' + d.id + '">'
+				+   '<div class="wpistic-ffl-saved__title">' + escapeHtml( d.business_name ) + ' ' + pinned + '</div>'
+				+   '<div class="wpistic-ffl-saved__meta">' + escapeHtml( addr ) + ( fee ? ' · ' + fee : '' ) + '</div>'
+				+   '<button type="button" class="wpistic-ffl-btn wpistic-ffl-btn--primary wpistic-ffl-btn--small wpistic-ffl-saved__use">'
+				+     escapeHtml( i18n.use || 'Use this dealer' )
+				+   '</button>'
+				+ '</div>';
+		} ).join( '' );
+
+		root.innerHTML =
+			'<div class="wpistic-ffl-saved__header">' +
+				'<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01z"/></svg>' +
+				'<strong>' + heading + '</strong>' +
+			'</div>' +
+			'<div class="wpistic-ffl-saved__grid">' + cards + '</div>';
+
+		root.style.display = 'block';
+
+		// Wire selection — uses the same path as a search-result click.
+		qsa( '.wpistic-ffl-saved__use', root ).forEach( function ( btn ) {
+			btn.addEventListener( 'click', function () {
+				const card = btn.closest( '.wpistic-ffl-saved__card' );
+				const id   = parseInt( card.dataset.dealerId, 10 );
+				const dealer = data.find( function ( d ) { return d.id === id; } );
+				if ( ! dealer ) { return; }
+				// Translate to the shape handleSelect() expects.
+				handleSelect( {
+					id:             dealer.id,
+					business_name:  dealer.business_name,
+					premise_street: '',
+					premise_city:   dealer.premise_city,
+					premise_state:  dealer.premise_state,
+					premise_zip:    dealer.premise_zip,
+					phone:          dealer.phone,
+					license_number: dealer.license_number,
+					is_preferred:   dealer.is_preferred,
+				} );
+			} );
+		} );
 	}
 
 	// ── Tab + View switching ──────────────────────────────────────────────────
@@ -262,12 +319,15 @@
 
 		const addr = [ dealer.premise_street, dealer.premise_city, dealer.premise_state, dealer.premise_zip ].filter( Boolean ).join( ', ' );
 		const info = el( 'wpistic-ffl-selected-info' );
+		// G2A: Maps deep-link so a mobile shopper can tap to drive to the pickup point.
+		const mapsHref = addr ? 'https://www.google.com/maps/dir/?api=1&destination=' + encodeURIComponent( addr ) : '';
 		if ( info ) {
 			info.innerHTML =
-				'<strong>' + escapeHtml( dealer.business_name || '' ) + ( dealer.is_preferred ? ' ' + recommendedBadge() : '' ) + '</strong>' +
-				escapeHtml( addr ) +
-				( dealer.phone ? '<br>📞 ' + escapeHtml( dealer.phone ) : '' ) +
-				'<br>FFL: ' + escapeHtml( dealer.license_number || '—' );
+			'<strong>' + escapeHtml( dealer.business_name || '' ) + ( dealer.is_preferred ? ' ' + recommendedBadge() : '' ) + '</strong>' +
+			escapeHtml( addr ) +
+			( mapsHref ? ' <a href="' + mapsHref + '" target="_blank" rel="noopener">🧭 Directions</a>' : '' ) +
+			( dealer.phone ? '<br>📞 <a href="tel:' + encodeURIComponent( dealer.phone ) + '">' + escapeHtml( dealer.phone ) + '</a>' : '' ) +
+			'<br>FFL: ' + escapeHtml( dealer.license_number || '—' );
 		}
 
 		hideResultsArea();
@@ -387,9 +447,9 @@
 	function pinIcon() {
 		return {
 			path: 'M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z',
-			fillColor: '#C8102E',
+			fillColor: '#DCB45F',
 			fillOpacity: 1,
-			strokeColor: '#7F0A1D',
+			strokeColor: '#8B6914',
 			strokeWeight: 1.5,
 			scale: 1.6,
 			anchor: new google.maps.Point( 12, 22 ),

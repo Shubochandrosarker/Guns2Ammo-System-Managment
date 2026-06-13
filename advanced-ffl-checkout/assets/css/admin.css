@@ -1,17 +1,19 @@
 /**
- * Advanced FFL Checkout — Admin Panel Styles
- * WordPressistic brand: Purple #7c5cf6
+ * Advanced FFL Checkout — Admin Panel Styles (v1.3.0 G2A Edition)
+ * G2A brand: Tactical brass + graphite
  */
 
 /* ── Variables ────────────────────────────────────────────────────────────── */
 :root {
-	--wp-ffl-purple: #c46a2d;
-	--wp-ffl-purple-d: #22c55e;
-	--wp-ffl-purple-l: #ede9fe;
-	--wp-ffl-green: #059669;
-	--wp-ffl-orange: #f59e0b;
-	--wp-ffl-red: #dc2626;
-	--wp-ffl-blue: #2563eb;
+	/* Legacy *-purple variable names retained so existing rules keep working;
+	   values mapped to the G2A brass palette. */
+	--wp-ffl-purple:   #DCB45F;  /* brass-bright */
+	--wp-ffl-purple-d: #C9A84C;  /* brass */
+	--wp-ffl-purple-l: rgba(220,180,95,0.12);
+	--wp-ffl-green:    #16A34A;
+	--wp-ffl-orange:   #E8802F;
+	--wp-ffl-red:      #DC2626;
+	--wp-ffl-blue:     #3B82F6;
 	--wp-ffl-gray-50: #f9fafb;
 	--wp-ffl-gray-100: #f3f4f6;
 	--wp-ffl-gray-200: #e5e7eb;

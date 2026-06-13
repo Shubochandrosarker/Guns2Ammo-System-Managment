@@ -53,6 +53,7 @@ import AiSettings from './views/AiSettings';
 import AiBrain from './views/AiBrain';
 import AiAudit from './views/AiAudit';
 import AgentOmnibar from './components/AgentOmnibar';
+import ErrorBoundary from './components/ErrorBoundary';
 import Settings from './views/Settings';
 
 const VIEWS: Record<NavKey, () => JSX.Element> = {
@@ -134,7 +135,11 @@ export default function App() {
     return () => window.removeEventListener('hashchange', handler);
   }, []);
 
-  const View = VIEWS[view];
+  // Fall back to a friendly notice instead of crashing if a hash ever maps to
+  // a key with no registered view component.
+  const View = VIEWS[view] ?? (() => (
+    <div className="card p-6">This screen isn’t available. Pick another from the sidebar.</div>
+  ));
 
   return (
     <div className="flex h-full min-h-screen w-full bg-zinc-50 text-zinc-900 dark:bg-zinc-950 dark:text-zinc-100">
@@ -146,10 +151,16 @@ export default function App() {
           onToggleSidebar={() => setSidebarOpen((o) => !o)}
         />
         <main className="w-full min-w-0 flex-1 overflow-auto p-4 sm:p-6">
-          <View />
+          {/* A crash in any single view is contained here so it can never blank
+              the whole dashboard (the Import CSV white-screen). */}
+          <ErrorBoundary resetKey={view}>
+            <View />
+          </ErrorBoundary>
         </main>
       </div>
-      <AgentOmnibar />
+      <ErrorBoundary resetKey={view} label="The assistant">
+        <AgentOmnibar />
+      </ErrorBoundary>
     </div>
   );
 }

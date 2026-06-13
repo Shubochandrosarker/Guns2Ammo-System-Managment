@@ -41,7 +41,9 @@ $form_action = $is_preview ? '#preview-disabled' : admin_url( 'admin-post.php' )
 // Detect a flash error from a redirect (?error=)
 $flash_error = isset( $_GET['error'] ) ? sanitize_key( wp_unslash( $_GET['error'] ) ) : '';
 $flash_messages = [
-	'two_factor_failed' => __( 'License verification failed. Please double-check the last 4 characters of your FFL license number.', 'advanced-ffl-checkout' ),
+	'two_factor_failed' => 'email_otp' === ( $view['two_factor'] ?? '' )
+		? __( 'Verification code did not match, expired, or was used too many times. Click "Resend" below for a fresh code.', 'advanced-ffl-checkout' )
+		: __( 'License verification failed. Please double-check the last 4 characters of your FFL license number.', 'advanced-ffl-checkout' ),
 ];
 ?><!DOCTYPE html>
 <html <?php language_attributes(); ?>>
@@ -171,6 +173,31 @@ $flash_messages = [
 						</label>
 						<input type="text" id="wpistic-ffl-last4" name="last4" maxlength="4" required pattern="[0-9A-Za-z]{4}" inputmode="numeric" autocomplete="off" class="wpistic-ffl-portal__input wpistic-ffl-portal__input--otp" placeholder="••••">
 						<p class="wpistic-ffl-portal__hint"><?php esc_html_e( 'Enter the last 4 characters of your FFL license number for security.', 'advanced-ffl-checkout' ); ?></p>
+					</div>
+				<?php elseif ( 'email_otp' === $two_factor ) : ?>
+					<div class="wpistic-ffl-portal__field">
+						<label for="wpistic-ffl-otp" class="wpistic-ffl-portal__label">
+							<?php esc_html_e( 'Verify your identity — 6-digit code from email', 'advanced-ffl-checkout' ); ?>
+							<span class="wpistic-ffl-portal__required">*</span>
+						</label>
+						<input type="text" id="wpistic-ffl-otp" name="otp_code" maxlength="6" required pattern="[0-9]{6}" inputmode="numeric" autocomplete="one-time-code" class="wpistic-ffl-portal__input wpistic-ffl-portal__input--otp" placeholder="••••••" style="letter-spacing:.4em;text-align:center;">
+						<p class="wpistic-ffl-portal__hint">
+							<?php if ( ! empty( $view['otp_sent_to'] ) ) : ?>
+								<?php
+								printf(
+									/* translators: %s = masked email */
+									esc_html__( 'We sent a 6-digit code to %s. It expires in 10 minutes.', 'advanced-ffl-checkout' ),
+									'<strong>' . esc_html( $view['otp_sent_to'] ) . '</strong>'
+								);
+								?>
+							<?php else : ?>
+								<?php esc_html_e( 'Enter the 6-digit verification code from the email we just sent. It expires in 10 minutes.', 'advanced-ffl-checkout' ); ?>
+							<?php endif; ?>
+							<br>
+							<a href="<?php echo esc_url( add_query_arg( 'resend_otp', '1', $portal_url ) ); ?>" style="color:var(--ffl-primary,#DCB45F);text-decoration:underline;font-size:12px;">
+								<?php esc_html_e( "Didn't get the code? Resend", 'advanced-ffl-checkout' ); ?>
+							</a>
+						</p>
 					</div>
 				<?php endif; ?>
 

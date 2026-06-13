@@ -203,6 +203,7 @@ add_action( 'pre_get_posts', function ( $query ) {
 
 	$min = isset( $_GET['min_price'] ) ? max( 0, (float) $_GET['min_price'] ) : 0;
 	$max = isset( $_GET['max_price'] ) ? max( 0, (float) $_GET['max_price'] ) : 0;
+	$has_price_filter = false;
 	if ( $min > 0 || $max > 0 ) {
 		$range = [ 'key' => '_price', 'type' => 'DECIMAL(10,2)' ];
 		if ( $min > 0 && $max > 0 && $max >= $min ) {
@@ -215,7 +216,12 @@ add_action( 'pre_get_posts', function ( $query ) {
 			$range['value']   = $max;
 			$range['compare'] = '<=';
 		}
-		$meta_query[] = $range;
+		// Named clause so price sorting can order by THIS join instead of a
+		// second `meta_key=_price` join — combining a price filter with a
+		// price sort previously produced an ambiguous query that returned
+		// wrong/empty results.
+		$meta_query['g2a_price'] = $range;
+		$has_price_filter        = true;
 	}
 	$query->set( 'meta_query', $meta_query );
 
@@ -226,14 +232,22 @@ add_action( 'pre_get_posts', function ( $query ) {
 			$query->set( 'order', 'DESC' );
 			break;
 		case 'price':
-			$query->set( 'meta_key', '_price' );
-			$query->set( 'orderby', 'meta_value_num' );
-			$query->set( 'order', 'ASC' );
+			if ( $has_price_filter ) {
+				$query->set( 'orderby', [ 'g2a_price' => 'ASC' ] );
+			} else {
+				$query->set( 'meta_key', '_price' );
+				$query->set( 'orderby', 'meta_value_num' );
+				$query->set( 'order', 'ASC' );
+			}
 			break;
 		case 'price-desc':
-			$query->set( 'meta_key', '_price' );
-			$query->set( 'orderby', 'meta_value_num' );
-			$query->set( 'order', 'DESC' );
+			if ( $has_price_filter ) {
+				$query->set( 'orderby', [ 'g2a_price' => 'DESC' ] );
+			} else {
+				$query->set( 'meta_key', '_price' );
+				$query->set( 'orderby', 'meta_value_num' );
+				$query->set( 'order', 'DESC' );
+			}
 			break;
 		case 'popularity':
 			$query->set( 'meta_key', 'total_sales' );
@@ -247,3 +261,177 @@ add_action( 'pre_get_posts', function ( $query ) {
 			break;
 	}
 } );
+
+/* ==================================================================
+ * SALE / SPECIAL-OFFER COUNTDOWNS
+ * A live countdown wherever a product is on sale with a scheduled end
+ * date (_sale_price_dates_to): a "Special Offer" banner at the top of
+ * the shop, a compact timer on shop cards, and a prominent timer on the
+ * single-product page. All driven by one shared CSS + ticker.
+ * ================================================================== */
+
+/**
+ * Sale-end UNIX timestamp for a product, or 0 when it isn't a time-boxed
+ * sale that is still running. Variable products use the soonest child end.
+ */
+function g2a_sale_ends_ts( $product ) {
+	if ( ! $product instanceof WC_Product || ! $product->is_on_sale() ) {
+		return 0;
+	}
+	$dt = $product->get_date_on_sale_to();
+	$to = $dt ? (int) $dt->getTimestamp() : 0;
+	if ( ! $to && $product->is_type( 'variable' ) ) {
+		foreach ( $product->get_children() as $cid ) {
+			$child = wc_get_product( $cid );
+			$cdt   = $child && $child->is_on_sale() ? $child->get_date_on_sale_to() : null;
+			if ( $cdt ) {
+				$cto = (int) $cdt->getTimestamp();
+				$to  = $to ? min( $to, $cto ) : $cto;
+			}
+		}
+	}
+	return ( $to && $to > time() ) ? $to : 0;
+}
+
+/**
+ * Print the shared countdown CSS + ticker once per page. The ticker
+ * re-queries every second, so countdowns rendered after it still update.
+ */
+function g2a_sale_countdown_assets() {
+	static $done = false;
+	if ( $done ) {
+		return;
+	}
+	$done = true;
+	?>
+<style id="g2a-sale-cd-css">
+.g2a-cd{--cd-brass:var(--color-brass-bright,#DCB45F);--cd-ember:var(--color-ember,#E8802F);font-family:var(--font-mono,monospace)}
+.g2a-cd.is-ended{display:none}
+.g2a-cd--card{display:flex;align-items:center;gap:6px;margin:8px 0 2px;font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--color-silver,#8E8D96)}
+.g2a-cd--card .g2a-cd__lbl{color:var(--cd-ember);font-weight:700}
+.g2a-cd--card .g2a-cd__t b{color:var(--color-white,#F4F4F6);font-weight:700}
+.g2a-offer{position:relative;overflow:hidden;display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:16px;margin:0 0 22px;padding:18px 22px;border:1px solid var(--color-hairline,rgba(255,255,255,.1));border-radius:12px;background:linear-gradient(120deg,var(--color-gunmetal,#26252C),var(--color-surface-2,#1f1f27))}
+.g2a-offer::before{content:"";position:absolute;left:0;top:0;bottom:0;width:5px;background:linear-gradient(180deg,var(--cd-brass),var(--cd-ember))}
+.g2a-offer__l{min-width:0}
+.g2a-offer__ey{font-family:var(--font-mono,monospace);font-size:10px;letter-spacing:.24em;text-transform:uppercase;color:var(--cd-ember);font-weight:700}
+.g2a-offer__t{font-family:var(--font-display,sans-serif);font-size:clamp(20px,3vw,30px);line-height:1.05;margin:4px 0 0;color:var(--color-white,#F4F4F6)}
+.g2a-offer__t a{color:inherit;text-decoration:none}
+.g2a-offer__t a:hover{color:var(--cd-brass)}
+.g2a-offer__sub{font-family:var(--font-ui,sans-serif);font-size:13px;color:var(--color-fog,#CBCAD2);margin-top:2px}
+.g2a-cd__units{display:flex;gap:10px}
+.g2a-cd__units span{display:flex;flex-direction:column;align-items:center;gap:4px;min-width:54px;padding:10px 8px;background:rgba(0,0,0,.28);border:1px solid rgba(220,180,95,.4);border-radius:10px}
+html[data-theme="light"] .g2a-cd__units span{background:rgba(20,19,23,.06)}
+.g2a-cd__units b{font-family:var(--font-mono,monospace);font-size:26px;font-weight:700;line-height:1;color:var(--cd-brass);font-variant-numeric:tabular-nums}
+.g2a-cd__units i{font-style:normal;font-size:9px;letter-spacing:.16em;text-transform:uppercase;color:var(--color-silver,#8E8D96)}
+.g2a-cd--single{display:flex;flex-wrap:wrap;align-items:center;gap:14px;margin:14px 0;padding:14px 16px;border:1px solid rgba(220,180,95,.4);border-radius:12px;background:linear-gradient(120deg,rgba(232,128,47,.10),transparent)}
+.g2a-cd--single .g2a-cd__flag{font-family:var(--font-mono,monospace);font-size:11px;letter-spacing:.18em;text-transform:uppercase;font-weight:700;color:var(--cd-ember)}
+@media(max-width:600px){.g2a-cd__units span{min-width:46px}.g2a-cd__units b{font-size:21px}}
+</style>
+<script id="g2a-sale-cd-js">
+(function(){
+	function pad(n){return n<10?'0'+n:''+n;}
+	function tick(){
+		var now=Date.now();
+		var nodes=document.querySelectorAll('.g2a-cd[data-ends]');
+		for(var i=0;i<nodes.length;i++){
+			var el=nodes[i];
+			var t=parseInt(el.getAttribute('data-ends'),10)*1000;
+			var diff=Math.max(0,t-now),s=Math.floor(diff/1000);
+			var d=Math.floor(s/86400);s%=86400;var h=Math.floor(s/3600);s%=3600;var m=Math.floor(s/60);s%=60;
+			var dd=el.querySelector('[data-d]'),hh=el.querySelector('[data-h]'),mm=el.querySelector('[data-m]'),ss=el.querySelector('[data-s]');
+			if(dd)dd.textContent=pad(d);if(hh)hh.textContent=pad(h);if(mm)mm.textContent=pad(m);if(ss)ss.textContent=pad(s);
+			if(diff<=0)el.classList.add('is-ended');
+		}
+	}
+	tick();setInterval(tick,1000);
+})();
+</script>
+	<?php
+}
+
+/** Compact "Sale ends" timer under the price on shop cards. */
+function g2a_render_sale_countdown_card() {
+	global $product;
+	$ends = g2a_sale_ends_ts( $product );
+	if ( ! $ends ) {
+		return;
+	}
+	g2a_sale_countdown_assets();
+	echo '<div class="g2a-cd g2a-cd--card" data-ends="' . esc_attr( (string) $ends ) . '" role="timer" aria-label="' . esc_attr__( 'Sale ends in', 'guns2ammo' ) . '">'
+		. '<span class="g2a-cd__lbl">' . esc_html__( 'Sale ends', 'guns2ammo' ) . '</span>'
+		. '<span class="g2a-cd__t"><b data-d>00</b>d <b data-h>00</b>h <b data-m>00</b>m <b data-s>00</b>s</span>'
+		. '</div>';
+}
+add_action( 'woocommerce_after_shop_loop_item_title', 'g2a_render_sale_countdown_card', 11 );
+
+/** Prominent special-offer timer on the single-product summary. */
+function g2a_render_sale_countdown_single() {
+	global $product;
+	$ends = g2a_sale_ends_ts( $product );
+	if ( ! $ends ) {
+		return;
+	}
+	g2a_sale_countdown_assets();
+	echo '<div class="g2a-cd g2a-cd--single" data-ends="' . esc_attr( (string) $ends ) . '" role="timer">'
+		. '<span class="g2a-cd__flag">' . esc_html__( '⚡ Special Offer ends in', 'guns2ammo' ) . '</span>'
+		. '<div class="g2a-cd__units">'
+		. '<span><b data-d>00</b><i>' . esc_html__( 'Days', 'guns2ammo' ) . '</i></span>'
+		. '<span><b data-h>00</b><i>' . esc_html__( 'Hrs', 'guns2ammo' ) . '</i></span>'
+		. '<span><b data-m>00</b><i>' . esc_html__( 'Min', 'guns2ammo' ) . '</i></span>'
+		. '<span><b data-s>00</b><i>' . esc_html__( 'Sec', 'guns2ammo' ) . '</i></span>'
+		. '</div></div>';
+}
+add_action( 'woocommerce_single_product_summary', 'g2a_render_sale_countdown_single', 25 );
+
+/** "Special Offer" banner with the soonest-ending sale on the main shop. */
+function g2a_render_shop_offer_banner() {
+	if ( ! ( function_exists( 'is_shop' ) && is_shop() ) || is_paged() ) {
+		return;
+	}
+	$q = new WP_Query(
+		array(
+			'post_type'      => 'product',
+			'post_status'    => 'publish',
+			'posts_per_page' => 1,
+			'no_found_rows'  => true,
+			'fields'         => 'ids',
+			'meta_key'       => '_sale_price_dates_to',
+			'orderby'        => 'meta_value_num',
+			'order'          => 'ASC',
+			'meta_query'     => array(
+				array(
+					'key'     => '_sale_price_dates_to',
+					'value'   => time(),
+					'compare' => '>',
+					'type'    => 'NUMERIC',
+				),
+			),
+		)
+	);
+	if ( empty( $q->posts ) ) {
+		return;
+	}
+	$product = wc_get_product( (int) $q->posts[0] );
+	$ends    = g2a_sale_ends_ts( $product );
+	if ( ! $ends ) {
+		return;
+	}
+	g2a_sale_countdown_assets();
+	?>
+	<div class="g2a-offer" role="region" aria-label="<?php esc_attr_e( 'Special offer', 'guns2ammo' ); ?>">
+		<div class="g2a-offer__l">
+			<div class="g2a-offer__ey"><?php esc_html_e( 'Special Offer', 'guns2ammo' ); ?></div>
+			<h3 class="g2a-offer__t"><a href="<?php echo esc_url( $product->get_permalink() ); ?>"><?php echo esc_html( $product->get_name() ); ?></a></h3>
+			<div class="g2a-offer__sub"><?php echo wp_kses_post( $product->get_price_html() ); ?> &mdash; <?php esc_html_e( 'limited time only', 'guns2ammo' ); ?></div>
+		</div>
+		<div class="g2a-cd g2a-cd__units" data-ends="<?php echo esc_attr( (string) $ends ); ?>" role="timer">
+			<span><b data-d>00</b><i><?php esc_html_e( 'Days', 'guns2ammo' ); ?></i></span>
+			<span><b data-h>00</b><i><?php esc_html_e( 'Hrs', 'guns2ammo' ); ?></i></span>
+			<span><b data-m>00</b><i><?php esc_html_e( 'Min', 'guns2ammo' ); ?></i></span>
+			<span><b data-s>00</b><i><?php esc_html_e( 'Sec', 'guns2ammo' ); ?></i></span>
+		</div>
+	</div>
+	<?php
+	wp_reset_postdata();
+}
+add_action( 'woocommerce_before_shop_loop', 'g2a_render_shop_offer_banner', 5 );

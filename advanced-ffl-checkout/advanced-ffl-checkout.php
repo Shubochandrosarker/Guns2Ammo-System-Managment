@@ -3,7 +3,7 @@
  * Plugin Name:       Advanced FFL Checkout Solutions — G2A Edition
  * Plugin URI:        https://wordpressistic.com/products/advanced-ffl-checkout
  * Description:       Federal Firearms License (FFL) dealer management, WooCommerce checkout integration, transfer tracking and one-click dealer confirmation portal — customized for the Guns2Ammo system (HPOS-safe order meta, brass/graphite branding, customer "My FFL Transfers" tab, NICS 3-day automation, SMS via Verifyistic, WC order ↔ transfer status bridge).
- * Version:           1.4.0
+ * Version:           1.7.4
  * Requires at least: 6.4
  * Requires PHP:      8.1
  * Author:            Wordpressistic
@@ -29,7 +29,7 @@ if ( version_compare( PHP_VERSION, '8.1', '<' ) ) {
 }
 
 // ── Constants ─────────────────────────────────────────────────────────────────
-define( 'WPISTIC_FFL_VERSION',   '1.4.0' );
+define( 'WPISTIC_FFL_VERSION',   '1.7.4' );
 define( 'WPISTIC_FFL_FILE',      __FILE__ );
 define( 'WPISTIC_FFL_PATH',      plugin_dir_path( __FILE__ ) );
 define( 'WPISTIC_FFL_URL',       plugin_dir_url( __FILE__ ) );
@@ -128,24 +128,43 @@ register_activation_hook( __FILE__, function (): void {
 	update_option( 'wpistic_ffl_zip_import_status', 'pending' );
 	update_option( 'wpistic_ffl_zip_import_offset', 0 );
 
-	// G2A: register the My Account endpoint before flushing so the rewrite
-	// rule lands in the same activation request.
+	// G2A: register every front-facing rewrite once so it survives activation.
 	if ( class_exists( '\WpisticFFL\G2A_Account' ) ) {
 		( new \WpisticFFL\G2A_Account() )->register_endpoint();
 	} else {
-		// Class not yet autoloaded during activation — add_rewrite_endpoint
-		// will be re-registered on next page load by the bootstrap.
 		add_rewrite_endpoint( 'ffl-transfers', EP_ROOT | EP_PAGES );
+	}
+	if ( class_exists( '\WpisticFFL\G2A_Customer_Tracking' ) ) {
+		( new \WpisticFFL\G2A_Customer_Tracking() )->register_rewrites();
+	}
+	if ( class_exists( '\WpisticFFL\G2A_Form_4473' ) ) {
+		( new \WpisticFFL\G2A_Form_4473() )->register_rewrites();
+	}
+	if ( class_exists( '\WpisticFFL\G2A_Scorecard' ) ) {
+		( new \WpisticFFL\G2A_Scorecard() )->register_rewrites();
 	}
 
 	flush_rewrite_rules();
 } );
 
 register_deactivation_hook( __FILE__, function (): void {
-	wp_clear_scheduled_hook( 'wpistic_ffl_process_zip_import' );
-	wp_clear_scheduled_hook( 'wpistic_ffl_process_atf_sync' );
-	wp_clear_scheduled_hook( 'wpistic_ffl_monthly_sync' );
-	wp_clear_scheduled_hook( 'wpistic_ffl_daily_portal_runner' );
+	// Cancel from both engines (Action Scheduler + WP-Cron) — defensive.
+	$hooks = [
+		'wpistic_ffl_process_zip_import',
+		'wpistic_ffl_process_atf_sync',
+		'wpistic_ffl_monthly_sync',
+		'wpistic_ffl_daily_portal_runner',
+		'wpistic_ffl_carrier_poll',
+		'wpistic_ffl_async_issue_dealer_token',
+		'wpistic_ffl_dealer_health_check',
+		'wpistic_ffl_webhook_retry',
+	];
+	foreach ( $hooks as $hook ) {
+		wp_clear_scheduled_hook( $hook );
+		if ( function_exists( 'as_unschedule_all_actions' ) ) {
+			\as_unschedule_all_actions( $hook, [], 'wpistic-ffl' );
+		}
+	}
 	flush_rewrite_rules();
 } );
 
@@ -167,40 +186,24 @@ add_filter( 'cron_schedules', function ( array $schedules ): array {
 } );
 
 // ── CORS — allow G2A Dashboard (app.guns2ammo.com) to call WP REST API ───────
-// Scoped strictly to the plugin's REST namespace so we don't leak credentials
-// to unrelated WP REST routes or front-end pages.
-function wpistic_ffl_cors_allowed_origins(): array {
-	return array(
-		'https://app.guns2ammo.com',
-		'http://localhost:3000',
-		'http://localhost:5173',
-	);
-}
-
-function wpistic_ffl_request_is_plugin_route(): bool {
-	if ( isset( $_SERVER['REQUEST_URI'] ) ) {
-		$uri = wp_unslash( $_SERVER['REQUEST_URI'] );
-		if ( false !== strpos( $uri, '/wp-json/' . WPISTIC_FFL_REST_NS . '/' )
-			|| false !== strpos( $uri, '?rest_route=/' . WPISTIC_FFL_REST_NS . '/' )
-		) {
-			return true;
-		}
-	}
-	return false;
-}
-
+// Scoped to plugin REST namespace only — prevents leaking CORS headers across the whole site.
 add_action( 'rest_api_init', function (): void {
+	remove_filter( 'rest_pre_serve_request', 'rest_send_cors_headers' );
+
 	add_filter( 'rest_pre_serve_request', function ( $served, $result, $request ) {
-		if ( ! $request instanceof \WP_REST_Request ) {
-			return $served;
-		}
-		$route = (string) $request->get_route();
-		if ( 0 !== strpos( $route, '/' . WPISTIC_FFL_REST_NS . '/' ) ) {
+		$route = method_exists( $request, 'get_route' ) ? (string) $request->get_route() : '';
+		if ( strpos( $route, '/' . WPISTIC_FFL_REST_NS . '/' ) !== 0 ) {
 			return $served;
 		}
 
+		$allowed_origins = array(
+			'https://app.guns2ammo.com',
+			'http://localhost:3000',
+			'http://localhost:5173',
+		);
 		$origin = isset( $_SERVER['HTTP_ORIGIN'] ) ? sanitize_text_field( wp_unslash( $_SERVER['HTTP_ORIGIN'] ) ) : '';
-		if ( $origin && in_array( $origin, wpistic_ffl_cors_allowed_origins(), true ) ) {
+
+		if ( in_array( $origin, $allowed_origins, true ) ) {
 			header( 'Access-Control-Allow-Origin: ' . $origin );
 			header( 'Access-Control-Allow-Credentials: true' );
 			header( 'Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS' );
@@ -208,32 +211,15 @@ add_action( 'rest_api_init', function (): void {
 			header( 'Access-Control-Max-Age: 600' );
 			header( 'Vary: Origin', false );
 		}
+
+		if ( isset( $_SERVER['REQUEST_METHOD'] ) && 'OPTIONS' === $_SERVER['REQUEST_METHOD'] ) {
+			status_header( 200 );
+			exit();
+		}
+
 		return $served;
 	}, 10, 3 );
-}, 5 );
-
-// OPTIONS preflight short-circuit — only for the plugin's REST routes.
-// Fires before WP's REST router so the browser sees a 200 without auth/cookies.
-add_action( 'init', function (): void {
-	if ( ! isset( $_SERVER['REQUEST_METHOD'] ) || 'OPTIONS' !== $_SERVER['REQUEST_METHOD'] ) {
-		return;
-	}
-	if ( ! wpistic_ffl_request_is_plugin_route() ) {
-		return;
-	}
-
-	$origin = isset( $_SERVER['HTTP_ORIGIN'] ) ? sanitize_text_field( wp_unslash( $_SERVER['HTTP_ORIGIN'] ) ) : '';
-	if ( $origin && in_array( $origin, wpistic_ffl_cors_allowed_origins(), true ) ) {
-		header( 'Access-Control-Allow-Origin: ' . $origin );
-		header( 'Access-Control-Allow-Credentials: true' );
-		header( 'Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS' );
-		header( 'Access-Control-Allow-Headers: Authorization, Content-Type, X-WP-Nonce, X-Requested-With' );
-		header( 'Access-Control-Max-Age: 600' );
-		header( 'Vary: Origin', false );
-	}
-	status_header( 200 );
-	exit();
-}, 1 );
+}, 15 );
 
 // ── Boot ──────────────────────────────────────────────────────────────────────
 add_action( 'plugins_loaded', function (): void {
@@ -298,9 +284,7 @@ add_action( 'plugins_loaded', function (): void {
 			return;
 		}
 		if ( 'shipped_to_dealer' === $new_status ) {
-			if ( ! wp_next_scheduled( 'wpistic_ffl_async_issue_dealer_token', [ (int) $transfer_id ] ) ) {
-				wp_schedule_single_event( time() + 5, 'wpistic_ffl_async_issue_dealer_token', [ (int) $transfer_id ] );
-			}
+			\WpisticFFL\G2A_Scheduler::async( 'wpistic_ffl_async_issue_dealer_token', [ (int) $transfer_id ] );
 		}
 	}, 10, 3 );
 
@@ -320,6 +304,47 @@ add_action( 'plugins_loaded', function (): void {
 
 	// G2A: theme bridge — capture Transfer Request form posts as draft transfers.
 	new \WpisticFFL\G2A_Bridge();
+
+	// G2A: public per-transfer tracking page (HMAC-protected, no login).
+	new \WpisticFFL\G2A_Customer_Tracking();
+
+	// G2A: admin Activity Log page + JSON endpoints for the dashboard.
+	new \WpisticFFL\G2A_Activity();
+
+	// G2A: compliance + security audit page + token-secret nag + regen handler.
+	new \WpisticFFL\G2A_Compliance_Check();
+	add_action( 'admin_init', [ '\WpisticFFL\G2A_Compliance_Check', 'maybe_regenerate_secret' ] );
+
+	// G2A: carrier tracking auto-advance on shipment_tracking entry.
+	new \WpisticFFL\G2A_Carrier();
+
+	// G2A: live carrier providers (EasyPost pull + webhook receiver for Shippo/EasyPost/AfterShip/ShipStation).
+	new \WpisticFFL\G2A_Carrier_Providers();
+
+	// G2A: per-customer saved-dealer registry — quick-pick at checkout + manage in My Account.
+	new \WpisticFFL\G2A_Saved_Dealers();
+
+	// G2A: generic outbound webhook dispatcher (Zapier/Make/n8n/custom CRM).
+	new \WpisticFFL\G2A_Webhooks_Out();
+
+	// G2A: ops tools — bulk dealer fees, customer LTV lookup, nightly health alerts.
+	new \WpisticFFL\G2A_Ops_Tools();
+
+	// G2A: admin TOTP 2FA (opt-in per user).
+	new \WpisticFFL\G2A_Admin_2FA();
+
+	// G2A: WP personal-data exporter / eraser for FFL transfers.
+	new \WpisticFFL\G2A_Gdpr();
+
+	// G2A: public [g2a_ffl_dealer_onboard] shortcode for FFLs to apply.
+	new \WpisticFFL\G2A_Dealer_Onboarding();
+
+	// G2A: 4473 worksheet draft generator + dealer scorecard PDFs (admin-only URLs).
+	new \WpisticFFL\G2A_Form_4473();
+	new \WpisticFFL\G2A_Scorecard();
+
+	// G2A: 50-state law engine top-up — ensures every state has a baseline rule.
+	new \WpisticFFL\G2A_State_Laws();
 
 }, 20 );
 

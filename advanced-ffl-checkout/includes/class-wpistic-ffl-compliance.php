@@ -42,10 +42,10 @@ class Compliance {
 
 		$rules = $this->get_applicable_rules( $state, $ffl_item_types );
 
-		// Strict mode (default) blocks checkout with an error; warnings-only mode
-		// preserves the legacy non-blocking notice behavior for shops that opt in.
-		$strict = '1' === (string) get_option( 'wpistic_ffl_compliance_strict', '1' );
-		$type   = $strict ? 'error' : 'notice';
+		// Strict mode (default) blocks checkout so customers cannot bypass state restrictions
+		// by ignoring a passive notice. Site owners can opt back into legacy warning behavior.
+		$strict = (string) get_option( 'wpistic_ffl_compliance_strict', '1' ) === '1';
+		$level  = $strict ? 'error' : 'notice';
 
 		foreach ( $rules as $rule ) {
 			wc_add_notice(
@@ -54,9 +54,51 @@ class Compliance {
 					esc_html( $state ),
 					esc_html( $rule->description )
 				),
-				$type
+				$level
 			);
 		}
+	}
+
+	/**
+	 * Advisory check that the chosen dealer's state is compatible with the buyer's
+	 * billing state. Logs (does not block) so admins can spot likely-illegal pairings.
+	 *
+	 * @param object|null     $dealer Dealer row (must expose ->state and ->id when present).
+	 * @param \WC_Order|null  $order  Order whose billing state to compare.
+	 */
+	public static function validate_dealer_for_buyer( $dealer, $order ): void {
+		if ( ! $dealer || ! $order || ! is_object( $dealer ) ) {
+			return;
+		}
+
+		$dealer_state = isset( $dealer->state ) ? strtoupper( (string) $dealer->state ) : '';
+		$buyer_state  = method_exists( $order, 'get_billing_state' ) ? strtoupper( (string) $order->get_billing_state() ) : '';
+		if ( '' === $dealer_state || '' === $buyer_state ) {
+			return;
+		}
+		if ( $dealer_state === $buyer_state ) {
+			return;
+		}
+
+		$allow = apply_filters( 'wpistic_ffl_dealer_buyer_state_allowlist', [], $dealer_state, $buyer_state );
+		$pair  = $dealer_state . ':' . $buyer_state;
+		if ( is_array( $allow ) && in_array( $pair, $allow, true ) ) {
+			return;
+		}
+
+		$msg = sprintf(
+			'[FFL] Dealer state %s does not match buyer state %s on order #%s (dealer #%s).',
+			$dealer_state,
+			$buyer_state,
+			method_exists( $order, 'get_id' ) ? (string) $order->get_id() : '?',
+			isset( $dealer->id ) ? (string) $dealer->id : '?'
+		);
+		if ( function_exists( 'wc_get_logger' ) ) {
+			wc_get_logger()->warning( $msg, [ 'source' => 'wpistic-ffl-compliance' ] );
+		} else {
+			error_log( $msg );
+		}
+		do_action( 'wpistic_ffl_dealer_buyer_state_mismatch', $dealer, $order );
 	}
 
 	/**
@@ -110,45 +152,6 @@ class Compliance {
 	 */
 	public static function is_restricted( string $state, string $item_type ): bool {
 		return count( self::get_applicable_rules( $state, [ $item_type ] ) ) > 0;
-	}
-
-	/**
-	 * Validate that a resolved dealer is permitted to receive a transfer for
-	 * the buyer on a given order. Currently advisory only: logs a compliance
-	 * audit event when either side of the state pair is missing.
-	 *
-	 * TODO: replace with an admin-managed state-pair allow/deny list keyed on
-	 * (dealer_state, buyer_state, item_type) once the rules editor lands.
-	 *
-	 * @param object    $dealer  Row from the dealers table (must expose premise_state).
-	 * @param \WC_Order $order   The order being processed.
-	 * @return bool true if the pair looks valid, false if missing data.
-	 */
-	public static function validate_dealer_for_buyer( $dealer, \WC_Order $order ): bool {
-		$dealer_state = is_object( $dealer ) ? strtoupper( (string) ( $dealer->premise_state ?? '' ) ) : '';
-		$buyer_state  = strtoupper( (string) $order->get_billing_state() );
-
-		if ( ! $dealer_state || ! $buyer_state ) {
-			global $wpdb;
-			$transfer_id = (int) $order->get_meta( '_wpistic_ffl_transfer_id' );
-			$notes       = sprintf(
-				'Compliance audit: dealer/buyer state pair incomplete (dealer=%s, buyer=%s) on order #%d.',
-				$dealer_state ?: '?',
-				$buyer_state  ?: '?',
-				(int) $order->get_id()
-			);
-			$wpdb->insert( DB::table( 'events' ), [ // phpcs:ignore WordPress.DB.DirectDatabaseQuery
-				'transfer_id' => $transfer_id ?: 0,
-				'event_type'  => 'compliance_warning',
-				'new_status'  => null,
-				'notes'       => $notes,
-				'actor'       => 'system',
-				'actor_ip'    => '',
-			] );
-			return false;
-		}
-
-		return true;
 	}
 
 	// ── Private helpers ───────────────────────────────────────────────────────
