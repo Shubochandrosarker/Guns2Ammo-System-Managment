@@ -490,6 +490,47 @@ h1, h2, h3 { color: var(--color-white); margin: 0; }
 html[data-theme="light"] .g2a-mode .ico-sun { display: block; }
 html[data-theme="light"] .g2a-mode .ico-moon { display: none; }
 @media (max-width: 480px) { .g2a-mode { width: 34px; height: 34px; } }
+
+/* ──────────────────────────────────────────────────────────────────
+   NAV CONTRAST — light/dark + over-hero readability
+   The bar is fixed and transparent at the very top of every page,
+   floating over the page hero. G2A heroes are predominantly DARK
+   photos / gradients, so at the top the bar ink must stay LIGHT in
+   BOTH colour modes (this mirrors the .hero-media on-media ink rule).
+   Without this, light mode flips the ink to near-black and the whole
+   menu + logo disappear over the dark hero — the reported bug. A faint
+   top-scrim keeps that light ink readable even when a page opens on a
+   lighter section. Once scrolled, the bar gains the solid chrome
+   background and the ink flips to the active theme palette (dark on the
+   light chrome in light mode, light on dark in dark mode). */
+.g2a-nav:not(.scrolled) {
+  background: linear-gradient(180deg, rgba(8,7,10,0.55) 0%, rgba(8,7,10,0.14) 58%, rgba(8,7,10,0) 100%);
+}
+.g2a-nav:not(.scrolled) .logo { color: var(--ink-on-media); }
+.g2a-nav:not(.scrolled) .logo .mark { border-color: var(--brass-on-media); }
+.g2a-nav:not(.scrolled) .logo .mark::after { background: var(--brass-on-media); }
+.g2a-nav:not(.scrolled) .links > li > a { color: var(--ink-on-media-dim); }
+.g2a-nav:not(.scrolled) .links > li:hover > a,
+.g2a-nav:not(.scrolled) .links > li > a[aria-current="page"] { color: var(--ink-on-media); }
+.g2a-nav:not(.scrolled) .phone { color: var(--brass-on-media); }
+.g2a-nav:not(.scrolled) .hamburger,
+.g2a-nav:not(.scrolled) .g2a-mode,
+.g2a-nav:not(.scrolled) .profile-btn { color: var(--ink-on-media); border-color: rgba(245,244,240,0.32); }
+.g2a-nav:not(.scrolled) .profile-btn:hover,
+.g2a-nav:not(.scrolled) .g2a-mode:hover { color: var(--brass-on-media); border-color: var(--brass-on-media); }
+
+/* Scrolled: solid chrome bar — ink follows the active colour mode. */
+.g2a-nav.scrolled .logo { color: var(--color-white); }
+.g2a-nav.scrolled .logo .mark { border-color: var(--color-brass); }
+.g2a-nav.scrolled .logo .mark::after { background: var(--color-brass); }
+.g2a-nav.scrolled .links > li > a { color: var(--color-fog); }
+.g2a-nav.scrolled .links > li:hover > a,
+.g2a-nav.scrolled .links > li > a[aria-current="page"] { color: var(--color-white); }
+.g2a-nav.scrolled .phone { color: var(--color-brass-bright); }
+.g2a-nav.scrolled .hamburger,
+.g2a-nav.scrolled .g2a-mode,
+.g2a-nav.scrolled .profile-btn { color: var(--color-fog); }
+
 .g2a-profile .profile-menu { position: absolute; top: calc(100% + 8px); right: 0; min-width: 260px; background: var(--color-chrome-panel); backdrop-filter: blur(14px); border: 1px solid var(--color-hairline-bright); padding: 8px 0; opacity: 0; pointer-events: none; transform: translateY(-6px); transition: opacity 200ms var(--ease-std), transform 200ms var(--ease-std); }
 .g2a-profile.open .profile-menu { opacity: 1; pointer-events: auto; transform: translateY(0); }
 .g2a-profile .profile-menu .pm-head { padding: 12px 18px 14px; border-bottom: 1px solid var(--color-hairline); margin-bottom: 6px; }
