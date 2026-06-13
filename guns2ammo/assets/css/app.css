@@ -668,3 +668,105 @@ body.g2a-noscroll { overflow: hidden; }
     grid-template-columns: 1fr !important;
   }
 }
+
+/* ====================================================================
+   FOOTER MAP — live Google embed with animated brand pin
+   ==================================================================== */
+.g2a-foot-map { padding-top: 6px; }
+.g2a-map {
+  position: relative; height: 190px; border-radius: 6px; overflow: hidden;
+  border: 1px solid var(--color-hairline-bright);
+  transition: transform 240ms var(--ease-out), border-color 240ms var(--ease-std);
+}
+.g2a-map:hover { transform: translateY(-2px); border-color: var(--color-brass-dim); }
+.g2a-map iframe {
+  position: absolute; inset: 0; width: 100%; height: 100%; border: 0;
+  filter: saturate(0.85) contrast(1.02);
+}
+.g2a-map__pin {
+  position: absolute; left: 50%; top: 50%; transform: translate(-50%, -100%);
+  color: var(--color-ember); display: grid; place-items: center;
+  pointer-events: auto; text-decoration: none;
+  animation: g2a-pin-drop 600ms var(--ease-out) both, g2a-pin-bob 2.6s ease-in-out 800ms infinite;
+  filter: drop-shadow(0 6px 10px rgba(0,0,0,0.35));
+}
+.g2a-map__pin .ring {
+  position: absolute; bottom: -4px; left: 50%; transform: translateX(-50%);
+  width: 18px; height: 7px; border-radius: 50%;
+  background: rgba(232,128,47,0.45);
+  animation: g2a-pin-ring 2.6s ease-out 800ms infinite;
+}
+@keyframes g2a-pin-drop { from { transform: translate(-50%, -260%); opacity: 0; } to { transform: translate(-50%, -100%); opacity: 1; } }
+@keyframes g2a-pin-bob  { 0%,100% { transform: translate(-50%, -100%); } 50% { transform: translate(-50%, -118%); } }
+@keyframes g2a-pin-ring { 0%,100% { transform: translateX(-50%) scale(1); opacity: .45; } 50% { transform: translateX(-50%) scale(1.5); opacity: .15; } }
+
+/* ====================================================================
+   FAQ ACCORDION — shared (.g2a-faq) used on homepage + money pages
+   ==================================================================== */
+.g2a-faq { max-width: 880px; margin: 0 auto; display: grid; gap: 12px; }
+.g2a-faq details {
+  background: var(--color-gunmetal);
+  border: 1px solid var(--color-hairline);
+  border-left: 3px solid var(--color-brass-dim);
+  border-radius: 4px; padding: 0;
+  transition: border-color 240ms var(--ease-std), transform 240ms var(--ease-out);
+}
+.g2a-faq details:hover { border-left-color: var(--color-brass); transform: translateX(2px); }
+.g2a-faq details[open] { border-left-color: var(--color-ember); }
+.g2a-faq summary {
+  cursor: pointer; list-style: none; display: flex; align-items: center; justify-content: space-between; gap: 16px;
+  padding: 18px 22px; font-family: var(--font-condensed); font-weight: 600; font-size: 17px;
+  letter-spacing: 0.03em; color: var(--color-white);
+}
+.g2a-faq summary::-webkit-details-marker { display: none; }
+.g2a-faq summary::after {
+  content: ""; flex: 0 0 auto; width: 10px; height: 10px;
+  border-right: 2px solid var(--color-brass-bright); border-bottom: 2px solid var(--color-brass-bright);
+  transform: rotate(45deg); transition: transform 280ms var(--ease-out); margin-top: -4px;
+}
+.g2a-faq details[open] summary::after { transform: rotate(225deg); margin-top: 4px; }
+.g2a-faq .faq-a { padding: 0 22px 20px; color: var(--color-fog); font-size: 15px; line-height: 1.7; }
+.g2a-faq details[open] .faq-a { animation: g2a-faq-in 320ms var(--ease-out); }
+@keyframes g2a-faq-in { from { opacity: 0; transform: translateY(-6px); } to { opacity: 1; transform: none; } }
+
+/* ====================================================================
+   ANIMATION SYSTEM — clean, smooth, simple. All scroll reveals ride the
+   existing [data-reveal] IntersectionObserver in chrome.js; variants and
+   stagger are pure CSS. Everything collapses under prefers-reduced-motion.
+   ==================================================================== */
+[data-reveal="left"]  { transform: translateX(-28px); }
+[data-reveal="right"] { transform: translateX(28px); }
+[data-reveal="zoom"]  { transform: scale(0.94); }
+[data-reveal].is-in   { transform: none; }
+/* Stagger children: parent gets data-reveal-stagger; children inherit delay */
+[data-reveal-stagger] > * { opacity: 0; transform: translateY(18px); transition: opacity 600ms var(--ease-out), transform 600ms var(--ease-out); }
+[data-reveal-stagger].is-in > * { opacity: 1; transform: none; }
+[data-reveal-stagger].is-in > *:nth-child(1) { transition-delay: 0ms; }
+[data-reveal-stagger].is-in > *:nth-child(2) { transition-delay: 90ms; }
+[data-reveal-stagger].is-in > *:nth-child(3) { transition-delay: 180ms; }
+[data-reveal-stagger].is-in > *:nth-child(4) { transition-delay: 270ms; }
+[data-reveal-stagger].is-in > *:nth-child(5) { transition-delay: 360ms; }
+[data-reveal-stagger].is-in > *:nth-child(6) { transition-delay: 450ms; }
+[data-reveal-stagger].is-in > *:nth-child(n+7) { transition-delay: 540ms; }
+/* Brass underline draw on section headings */
+.g2a-underline { position: relative; display: inline-block; }
+.g2a-underline::after {
+  content: ""; position: absolute; left: 0; bottom: -8px; height: 3px; width: 100%;
+  background: linear-gradient(90deg, var(--color-brass), var(--color-ember));
+  transform: scaleX(0); transform-origin: left; transition: transform 700ms var(--ease-out) 200ms;
+}
+.is-in .g2a-underline::after, .g2a-underline.is-in::after { transform: scaleX(1); }
+/* Button arrow nudge */
+.btn .btn-arrow { transition: transform 200ms var(--ease-out); }
+.btn:hover .btn-arrow, button:hover .btn-arrow { transform: translateX(4px); }
+/* Card hover lift (opt-in via .g2a-lift) */
+.g2a-lift { transition: transform 240ms var(--ease-out), box-shadow 240ms var(--ease-out), border-color 240ms var(--ease-std); }
+.g2a-lift:hover { transform: translateY(-4px); box-shadow: 0 18px 44px rgba(0,0,0,0.28); border-color: var(--color-hairline-bright); }
+html[data-theme="light"] .g2a-lift:hover { box-shadow: 0 18px 44px rgba(40,30,8,0.14); }
+/* Count-up stat targets (chrome.js animates textContent) */
+[data-countup] { font-variant-numeric: tabular-nums; }
+@media (prefers-reduced-motion: reduce) {
+  [data-reveal-stagger] > * { opacity: 1 !important; transform: none !important; transition: none !important; }
+  .g2a-underline::after { transform: scaleX(1) !important; transition: none !important; }
+  .g2a-map__pin, .g2a-map__pin .ring { animation: none !important; }
+}

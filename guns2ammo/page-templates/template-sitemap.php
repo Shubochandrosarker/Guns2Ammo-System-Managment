@@ -45,8 +45,6 @@ $groups = [
 		[ 'Ammunition', '/collections/ammunition/' ],
 		[ 'Magazines', '/collections/magazines/' ],
 		[ 'FFL Transfers Info', '/transfers/' ],
-		[ 'Local Pickup', '/shop/' ],
-		[ 'Expert Fitment', '/contact/' ],
 		[ 'Federal Compliance', '/ffl-services/' ],
 	],
 	'Transfers & Selling' => [
@@ -103,7 +101,7 @@ $groups = [
   <div class="c">
     <span class="eyebrow">Guns 2 Ammo  Site Map</span>
     <h1>FIND <span class="a">EVERYTHING.</span></h1>
-    <p class="lead">Every page on the Guns 2 Ammo website, organized by area  the range, training, the machine gun experience, the shop, memberships, and more. Looking for the XML sitemap? It's at <a href="<?php echo esc_url( home_url( '/sitemap_index.xml' ) ); ?>" style="color:var(--color-brass-bright);">/sitemap_index.xml</a>.</p>
+    <p class="lead">Every page on the Guns 2 Ammo website, organized by area  the range, training, the machine gun experience, the shop, memberships, and more. Looking for the XML sitemap? It's at <a href="<?php echo esc_url( home_url( '/sitemap.xml' ) ); ?>" style="color:var(--color-brass-bright);">/sitemap.xml</a>.</p>
   </div>
 </header>
 

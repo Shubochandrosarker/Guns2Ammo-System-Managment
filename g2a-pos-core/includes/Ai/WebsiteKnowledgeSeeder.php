@@ -78,11 +78,34 @@ final class WebsiteKnowledgeSeeder {
 
 		$result['default_sections'] = self::seed_default_pack( $result['chunks'] );
 
+		// Refresh all live-tagged docs in one pass: purge once, then re-ingest
+		// the DB snapshot and the website copy so neither deletes the other.
+		self::purge_tag( self::TAG_LIVE );
+
+		// Authoritative live snapshot straight from the database: the real
+		// Memberistic plan names/prices and the current WooCommerce catalog
+		// size. This overrides any plan names guessed in the static pack.
+		$snapshot = self::live_data_doc();
+		if ( $snapshot !== '' ) {
+			$r = BrainService::ingest_text(
+				'Guns 2 Ammo — current membership plans and catalog (live)',
+				$snapshot,
+				array(
+					'source_type' => 'seed',
+					'tags'        => self::TAG_LIVE,
+					'scope'       => 'public',
+				)
+			);
+			if ( ! empty( $r['ok'] ) ) {
+				++$result['live_sections'];
+				$result['chunks'] += (int) ( $r['chunks'] ?? 0 );
+			}
+		}
+
 		// Live site content — the theme serves /llms-full.txt with current copy.
 		$url  = function_exists( 'home_url' ) ? home_url( '/llms-full.txt' ) : '';
 		$body = $url ? self::fetch( $url ) : null;
 		if ( $body !== null && $body !== '' ) {
-			self::purge_tag( self::TAG_LIVE );
 			$sections = self::split_sections( $body );
 			foreach ( $sections as $i => $section ) {
 				$r = BrainService::ingest_text(
@@ -159,12 +182,13 @@ final class WebsiteKnowledgeSeeder {
 				. 'Walk-ins are welcome; lanes can also be booked online.',
 
 			'Guns 2 Ammo — services and pricing' =>
-				"Range lane rental: \$20 per hour per lane. Extra shooter on the same lane: \$15.\n"
+				"Range lane rental: \$20 per hour per lane. Extra shooter on the same lane: \$15. Eye and ear protection: \$3 combined.\n"
 				. "Gun rentals: from \$15 (handguns and rifles available; rental guns must use range-purchased ammunition).\n"
-				. "Training: Arizona CCW class \$85 (4 hours, includes fingerprinting guidance). Basic handgun class \$95. Private one-on-one instruction \$140 per hour with an NRA-certified instructor.\n"
-				. "FFL transfers: \$35 per firearm (incoming transfers from any dealer or online retailer).\n"
-				. "Machine gun experience packages: \$249 (Bronze), \$449 (Silver), \$749 (Gold) — full-auto rentals with range officer supervision.\n"
-				. "Memberships: Ranger \$29.99/month, Operator \$39.99/month, Legacy \$59.99/month. Members get free or discounted lane time, guest passes, rental discounts, and store discounts depending on tier.",
+				. "Training: Arizona CCW classroom class \$85 (4 hours, Saturdays, includes fingerprinting guidance). Arizona CCW + Live Fire \$149.99 (5 hours, Monday evenings). Basic handgun class \$95. Private one-on-one instruction \$140 per hour with an NRA-certified instructor.\n"
+				. "FFL transfers: \$35 per firearm. NFA transfers: \$95 suppressor/SBR, \$295 full-auto.\n"
+				. "Machine gun experience packages: \$249 (Basic), \$449 (Premium), \$749 (Elite) — full-auto rentals (MP5 9×19mm, M16 5.56×45mm, AK-47 7.62×39mm) with one-on-one range officer supervision; ammo and targets included.\n"
+				. "Memberships (as published on the storefront): Defender, Patriot, and Guardian tiers. Members get free or discounted lane time, guest passes, rental discounts, and store discounts depending on tier. NOTE: the live 'Guns 2 Ammo — current membership plans' document below reflects the exact plan names and prices configured in Memberistic and takes precedence over this summary.\n"
+				. "Ladies Tuesday: women shoot a free 1-hour lane every Tuesday, with 25% off rentals; no membership required.",
 
 			'Guns 2 Ammo — website pages'    =>
 				"Key pages on {$home}:\n"
@@ -193,6 +217,77 @@ final class WebsiteKnowledgeSeeder {
 				. "Waivers: the Waivers workspace stores signed range waivers (OtterWaiver imports plus Verifyistic and Memberistic sources). Use the search box to confirm a customer has a waiver on file and the Check-in button to record a range visit.\n"
 				. "Lane reservations: the Lane Reservations workspace shows POS reservations and online bookings from the booking engine for any date. POS reservations are conflict-checked per lane and time window; use Check in / Check out / No-show to manage the day's roster.",
 		);
+	}
+
+	/**
+	 * Build a live snapshot document from the database: the exact Memberistic
+	 * plan names + prices and the current WooCommerce catalog size. Empty
+	 * string when neither data source is present.
+	 */
+	private static function live_data_doc(): string {
+		global $wpdb;
+		$parts = array();
+
+		if ( isset( $wpdb ) ) {
+			$plans_table = $wpdb->prefix . 'memberistic_plans';
+			$has_plans   = (bool) $wpdb->get_var(
+				$wpdb->prepare( 'SHOW TABLES LIKE %s', $wpdb->esc_like( $plans_table ) )
+			);
+			if ( $has_plans ) {
+				$rows = $wpdb->get_results(
+					"SELECT name, monthly_price, annual_price, status FROM {$plans_table} WHERE status = 'active' ORDER BY monthly_price ASC",
+					ARRAY_A
+				);
+				if ( $rows ) {
+					$lines = array();
+					foreach ( $rows as $row ) {
+						$name = (string) ( $row['name'] ?? '' );
+						$mo   = isset( $row['monthly_price'] ) ? number_format( (float) $row['monthly_price'], 2 ) : '';
+						$yr   = isset( $row['annual_price'] ) && (float) $row['annual_price'] > 0 ? number_format( (float) $row['annual_price'], 2 ) : '';
+						$line = '- ' . $name;
+						if ( '' !== $mo ) {
+							$line .= ": \${$mo}/month";
+						}
+						if ( '' !== $yr ) {
+							$line .= " (or \${$yr}/year)";
+						}
+						$lines[] = $line;
+					}
+					$parts[] = "Current Memberistic membership plans (authoritative — these are the real plan names and prices configured on the site):\n" . implode( "\n", $lines );
+				}
+			}
+		}
+
+		if ( function_exists( 'wp_count_posts' ) ) {
+			$counts = wp_count_posts( 'product' );
+			$pub    = isset( $counts->publish ) ? (int) $counts->publish : 0;
+			if ( $pub > 0 ) {
+				$cats = function_exists( 'get_terms' ) ? get_terms(
+					array(
+						'taxonomy'   => 'product_cat',
+						'hide_empty' => true,
+						'number'     => 12,
+						'orderby'    => 'count',
+						'order'      => 'DESC',
+					)
+				) : array();
+				$cat_names = array();
+				if ( is_array( $cats ) ) {
+					foreach ( $cats as $cat ) {
+						if ( is_object( $cat ) && isset( $cat->name ) ) {
+							$cat_names[] = $cat->name;
+						}
+					}
+				}
+				$line = "The online store currently has {$pub} published product(s).";
+				if ( $cat_names ) {
+					$line .= ' Top categories: ' . implode( ', ', $cat_names ) . '.';
+				}
+				$parts[] = $line;
+			}
+		}
+
+		return $parts ? implode( "\n\n", $parts ) : '';
 	}
 
 	// ------------------------------------------------------------------ helpers

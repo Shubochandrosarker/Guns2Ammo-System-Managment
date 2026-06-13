@@ -302,13 +302,14 @@
       setInterval(update, 60000);
     }
 
-    /* ===== Reveal on scroll =====
-     * [data-reveal] fades/slides in when scrolled into view. Variants:
-     *   data-reveal="left" | "right" | "scale" | "fade" (CSS in app.css).
-     * Stagger: [data-reveal] children of a [data-reveal-group] get an
-     * incremental transition-delay (capped at 6 steps) so card grids
-     * cascade as one motion. After the entrance finishes, the inline
-     * delay is cleared and .did-reveal restores snappy hover physics.
+    /* ===== Reveal on scroll (unified) =====
+     * Supports both conventions used across the theme:
+     *   [data-reveal]            fade/slide in (variants left|right|scale|fade via CSS)
+     *   [data-reveal-group]      children [data-reveal] cascade with a stagger delay
+     *   [data-reveal-stagger]    container whose direct children stagger (CSS-driven)
+     *   [data-countup]           animate a number up to data-countup when revealed
+     * All honor prefers-reduced-motion. After entrance, the inline delay is
+     * cleared and .did-reveal restores snappy hover physics.
      */
     var reduceMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     var REVEAL_STEP = 90, REVEAL_CAP = 5;
@@ -319,26 +320,42 @@
         });
       });
     }
+    var startCountup = function (el) {
+      var target = parseFloat(el.dataset.countup);
+      if (isNaN(target) || el.dataset.countupDone) return;
+      el.dataset.countupDone = '1';
+      if (reduceMotion) { el.textContent = (el.dataset.countupSuffix ? target + el.dataset.countupSuffix : target); return; }
+      var suffix = el.dataset.countupSuffix || '';
+      var decimals = (String(el.dataset.countup).split('.')[1] || '').length;
+      var dur = 1400, t0 = null;
+      var step = function (ts) {
+        if (!t0) t0 = ts;
+        var p = Math.min(1, (ts - t0) / dur);
+        var eased = 1 - Math.pow(1 - p, 3);
+        el.textContent = (target * eased).toFixed(decimals) + suffix;
+        if (p < 1) requestAnimationFrame(step);
+      };
+      requestAnimationFrame(step);
+    };
     var revealDone = function (el) {
       var delay = parseInt(el.style.transitionDelay, 10) || 0;
-      setTimeout(function () {
-        el.style.transitionDelay = '';
-        el.classList.add('did-reveal');
-      }, delay + 750);
+      setTimeout(function () { el.style.transitionDelay = ''; el.classList.add('did-reveal'); }, delay + 750);
     };
+    var REVEAL_SEL = '[data-reveal], [data-reveal-stagger], [data-countup]';
     if ('IntersectionObserver' in window && !reduceMotion) {
       var io = new IntersectionObserver(function (entries) {
         entries.forEach(function (en) {
-          if (en.isIntersecting) {
-            en.target.classList.add('is-in');
-            revealDone(en.target);
-            io.unobserve(en.target);
-          }
+          if (!en.isIntersecting) return;
+          en.target.classList.add('is-in');
+          if (en.target.hasAttribute('data-countup')) startCountup(en.target);
+          revealDone(en.target);
+          io.unobserve(en.target);
         });
       }, { threshold: 0.12, rootMargin: '0px 0px -40px 0px' });
-      document.querySelectorAll('[data-reveal]').forEach(function (el) { io.observe(el); });
+      document.querySelectorAll(REVEAL_SEL).forEach(function (el) { io.observe(el); });
     } else {
-      document.querySelectorAll('[data-reveal]').forEach(function (el) { el.classList.add('is-in', 'did-reveal'); });
+      document.querySelectorAll(REVEAL_SEL).forEach(function (el) { el.classList.add('is-in', 'did-reveal'); });
+      document.querySelectorAll('[data-countup]').forEach(startCountup);
     }
 
     /* ===== FAQ accordion (homepage "Common Questions") =====

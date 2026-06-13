@@ -85,7 +85,12 @@ get_header();
   <div class="c">
     <span class="eyebrow"> Since 2014  Mesa, AZ</span>
     <h1 style="margin-top: 22px;">MORE THAN<br>A RANGE.<br>A TRAINING <span class="a">INSTITUTION.</span></h1>
-    <p>What started as one couple's range  opened with a simple promise that every shooter, beginner or veteran, would be treated with the same respect  has grown into Mesa's premier indoor facility. We've trained 5,000+ students, served church security teams, certified law enforcement, and helped first-time buyers walk out confident.</p>
+    <p><?php echo g2a_content( // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- esc_html applied inside g2a_content().
+      'about_story',
+      "What started as one couple's range  opened with a simple promise that every shooter, beginner or veteran, would be treated with the same respect  has grown into Mesa's premier indoor facility. We've trained 5,000+ students, served church security teams, certified law enforcement, and helped first-time buyers walk out confident.",
+      'text',
+      'About — Story paragraph'
+    ); ?></p>
   </div>
 </header>
 
@@ -93,7 +98,7 @@ get_header();
   <div class="c">
     <span class="eyebrow" style="justify-content:center;"> Our Philosophy</span>
     <blockquote>"A safe shooter is a <em>disciplined</em> shooter. A disciplined shooter is a <em>trained</em> shooter. We are not in the business of selling guns. We are in the business of <em>training people</em> to handle them correctly  for life."</blockquote>
-    <div class="sig"> Robert &amp; Diane Halsey  Owners</div>
+    <div class="sig"> The Guns 2 Ammo Team</div>
   </div>
 </section>
 
@@ -105,7 +110,7 @@ get_header();
       <div class="cred">
         <div class="ic"><span></span></div>
         <h4>NRA CERTIFIED</h4>
-        <p>Every primary instructor holds NRA certification. Every assistant has 5,000+ documented hours.</p>
+        <p>Every instructor holds NRA certification, backed by military and law-enforcement experience.</p>
         <div class="meta">National Rifle Association</div>
       </div>
       <div class="cred">
@@ -147,39 +152,43 @@ get_header();
     <span class="eyebrow"> The Team</span>
     <h2>OPERATORS,<br>TEACHERS, FAMILY.</h2>
     <p style="color: var(--color-fog); max-width:64ch; margin: 0 0 32px;">Decades of combined experience from law enforcement, military, and competitive shooting. The team you train with is the team that owns the building.</p>
-    <div class="team-grid" data-reveal-group>
-      <div class="member" data-reveal>
-        <div class="photo" data-pl="EDITORIAL  ROBERT"></div>
-        <div class="body">
-          <div class="role">Owner  Lead Instructor</div>
-          <h4>ROBERT HALSEY</h4>
-          <p>22 years USAF security forces. NRA Pistol &amp; Rifle. AZ DPS approved.</p>
+    <?php
+    /* Real roster — same single source as /training/ (inc/instructors.php).
+       The fabricated Halsey/Cruz/Okafor grid conflicted with the training
+       page's equally fabricated Mendoza/Kelly/Tran roster. */
+    $g2a_team = function_exists( 'g2a_instructors' ) ? g2a_instructors() : array();
+    ?>
+    <div class="team-grid" data-reveal-stagger>
+      <?php foreach ( $g2a_team as $g2a_member ) : ?>
+        <div class="member g2a-lift">
+          <?php
+          /* Per-member editable headshot slot (Appearance → Site Content).
+             Priority: roster photo from inc/instructors.php → client
+             override → the original data-pl placeholder. No stock default
+             here on purpose: a range photo is not a headshot. */
+          $g2a_member_photo = ! empty( $g2a_member['photo'] ) ? $g2a_member['photo'] : '';
+          $g2a_member_slot  = g2a_content(
+            'about_team_photo_' . sanitize_title( $g2a_member['name'] ),
+            '',
+            'image',
+            'About — Team photo: ' . $g2a_member['name']
+          );
+          if ( ! $g2a_member_photo && $g2a_member_slot ) {
+            $g2a_member_photo = $g2a_member_slot;
+          }
+          ?>
+          <?php if ( $g2a_member_photo ) : ?>
+            <div class="photo" style="background-image:url('<?php echo esc_url( $g2a_member_photo ); ?>');background-size:cover;background-position:center;"></div>
+          <?php else : ?>
+            <div class="photo" data-pl="<?php echo esc_attr( strtoupper( $g2a_member['name'] ) ); ?>"></div>
+          <?php endif; ?>
+          <div class="body">
+            <div class="role"><?php echo esc_html( $g2a_member['role'] ); ?></div>
+            <h4><?php echo esc_html( strtoupper( $g2a_member['name'] ) ); ?></h4>
+            <p><?php echo esc_html( implode( ' · ', array_slice( (array) ( $g2a_member['creds'] ?? array() ), 0, 3 ) ) ); ?></p>
+          </div>
         </div>
-      </div>
-      <div class="member" data-reveal>
-        <div class="photo" data-pl="EDITORIAL  DIANE"></div>
-        <div class="body">
-          <div class="role">Owner  Operations</div>
-          <h4>DIANE HALSEY</h4>
-          <p>Built the curriculum. Runs the shop. Probably the reason you came back.</p>
-        </div>
-      </div>
-      <div class="member" data-reveal>
-        <div class="photo" data-pl="EDITORIAL  MARCUS"></div>
-        <div class="body">
-          <div class="role">Senior RSO</div>
-          <h4>MARCUS CRUZ</h4>
-          <p>14 years Mesa PD SWAT. USPSA Master Class. Quietest man on the line.</p>
-        </div>
-      </div>
-      <div class="member" data-reveal>
-        <div class="photo" data-pl="EDITORIAL  SARAH"></div>
-        <div class="body">
-          <div class="role">CCW Instructor</div>
-          <h4>SARAH OKAFOR</h4>
-          <p>USMC veteran. Specializes in first-time owners and women's-only classes.</p>
-        </div>
-      </div>
+      <?php endforeach; ?>
     </div>
   </div>
 </section>
@@ -189,12 +198,25 @@ get_header();
     <span class="eyebrow"> Facility</span>
     <h2>BUILT FOR PRECISION.</h2>
     <p style="color: var(--color-fog); max-width:64ch; margin: 0 0 32px;">Six 25-yard climate-controlled lanes. Smart ventilation rated for 12 air changes per hour. A retail floor stocked like a working operator's closet, not a sporting goods aisle.</p>
-    <div class="tour-grid" data-reveal-group>
-      <div class="photo" data-reveal="scale" style="background-image: linear-gradient(180deg, rgba(26,25,30,0.3), rgba(26,25,30,0.7)), url('<?php echo esc_url( g2a_asset( 'img/guns2ammo-indoor-range-lanes-mesa.jpg' ) ); ?>');"><div class="cap"><small>01  The Line</small>Six 25-yard climate-controlled lanes</div></div>
-      <div class="photo" data-reveal="scale" style="background-image: linear-gradient(180deg, rgba(26,25,30,0.3), rgba(26,25,30,0.7)), url('<?php echo esc_url( g2a_asset( 'img/guns2ammo-retail-floor-mesa.jpg' ) ); ?>');"><div class="cap"><small>02  Retail</small>Curated handguns &amp; rifles</div></div>
-      <div class="photo" data-reveal="scale" style="background-image: linear-gradient(180deg, rgba(26,25,30,0.3), rgba(26,25,30,0.7)), url('<?php echo esc_url( g2a_asset( 'img/guns2ammo-range-training-session.jpg' ) ); ?>');"><div class="cap"><small>03  Classroom</small>CCW &amp; safety courses</div></div>
-      <div class="photo" data-reveal="scale" style="background-image: linear-gradient(180deg, rgba(26,25,30,0.3), rgba(26,25,30,0.7)), url('<?php echo esc_url( g2a_asset( 'img/guns2ammo-rifles-rack.jpg' ) ); ?>');"><div class="cap"><small>04  Armory</small>The rental machine guns</div></div>
-      <div class="photo" data-reveal="scale" style="background-image: linear-gradient(180deg, rgba(26,25,30,0.3), rgba(26,25,30,0.7)), url('<?php echo esc_url( g2a_asset( 'img/guns2ammo-shop-floor.jpg' ) ); ?>');"><div class="cap"><small>05  Lounge</small>Members &amp; guests</div></div>
+    <?php
+    /* Facility tour — real brand photos, each one editable from
+       Appearance → Site Content. Clearing a URL gracefully falls back to
+       the original striped placeholder defined in the .photo CSS above. */
+    $g2a_tour_slots = array(
+      array( 'about_tour_01', g2a_asset( 'img/gallery/guns2ammo-range-lanes-mesa.jpg' ),  'About — Tour photo 01 (The Line)',  '01  The Line',  'Six 25-yard climate-controlled lanes' ),
+      array( 'about_tour_02', g2a_asset( 'img/gallery/guns2ammo-handgun-counter.jpg' ),   'About — Tour photo 02 (Retail)',    '02  Retail',    'Curated handguns &amp; rifles' ),
+      array( 'about_tour_03', g2a_asset( 'img/gallery/guns2ammo-training-class.jpg' ),    'About — Tour photo 03 (Classroom)', '03  Classroom', 'CCW &amp; safety courses' ),
+      array( 'about_tour_04', g2a_asset( 'img/gallery/guns2ammo-rifle-wall.jpg' ),        'About — Tour photo 04 (Armory)',    '04  Armory',    'The rental machine guns' ),
+      array( 'about_tour_05', g2a_asset( 'img/gallery/guns2ammo-retail-floor.jpg' ),      'About — Tour photo 05 (Lounge)',    '05  Lounge',    'Members &amp; guests' ),
+    );
+    ?>
+    <div class="tour-grid">
+      <?php foreach ( $g2a_tour_slots as $g2a_slot ) :
+        list( $g2a_slot_key, $g2a_slot_default, $g2a_slot_label, $g2a_slot_small, $g2a_slot_cap ) = $g2a_slot;
+        $g2a_slot_url = g2a_content( $g2a_slot_key, $g2a_slot_default, 'image', $g2a_slot_label );
+      ?>
+      <div class="photo"<?php if ( $g2a_slot_url ) : ?> style="background-image:linear-gradient(180deg, rgba(26,25,30,0.25), rgba(26,25,30,0.75)), url('<?php echo esc_url( $g2a_slot_url ); ?>');background-size:cover;background-position:center;"<?php endif; ?>><div class="cap"><small><?php echo esc_html( $g2a_slot_small ); ?></small><?php echo wp_kses_post( $g2a_slot_cap ); ?></div></div>
+      <?php endforeach; ?>
     </div>
   </div>
 </section>
@@ -228,7 +250,18 @@ get_header();
         </div>
         <div class="contact-card">
           <div class="label">Range Status</div>
-          <div class="val"><span class="dot-live" style="margin-right:8px;"></span>OPEN  4 lanes free</div>
+          <div class="val" id="g2a-about-lanes"><span class="dot-live" style="margin-right:8px;"></span><span id="g2a-about-lanes-label">6 lanes</span></div>
+          <script>
+          (function(){
+            fetch('<?php echo esc_url_raw( rest_url( 'g2a-booking/v1/lanes-status' ) ); ?>', { cache: 'no-store', headers: { 'Accept': 'application/json' } })
+              .then(function(r){ return r.json(); })
+              .then(function(j){
+                if (!j || !j.success || !j.data || !j.data.total) return;
+                var lb = document.getElementById('g2a-about-lanes-label');
+                if (lb) lb.textContent = j.data.label;
+              }).catch(function(){});
+          })();
+          </script>
         </div>
       </div>
       <div style="display:flex; gap:14px; margin-top: 32px; flex-wrap:wrap;">

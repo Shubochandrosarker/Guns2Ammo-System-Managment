@@ -22,7 +22,22 @@ $g2a_lane_membership_pitch   = get_post_meta( $g2a_page_id, 'lane_membership_pit
       <span class="it">6 Lanes</span>
       <span class="it">RSO On Duty</span>
       <span class="it">Smart Ventilation</span>
-      <span class="it"><span class="dot-live"></span> 4 of 6 lanes open now</span>
+      <span class="it" id="g2a-lane-live" hidden><span class="dot-live"></span> <span id="g2a-lane-live-label"></span></span>
+      <script>
+      /* Live lane occupancy — real data from the booking engine; the chip
+         stays hidden unless the endpoint answers, so we never show a fake
+         number again. */
+      (function(){
+        fetch('<?php echo esc_url_raw( rest_url( 'g2a-booking/v1/lanes-status' ) ); ?>', { cache: 'no-store', headers: { 'Accept': 'application/json' } })
+          .then(function(r){ return r.json(); })
+          .then(function(j){
+            if (!j || !j.success || !j.data || !j.data.total) return;
+            var el = document.getElementById('g2a-lane-live');
+            var lb = document.getElementById('g2a-lane-live-label');
+            if (el && lb) { lb.textContent = j.data.label; el.hidden = false; }
+          }).catch(function(){});
+      })();
+      </script>
     </div>
   </div>
 </header>

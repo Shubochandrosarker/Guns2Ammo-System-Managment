@@ -102,7 +102,7 @@ final class G2AB_Frontend_Shortcode_Banner {
 					</div>
 					<a class="g2ab-banr__cta" href="<?php echo esc_url( $book_url ); ?>">
 						<span><?php echo esc_html( $atts['cta'] ); ?></span>
-						<span class="g2ab-banr__cta-arrow">→</span>
+						<span class="g2ab-banr__cta-arrow" aria-hidden="true"><svg width="18" height="14" viewBox="0 0 20 16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 8h17M12 2l6 6-6 6"/></svg></span>
 					</a>
 				</div>
 

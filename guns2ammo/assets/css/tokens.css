@@ -464,6 +464,7 @@ h1, h2, h3 { color: var(--color-white); margin: 0; }
   overflow: hidden;
 }
 .g2a-profile .profile-btn .av svg { width: 14px; height: 14px; display: block; }
+.g2a-profile .profile-btn .av img { width: 100%; height: 100%; object-fit: cover; border-radius: 50%; display: block; }
 .g2a-profile .profile-btn:hover .av { background: rgba(201, 168, 76, 0.22); }
 /* Member profile photo (gravatar / membership-plugin photo via the
    g2a_profile_avatar_url filter) renders as a circular cover image. */
@@ -3405,4 +3406,54 @@ body.single-product .upsells,
 	}
 	.g2a-cart-table td.product-name,
 	.woocommerce-cart table.cart td.product-name { min-width: 0; }
+}
+
+/* ====== LIGHT MODE: HERO SECTIONS STAY CINEMATIC ======
+   Every hero uses photographic backgrounds with dark scrims and
+   light display type. Flipping those tokens to the light palette made
+   hero text unreadable (dark text over dark imagery). The premium fix:
+   heroes keep the dark treatment in BOTH modes — like the rest of the
+   industry's photo heroes — by re-pinning the text/hairline tokens to
+   their dark values inside hero containers only. */
+html[data-theme="light"] .hero,
+html[data-theme="light"] .bk-hero,
+html[data-theme="light"] .ccw-hero,
+html[data-theme="light"] .mg-hero,
+html[data-theme="light"] .gw-hero,
+html[data-theme="light"] .ph-hero,
+html[data-theme="light"] .sg-hero,
+html[data-theme="light"] .ar-hero,
+html[data-theme="light"] .col-hero,
+html[data-theme="light"] .cr-hero,
+html[data-theme="light"] .pi-hero,
+html[data-theme="light"] .fc-hero,
+html[data-theme="light"] .sy-hero,
+html[data-theme="light"] .si-hero,
+html[data-theme="light"] .gs-hero,
+html[data-theme="light"] .cx-hero,
+html[data-theme="light"] .tr-hero,
+html[data-theme="light"] .lg-hero,
+html[data-theme="light"] .lt-hero,
+html[data-theme="light"] .kh-hero,
+html[data-theme="light"] .shop-hero,
+html[data-theme="light"] .kh-x-hero,
+html[data-theme="light"] .sp-hero,
+html[data-theme="light"] .sm-hero {
+  --color-white: #F7F7F9;
+  --color-fog: #D8D7DD;
+  --color-silver: #A7A6AE;
+  --color-brass: #C9A84C;
+  --color-brass-bright: #DCB45F;
+  --color-brass-dim: #8B6914;
+  --color-ember: #E8802F;
+  --color-hairline: rgba(255, 255, 255, 0.085);
+  --color-hairline-bright: rgba(255, 255, 255, 0.16);
+  --color-smoke: rgba(255, 255, 255, 0.045);
+  --color-gunmetal: #26252C;
+  --color-void: #1A191E;
+  --color-surface-1: #211F26;
+  --color-surface-2: #2B2932;
+  --color-ink: #111114;
+  background-color: #1A191E;
+  color: var(--color-fog);
 }

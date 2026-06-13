@@ -124,6 +124,10 @@ class WPISTIC_CF_Settings {
 		register_setting( self::GROUP, 'WPISTIC_CF_capture_g2a',     [ 'sanitize_callback' => $bool, 'default' => '1' ] );
 		register_setting( self::GROUP, 'WPISTIC_CF_capture_wpmail',  [ 'sanitize_callback' => $bool, 'default' => '0' ] );
 
+		// Newsletter welcome email (sent by WPISTIC_CF_Emails on first signup).
+		register_setting( self::GROUP, 'WPISTIC_CF_nl_welcome_enabled', [ 'sanitize_callback' => $bool, 'default' => '1' ] );
+		register_setting( self::GROUP, 'WPISTIC_CF_nl_welcome_subject', [ 'sanitize_callback' => 'sanitize_text_field', 'default' => 'Welcome to the Guns 2 Ammo range list 🎯' ] );
+
 		// Safety — staging / dev controls.
 		register_setting( self::GROUP, 'WPISTIC_CF_emails_disabled', [ 'sanitize_callback' => $bool, 'default' => '0' ] );
 
@@ -364,6 +368,20 @@ class WPISTIC_CF_Settings {
 					<textarea class="large-text" rows="4" id="WPISTIC_CF_reply_signature" name="WPISTIC_CF_reply_signature"><?php echo esc_textarea( get_option( 'WPISTIC_CF_reply_signature', '' ) ); ?></textarea>
 					<p class="description"><?php esc_html_e( 'Appended to the bottom of every reply you send from the dashboard.', 'wpistic-contact-form' ); ?></p>
 				</td>
+			</tr>
+			<tr>
+				<th scope="row"><?php esc_html_e( 'Newsletter welcome email', 'wpistic-contact-form' ); ?></th>
+				<td>
+					<input type="hidden" name="WPISTIC_CF_nl_welcome_enabled" value="0">
+					<label>
+						<input type="checkbox" name="WPISTIC_CF_nl_welcome_enabled" value="1" <?php checked( get_option( 'WPISTIC_CF_nl_welcome_enabled', '1' ), '1' ); ?>>
+						<?php esc_html_e( 'Send a branded welcome email when someone subscribes to the newsletter.', 'wpistic-contact-form' ); ?>
+					</label>
+				</td>
+			</tr>
+			<tr>
+				<th scope="row"><label for="WPISTIC_CF_nl_welcome_subject"><?php esc_html_e( 'Welcome email subject', 'wpistic-contact-form' ); ?></label></th>
+				<td><input type="text" class="regular-text" id="WPISTIC_CF_nl_welcome_subject" name="WPISTIC_CF_nl_welcome_subject" value="<?php echo esc_attr( get_option( 'WPISTIC_CF_nl_welcome_subject', 'Welcome to the Guns 2 Ammo range list 🎯' ) ); ?>"></td>
 			</tr>
 		</table>
 

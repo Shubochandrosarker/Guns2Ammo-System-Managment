@@ -44,6 +44,7 @@ final class WPISTIC_CF_Plugin {
 		( new WPISTIC_CF_Gdpr() )->register();
 		( new WPistic_CF_AI() )->register();
 		( new WPISTIC_CF_Newsletter() )->register();
+		( new WPISTIC_CF_Emails() )->register();
 
 		// Defensive re-schedule in case the cron event vanished mid-life.
 		WPISTIC_CF_Gdpr::maybe_schedule();

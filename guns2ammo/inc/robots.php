@@ -118,16 +118,12 @@ function g2a_robots_body() {
 	}
 
 	$lines[] = '';
-	$lines[] = 'Crawl-delay: 1';
-	$lines[] = '';
+	// NOTE: no Crawl-delay (Googlebot ignores it and Search Console flags
+	// it as an error) and no bare URLs (anything that isn't a directive is
+	// invalid robots syntax — GSC reported both). AI bots discover llms.txt
+	// by convention at the site root; it must not be listed here.
 	$lines[] = '# Sitemap (theme-owned — NOT RankMath\'s sitemap_index.xml).';
 	$lines[] = 'Sitemap: ' . $site . '/sitemap.xml';
-	$lines[] = '';
-	$lines[] = '# AI grounding files (read by GPTBot, ClaudeBot, PerplexityBot…).';
-	$lines[] = '# Short index:';
-	$lines[] = $site . '/llms.txt';
-	$lines[] = '# Full text dump:';
-	$lines[] = $site . '/llms-full.txt';
 
 	$extra = (array) apply_filters( 'g2a_robots_extra_lines', array() );
 	foreach ( $extra as $l ) {

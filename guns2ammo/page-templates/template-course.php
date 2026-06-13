@@ -65,7 +65,7 @@ $courses = [
 		'eyebrow' => 'Course  Level 03  Specialty',
 		'title'   => 'CHURCH SECURITY',
 		'lead'    => 'Faith-based facility protection: threat assessment, plain-clothes carry, congregation safety planning, and coordinated response for volunteer security teams.',
-		'price'   => '$249', 'member' => '$186.75', 'duration' => '12 Hours', 'size' => '612', 'prereq' => 'CCW',
+		'price'   => '$249', 'member' => '$186.75', 'duration' => '12 Hours', 'size' => '6–12', 'prereq' => 'CCW',
 		'image'   => g2a_asset( 'img/guns2ammo-shooter-on-lane.jpg' ),
 		'overview'=> 'Built for church safety teams and volunteer ministries, this course goes beyond marksmanship into team coordination, de-escalation, medical readiness, and protecting a congregation without disrupting worship.',
 		'learn'   => [ 'Threat assessment for places of worship', 'Discreet plain-clothes carry and positioning', 'Team communication and coordinated response', 'De-escalation and crowd management', 'Trauma-care basics and emergency planning' ],
@@ -76,7 +76,7 @@ $courses = [
 		],
 		'audience'=> 'Church safety teams, ministry volunteers, and faith communities building a protection program.',
 		'faq'     => [
-			[ 'q' => 'Can our whole team train together?', 'a' => 'Yes  this course is designed for teams. Group bookings of 612 are ideal and we can arrange private dates for your ministry.' ],
+			[ 'q' => 'Can our whole team train together?', 'a' => 'Yes  this course is designed for teams. Group bookings of 6–12 are ideal and we can arrange private dates for your ministry.' ],
 			[ 'q' => 'Is a CCW required?', 'a' => 'An active concealed-carry permit is the prerequisite. We can get your team through Arizona CCW first if needed.' ],
 			[ 'q' => 'Do you cover legal liability?', 'a' => 'Yes. We cover the legal framework for volunteer protectors and the importance of a documented, church-approved plan.' ],
 		],

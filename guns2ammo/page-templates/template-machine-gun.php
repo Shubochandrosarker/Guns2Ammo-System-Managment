@@ -13,11 +13,27 @@ $g2a_page_id             = get_the_ID();
 $g2a_mg_hero_intro       = get_post_meta( $g2a_page_id, 'mg_hero_intro', true );
 $g2a_mg_ccw_replace      = get_post_meta( $g2a_page_id, 'mg_ccw_remove_text', true );
 ?>
-<header class="mg-hero hero-media">
+<?php
+// Editable hero background photo (Appearance → Site Content). When the
+// client clears the URL, the original ember-gradient background from
+// machine-gun.css takes over — page never renders broken.
+$g2a_mg_hero_bg = function_exists( 'g2a_content' ) ? g2a_content( 'mg_hero_bg', g2a_asset( 'img/gallery/guns2ammo-shooter-on-the-line.jpg' ), 'image', 'Machine Gun — Hero background photo' ) : '';
+?>
+<header class="mg-hero hero-media"<?php if ( $g2a_mg_hero_bg ) : ?> style="background-image:linear-gradient(100deg, rgba(13,13,15,0.95) 30%, rgba(13,13,15,0.72) 60%, rgba(42,32,32,0.55)), url('<?php echo esc_url( $g2a_mg_hero_bg ); ?>');background-size:cover;background-position:center right;"<?php endif; ?>>
   <div class="c">
-    <span class="eyebrow" style="color: var(--color-ember);">Signature Experience  Booked 46 weeks out</span>
-    <h1 style="margin-top:18px;"><span class="thin">FIRE THE</span>UNTHINKABLE<span class="ember">.</span></h1>
-    <p><?php echo esc_html( $g2a_mg_hero_intro ? $g2a_mg_hero_intro : 'One-on-one, fully-automatic instruction. Three legendary platforms. A certified RSO at your side. Built for adrenaline, entertainment, and unforgettable range time.' ); ?></p>
+    <span class="eyebrow" style="color: var(--color-ember);">Signature Experience  Booked 4–6 weeks out</span>
+    <h1 style="margin-top:18px;"><?php echo g2a_content( // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- g2a_content() returns wp_kses_post-escaped HTML.
+      'mg_hero_heading',
+      '<span class="thin">FIRE THE</span>UNTHINKABLE<span class="ember">.</span>',
+      'textarea',
+      'Machine Gun — Hero heading'
+    ); ?></h1>
+    <p><?php echo g2a_content( // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- esc_html applied inside g2a_content(). Page-meta value (if set) acts as the default.
+      'mg_hero_intro',
+      $g2a_mg_hero_intro ? $g2a_mg_hero_intro : 'One-on-one, fully-automatic instruction. Three legendary platforms. A certified RSO at your side. Built for adrenaline, entertainment, and unforgettable range time.',
+      'text',
+      'Machine Gun — Hero intro paragraph'
+    ); ?></p>
     <div style="display:flex; gap:14px; flex-wrap:wrap;">
       <a class="btn btn-ember btn-lg" href="#tiers">Book Your Experience </a>
       <a class="btn btn-ghost btn-lg" href="<?php echo esc_url( home_url( "/book-a-lane/" ) ); ?>">Or Book A Standard Lane</a>

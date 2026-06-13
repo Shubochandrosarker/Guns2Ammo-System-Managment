@@ -7,13 +7,85 @@
  * @package guns2ammo
  */
 if ( ! defined( 'ABSPATH' ) ) exit;
+
+$g2a_lt_title       = 'Ladies Night Gun Range in Mesa, AZ | Free Range Time for Women Every Tuesday';
+$g2a_lt_description = 'Ladies Tuesday at our Mesa, AZ gun range: women get one free hour of lane time every Tuesday, 10AM-6PM. No membership needed, rentals 25% off, beginners welcome.';
+$g2a_lt_url         = home_url( '/ladies-tuesday/' );
+
+/* Keep the page-specific search snippet consistent across WordPress, Rank Math,
+ * Yoast, and the theme's own SEO/OG output without changing global SEO rules. */
+add_filter( 'pre_get_document_title', function () use ( $g2a_lt_title ) {
+	return $g2a_lt_title;
+}, 99 );
+add_filter( 'rank_math/frontend/title', function () use ( $g2a_lt_title ) {
+	return $g2a_lt_title;
+}, 99 );
+add_filter( 'rank_math/frontend/description', function () use ( $g2a_lt_description ) {
+	return $g2a_lt_description;
+}, 99 );
+add_filter( 'wpseo_title', function () use ( $g2a_lt_title ) {
+	return $g2a_lt_title;
+}, 99 );
+add_filter( 'wpseo_metadesc', function () use ( $g2a_lt_description ) {
+	return $g2a_lt_description;
+}, 99 );
+
+$g2a_lt_page = get_queried_object();
+if ( $g2a_lt_page instanceof WP_Post ) {
+	$g2a_lt_page->post_excerpt = $g2a_lt_description;
+}
+
+/* Weekly Event JSON-LD — free, recurring every Tuesday. */
+add_action( 'wp_head', function () use ( $g2a_lt_url, $g2a_lt_description ) {
+	$schema = [
+		'@context'            => 'https://schema.org',
+		'@type'               => 'Event',
+		'@id'                 => $g2a_lt_url . '#event',
+		'name'                => 'Ladies Tuesday — Free Range Time for Women',
+		'description'         => $g2a_lt_description,
+		'url'                 => $g2a_lt_url,
+		'eventAttendanceMode' => 'https://schema.org/OfflineEventAttendanceMode',
+		'eventStatus'         => 'https://schema.org/EventScheduled',
+		'isAccessibleForFree' => true,
+		'eventSchedule'       => [
+			'@type'            => 'Schedule',
+			'byDay'            => 'https://schema.org/Tuesday',
+			'startTime'        => '10:00',
+			'endTime'          => '18:00',
+			'repeatFrequency'  => 'P1W',
+			'scheduleTimezone' => 'America/Phoenix',
+		],
+		'location'            => [
+			'@type'   => 'Place',
+			'name'    => 'Guns 2 Ammo',
+			'address' => [
+				'@type'           => 'PostalAddress',
+				'streetAddress'   => '6030 E Main St Ste 103',
+				'addressLocality' => 'Mesa',
+				'addressRegion'   => 'AZ',
+				'postalCode'      => '85205',
+				'addressCountry'  => 'US',
+			],
+		],
+		'organizer'           => [ '@id' => home_url( '/#business' ) ],
+		'offers'              => [
+			'@type'         => 'Offer',
+			'url'           => $g2a_lt_url,
+			'price'         => '0',
+			'priceCurrency' => 'USD',
+			'availability'  => 'https://schema.org/InStock',
+		],
+	];
+	echo "\n<!-- Ladies Tuesday Weekly Event Schema -->\n";
+	echo '<script type="application/ld+json">' . wp_json_encode( $schema, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE ) . '</script>' . "\n";
+}, 11 );
+
 get_header();
 
-$g2a_page_id                    = get_the_ID();
-$g2a_ladies_hero_subtitle       = get_post_meta( $g2a_page_id, 'ladies_hero_subtitle', true );
-$g2a_ladies_offer_text          = get_post_meta( $g2a_page_id, 'ladies_offer_text', true );
-$g2a_ladies_no_female_rso_note  = get_post_meta( $g2a_page_id, 'ladies_no_female_rso_note', true );
-$g2a_ladies_events_shortcode    = get_post_meta( $g2a_page_id, 'ladies_upcoming_events_shortcode', true );
+$g2a_page_id                 = get_the_ID();
+$g2a_ladies_hero_subtitle    = get_post_meta( $g2a_page_id, 'ladies_hero_subtitle', true );
+$g2a_ladies_offer_text       = get_post_meta( $g2a_page_id, 'ladies_offer_text', true );
+$g2a_ladies_events_shortcode = get_post_meta( $g2a_page_id, 'ladies_upcoming_events_shortcode', true );
 ?>
 <style>body { background: var(--color-void); }
 
@@ -185,19 +257,19 @@ $g2a_ladies_events_shortcode    = get_post_meta( $g2a_page_id, 'ladies_upcoming_
       <div class="wrap">
         <div>
           <div class="badge-row">
-            <span class="b-pill"> Every Tuesday</span>
+            <span class="b-pill">Every Tuesday</span>
             <span class="b-pill">No Membership Required</span>
             <span class="b-pill">Walk-Ins Welcome</span>
           </div>
-          <h1>Ladies <em>Tuesday.</em><br />Half Off The Lane.</h1>
-          <p class="sub"><?php echo esc_html( $g2a_ladies_hero_subtitle ? $g2a_ladies_hero_subtitle : 'Every Tuesday, women receive one free hour of lane time. No female RSO is advertised for this promotion. Whether it is your first time or your hundredth, this is your day.' ); ?></p>
+          <h1>Ladies <em>Tuesday</em> —<br />Free Lane Time,<br />Every Tuesday.</h1>
+          <p class="sub"><?php echo esc_html( $g2a_ladies_hero_subtitle ? $g2a_ladies_hero_subtitle : 'Every Tuesday at our Mesa gun range, women shoot free for one hour. No membership needed, rentals are 25% off, and beginners are always welcome — a range safety officer walks first-timers through safety, grip, and stance at your pace.' ); ?></p>
           <div class="actions">
-            <a class="btn btn-ember btn-lg" href="#reserve">Reserve A Tuesday Lane </a>
+            <a class="btn btn-ember btn-lg" href="#reserve">Reserve A Tuesday Lane</a>
             <a class="btn btn-brass btn-lg" href="#schedule">View Schedule</a>
           </div>
         </div>
         <aside class="lt-disc">
-          <div class="day">Tuesdays  All Day  10a6p</div>
+          <div class="day">Tuesdays · All Day · 10AM&ndash;6PM</div>
           <div class="pct"><em>FREE</em></div>
           <div class="lbl"><?php echo esc_html( $g2a_ladies_offer_text ? $g2a_ladies_offer_text : 'Free 1 Hour Lane Time For Women On Tuesdays' ); ?></div>
           <div class="fine">One free hour of lane time for women every Tuesday during open hours</div>
@@ -205,19 +277,27 @@ $g2a_ladies_events_shortcode    = get_post_meta( $g2a_page_id, 'ladies_upcoming_
       </div>
     </section>
 
-    <!-- COUNTDOWN -->
+    <!-- COUNTDOWN (renders only when the shortcode exists and returns output —
+         no empty 00d 00h shell, no leaked shortcode text) -->
+    <?php
+    $g2a_lt_countdown = '';
+    if ( shortcode_exists( 'g2a_event_countdown' ) ) {
+        $g2a_lt_countdown = trim( do_shortcode( '[g2a_event_countdown type="ladies-day" title="Next Ladies Tuesday"]' ) );
+    }
+    if ( '' !== $g2a_lt_countdown ) : ?>
     <section class="lt-count">
       <div class="wrap">
-        <?php echo do_shortcode( '[g2a_event_countdown type="ladies-day" title="Next Ladies Tuesday"]' ); ?>
+        <?php echo $g2a_lt_countdown; // phpcs:ignore WordPress.Security.EscapeOutput -- shortcode HTML. ?>
       </div>
     </section>
+    <?php endif; ?>
 
     <!-- WHAT'S INCLUDED -->
     <section class="lt-inc">
       <div class="wrap">
         <div class="head">
           <h2>Built for <em>her</em>.<br />Not against him.</h2>
-          <p class="lede">Ladies Tuesday isn't a watered-down range day  it's the full G2A experience with a few practical touches that make new and experienced women shooters feel at home.</p>
+          <p class="lede">Ladies Tuesday isn't a watered-down range day &mdash; it's the full G2A experience with a few practical touches that make new and experienced women shooters feel at home.</p>
         </div>
 
         <div class="inc-grid">
@@ -230,20 +310,20 @@ $g2a_ladies_events_shortcode    = get_post_meta( $g2a_page_id, 'ladies_upcoming_
           <div class="inc-card">
             <div class="ic"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M12 2v4M4.93 4.93l2.83 2.83M2 12h4M4.93 19.07l2.83-2.83M12 22v-4M19.07 19.07l-2.83-2.83M22 12h-4M19.07 4.93l-2.83 2.83"/><circle cx="12" cy="12" r="3"/></svg></div>
             <div class="n">02</div>
-            <h3>On-Duty Range Staff Support</h3>
-            <p>Our on-duty range team assists all shooters every Tuesday. No dedicated female RSO is advertised for this day.</p>
+            <h3>RSO-Guided First Visits</h3>
+            <p>A range safety officer is on the floor every Tuesday and will walk first-timers through safety, grip, and stance &mdash; at your pace, no rush.</p>
           </div>
           <div class="inc-card">
             <div class="ic"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="9" cy="9" r="3"/><circle cx="17" cy="10" r="2.5"/><path d="M3 21c0-4 3-6 6-6s6 2 6 6"/><path d="M14 21c0-3 2-4 3-4s4 1 4 4"/></svg></div>
             <div class="n">03</div>
-            <h3>+1 At Member Rate</h3>
-            <p>Bring a friend, sister, or mom  they get the same Tuesday pricing, no questions asked.</p>
+            <h3>+1 Welcome</h3>
+            <p>Bring a friend, sister, or mom &mdash; check in together and they get the same Tuesday pricing, no questions asked.</p>
           </div>
           <div class="inc-card">
             <div class="ic"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="5" y="2" width="14" height="20" rx="2"/><path d="M5 8h14M5 16h14"/></svg></div>
             <div class="n">04</div>
             <h3>25% Off Rentals</h3>
-            <p>40+ rental firearms on the wall. Try a Glock 19, a Sig P365, or a S&amp;W M&amp;P at member pricing.</p>
+            <p>40+ rental firearms on the wall. Try a Glock 19, a Sig P365, or a S&amp;W M&amp;P for 25% off every Tuesday.</p>
           </div>
           <div class="inc-card">
             <div class="ic"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M21 11.5c0 4.7-3.5 8-9 8s-9-3.3-9-8 3.5-8 9-8 9 3.3 9 8z"/><path d="M9 11l3 3 5-5"/></svg></div>
@@ -261,13 +341,48 @@ $g2a_ladies_events_shortcode    = get_post_meta( $g2a_page_id, 'ladies_upcoming_
             <div class="ic"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M12 2L4 6v6c0 5 3.4 9.5 8 10 4.6-.5 8-5 8-10V6l-8-4z"/></svg></div>
             <div class="n">07</div>
             <h3>Safety First</h3>
-            <p>1:1 onboarding for first-timers. We don't rush you to the line  you'll go when you're ready.</p>
+            <p>1:1 onboarding for first-timers. We don't rush you to the line &mdash; you'll go when you're ready.</p>
           </div>
           <div class="inc-card">
             <div class="ic"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="9" cy="9" r="3"/><circle cx="17" cy="10" r="2.5"/><circle cx="15" cy="17" r="2"/><path d="M2 22c0-3 2-5 5-5"/></svg></div>
             <div class="n">08</div>
             <h3>Women's Group Day</h3>
-            <p>Book the entire range for a private group  bachelorette parties, birthdays, or a girls' afternoon out.</p>
+            <p>Book the entire range for a private group &mdash; bachelorette parties, birthdays, or a girls' afternoon out.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- FIRST-TIMERS: WHAT TO EXPECT -->
+    <section class="lt-rules" id="first-timers" style="border-bottom:1px solid var(--color-hairline);">
+      <div class="wrap">
+        <h2>First Time?<br />Here's What To Expect</h2>
+        <div class="row">
+          <div class="n">01</div>
+          <div class="body">
+            <div class="t">Arrive Any Time, 10AM&ndash;6PM</div>
+            <div class="d">No appointment needed &mdash; walk in whenever suits you on a Tuesday. If you'd rather lock in a time, reserve a lane below.</div>
+          </div>
+        </div>
+        <div class="row">
+          <div class="n">02</div>
+          <div class="body">
+            <div class="t">Check In At The Counter</div>
+            <div class="d">Bring a government photo ID and sign the quick first-visit waiver on a tablet. Your free hour is applied right there &mdash; nothing to claim or print.</div>
+          </div>
+        </div>
+        <div class="row">
+          <div class="n">03</div>
+          <div class="body">
+            <div class="t">Get Your Eye &amp; Ear Protection</div>
+            <div class="d">We set you up with eye and ear protection before you head to the floor. Closed-toe shoes and a high-neck shirt are all you need to bring.</div>
+          </div>
+        </div>
+        <div class="row">
+          <div class="n">04</div>
+          <div class="body">
+            <div class="t">Lane Briefing With An RSO</div>
+            <div class="d">A range safety officer walks you through range rules, then safety, grip, and stance at your lane. You fire your first shot when you're ready &mdash; not before.</div>
           </div>
         </div>
       </div>
@@ -277,7 +392,7 @@ $g2a_ladies_events_shortcode    = get_post_meta( $g2a_page_id, 'ladies_upcoming_
     <section class="lt-sched" id="schedule">
       <div class="wrap">
         <h2>Upcoming Tuesdays</h2>
-        <p class="sub">Themed sessions and intro classes are added monthly. Standard Tuesdays are open-floor  show up any time during open hours.</p>
+        <p class="sub">Themed sessions and intro classes are added monthly. Standard Tuesdays are open floor &mdash; show up any time during open hours.</p>
 
         <div>
           <?php echo do_shortcode( '[g2a_events type="ladies-day" limit="12"]' ); ?>
@@ -291,17 +406,17 @@ $g2a_ladies_events_shortcode    = get_post_meta( $g2a_page_id, 'ladies_upcoming_
         <h2>Voices From The Floor</h2>
         <div class="vox-grid">
           <article class="vox">
-            <p>"I'd never held a firearm in my life. Sarah walked me through every step on my first Tuesday  never made me feel stupid, never rushed. I'm signing up for the CCW class next month."</p>
+            <p>"I'd never held a firearm in my life. The RSO walked me through every step on my first Tuesday &mdash; never made me feel stupid, never rushed. I'm signing up for the CCW class next month."</p>
             <div class="who">
               <div class="av">KH</div>
               <div>
                 <div class="name">Kelly H.</div>
-                <div class="stat">First Visit  Mar 2026</div>
+                <div class="stat">First Visit · Mar 2026</div>
               </div>
             </div>
           </article>
           <article class="vox">
-            <p>"Brought my mom for her 60th birthday. She had a blast and we both walked out smiling. The discount + rental price meant we tried four different pistols on the same lane for less than $80 total."</p>
+            <p>"Brought my mom for her 60th birthday. She had a blast and we both walked out smiling. The free lane hour plus the rental discount meant we tried four different pistols on the same lane for less than $80 total."</p>
             <div class="who">
               <div class="av">JR</div>
               <div>
@@ -316,7 +431,7 @@ $g2a_ladies_events_shortcode    = get_post_meta( $g2a_page_id, 'ladies_upcoming_
               <div class="av">MV</div>
               <div>
                 <div class="name">Marisol V.</div>
-                <div class="stat">USPSA  Member Since '22</div>
+                <div class="stat">USPSA · Member Since '22</div>
               </div>
             </div>
           </article>
@@ -339,28 +454,28 @@ $g2a_ladies_events_shortcode    = get_post_meta( $g2a_page_id, 'ladies_upcoming_
           <div class="n">02</div>
           <div class="body">
             <div class="t">Show ID At Check-In</div>
-            <div class="d">Standard government photo ID required like any other day. First-time waiver signed on a tablet  takes 90 seconds.</div>
+            <div class="d">Standard government photo ID required like any other day. First-time waiver signed on a tablet &mdash; takes 90 seconds.</div>
           </div>
         </div>
         <div class="row">
           <div class="n">03</div>
           <div class="body">
-            <div class="t">Discount Applied Automatically</div>
-            <div class="d">One free hour of lane time is applied at check-in for eligible guests on Tuesday.</div>
+            <div class="t">Free Hour Applied Automatically</div>
+            <div class="d">Your free hour of lane time is applied at check-in &mdash; no code, no coupon, nothing to claim.</div>
           </div>
         </div>
         <div class="row">
           <div class="n">04</div>
           <div class="body">
             <div class="t">+1 Welcome At The Same Rate</div>
-            <div class="d">Bring a friend (any gender  yes, husbands too). They get the same Tuesday pricing as long as you check in together.</div>
+            <div class="d">Bring a friend (any gender &mdash; yes, husbands too). They get the same Tuesday pricing as long as you check in together.</div>
           </div>
         </div>
         <div class="row">
           <div class="n">05</div>
           <div class="body">
-            <div class="t">Stay As Long As You Like</div>
-            <div class="d">Standard one-hour lane window. Additional time can be purchased at regular posted rates.</div>
+            <div class="t">Your Free Hour &mdash; And Beyond</div>
+            <div class="d">The free hour covers a standard one-hour lane window. Want to keep shooting? Add more time at regular posted rates.</div>
           </div>
         </div>
       </div>
@@ -371,10 +486,10 @@ $g2a_ladies_events_shortcode    = get_post_meta( $g2a_page_id, 'ladies_upcoming_
       <div class="wrap">
         <h2>Common Questions</h2>
         <div class="acc">
-          <details open><summary>Do I need to be a member?</summary><div class="answer">No. Ladies Tuesday is open to everyone  walk-ins and members. Members still get their member rate on rentals (the deeper discount applies).</div></details>
-          <details><summary>Can my husband or boyfriend join me?</summary><div class="answer">Yes  your +1 gets the same Ladies Tuesday rate as long as you check in together. We don't gatekeep the discount.</div></details>
-          <details><summary>I've never fired a gun. Is this for me?</summary><div class="answer"><?php echo esc_html( $g2a_ladies_no_female_rso_note ? $g2a_ladies_no_female_rso_note : 'Yes. First-time onboarding is available from on-duty range staff each Tuesday. We do not advertise a dedicated female RSO for this day.' ); ?></div></details>
-          <details><summary>Are there themed classes too?</summary><div class="answer">Upcoming Tuesday events are managed by staff and can be published through the events shortcode field in the page settings.</div></details>
+          <details open><summary>Do I need to be a member?</summary><div class="answer">No. Ladies Tuesday is open to everyone &mdash; walk-ins and members. Members still get their member rate on rentals (the deeper discount applies).</div></details>
+          <details><summary>Can my husband or boyfriend join me?</summary><div class="answer">Yes &mdash; your +1 gets the same Ladies Tuesday rate as long as you check in together. We don't gatekeep the discount.</div></details>
+          <details><summary>I've never fired a gun. Is this for me?</summary><div class="answer">Absolutely &mdash; Tuesdays are made for first-timers. A range safety officer will walk you through safety, grip, and stance before you ever load a magazine, and you fire your first shot when you're ready, not before.</div></details>
+          <details><summary>Are there themed classes too?</summary><div class="answer">Yes. We add themed sessions and intro classes most months. Check the Upcoming Tuesdays schedule above, or ask at the counter and we'll tell you what's coming up.</div></details>
           <details><summary>Can I book the whole range for a private group?</summary><div class="answer">Yes. Six-lane buyouts run $360 for a 90-minute window with a dedicated RSO. <a href="<?php echo esc_url( home_url( "/contact/" ) ); ?>" style="color: var(--color-brass-bright);">Email us</a> for bachelorette and birthday packages.</div></details>
           <details><summary>What should I wear?</summary><div class="answer">Closed-toe shoes, high-neck shirt (hot brass policy), no loose jewelry. Bring a hat if you have one. We have loaners for everything else.</div></details>
         </div>
@@ -402,7 +517,7 @@ $g2a_ladies_events_shortcode    = get_post_meta( $g2a_page_id, 'ladies_upcoming_
     get_template_part( 'template-parts/reservation-form', null, [
         'subject' => 'Ladies Tuesday Reservation',
         'heading' => 'RESERVE YOUR TUESDAY LANE',
-        'intro'   => 'Reserve your Ladies Tuesday lane  solo, with a friend, or as a group. Send your details and our team will confirm your spot. Walk-ins are always welcome too.',
+        'intro'   => 'Reserve your free Ladies Tuesday lane — solo, with a friend, or as a group. Send your details and our team will confirm your spot. Walk-ins are always welcome too.',
         'cta'     => 'Request My Tuesday Lane',
     ] );
     endif; ?>
@@ -411,13 +526,13 @@ $g2a_ladies_events_shortcode    = get_post_meta( $g2a_page_id, 'ladies_upcoming_
     <section class="lt-final">
       <div class="wrap">
         <div class="eyebrow" style="justify-content: center; margin-bottom: 8px;">See You Tuesday</div>
-        <h2>Half off the lane.<br />All of the <em>welcome.</em></h2>
+        <h2>A free hour on us.<br />All of the <em>welcome.</em></h2>
         <p>Every Tuesday is yours. Walk in, reserve ahead, or message us to set up a private group. We'll have your eye and ear set out.</p>
         <div class="row">
-          <a class="btn btn-ember btn-lg" href="#reserve">Reserve A Tuesday Lane </a>
+          <a class="btn btn-ember btn-lg" href="#reserve">Reserve A Tuesday Lane</a>
           <a class="btn btn-brass btn-lg" href="<?php echo esc_url( home_url( "/contact/" ) ); ?>">Group &amp; Private Bookings</a>
         </div>
-        <div class="micro">Walk-Ins Welcome  Mesa, AZ  6030 E Main St</div>
+        <div class="micro">Walk-Ins Welcome · Mesa, AZ · 6030 E Main St Ste 103</div>
       </div>
     </section>
   </main>

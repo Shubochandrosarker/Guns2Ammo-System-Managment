@@ -199,10 +199,76 @@ final class WooCatalogSync {
 			$barcode = self::upsert_barcode( $product_id, $upc );
 		}
 
+		// Variable products keep their sellable SKU/UPC/stock on each
+		// variation (a product_variation post), not the parent. Walk them so
+		// scanning a variant's barcode in the POS resolves to a real item.
+		if ( method_exists( $product, 'is_type' ) && $product->is_type( 'variable' ) && method_exists( $product, 'get_children' ) ) {
+			foreach ( (array) $product->get_children() as $variation_id ) {
+				$variation_id = (int) $variation_id;
+				if ( $variation_id <= 0 || ! function_exists( 'wc_get_product' ) ) {
+					continue;
+				}
+				$variation = wc_get_product( $variation_id );
+				if ( $variation ) {
+					self::sync_variation( $variation, $product, $categories );
+				}
+			}
+		}
+
 		return array(
 			'created' => $created,
 			'barcode' => $barcode,
 		);
+	}
+
+	/**
+	 * Sync a single product_variation. Records its own SKU/UPC/stock under a
+	 * variation-scoped source ref, falling back to the parent's identifiers
+	 * for display, so barcode lookups land on the exact sellable variant.
+	 */
+	private static function sync_variation( $variation, $parent, array $categories ): void {
+		$variation_id = (int) $variation->get_id();
+		if ( $variation_id <= 0 ) {
+			return;
+		}
+		$sku = (string) $variation->get_sku();
+		$upc = (string) get_post_meta( $variation_id, '_upc', true );
+		if ( $upc === '' ) {
+			$upc = (string) get_post_meta( $variation_id, '_global_unique_id', true );
+		}
+		// Nothing scannable on this variation — skip to avoid noise rows.
+		if ( $sku === '' && $upc === '' ) {
+			return;
+		}
+
+		$name = (string) $parent->get_name();
+		if ( method_exists( $variation, 'get_attribute_summary' ) ) {
+			$summary = (string) $variation->get_attribute_summary();
+			if ( $summary !== '' ) {
+				$name .= ' — ' . wp_strip_all_tags( $summary );
+			}
+		}
+
+		( new ExternalRefRepository() )->upsert(
+			$variation_id,
+			self::SOURCE,
+			'wc:' . $variation_id,
+			$upc !== '' ? $upc : null,
+			$sku !== '' ? $sku : null,
+			array(
+				'name'        => $name,
+				'price'       => (float) $variation->get_price(),
+				'stock'       => $variation->get_stock_quantity() !== null ? (float) $variation->get_stock_quantity() : null,
+				'status'      => (string) $variation->get_status(),
+				'categories'  => $categories,
+				'parent_id'   => (int) $parent->get_id(),
+				'variation'   => true,
+			)
+		);
+
+		if ( $upc !== '' ) {
+			self::upsert_barcode( $variation_id, $upc );
+		}
 	}
 
 	/** Idempotent g2a_barcodes upsert (same shape as Inventory\Importer). */

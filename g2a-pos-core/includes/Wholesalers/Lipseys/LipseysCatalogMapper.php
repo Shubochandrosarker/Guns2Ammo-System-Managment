@@ -68,6 +68,35 @@ final class LipseysCatalogMapper {
 	);
 
 	/**
+	 * Map one JSON item from the API CatalogFeed (GET
+	 * /api/Integration/Items/CatalogFeed) to the same normalized
+	 * wholesaler_products schema as the CSV path. The API uses camelCase
+	 * field names that are case-insensitively identical to the CSV headers
+	 * (itemNo ↔ ITEMNO, caliberGauge ↔ CALIBERGAUGE, …), so we uppercase the
+	 * keys and reuse mapRow().
+	 *
+	 * @param array<string,mixed> $item Decoded API item object.
+	 * @return array<string,mixed> normalized product row
+	 */
+	public static function mapApiItem( array $item ): array {
+		$row = array();
+		$idx = array();
+		$i   = 0;
+		foreach ( $item as $key => $value ) {
+			$idx[ strtoupper( (string) $key ) ] = $i;
+			if ( is_bool( $value ) ) {
+				$row[ $i ] = $value ? 'TRUE' : 'FALSE';
+			} elseif ( is_scalar( $value ) ) {
+				$row[ $i ] = (string) $value;
+			} else {
+				$row[ $i ] = '';
+			}
+			++$i;
+		}
+		return self::mapRow( $row, $idx );
+	}
+
+	/**
 	 * @param array<int,string> $row CSV row (0-indexed)
 	 * @param array<string,int> $idx Map of UPPERCASE column name -> 0-based index
 	 * @return array<string,mixed> normalized product row

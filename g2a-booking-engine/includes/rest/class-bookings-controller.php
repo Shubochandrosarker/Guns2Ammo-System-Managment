@@ -76,6 +76,13 @@ final class G2AB_REST_Bookings_Controller {
 			'callback' => array( $this, 'get_session' ),
 			'permission_callback' => array( $this, 'permission_public_read' ),
 		) );
+		// Live lane occupancy — replaces the theme's old static
+		// "4 of 6 lanes open now" placeholder with real data.
+		register_rest_route( G2AB_REST_NAMESPACE, '/lanes-status', array(
+			'methods' => WP_REST_Server::READABLE,
+			'callback' => array( $this, 'get_lanes_status' ),
+			'permission_callback' => array( $this, 'permission_public_read' ),
+		) );
 		register_rest_route( G2AB_REST_NAMESPACE, '/bookings', array(
 			'methods' => WP_REST_Server::CREATABLE,
 			'callback' => array( $this, 'create_booking' ),
@@ -203,6 +210,53 @@ final class G2AB_REST_Bookings_Controller {
 		$response->header( 'Cache-Control', 'no-cache, no-store, must-revalidate, max-age=0' );
 		$response->header( 'Pragma', 'no-cache' );
 		$response->header( 'Expires', 'Thu, 01 Jan 1970 00:00:00 GMT' );
+		return $response;
+	}
+
+	/**
+	 * Live lane occupancy: how many active lane resources have NO active
+	 * booking covering the current moment. Cached for 60s; never page-cached.
+	 */
+	public function get_lanes_status() {
+		$data = get_transient( 'g2ab_lanes_status' );
+		if ( ! is_array( $data ) ) {
+			global $wpdb;
+			$now   = current_time( 'mysql' );
+			// Count lane resources only — but if this install labels lanes
+			// differently, fall back to all active resources. The "busy"
+			// query below MUST use the same scope, otherwise a concurrent
+			// class/training-room booking would shrink the lane count and
+			// the widget could show no availability while lanes are open.
+			$lane_only = true;
+			$total = (int) $wpdb->get_var(
+				"SELECT COUNT(*) FROM {$wpdb->prefix}g2ab_resources WHERE is_active = 1 AND type = 'lane'"
+			);
+			if ( 0 === $total ) {
+				$lane_only = false;
+				$total = (int) $wpdb->get_var( "SELECT COUNT(*) FROM {$wpdb->prefix}g2ab_resources WHERE is_active = 1" );
+			}
+			$lane_predicate = $lane_only ? "AND r.type = 'lane'" : '';
+			$busy = (int) $wpdb->get_var( $wpdb->prepare(
+				"SELECT COUNT(DISTINCT b.resource_id)
+				 FROM {$wpdb->prefix}g2ab_bookings b
+				 INNER JOIN {$wpdb->prefix}g2ab_resources r ON r.id = b.resource_id AND r.is_active = 1 {$lane_predicate}
+				 WHERE b.status IN ('pending','reserved','confirmed','paid','checked_in')
+				   AND b.start_at <= %s AND b.end_at > %s",
+				$now,
+				$now
+			) );
+			$available = max( 0, $total - $busy );
+			$data      = array(
+				'total'     => $total,
+				'busy'      => $busy,
+				'available' => $available,
+				/* translators: 1: available lanes, 2: total lanes */
+				'label'     => sprintf( __( '%1$d of %2$d lanes open now', 'g2a-booking' ), $available, $total ),
+			);
+			set_transient( 'g2ab_lanes_status', $data, MINUTE_IN_SECONDS );
+		}
+		$response = rest_ensure_response( array( 'success' => true, 'data' => $data ) );
+		$response->header( 'Cache-Control', 'no-cache, no-store, must-revalidate, max-age=0' );
 		return $response;
 	}
 

@@ -415,6 +415,34 @@ final class Pages
             . 'body.g2a-pos-fullwidth #wpbody-content > .wrap{margin:0!important;padding:0!important;max-width:none!important;width:auto!important;}'
             . 'body.g2a-pos-fullwidth #wpfooter{display:none!important;}'
             . 'body.g2a-pos-fullwidth #g2a-pos-dashboard{width:100%;max-width:100%;}'
+            // WP core admin CSS ships its own `.card { max-width: 520px;
+            // margin-top: 20px; padding: .7em 2em 1em }` (common.css). The
+            // SPA's Tailwind `.card` never resets max-width/margin, so EVERY
+            // card + records table in the POS was silently capped at 520px —
+            // the "half-width blocks" bug. Neutralize the core rule inside
+            // the app root; Tailwind's own p-*/m-* utilities still apply.
+            // Neutralize ONLY the WordPress core `.card` defaults (max-width
+            // 520px, margin-top 20px, padding) without clobbering the SPA's
+            // own Tailwind utilities. We reset padding/margin/max-width to 0
+            // here, then restore every utility the SPA actually puts on cards
+            // so deliberate spacing (mt-*) and constrained widths (max-w-*,
+            // e.g. the distributor modal) survive.
+            . 'body.g2a-pos-fullwidth #g2a-pos-dashboard .card{max-width:none!important;min-width:0!important;margin-top:0!important;padding:0!important;}'
+            . 'body.g2a-pos-fullwidth #g2a-pos-dashboard .card.p-3{padding:.75rem!important;}'
+            . 'body.g2a-pos-fullwidth #g2a-pos-dashboard .card.p-4{padding:1rem!important;}'
+            . 'body.g2a-pos-fullwidth #g2a-pos-dashboard .card.p-5{padding:1.25rem!important;}'
+            . 'body.g2a-pos-fullwidth #g2a-pos-dashboard .card.p-6{padding:1.5rem!important;}'
+            // Restore deliberate top-margin utilities.
+            . 'body.g2a-pos-fullwidth #g2a-pos-dashboard .card.mt-2{margin-top:.5rem!important;}'
+            . 'body.g2a-pos-fullwidth #g2a-pos-dashboard .card.mt-4{margin-top:1rem!important;}'
+            . 'body.g2a-pos-fullwidth #g2a-pos-dashboard .card.mt-6{margin-top:1.5rem!important;}'
+            . 'body.g2a-pos-fullwidth #g2a-pos-dashboard .card.mt-8{margin-top:2rem!important;}'
+            // Restore intentional max-width constraints (e.g. modal dialogs).
+            . 'body.g2a-pos-fullwidth #g2a-pos-dashboard .card.max-w-sm{max-width:24rem!important;}'
+            . 'body.g2a-pos-fullwidth #g2a-pos-dashboard .card.max-w-md{max-width:28rem!important;}'
+            . 'body.g2a-pos-fullwidth #g2a-pos-dashboard .card.max-w-lg{max-width:32rem!important;}'
+            . 'body.g2a-pos-fullwidth #g2a-pos-dashboard .card.max-w-xl{max-width:36rem!important;}'
+            . 'body.g2a-pos-fullwidth #g2a-pos-dashboard .card.max-w-2xl{max-width:42rem!important;}'
             . '</style>';
         echo '<div class="wrap" style="margin:0;padding:0">';
         echo '<script>window.G2A_POS_ADMIN = ' . wp_json_encode($cfg) . ';';

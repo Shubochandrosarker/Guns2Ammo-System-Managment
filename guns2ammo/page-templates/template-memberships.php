@@ -51,6 +51,7 @@ get_header();
   <p class="sub fade-up d2">Pick a plan, create your account, and shoot today. No contracts. No drama.</p>
 </section>
 
+<?php if ( current_user_can( 'manage_options' ) ) : // Design-preview widget — admins only. Was public and exposed a fake "Visa 4242" member card to every visitor (E-E-A-T/trust bug). ?>
 <div class="toggle-state">
   <div class="pill-set">
     <button class="on" onclick="toggleState(false)">Visitor View</button>
@@ -71,6 +72,7 @@ get_header();
     </div>
   </div>
 </div>
+<?php endif; ?>
 
 <div class="toggle-row fade-up">
   <span style="font-family: var(--font-mono); font-size:11px; letter-spacing:0.24em; color: var(--color-silver); text-transform: uppercase;">Billing</span>

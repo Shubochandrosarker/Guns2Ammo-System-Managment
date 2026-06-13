@@ -116,15 +116,23 @@ $phone_tel = preg_replace( '/[^0-9+]/', '', '+1' . $phone );
 				if ( is_user_logged_in() ) {
 					$g2a_av_user_id = get_current_user_id();
 					$g2a_av_name    = wp_get_current_user()->display_name;
-					// Member profile image: gravatar by default; the
-					// membership plugin can supply a member photo via the
-					// g2a_profile_avatar_url filter. Falls back to the
-					// 2-letter initials when no URL is available.
-					$g2a_av_url = get_avatar_url( $g2a_av_user_id, [ 'size' => 64 ] );
+					// Member profile image: the Memberistic account dashboard
+					// upload (memberistic_profile_image_id) wins; otherwise a
+					// membership plugin can supply one via the
+					// g2a_profile_avatar_url filter, then gravatar, then the
+					// 2-letter initials.
+					$g2a_av_url = '';
+					$g2a_img_id = (int) get_user_meta( $g2a_av_user_id, 'memberistic_profile_image_id', true );
+					if ( $g2a_img_id ) {
+						$g2a_av_url = (string) wp_get_attachment_image_url( $g2a_img_id, 'thumbnail' );
+					}
+					if ( ! $g2a_av_url ) {
+						$g2a_av_url = get_avatar_url( $g2a_av_user_id, [ 'size' => 64 ] );
+					}
 					$g2a_av_url = apply_filters( 'g2a_profile_avatar_url', $g2a_av_url, $g2a_av_user_id );
 					if ( $g2a_av_url ) {
 						printf(
-							'<img class="av-img" src="%s" alt="%s" width="64" height="64" decoding="async" />',
+							'<img class="av-img" src="%s" alt="%s" width="64" height="64" loading="lazy" decoding="async" />',
 							esc_url( $g2a_av_url ),
 							esc_attr( $g2a_av_name )
 						);

@@ -26,11 +26,19 @@ $g2a_mg4_desc           = get_post_meta( $g2a_page_id, 'mg_fourth_weapon_desc', 
   <div class="inner">
     <span class="eb-pill">Arizona's Premier Indoor Range  Mesa, AZ</span>
     <h1 class="hl-display">
-      SHOOT SMART.<br>
-      CARRY SAFE.<br>
-      <span class="a">TRAIN LIKE A PRO.</span>
+      <?php echo g2a_content( // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- g2a_content() returns wp_kses_post-escaped HTML.
+        'home_hero_headline',
+        'SHOOT SMART.<br>CARRY SAFE.<br><span class="a">TRAIN LIKE A PRO.</span>',
+        'textarea',
+        'Homepage — Hero headline'
+      ); ?>
     </h1>
-    <p class="lead">6-lane climate-controlled indoor range, FFL-licensed firearm sales, and NRA-certified training  all under one roof in Mesa. Walk in, book a lane, or shop Mesa's most-trusted arsenal.</p>
+    <p class="lead"><?php echo g2a_content( // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- esc_html applied inside g2a_content().
+      'home_hero_lead',
+      "6-lane climate-controlled indoor range, FFL-licensed firearm sales, and NRA-certified training  all under one roof in Mesa. Walk in, book a lane, or shop Mesa's most-trusted arsenal.",
+      'text',
+      'Homepage — Hero lead paragraph'
+    ); ?></p>
     <div class="ctas">
       <a class="btn btn-ember btn-arrow" href="<?php echo esc_url( home_url( "/book-a-lane/" ) ); ?>">Book A Lane</a>
       <a class="btn btn-ghost" href="<?php echo esc_url( home_url( "/shop/" ) ); ?>">Shop Collections</a>
@@ -122,7 +130,13 @@ $g2a_mg4_desc           = get_post_meta( $g2a_page_id, 'mg_fourth_weapon_desc', 
     </div>
     <div class="right" data-reveal="right">
       <div class="photo-card">
-        <div class="ph"></div>
+        <?php
+        // Editable photo slot — real arsenal-wall photo by default; if the
+        // client clears the URL the original CSS placeholder background in
+        // front-page.css still renders, so the card never looks broken.
+        $g2a_mg_photo = g2a_content( 'home_mg_photo', g2a_asset( 'img/gallery/guns2ammo-arsenal-wall.jpg' ), 'image', 'Homepage — Machine gun section photo' );
+        ?>
+        <div class="ph"<?php if ( $g2a_mg_photo ) : ?> style="background-image:linear-gradient(180deg, rgba(0,0,0,0.1), rgba(0,0,0,0.4)), url('<?php echo esc_url( $g2a_mg_photo ); ?>');"<?php endif; ?>></div>
         <span class="cap"> The Arsenal </span>
       </div>
       <div class="arsenal-grid">
@@ -218,7 +232,7 @@ $g2a_mg4_desc           = get_post_meta( $g2a_page_id, 'mg_fourth_weapon_desc', 
         <div class="bg" style="background-image: linear-gradient(180deg, rgba(26,25,30,0.3), rgba(26,25,30,0.85)), url('<?php echo esc_url( g2a_asset( 'img/guns2ammo-store-counter-staff.jpg' ) ); ?>');"></div>
         <div class="scrim"></div>
         <div class="body">
-          <div class="cat">$25 Flat Fee</div>
+          <div class="cat">$35 Flat Fee</div>
           <h3>TRANSFERS</h3>
           <span class="more">Start </span>
         </div>
@@ -312,7 +326,12 @@ $g2a_week_order = array( 1, 2, 3, 4, 5, 6, 0 );
         <a class="btn btn-ghost" href="<?php echo esc_url( g2a_biz_tel_href() ); ?>"><?php printf( esc_html__( 'Call %s', 'guns2ammo' ), esc_html( $g2a_biz['phone'] ) ); ?></a>
       </div>
     </div>
-    <div class="visit-photo" data-reveal="right">
+    <?php
+    // Editable photo slot — real retail-floor photo by default; falls back
+    // to the stock background baked into front-page.css when cleared.
+    $g2a_visit_photo = function_exists( 'g2a_content' ) ? g2a_content( 'home_visit_photo', g2a_asset( 'img/gallery/guns2ammo-retail-floor.jpg' ), 'image', 'Homepage — Visit section photo' ) : '';
+    ?>
+    <div class="visit-photo" data-reveal="right"<?php if ( $g2a_visit_photo ) : ?> style="background-image:linear-gradient(180deg, rgba(0,0,0,0.1), rgba(0,0,0,0.5)), url('<?php echo esc_url( $g2a_visit_photo ); ?>');"<?php endif; ?>>
       <span class="badge"> Main Floor</span>
     </div>
   </div>
@@ -369,43 +388,82 @@ $g2a_week_order = array( 1, 2, 3, 4, 5, 6, 0 );
   </div>
 </section>
 
-<!-- COMMON QUESTIONS (curated home FAQ — full list lives at /faqs/) -->
-<?php if ( function_exists( 'g2a_home_faqs' ) ) :
-	$g2a_home_faqs = g2a_home_faqs();
-	if ( ! empty( $g2a_home_faqs ) ) : ?>
-<section class="home-faq" id="faq" aria-labelledby="home-faq-title">
-  <div class="wrap">
-    <div class="head" data-reveal>
-      <span class="eb-pill"><?php esc_html_e( 'Straight Answers', 'guns2ammo' ); ?></span>
-      <h2 id="home-faq-title">COMMON<br><span class="a">QUESTIONS.</span></h2>
-      <p><?php esc_html_e( 'No fine print, no runaround. Here is what first-timers and regulars ask us most.', 'guns2ammo' ); ?></p>
+<!-- FAQ — answer-engine ready, animated accordion -->
+<section class="home-faq" style="padding: 96px 32px; background: var(--color-surface-1);">
+  <div style="max-width: 880px; margin: 0 auto;">
+    <div style="text-align:center; margin-bottom: 40px;" data-reveal>
+      <span class="eyebrow">Before You Visit</span>
+      <h2 class="sec" style="font-family: var(--font-display); font-size: clamp(40px, 5vw, 60px); color: var(--color-white); letter-spacing: 0.02em; line-height: 1; margin: 14px 0 0;"><span class="g2a-underline">QUESTIONS, ANSWERED.</span></h2>
     </div>
-    <div class="faq-list" data-reveal-group>
-      <?php foreach ( $g2a_home_faqs as $g2a_faq_i => $g2a_faq ) : ?>
-      <div class="faq-item" data-reveal>
-        <button class="faq-q" type="button" aria-expanded="false" aria-controls="home-faq-a-<?php echo (int) $g2a_faq_i; ?>" data-faq-toggle>
-          <span><?php echo esc_html( $g2a_faq['q'] ); ?></span>
-          <svg class="chev" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6l5 5 5-5"/></svg>
-        </button>
-        <div class="faq-a" id="home-faq-a-<?php echo (int) $g2a_faq_i; ?>">
-          <div><p><?php echo esc_html( $g2a_faq['a'] ); ?></p></div>
-        </div>
-      </div>
+    <?php
+    $g2a_home_faqs = array(
+      array(
+        'q' => 'How much does the shooting range cost?',
+        'a' => 'Lane rental is $20 per hour and each extra shooter on your lane is $15. Gun rentals start at $15, eye and ear protection is $3 combined, and members shoot on included lane time. Walk-ins are welcome seven days a week.',
+      ),
+      array(
+        'q' => 'Do I need to bring my own gun?',
+        'a' => 'No — we have a rental wall with 40+ pistols and rifles starting at $15, plus range ammo for sale at the counter. A Range Safety Officer will set you up and walk you through anything unfamiliar.',
+      ),
+      array(
+        'q' => 'Can complete beginners come?',
+        'a' => 'Absolutely. First-timers are our favorite guests: an RSO covers safety, grip, and stance before you shoot, and our $95 Basic Handgun class or $140/hr private instruction can take you further whenever you\'re ready.',
+      ),
+      array(
+        'q' => 'What are the age requirements?',
+        'a' => 'Shooters 8 and older are welcome with a parent or guardian on the lane; you must be 18+ to shoot solo. Bring a valid government-issued photo ID for check-in.',
+      ),
+      array(
+        'q' => 'Do you offer Arizona CCW classes?',
+        'a' => 'Yes — the $85 classroom CCW course runs Saturdays (4 hours, covers A.R.S. §13-3112, reciprocity in 37 states, and DPS paperwork) and a $149.99 CCW + Live Fire course adds an hour on the range.',
+      ),
+      array(
+        'q' => 'Can I really shoot a machine gun?',
+        'a' => 'Yes. We run Mesa\'s only indoor full-auto experience — MP5, M16, and AK-47 packages from $249 with a one-on-one RSO, ammo and targets included. No experience needed; book 4–6 weeks ahead.',
+      ),
+    );
+    ?>
+    <div class="g2a-faq" data-reveal-stagger>
+      <?php foreach ( $g2a_home_faqs as $i => $f ) : ?>
+        <details<?php echo 0 === $i ? ' open' : ''; ?>>
+          <summary><?php echo esc_html( $f['q'] ); ?></summary>
+          <div class="faq-a"><?php echo esc_html( $f['a'] ); ?></div>
+        </details>
       <?php endforeach; ?>
     </div>
-    <div class="all-link" data-reveal>
-      <a class="btn btn-brass btn-arrow" href="<?php echo esc_url( home_url( '/faqs/' ) ); ?>"><?php esc_html_e( 'View All FAQs', 'guns2ammo' ); ?></a>
-    </div>
+    <script type="application/ld+json"><?php
+      $g2a_faq_ld = array(
+        '@context'   => 'https://schema.org',
+        '@type'      => 'FAQPage',
+        'mainEntity' => array_map( function ( $f ) {
+          return array(
+            '@type'          => 'Question',
+            'name'           => $f['q'],
+            'acceptedAnswer' => array( '@type' => 'Answer', 'text' => $f['a'] ),
+          );
+        }, $g2a_home_faqs ),
+      );
+      echo wp_json_encode( $g2a_faq_ld, JSON_UNESCAPED_SLASHES );
+    ?></script>
   </div>
 </section>
-<?php endif; endif; ?>
 
 <!-- FINAL CTA -->
 <section class="final hero-media">
   <div class="wrap" data-reveal>
     <span class="eb-pill" style="margin: 0 auto;">Mesa's Most-Trusted Range</span>
-    <h2>READY TO<br><span class="a">SHOOT?</span></h2>
-    <p>Book a lane, enroll in a course, or stop by the shop. We're open six days a week  Friday closed  and there's always an RSO on duty.</p>
+    <h2><?php echo g2a_content( // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- g2a_content() returns wp_kses_post-escaped HTML.
+      'home_final_cta_heading',
+      'READY TO<br><span class="a">SHOOT?</span>',
+      'textarea',
+      'Homepage — Final CTA heading'
+    ); ?></h2>
+    <p><?php echo g2a_content( // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- esc_html applied inside g2a_content().
+      'home_final_cta_text',
+      "Book a lane, enroll in a course, or stop by the shop. We're open seven days a week and there's always an RSO on duty.",
+      'text',
+      'Homepage — Final CTA paragraph'
+    ); ?></p>
     <div class="ctas">
       <a class="btn btn-ember btn-arrow" href="<?php echo esc_url( home_url( "/book-a-lane/" ) ); ?>">Book A Lane</a>
       <a class="btn btn-ghost" href="<?php echo esc_url( home_url( "/memberships/" ) ); ?>">Become a Member</a>

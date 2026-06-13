@@ -3,7 +3,7 @@
         'name' => 'wordpressistic/g2a-pos-core',
         'pretty_version' => 'dev-main',
         'version' => 'dev-main',
-        'reference' => '3c3989b8ef58363bedf63a5c20f0d37a15e68f34',
+        'reference' => '76772aa6d23469474a11dd79753daa5183dc24a2',
         'type' => 'wordpress-plugin',
         'install_path' => __DIR__ . '/../../',
         'aliases' => array(),
@@ -31,7 +31,7 @@
         'wordpressistic/g2a-pos-core' => array(
             'pretty_version' => 'dev-main',
             'version' => 'dev-main',
-            'reference' => '3c3989b8ef58363bedf63a5c20f0d37a15e68f34',
+            'reference' => '76772aa6d23469474a11dd79753daa5183dc24a2',
             'type' => 'wordpress-plugin',
             'install_path' => __DIR__ . '/../../',
             'aliases' => array(),
