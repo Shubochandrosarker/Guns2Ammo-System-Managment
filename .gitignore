@@ -26,3 +26,6 @@ g2a-pos-core/vendor/theseer/
 g2a-pos-core/vendor/wp-coding-standards/
 g2a-pos-core/.phpunit.cache/
 g2a-pos-core/vendor/composer/autoload_files.php
+
+# TypeScript incremental build cache (POS admin)
+*.tsbuildinfo

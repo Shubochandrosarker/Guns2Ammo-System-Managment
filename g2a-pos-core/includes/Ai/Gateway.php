@@ -143,14 +143,27 @@ final class Gateway {
 		$names     = array_map( static fn( $f ) => $f['name'] ?? '', is_array( $available ) ? $available : array() );
 		$lower     = strtolower( $last_user );
 
+		// Keyword → tool routing. Ordered most-specific first so e.g.
+		// "membership" wins over a bare "find". This is what lets the agent
+		// scan bookings, memberships and products usefully even before a live
+		// LLM is configured (stub mode).
 		$pick = null;
 		foreach ( array(
 			'email invoice'   => 'cart.email_invoice',
 			'create invoice'  => 'cart.create_invoice',
-			'find ammo'       => 'inventory.find',
+			'booking'         => 'booking.lookup',
+			'reservation'     => 'booking.lookup',
+			'lane booking'    => 'booking.lookup',
+			'membership'      => 'membership.lookup',
+			'member '         => 'membership.lookup',
+			'renewal'         => 'membership.lookup',
+			'who renews'      => 'membership.lookup',
 			'find a customer' => 'customer.lookup',
 			'lookup customer' => 'customer.lookup',
+			'find ammo'       => 'inventory.find',
 			'in stock'        => 'inventory.find',
+			'product'         => 'inventory.find',
+			'inventory'       => 'inventory.find',
 			'sales today'     => 'reports.sales',
 			'how many'        => 'reports.sales',
 		) as $needle => $tool ) {
