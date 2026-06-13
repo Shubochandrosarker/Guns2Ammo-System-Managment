@@ -25,6 +25,20 @@ final class G2AB_Frontend {
 	private static $instance = null;
 	private $enqueued = false;
 
+	/**
+	 * Tag of the booking shortcode currently mid-render, or null when nothing
+	 * is rendering. Read by the shutdown fatal-catcher so a NON-catchable fatal
+	 * (out-of-memory, max_execution_time, deep recursion) raised inside a
+	 * booking shortcode can never leave the visitor on a pure-white page —
+	 * try/catch alone cannot intercept those.
+	 *
+	 * @var string|null
+	 */
+	private static $active_render = null;
+
+	/** True once the shutdown fatal-catcher has been registered. */
+	private static $shutdown_hooked = false;
+
 	public static function instance() {
 		if ( null === self::$instance ) {
 			self::$instance = new self();
@@ -64,9 +78,13 @@ final class G2AB_Frontend {
 	private function guard( $method ) {
 		return function ( $atts = array(), $content = '', $tag = '' ) use ( $method ) {
 			$ob_level = ob_get_level();
+			self::begin_render( $tag ? $tag : $method );
 			try {
-				return $this->{$method}( $atts, $content, $tag );
+				$html = $this->{$method}( $atts, $content, $tag );
+				self::end_render();
+				return $html;
 			} catch ( \Throwable $e ) {
+				self::end_render();
 				// Drop any partial markup the renderer left buffered so the
 				// page isn't left with an unbalanced output buffer.
 				while ( ob_get_level() > $ob_level ) {
@@ -79,21 +97,109 @@ final class G2AB_Frontend {
 					$e->getFile(),
 					$e->getLine()
 				) );
-				if ( current_user_can( 'manage_options' ) ) {
-					return '<div class="g2ab g2ab-error"><p>'
-						. esc_html( sprintf(
-							/* translators: 1: shortcode method, 2: error message (admin-only) */
-							__( 'Booking widget error in %1$s (visible to admins only): %2$s', 'g2a-booking' ),
-							$method,
-							$e->getMessage()
-						) )
-						. '</p></div>';
-				}
-				return '<div class="g2ab g2ab-error"><p>'
-					. esc_html__( 'The booking form is temporarily unavailable. Please refresh the page, or call us and our team will book you right in.', 'g2a-booking' )
-					. '</p></div>';
+				return self::error_box( $method, $e->getMessage() . ' @ ' . basename( $e->getFile() ) . ':' . $e->getLine() );
 			}
 		};
+	}
+
+	/**
+	 * Mark the start of a booking-shortcode render and arm the safety net.
+	 *
+	 * Raises the memory + time limits for the duration of the render (a heavy
+	 * page can otherwise tip the widget into an out-of-memory / timeout fatal
+	 * that try/catch cannot catch) and registers a one-time shutdown handler
+	 * that recovers the page from any such non-catchable fatal.
+	 *
+	 * Public + static so the Events shortcodes can share the same net.
+	 *
+	 * @param string $tag Shortcode tag (for diagnostics).
+	 * @return void
+	 */
+	public static function begin_render( $tag ) {
+		self::$active_render = (string) $tag;
+
+		if ( function_exists( 'wp_raise_memory_limit' ) ) {
+			wp_raise_memory_limit( 'g2ab_booking' );
+		}
+		$current = function_exists( 'wp_convert_hr_to_bytes' )
+			? wp_convert_hr_to_bytes( (string) ini_get( 'memory_limit' ) )
+			: 0;
+		if ( $current > 0 && $current < 268435456 ) {
+			@ini_set( 'memory_limit', '256M' ); // phpcs:ignore WordPress.PHP.IniSet
+		}
+		// Give a slow shared host headroom without removing the limit entirely
+		// (which would let a genuine infinite loop hang instead of erroring).
+		@set_time_limit( 120 ); // phpcs:ignore
+
+		if ( ! self::$shutdown_hooked ) {
+			self::$shutdown_hooked = true;
+			register_shutdown_function( array( __CLASS__, 'handle_fatal_shutdown' ) );
+		}
+	}
+
+	/** Mark a render as completed cleanly so the shutdown net stays silent. */
+	public static function end_render() {
+		self::$active_render = null;
+	}
+
+	/**
+	 * Last line of defence: if the request is aborting on a fatal that struck
+	 * while a booking shortcode was mid-render, the page would otherwise go
+	 * pure white. Flush buffers, print a visible notice and reveal the page
+	 * (dismiss the theme preloader) so the visitor always sees *something*.
+	 *
+	 * @return void
+	 */
+	public static function handle_fatal_shutdown() {
+		if ( null === self::$active_render ) {
+			return; // render finished cleanly — nothing to recover.
+		}
+		$err    = error_get_last();
+		$fatals = array( E_ERROR, E_PARSE, E_CORE_ERROR, E_COMPILE_ERROR, E_USER_ERROR, E_RECOVERABLE_ERROR );
+		if ( ! $err || ! in_array( $err['type'], $fatals, true ) ) {
+			return; // not a fatal — normal shutdown.
+		}
+		error_log( sprintf(
+			'[G2AB] FATAL during shortcode %s: %s @ %s:%d',
+			self::$active_render,
+			$err['message'],
+			$err['file'],
+			$err['line']
+		) );
+		// Close any buffers the dying renderer left open, then emit recovery UI.
+		while ( ob_get_level() > 0 ) {
+			@ob_end_flush(); // phpcs:ignore
+		}
+		echo self::error_box( self::$active_render, $err['message'] . ' @ ' . $err['file'] . ':' . $err['line'] ); // phpcs:ignore WordPress.Security.EscapeOutput
+		echo '<script>document.documentElement.classList.remove("g2a-loading");var _p=document.getElementById("g2a-preloader");if(_p&&_p.parentNode){_p.parentNode.removeChild(_p);}</script>';
+	}
+
+	/**
+	 * Build the inline error/notice box shared by the catch handler and the
+	 * shutdown net. The real error is shown to admins, or to anyone who adds
+	 * `?g2ab_debug=1` to the URL (so a site owner can capture the cause without
+	 * touching wp-config). Everyone else sees a reassuring fallback. Inline
+	 * styles keep it readable even when no theme CSS loaded.
+	 *
+	 * @param string $where  Shortcode/method that failed.
+	 * @param string $detail Underlying error detail.
+	 * @return string
+	 */
+	public static function error_box( $where, $detail ) {
+		$show = ( function_exists( 'current_user_can' ) && current_user_can( 'manage_options' ) )
+			|| ( isset( $_GET['g2ab_debug'] ) && '1' === $_GET['g2ab_debug'] ); // phpcs:ignore WordPress.Security.NonceVerification
+		if ( $show ) {
+			$body = sprintf(
+				/* translators: 1: shortcode/method, 2: underlying error */
+				__( 'Booking widget error in %1$s: %2$s', 'g2a-booking' ),
+				(string) $where,
+				(string) $detail
+			);
+		} else {
+			$body = __( 'The booking form is temporarily unavailable. Please refresh the page, or call us and our team will book you right in.', 'g2a-booking' );
+		}
+		return '<div class="g2ab g2ab-error" style="margin:24px auto;max-width:680px;padding:16px 20px;border:1px solid #cc3333;border-radius:8px;background:#fff;color:#a00000;font:14px/1.5 system-ui,-apple-system,sans-serif;">'
+			. '<p style="margin:0;">' . esc_html( $body ) . '</p></div>';
 	}
 
 	public function register_assets() {
