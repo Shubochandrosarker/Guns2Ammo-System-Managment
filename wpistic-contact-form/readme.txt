@@ -4,7 +4,7 @@ Tags: contact form, form builder, wordpress, submissions, inbox, ai, spam protec
 Requires at least: 6.2
 Tested up to: 6.9
 Requires PHP: 7.4
-Stable tag: 1.5.5
+Stable tag: 1.5.6
 License: GPL-2.0+
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -108,6 +108,10 @@ This plugin can connect to third-party services when enabled by the site adminis
 * Terms/Privacy: Depends on selected provider.
 
 == Changelog ==
+
+= 1.5.6 =
+* Fix: the `[wpistic_contact_form]` shortcode posted to /wp-admin/admin-post.php, which security plugins / WAFs (Cloudflare) / managed hosts routinely block for logged-OUT visitors — so the public contact form errored for everyone not logged in. The form now posts to the site home and is handled on `template_redirect` (admin_post hooks kept as a fallback). Nonce verification is now cache-resilient (same-origin fallback when a cached nonce has expired).
+* Fix: behind Cloudflare, submissions showed "sent" but never appeared in the dashboard. `client_ip()` returned Cloudflare's shared edge IP because the trusted-proxy allowlist was empty by default, so the per-IP rate limit (3/hour) collapsed onto a single bucket and silently dropped captures site-wide. Cloudflare's published edge ranges are now trusted by default (CF-Connecting-IP is honored only when REMOTE_ADDR is genuinely a Cloudflare IP, so it can't be spoofed). Other reverse proxies can still be added via `WPCF_TRUSTED_PROXIES` / the `WPISTIC_CF_trusted_proxies` option/filter.
 
 = 1.5.5 =
 * Fix: website forms (Contact, Firearms Transfer Request, etc.) submitted to admin-post.php and landed on a blank page with no confirmation. The plugin captures those theme forms at priority 1 — before the theme's redirect — and any output or error from its downstream actions (auto-responder / webhooks / AI) blocked that redirect. The capture is now fully output-buffered and wrapped in try/catch so the theme always redirects to the thank-you page.

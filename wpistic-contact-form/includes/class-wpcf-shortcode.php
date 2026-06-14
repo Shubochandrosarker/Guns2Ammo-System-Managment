@@ -25,7 +25,28 @@ class WPISTIC_CF_Shortcode {
 		add_shortcode( 'wpistic_contact_form', [ $this, 'render' ] );
 		add_action( 'admin_post_WPISTIC_CF_submit', [ $this, 'handle_submit' ] );
 		add_action( 'admin_post_nopriv_WPISTIC_CF_submit', [ $this, 'handle_submit' ] );
+		// Also handle the submission on the FRONT END. The form posts to the
+		// site home (see render()) rather than /wp-admin/admin-post.php, which
+		// many security plugins / WAFs (Cloudflare) / hosts block for logged-out
+		// visitors — silently breaking the public contact form for everyone not
+		// logged in. The admin_post_* hooks stay registered for backward
+		// compatibility with any page still cached with the old action.
+		add_action( 'template_redirect', [ $this, 'maybe_handle_frontend_submit' ], 0 );
 		add_action( 'wp_enqueue_scripts', [ $this, 'assets' ] );
+	}
+
+	/**
+	 * Front-end dispatcher: run the submit handler when the form posts to a
+	 * normal page URL with our action marker.
+	 */
+	public function maybe_handle_frontend_submit() {
+		if ( is_admin() ) {
+			return;
+		}
+		$action = isset( $_POST['action'] ) ? sanitize_key( wp_unslash( $_POST['action'] ) ) : '';
+		if ( 'WPISTIC_CF_submit' === $action ) {
+			$this->handle_submit();
+		}
 	}
 
 	/**
@@ -90,7 +111,7 @@ class WPISTIC_CF_Shortcode {
 				</div>
 			<?php endif; ?>
 
-			<form class="WPISTIC_CF-form" method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>"<?php echo $enctype; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?>>
+			<form class="WPISTIC_CF-form" method="post" action="<?php echo esc_url( home_url( '/' ) ); ?>"<?php echo $enctype; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?>>
 				<input type="hidden" name="action" value="WPISTIC_CF_submit">
 				<input type="hidden" name="WPISTIC_CF_form_name" value="<?php echo esc_attr( $atts['form_name'] ); ?>">
 				<?php wp_nonce_field( 'WPISTIC_CF_submit', 'WPISTIC_CF_nonce' ); ?>
@@ -178,7 +199,11 @@ class WPISTIC_CF_Shortcode {
 		}
 
 		$nonce = isset( $_POST['WPISTIC_CF_nonce'] ) ? sanitize_text_field( wp_unslash( $_POST['WPISTIC_CF_nonce'] ) ) : '';
-		if ( ! wp_verify_nonce( $nonce, 'WPISTIC_CF_submit' ) ) {
+		// Cache-resilient verification: a fresh nonce passes outright; a stale
+		// one (full-page cache / CDN serving an expired nonce) is accepted only
+		// when the POST is same-origin, so cross-site CSRF is still rejected.
+		// The honeypot above + the spam stack on capture remain the bot defense.
+		if ( ! ( $nonce && wp_verify_nonce( $nonce, 'WPISTIC_CF_submit' ) ) && ! $this->request_is_same_origin() ) {
 			$this->redirect_back( $back, 'error' );
 		}
 
@@ -260,6 +285,31 @@ class WPISTIC_CF_Shortcode {
 		}
 
 		$this->redirect_back( $back, '1' );
+	}
+
+	/**
+	 * Whether the current POST is same-origin (or carries no Origin/Referer to
+	 * judge). Used as the fallback when a cached nonce has expired. Rejects only
+	 * a request whose Origin/Referer host differs from the site host.
+	 *
+	 * @return bool
+	 */
+	protected function request_is_same_origin() {
+		$home_host = strtolower( (string) wp_parse_url( home_url(), PHP_URL_HOST ) );
+		$candidates = array(
+			wp_get_referer(),
+			isset( $_SERVER['HTTP_ORIGIN'] ) ? wp_unslash( $_SERVER['HTTP_ORIGIN'] ) : '',
+		);
+		foreach ( $candidates as $candidate ) {
+			if ( ! $candidate ) {
+				continue;
+			}
+			$host = strtolower( (string) wp_parse_url( $candidate, PHP_URL_HOST ) );
+			if ( $host && $host !== $home_host ) {
+				return false;
+			}
+		}
+		return true;
 	}
 
 	/**
