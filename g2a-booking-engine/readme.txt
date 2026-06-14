@@ -4,7 +4,7 @@ Tags: booking, reservation, scheduling, appointments, shooting range, firearms, 
 Requires at least: 6.2
 Tested up to: 6.5
 Requires PHP: 8.0
-Stable tag: 1.14.4
+Stable tag: 1.14.5
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -206,6 +206,27 @@ Yes. REST API at `/wp-json/g2a-booking/v1/` covers bookings, forms, calendar, fr
 7. Migration wizard — dry-run preview before live import.
 
 == Changelog ==
+
+= 1.14.5 =
+**Email + front-desk correctness fixes.**
+
+* FIX: Customer-facing email merge tags (`{customer_name}`, `{customer_phone}`)
+  rendered blank and the name fell through to "Guest". `build_tags()` read a
+  non-existent `fields` key instead of the real `customer_name`/`customer_email`/
+  `customer_phone` columns and the `form_data` JSON payload. It now reads the
+  dedicated columns first and falls back to `form_data`, matching the PDF
+  invoice renderer.
+* FIX: Lifecycle emails were silently dropped when a `g2ab_booking_*` hook
+  fired with a booking object that had no populated `uuid` — `resolve_booking()`
+  fell through to `absint( $object )` (=== 0) and returned null. It now accepts
+  any object as-is.
+* FIX: The front-desk terminal shortcode rendered an empty shell because its
+  inline roster script was registered with an empty-string `src` (`''`), which
+  causes WordPress to drop the `wp_add_inline_script()` payload. Now registered
+  with the boolean `false` sentinel, matching the stylesheet registration.
+* FIX: `uninstall.php` now also drops the `g2ab_checkins` and
+  `g2ab_booking_activity` tables (previously left orphaned on data-removal
+  uninstall).
 
 = 1.12.4 =
 **Lifecycle, payment, and invoice correctness fixes.**

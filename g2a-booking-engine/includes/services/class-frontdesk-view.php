@@ -89,7 +89,10 @@ final class G2AB_Frontdesk_View {
 		wp_enqueue_style( 'g2ab-frontdesk' );
 		wp_add_inline_style( 'g2ab-frontdesk', self::css() );
 
-		wp_register_script( 'g2ab-frontdesk', '', array(), G2AB_VERSION, true );
+		// Use the boolean `false` src (not ''), otherwise WordPress drops the
+		// wp_add_inline_script() payload and the front-desk terminal renders an
+		// empty, non-functional shell. Matches the wp_register_style() call above.
+		wp_register_script( 'g2ab-frontdesk', false, array(), G2AB_VERSION, true );
 		wp_enqueue_script( 'g2ab-frontdesk' );
 		wp_add_inline_script( 'g2ab-frontdesk', self::js() );
 	}

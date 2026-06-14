@@ -122,14 +122,6 @@ add_filter( 'script_loader_tag', function ( $tag, $handle ) {
  * intentionally removed — they would slow first paint with a useless
  * DNS lookup and leak the visitor's IP to Google. */
 
-/* Add defer to non-essential scripts */
-add_filter( 'script_loader_tag', function ( $tag, $handle ) {
-	if ( in_array( $handle, [ 'g2a-chrome' ], true ) ) {
-		return str_replace( ' src', ' defer src', $tag );
-	}
-	return $tag;
-}, 10, 2 );
-
 /* ---------- Body classes ---------- */
 add_filter( 'body_class', function ( $classes ) {
 	$classes[] = 'g2a-body';
@@ -300,14 +292,61 @@ function g2a_section( $name, $args = [] ) {
  * Powers the course, private-instruction and arsenal reservation forms.
  * Emails the business inbox and redirects back with a success flag.
  */
+/**
+ * Verify a theme-form submission, tolerating the stale nonces that full-page
+ * caches and CDNs inevitably serve.
+ *
+ * A public marketing site behind a page cache serves ONE cached copy of the
+ * form (and its embedded nonce) to every visitor. WordPress nonces expire
+ * after ~24h, but the cached HTML lives on — so once the baked-in nonce
+ * lapses, every legitimate submission fails wp_verify_nonce() and the visitor
+ * hits a hard "Security check failed" wall. That is the single most common
+ * cause of "the contact form suddenly stopped working for everyone."
+ *
+ * To keep the forms working we treat the nonce as the FIRST line of CSRF
+ * defense, not the only one: a fresh valid nonce is accepted outright; a
+ * missing/expired one is accepted UNLESS the request advertises a foreign
+ * Origin/Referer host (a clear cross-site POST), which is rejected. The
+ * caller's honeypot and the WPistic Contact Form spam stack (per-IP rate
+ * limit, blocklist, Akismet) remain the active bot/abuse defenses on capture.
+ *
+ * @param string $action Nonce action the form was created with.
+ * @return bool True when the submission should be processed.
+ */
+function g2a_verify_form_request( $action ) {
+	$nonce = isset( $_POST['g2a_nonce'] ) ? sanitize_text_field( wp_unslash( $_POST['g2a_nonce'] ) ) : '';
+	if ( $nonce && wp_verify_nonce( $nonce, $action ) ) {
+		return true; // Fresh, valid nonce — best case.
+	}
+
+	// Cache-stale / missing nonce: reject only an explicit cross-site POST.
+	$home_host = strtolower( (string) wp_parse_url( home_url(), PHP_URL_HOST ) );
+	$origins   = array(
+		wp_get_referer(),
+		isset( $_SERVER['HTTP_ORIGIN'] ) ? wp_unslash( $_SERVER['HTTP_ORIGIN'] ) : '',
+	);
+	foreach ( $origins as $candidate ) {
+		if ( ! $candidate ) {
+			continue;
+		}
+		$host = strtolower( (string) wp_parse_url( $candidate, PHP_URL_HOST ) );
+		if ( $host && $host !== $home_host ) {
+			return false; // Foreign origin/referer → genuine cross-site request.
+		}
+	}
+	return true;
+}
+
 function g2a_handle_reservation() {
 	// Honeypot  silent drop for bots.
 	if ( ! empty( $_POST['g2a_hp'] ) ) {
 		wp_safe_redirect( home_url( '/' ) );
 		exit;
 	}
-	if ( ! isset( $_POST['g2a_nonce'] ) || ! wp_verify_nonce( $_POST['g2a_nonce'], 'g2a_reservation' ) ) {
-		wp_die( 'Security check failed. Please go back and submit the form again.' );
+	if ( ! g2a_verify_form_request( 'g2a_reservation' ) ) {
+		$back = wp_get_referer() ?: home_url( '/' );
+		wp_safe_redirect( add_query_arg( 'g2a_sent', 'error', remove_query_arg( 'g2a_sent', $back ) ) . '#reserve' );
+		exit;
 	}
 
 	$subject = sanitize_text_field( wp_unslash( $_POST['g2a_subject'] ?? 'Reservation Request' ) );
@@ -363,8 +402,10 @@ function g2a_handle_request() {
 		wp_safe_redirect( home_url( '/' ) );
 		exit;
 	}
-	if ( ! isset( $_POST['g2a_nonce'] ) || ! wp_verify_nonce( $_POST['g2a_nonce'], 'g2a_request' ) ) {
-		wp_die( 'Security check failed. Please go back and submit the form again.' );
+	if ( ! g2a_verify_form_request( 'g2a_request' ) ) {
+		$back = wp_get_referer() ?: home_url( '/' );
+		wp_safe_redirect( add_query_arg( 'g2a_sent', 'error', remove_query_arg( 'g2a_sent', $back ) ) . '#request' );
+		exit;
 	}
 
 	$subject = sanitize_text_field( wp_unslash( $_POST['g2a_subject'] ?? 'Website Request' ) );

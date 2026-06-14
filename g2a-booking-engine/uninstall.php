@@ -37,6 +37,8 @@ $g2ab_cleanup = static function () use ( $wpdb ) {
 		$wpdb->prefix . 'g2ab_forms',
 		$wpdb->prefix . 'g2ab_booking_types',
 		$wpdb->prefix . 'g2ab_resources',
+		$wpdb->prefix . 'g2ab_checkins',
+		$wpdb->prefix . 'g2ab_booking_activity',
 		$wpdb->prefix . 'g2ab_bookings',
 	);
 
