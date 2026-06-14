@@ -452,7 +452,7 @@ if ( function_exists( 'g2a_emit_jsonld' ) && function_exists( 'g2a_faq_schema' )
       </div>
     <?php else : ?>
       <p class="rf-intro">Pick your course, tell us when you'd like to attend, and our team will confirm your seat by phone or email — usually within one business day. Guns 2 Ammo · 6030 E Main St #103, Mesa, AZ 85205.</p>
-      <form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
+      <form method="post" action="<?php echo esc_url( g2a_form_action_url() ); ?>">
         <input type="hidden" name="action" value="g2a_reservation">
         <input type="hidden" name="g2a_subject" id="ccw-subject" value="Arizona CCW Class Reservation">
         <?php wp_nonce_field( 'g2a_reservation', 'g2a_nonce' ); ?>

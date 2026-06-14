@@ -77,7 +77,7 @@ if ( function_exists( 'g2a_faq_schema' ) && function_exists( 'g2a_emit_jsonld' )
       </div>
     <?php else : ?>
       <p style="color:var(--color-fog); font-size:14px; line-height:1.7; margin:12px 0 22px;">The more detail you give us, the faster we can get your seller what they need. Nothing here is a commitment  it simply starts the transfer.</p>
-      <form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
+      <form method="post" action="<?php echo esc_url( g2a_form_action_url() ); ?>">
         <input type="hidden" name="action" value="g2a_request">
         <input type="hidden" name="g2a_subject" value="Firearms Transfer Request">
         <?php wp_nonce_field( 'g2a_request', 'g2a_nonce' ); ?>

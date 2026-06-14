@@ -96,7 +96,7 @@ get_header();
       <?php if ( isset( $_GET['g2a_sent'] ) ) : ?>
         <div class="alert success"><span class="ic"></span><div><div class="h">Message Received</div>Thanks  we'll be in touch within one business day. For anything urgent, call (602)&nbsp;715-2677.</div></div>
       <?php else : ?>
-      <form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
+      <form method="post" action="<?php echo esc_url( g2a_form_action_url() ); ?>">
         <input type="hidden" name="action" value="g2a_request">
         <input type="hidden" name="g2a_subject" value="Contact Message">
         <?php wp_nonce_field( 'g2a_request', 'g2a_nonce' ); ?>

@@ -42,7 +42,7 @@ $rf_sent    = isset( $_GET['g2a_sent'] );
       </div>
     <?php else : ?>
       <p class="rf-intro"><?php echo esc_html( $rf_intro ); ?></p>
-      <form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
+      <form method="post" action="<?php echo esc_url( g2a_form_action_url() ); ?>">
         <input type="hidden" name="action" value="g2a_reservation">
         <input type="hidden" name="g2a_subject" value="<?php echo esc_attr( $rf_subject ); ?>">
         <?php wp_nonce_field( 'g2a_reservation', 'g2a_nonce' ); ?>
