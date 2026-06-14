@@ -446,6 +446,48 @@ add_action( 'admin_post_g2a_request', 'g2a_handle_request' );
 add_action( 'admin_post_nopriv_g2a_request', 'g2a_handle_request' );
 
 /**
+ * URL that public theme forms POST to.
+ *
+ * Deliberately a FRONT-END url (the site home), NOT
+ * /wp-admin/admin-post.php. Many security plugins, WAFs (Cloudflare), and
+ * managed hosts block all /wp-admin/ requests for logged-OUT visitors. That
+ * silently broke every public form for anyone who wasn't logged in — the form
+ * submitted fine for admins (who pass the wp-admin gate) but errored for
+ * everyone else. Posting to the front end and handling the submission on
+ * template_redirect (see g2a_route_frontend_form) sidesteps the gate entirely.
+ *
+ * @return string
+ */
+function g2a_form_action_url() {
+	return home_url( '/' );
+}
+
+/**
+ * Process public theme form submissions on the FRONT END.
+ *
+ * Forms post to g2a_form_action_url() (the site home) instead of
+ * admin-post.php. We catch the POST early on template_redirect — before
+ * redirect_canonical (priority 10) and before the template renders — and
+ * dispatch to the same handlers the admin_post_* hooks use. Those hooks stay
+ * registered so any page still cached with the old admin-post.php action keeps
+ * working for logged-in users.
+ *
+ * @return void
+ */
+function g2a_route_frontend_form() {
+	if ( is_admin() || empty( $_POST['action'] ) ) {
+		return;
+	}
+	$action = sanitize_key( wp_unslash( $_POST['action'] ) );
+	if ( 'g2a_request' === $action ) {
+		g2a_handle_request();
+	} elseif ( 'g2a_reservation' === $action ) {
+		g2a_handle_reservation();
+	}
+}
+add_action( 'template_redirect', 'g2a_route_frontend_form', 0 );
+
+/**
  * Capture a theme form submission into the WPistic Contact Form dashboard.
  *
  * Single bridge so every Guns 2 Ammo theme form (reservation, sell-your-gun,
