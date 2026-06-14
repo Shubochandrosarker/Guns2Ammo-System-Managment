@@ -400,9 +400,9 @@ get_header();
         </div>
         <div>
           <form class="g2a-newsletter-form"
-                data-endpoint="<?php echo esc_url( admin_url( 'admin-ajax.php' ) ); ?>"
-                data-action="wpcf_newsletter_subscribe"
-                data-nonce="<?php echo esc_attr( wp_create_nonce( 'wpcf_newsletter' ) ); ?>"
+                data-endpoint="<?php echo esc_url( home_url( '/' ) ); ?>"
+                data-action="g2a_newsletter"
+                data-nonce="<?php echo esc_attr( wp_create_nonce( 'g2a_newsletter' ) ); ?>"
                 data-source="blog">
             <input type="email" name="email" placeholder="your@email.com" required />
             <button type="submit" class="btn btn-ember">Subscribe</button>
@@ -420,23 +420,25 @@ get_header();
               var original = btn.innerHTML;
               btn.disabled = true; btn.textContent = '…'; status.textContent = '';
               var fd = new FormData();
-              fd.append('action', f.dataset.action);
-              fd.append('_wpnonce', f.dataset.nonce);
+              fd.append('g2a_newsletter', '1');
+              fd.append('g2a_nonce', f.dataset.nonce);
               fd.append('email', input.value.trim());
               fd.append('source', f.dataset.source || 'blog');
               fetch(f.dataset.endpoint, { method: 'POST', credentials: 'same-origin', body: fd })
                 .then(function (r) { return r.json().catch(function(){ return null; }); })
                 .then(function (j) {
-                  if (j && j.success) {
+                  var ok = j && (j.status === 'ok' || j.status === 'duplicate' || j.success === true);
+                  var msg = j && (j.message || (j.data && j.data.message));
+                  if (ok) {
                     btn.textContent = '✓ Subscribed';
                     btn.classList.remove('btn-ember');
                     status.style.color = '#9DE05B';
-                    status.textContent = (j.data && j.data.message) || 'Subscribed.';
+                    status.textContent = msg || 'Subscribed.';
                     input.value = '';
                   } else {
                     btn.disabled = false; btn.innerHTML = original;
                     status.style.color = '#E8802F';
-                    status.textContent = (j && j.data && j.data.message) || 'Something went wrong.';
+                    status.textContent = msg || 'Something went wrong.';
                   }
                 })
                 .catch(function () {

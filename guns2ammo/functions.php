@@ -488,6 +488,38 @@ function g2a_route_frontend_form() {
 add_action( 'template_redirect', 'g2a_route_frontend_form', 0 );
 
 /**
+ * Front-end newsletter subscribe endpoint.
+ *
+ * The footer + blog "range updates" forms used to fetch() /wp-admin/admin-ajax.php,
+ * which — like admin-post.php — is blocked for logged-OUT visitors on sites
+ * behind a wp-admin firewall, so newsletter signups failed for everyone not
+ * logged in. This posts to the site home instead and reuses the WPistic Contact
+ * Form newsletter routine (which carries its own per-IP throttle). Returns JSON
+ * so the inline status keeps working; same cache-resilient verification as the
+ * other theme forms.
+ *
+ * @return void
+ */
+function g2a_route_frontend_newsletter() {
+	if ( is_admin() || empty( $_POST['g2a_newsletter'] ) ) {
+		return;
+	}
+	$email  = isset( $_POST['email'] ) ? wp_unslash( $_POST['email'] ) : '';
+	$source = isset( $_POST['source'] ) ? sanitize_text_field( wp_unslash( $_POST['source'] ) ) : 'footer';
+
+	if ( ! g2a_verify_form_request( 'g2a_newsletter' ) ) {
+		wp_send_json( array( 'status' => 'error', 'message' => __( 'Could not verify your request. Please reload the page and try again.', 'guns2ammo' ) ), 403 );
+	}
+	if ( class_exists( 'WPISTIC_CF_Newsletter' ) && is_callable( array( 'WPISTIC_CF_Newsletter', 'process' ) ) ) {
+		$res = WPISTIC_CF_Newsletter::process( $email, $source );
+		$ok  = in_array( ( $res['status'] ?? '' ), array( 'ok', 'duplicate' ), true );
+		wp_send_json( $res, $ok ? 200 : 400 );
+	}
+	wp_send_json( array( 'status' => 'error', 'message' => __( 'Newsletter signup is temporarily unavailable.', 'guns2ammo' ) ), 503 );
+}
+add_action( 'template_redirect', 'g2a_route_frontend_newsletter', 0 );
+
+/**
  * Capture a theme form submission into the WPistic Contact Form dashboard.
  *
  * Single bridge so every Guns 2 Ammo theme form (reservation, sell-your-gun,

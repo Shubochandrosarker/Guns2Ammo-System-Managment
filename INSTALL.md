@@ -8,7 +8,7 @@ All zips are at the repo root and can be uploaded directly via **WP Admin → Pl
 
 | Artifact | Filename | Current version |
 |---|---|---|
-| Theme | `WPistic-Theme-For-G2A-Version-1.8.9.zip` *(also in `releases/`)* | **1.27.2** |
+| Theme | `WPistic-Theme-For-G2A-Version-1.8.9.zip` *(also in `releases/`)* | **1.27.3** |
 | Booking Engine plugin | `g2a-booking-engine.zip` | **1.14.5** |
 | Memberistic Membership Solutions plugin | `memberistic-membership-solutions.zip` | **1.46.0** |
 | WPistic Contact Form plugin | `wpistic-contact-form.zip` | **1.5.5** (DB schema 1.2.0) |
