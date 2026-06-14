@@ -30,13 +30,14 @@ $founded   = (int) $biz['founded_year'];
 			<p>New inventory, training schedules, and exclusive member pricing  straight to your inbox.</p>
 		</div>
 		<?php
-		// Real newsletter wiring — posts to WPistic Contact Form's
-		// /wp-admin/admin-ajax.php endpoint and reports the result in
-		// the inline status span. Falls back to a mailto: link if the
-		// plugin isn't active (so the form never silently no-ops).
-		$nl_endpoint = admin_url( 'admin-ajax.php' );
-		$nl_action   = 'wpcf_newsletter_subscribe';
-		$nl_nonce    = wp_create_nonce( 'wpcf_newsletter' );
+		// Real newsletter wiring — posts to the theme's front-end newsletter
+		// endpoint (the site home, handled on template_redirect) rather than
+		// /wp-admin/admin-ajax.php, which is blocked for logged-out visitors on
+		// sites behind a wp-admin firewall. Reports the result in the inline
+		// status span. Falls back to a mailto: link if the plugin isn't active.
+		$nl_endpoint = home_url( '/' );
+		$nl_action   = 'g2a_newsletter';
+		$nl_nonce    = wp_create_nonce( 'g2a_newsletter' );
 		?>
 		<form class="g2a-newsletter-form"
 		      data-endpoint="<?php echo esc_url( $nl_endpoint ); ?>"
@@ -63,23 +64,25 @@ $founded   = (int) $biz['founded_year'];
 		    btn.textContent = '...';
 		    status.textContent = '';
 		    var fd = new FormData();
-		    fd.append('action', f.dataset.action);
-		    fd.append('_wpnonce', f.dataset.nonce);
+		    fd.append('g2a_newsletter', '1');
+		    fd.append('g2a_nonce', f.dataset.nonce);
 		    fd.append('email', email);
 		    fd.append('source', f.dataset.source || 'footer');
 		    fetch(f.dataset.endpoint, { method: 'POST', credentials: 'same-origin', body: fd })
 		      .then(function (r) { return r.json().catch(function(){ return null; }); })
 		      .then(function (j) {
-		        if (j && j.success) {
+		        var ok = j && (j.status === 'ok' || j.status === 'duplicate' || j.success === true);
+		        var msg = j && (j.message || (j.data && j.data.message));
+		        if (ok) {
 		          btn.textContent = 'JOINED';
 		          status.style.color = '#9DE05B';
-		          status.textContent = (j.data && j.data.message) || 'Subscribed.';
+		          status.textContent = msg || 'Subscribed.';
 		          f.querySelector('input[type=email]').value = '';
 		        } else {
 		          btn.disabled = false;
 		          btn.innerHTML = original;
 		          status.style.color = '#E8802F';
-		          status.textContent = (j && j.data && j.data.message) || 'Something went wrong. Please try again.';
+		          status.textContent = msg || 'Something went wrong. Please try again.';
 		        }
 		      })
 		      .catch(function () {
