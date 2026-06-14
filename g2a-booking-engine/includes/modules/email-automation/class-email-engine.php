@@ -245,18 +245,32 @@ class G2AB_Email_Engine {
 		$pay_url     = isset( $context['pay_url'] ) ? $context['pay_url'] : '';
 		$cancel_url  = $uuid ? add_query_arg( array( 'g2ab_cancel' => $uuid ), $site_url ) : '';
 
-		$customer_name  = '';
-		$customer_email = '';
-		$customer_phone = '';
-		if ( ! empty( $booking['fields'] ) ) {
-			$fields = is_string( $booking['fields'] ) ? json_decode( $booking['fields'], true ) : $booking['fields'];
+		// Prefer the dedicated bookings columns (customer_name/email/phone) and
+		// fall back to the JSON form payload. The earlier code only read a
+		// non-existent `fields` key, so every {customer_name}/{customer_phone}
+		// merge tag rendered blank (name fell through to "Guest"). This mirrors
+		// G2AB_Module_PDF_Invoices::resolve_booking(), which reads the columns
+		// first. `form_data` is the real column name; `fields` is kept in the
+		// fallback chain for any caller that still passes a pre-shaped array.
+		$customer_name  = isset( $booking['customer_name'] ) ? (string) $booking['customer_name'] : '';
+		$customer_email = isset( $booking['customer_email'] ) ? (string) $booking['customer_email'] : '';
+		$customer_phone = isset( $booking['customer_phone'] ) ? (string) $booking['customer_phone'] : '';
+
+		$raw_fields = $booking['form_data'] ?? ( $booking['fields'] ?? '' );
+		if ( ( '' === $customer_name || '' === $customer_email || '' === $customer_phone ) && ! empty( $raw_fields ) ) {
+			$fields = is_string( $raw_fields ) ? json_decode( $raw_fields, true ) : $raw_fields;
 			if ( is_array( $fields ) ) {
-				$customer_name  = $fields['name'] ?? trim( ( $fields['first_name'] ?? '' ) . ' ' . ( $fields['last_name'] ?? '' ) );
-				$customer_email = $fields['email'] ?? '';
-				$customer_phone = $fields['phone'] ?? '';
+				if ( '' === $customer_name ) {
+					$customer_name = $fields['name'] ?? trim( ( $fields['first_name'] ?? '' ) . ' ' . ( $fields['last_name'] ?? '' ) );
+				}
+				if ( '' === $customer_email ) {
+					$customer_email = $fields['email'] ?? '';
+				}
+				if ( '' === $customer_phone ) {
+					$customer_phone = $fields['phone'] ?? '';
+				}
 			}
 		}
-		if ( empty( $customer_email ) && ! empty( $booking['customer_email'] ) ) $customer_email = $booking['customer_email'];
 
 		return array(
 			'customer_name'    => $customer_name ?: 'Guest',

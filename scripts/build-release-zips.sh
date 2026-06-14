@@ -17,6 +17,9 @@ theme_version="${theme_version:-dev}"
 mkdir -p releases
 
 echo "→ Packaging theme as guns2ammo (version $theme_version)"
+# Remove the old archive first so files deleted from the source tree don't
+# survive inside the zip (zip -r only adds/updates entries, never prunes).
+rm -f "WPistic-Theme-For-G2A-Version-1.8.9.zip"
 zip -rq "WPistic-Theme-For-G2A-Version-1.8.9.zip" guns2ammo \
     -x "*/.DS_Store" "*/.git/*" "*/node_modules/*"
 cp "WPistic-Theme-For-G2A-Version-1.8.9.zip" \

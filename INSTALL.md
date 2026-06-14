@@ -8,8 +8,8 @@ All zips are at the repo root and can be uploaded directly via **WP Admin → Pl
 
 | Artifact | Filename | Current version |
 |---|---|---|
-| Theme | `WPistic-Theme-For-G2A-Version-1.8.9.zip` *(also in `releases/`)* | **1.27.0** |
-| Booking Engine plugin | `g2a-booking-engine.zip` | **1.14.4** |
+| Theme | `WPistic-Theme-For-G2A-Version-1.8.9.zip` *(also in `releases/`)* | **1.27.1** |
+| Booking Engine plugin | `g2a-booking-engine.zip` | **1.14.5** |
 | Memberistic Membership Solutions plugin | `memberistic-membership-solutions.zip` | **1.46.0** |
 | WPistic Contact Form plugin | `wpistic-contact-form.zip` | **1.5.5** (DB schema 1.2.0) |
 | G2A Theme Control plugin | `g2a-theme-control.zip` | **1.0.0** |
@@ -27,7 +27,7 @@ All zips are at the repo root and can be uploaded directly via **WP Admin → Pl
 Plugins first, theme last, so the theme activation can see the plugins.
 
 1. **G2A Theme Control** — meta-box plugin used by the theme. Upload, activate.
-2. **G2A Booking Engine** — bookings + payments + reminders. Upload, activate. Confirm DB schema v1.5.0. Visit `Booking Engine → Resources` and `Booking Types` for seed data.
+2. **G2A Booking Engine** — bookings + payments + reminders. Upload, activate. Confirm DB schema v1.6.1. Visit `Booking Engine → Resources` and `Booking Types` for seed data.
 3. **Memberistic Membership Solutions** — plans, member portal, content restriction. Upload, activate. Visit `Memberistic → Settings → Pages` to wire the linked pages.
 4. **WPistic Contact Form** — contact form + auto-responder. Upload, activate.
 5. **Verifyistic** — age verification popup + multi-webhook delivery. Upload, activate. Then `Verifyistic → Settings` (see `docs/VERIFYISTIC_SETUP_G2A.md`). Replaces Ottertext — see `docs/OTTERTEXT_REMOVAL.md`.
@@ -190,7 +190,7 @@ define( 'WPCF_EMAIL_DISABLED',          true );
 
 1. **Appearance → Customize → G2A Business Info** — fill FFL #, phone, email, address.
 2. **Memberistic → Settings → Pages** — point at your /account/, /checkout/, /thank-you/ pages.
-3. **Booking Engine → Resources** — confirm lane / range resources exist with the right capacity.
+3. **Booking Engine → Resources** — confirm lane / range resources exist with the right capacity. DB schema should read **v1.6.1** under Booking Engine → Build Status.
 4. **Pages → Machine Gun** — add your 20+ weapons via the inventory repeater.
 5. **WPistic Contact Form → Settings** — point auto-responder at the right inbox.
 

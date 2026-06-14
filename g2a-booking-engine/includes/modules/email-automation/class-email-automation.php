@@ -103,7 +103,12 @@ final class G2AB_Module_Email_Automation {
 	 * @return object|null Booking row, or null if not resolvable.
 	 */
 	private function resolve_booking( $booking_or_id ) {
-		if ( is_object( $booking_or_id ) && ! empty( $booking_or_id->uuid ) ) {
+		// Accept any object as-is. Requiring a non-empty ->uuid here meant a
+		// lifecycle hook fired with a uuid-less booking object fell through to
+		// absint( $object ) === 0 and returned null — silently dropping the
+		// email (and emitting an "Object could not be converted to int" warning
+		// on PHP 8). The PDF invoice module's resolver accepts any object too.
+		if ( is_object( $booking_or_id ) ) {
 			return $booking_or_id;
 		}
 		if ( is_array( $booking_or_id ) && ! empty( $booking_or_id['id'] ) ) {
