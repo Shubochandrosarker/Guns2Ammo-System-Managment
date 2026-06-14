@@ -174,7 +174,7 @@ function g2ab_request_is_from_trusted_proxy( $remote ) {
 	if ( '' !== $opt ) {
 		$proxies = array_merge( $proxies, array_filter( array_map( 'trim', explode( ',', $opt ) ) ) );
 	}
-	if ( (int) get_option( 'g2ab_trust_cloudflare', 0 ) === 1 ) {
+	if ( (int) get_option( 'g2ab_trust_cloudflare', 1 ) === 1 ) {
 		$proxies = array_merge( $proxies, g2ab_cloudflare_ranges() );
 	}
 
@@ -230,7 +230,14 @@ function g2ab_ip_in_cidr( $ip, $range ) {
 }
 
 /**
- * Cloudflare IP ranges (cached daily). Used only when g2ab_trust_cloudflare = 1.
+ * Cloudflare's published edge IP ranges (https://www.cloudflare.com/ips/).
+ *
+ * Trusted by default (g2ab_trust_cloudflare = 1) so sites behind Cloudflare
+ * resolve the real visitor IP via CF-Connecting-IP — otherwise every visitor
+ * shares Cloudflare's edge IP and the per-IP REST rate limits collapse onto one
+ * bucket. A hardcoded fallback guarantees a usable list even when the remote
+ * fetch fails, and the result (including the fallback) is ALWAYS cached so the
+ * 10s remote fetch can never run on every request on the rate-limit hot path.
  *
  * @return array
  */
@@ -239,9 +246,10 @@ function g2ab_cloudflare_ranges() {
 	if ( is_array( $cached ) && ! empty( $cached ) ) {
 		return $cached;
 	}
+
 	$ranges = array();
 	foreach ( array( 'https://www.cloudflare.com/ips-v4', 'https://www.cloudflare.com/ips-v6' ) as $url ) {
-		$resp = wp_remote_get( $url, array( 'timeout' => 10 ) );
+		$resp = wp_remote_get( $url, array( 'timeout' => 5 ) );
 		if ( is_wp_error( $resp ) || 200 !== (int) wp_remote_retrieve_response_code( $resp ) ) {
 			continue;
 		}
@@ -251,9 +259,23 @@ function g2ab_cloudflare_ranges() {
 			if ( '' !== $line ) $ranges[] = $line;
 		}
 	}
-	if ( ! empty( $ranges ) ) {
-		set_transient( 'g2ab_cf_ranges', $ranges, DAY_IN_SECONDS );
+
+	if ( empty( $ranges ) ) {
+		// Static fallback (current Cloudflare ranges) so a server without
+		// outbound HTTP still resolves real client IPs behind Cloudflare.
+		$ranges = array(
+			'173.245.48.0/20', '103.21.244.0/22', '103.22.200.0/22', '103.31.4.0/22',
+			'141.101.64.0/18', '108.162.192.0/18', '190.93.240.0/20', '188.114.96.0/20',
+			'197.234.240.0/22', '198.41.128.0/17', '162.158.0.0/15', '104.16.0.0/13',
+			'104.24.0.0/14', '172.64.0.0/13', '131.0.72.0/22',
+			'2400:cb00::/32', '2606:4700::/32', '2803:f800::/32', '2405:b500::/32',
+			'2405:8100::/32', '2a06:98c0::/29', '2c0f:f248::/32',
+		);
 	}
+
+	// Always cache (live list or fallback) so the remote fetch never re-runs on
+	// the hot path; the live list refreshes daily on cache expiry.
+	set_transient( 'g2ab_cf_ranges', $ranges, DAY_IN_SECONDS );
 	return $ranges;
 }
 
