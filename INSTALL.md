@@ -9,9 +9,9 @@ All zips are at the repo root and can be uploaded directly via **WP Admin → Pl
 | Artifact | Filename | Current version |
 |---|---|---|
 | Theme | `WPistic-Theme-For-G2A-Version-1.8.9.zip` *(also in `releases/`)* | **1.27.0** |
-| Booking Engine plugin | `g2a-booking-engine.zip` | **1.14.3** |
+| Booking Engine plugin | `g2a-booking-engine.zip` | **1.14.4** |
 | Memberistic Membership Solutions plugin | `memberistic-membership-solutions.zip` | **1.46.0** |
-| WPistic Contact Form plugin | `wpistic-contact-form.zip` | **1.5.4** (DB schema 1.2.0) |
+| WPistic Contact Form plugin | `wpistic-contact-form.zip` | **1.5.5** (DB schema 1.2.0) |
 | G2A Theme Control plugin | `g2a-theme-control.zip` | **1.0.0** |
 | Verifyistic (age verification) plugin | `verifyistic.zip` | **1.4.0** |
 | Advanced FFL Checkout (G2A Edition) plugin | `advanced-ffl-checkout.zip` | **1.7.5** (DB schema 1.2.0) |

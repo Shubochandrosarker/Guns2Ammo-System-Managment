@@ -377,53 +377,71 @@ class WPISTIC_CF_Capture {
 	 * Capture a Guns 2 Ammo theme form before its handler redirects away.
 	 */
 	public function capture_theme_form() {
-		if ( ! empty( $_POST['g2a_hp'] ) ) {
-			return;
-		}
+		// This runs at priority 1 on the shared admin_post_g2a_request hook,
+		// BEFORE the theme's priority-10 handler that redirects to the
+		// thank-you page. Any stray output (autoresponder / webhook / AI
+		// notices fired from store()) or any throwable here would block that
+		// redirect and strand the visitor on a blank admin-post.php. Buffer the
+		// output and catch throwables so the theme handler always gets to run.
+		$ob_level = ob_get_level();
+		ob_start();
+		try {
+			if ( ! empty( $_POST['g2a_hp'] ) ) {
+				return;
+			}
 
-		$nonce = isset( $_POST['g2a_nonce'] ) ? sanitize_text_field( wp_unslash( $_POST['g2a_nonce'] ) ) : '';
-		$is_valid = wp_verify_nonce( $nonce, 'g2a_request' ) || wp_verify_nonce( $nonce, 'g2a_reservation' );
-		if ( ! $is_valid ) {
-			return;
-		}
+			$nonce    = isset( $_POST['g2a_nonce'] ) ? sanitize_text_field( wp_unslash( $_POST['g2a_nonce'] ) ) : '';
+			$is_valid = wp_verify_nonce( $nonce, 'g2a_request' ) || wp_verify_nonce( $nonce, 'g2a_reservation' );
+			if ( ! $is_valid ) {
+				return;
+			}
 
-		$form_name = isset( $_POST['g2a_subject'] )
-			? sanitize_text_field( wp_unslash( $_POST['g2a_subject'] ) )
-			: __( 'Website Form', 'wpistic-contact-form' );
+			$form_name = isset( $_POST['g2a_subject'] )
+				? sanitize_text_field( wp_unslash( $_POST['g2a_subject'] ) )
+				: __( 'Website Form', 'wpistic-contact-form' );
 
-		$fields = [];
-		$labels = [
-			'g2a_name'       => __( 'Name', 'wpistic-contact-form' ),
-			'g2a_email'      => __( 'Email', 'wpistic-contact-form' ),
-			'g2a_phone'      => __( 'Phone', 'wpistic-contact-form' ),
-			'g2a_date'       => __( 'Preferred Date', 'wpistic-contact-form' ),
-			'g2a_count'      => __( 'Participants', 'wpistic-contact-form' ),
-			'g2a_experience' => __( 'Experience Level', 'wpistic-contact-form' ),
-			'g2a_notes'      => __( 'Notes', 'wpistic-contact-form' ),
-		];
-		foreach ( $labels as $key => $label ) {
-			if ( isset( $_POST[ $key ] ) && '' !== trim( (string) $_POST[ $key ] ) ) {
-				$fields[ $label ] = sanitize_textarea_field( wp_unslash( $_POST[ $key ] ) );
+			$fields = [];
+			$labels = [
+				'g2a_name'       => __( 'Name', 'wpistic-contact-form' ),
+				'g2a_email'      => __( 'Email', 'wpistic-contact-form' ),
+				'g2a_phone'      => __( 'Phone', 'wpistic-contact-form' ),
+				'g2a_date'       => __( 'Preferred Date', 'wpistic-contact-form' ),
+				'g2a_count'      => __( 'Participants', 'wpistic-contact-form' ),
+				'g2a_experience' => __( 'Experience Level', 'wpistic-contact-form' ),
+				'g2a_notes'      => __( 'Notes', 'wpistic-contact-form' ),
+			];
+			foreach ( $labels as $key => $label ) {
+				if ( isset( $_POST[ $key ] ) && '' !== trim( (string) $_POST[ $key ] ) ) {
+					$fields[ $label ] = sanitize_textarea_field( wp_unslash( $_POST[ $key ] ) );
+				}
+			}
+
+			foreach ( $_POST as $key => $value ) {
+				if ( 0 !== strpos( $key, 'g2a_f_' ) ) {
+					continue;
+				}
+				if ( is_array( $value ) ) {
+					$value = implode( ', ', array_map( 'sanitize_text_field', wp_unslash( $value ) ) );
+				} else {
+					$value = sanitize_textarea_field( wp_unslash( $value ) );
+				}
+				if ( '' === trim( (string) $value ) ) {
+					continue;
+				}
+				$label            = ucwords( str_replace( [ 'g2a_f_', '_', '-' ], [ '', ' ', ' ' ], $key ) );
+				$fields[ $label ] = $value;
+			}
+
+			$this->store( $form_name, $fields );
+		} catch ( \Throwable $e ) {
+			error_log( '[WPISTIC_CF] capture_theme_form failed: ' . $e->getMessage() );
+		} finally {
+			// Drop anything the capture (or its downstream actions) printed so
+			// the theme's wp_safe_redirect() can still send its headers.
+			while ( ob_get_level() > $ob_level ) {
+				ob_end_clean();
 			}
 		}
-
-		foreach ( $_POST as $key => $value ) {
-			if ( 0 !== strpos( $key, 'g2a_f_' ) ) {
-				continue;
-			}
-			if ( is_array( $value ) ) {
-				$value = implode( ', ', array_map( 'sanitize_text_field', wp_unslash( $value ) ) );
-			} else {
-				$value = sanitize_textarea_field( wp_unslash( $value ) );
-			}
-			if ( '' === trim( (string) $value ) ) {
-				continue;
-			}
-			$label            = ucwords( str_replace( [ 'g2a_f_', '_', '-' ], [ '', ' ', ' ' ], $key ) );
-			$fields[ $label ] = $value;
-		}
-
-		$this->store( $form_name, $fields );
 	}
 
 	/* ==================================================================
@@ -441,6 +459,16 @@ class WPISTIC_CF_Capture {
 	 * @return int Submission ID, or 0 if blocked / failed.
 	 */
 	public function store( $form_name, array $fields, $notify_admin = true ) {
+		// De-duplicate identical submissions within one request. The G2A theme
+		// form is captured BOTH by this plugin's priority-1 admin_post hook AND
+		// by the theme calling store() directly (g2a_capture_to_wpcf) — without
+		// this guard every website submission was saved twice in the inbox.
+		static $seen = [];
+		$sig = md5( (string) $form_name . '|' . wp_json_encode( $fields ) );
+		if ( isset( $seen[ $sig ] ) ) {
+			return $seen[ $sig ];
+		}
+
 		$name  = '';
 		$email = '';
 		$phone = '';
@@ -504,6 +532,7 @@ class WPISTIC_CF_Capture {
 		] );
 
 		if ( $id ) {
+			$seen[ $sig ]             = $id;
 			self::$last_submission_id = $id;
 			/**
 			 * Fires after a submission is captured.

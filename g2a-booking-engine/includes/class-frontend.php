@@ -61,6 +61,42 @@ final class G2AB_Frontend {
 		add_shortcode( 'g2a_booking_form', $this->guard( 'render_booking_form' ) );
 		add_action( 'wp_enqueue_scripts', array( $this, 'register_assets' ), 5 );
 		add_action( 'wp_enqueue_scripts', array( $this, 'maybe_enqueue_return_assets' ), 20 );
+		// Surface the last booking-page fatal in wp-admin so a site owner can
+		// read the exact cause without enabling WP_DEBUG or hunting log files.
+		add_action( 'admin_notices', array( __CLASS__, 'admin_fatal_notice' ) );
+		add_action( 'admin_post_g2ab_dismiss_fatal', array( __CLASS__, 'dismiss_fatal_notice' ) );
+	}
+
+	/**
+	 * Admin notice: if a booking shortcode fataled on the front end, show the
+	 * captured message/file/line here so it can be reported + fixed precisely.
+	 *
+	 * @return void
+	 */
+	public static function admin_fatal_notice() {
+		if ( ! current_user_can( 'manage_options' ) ) {
+			return;
+		}
+		$f = get_option( 'g2ab_last_frontend_fatal' );
+		if ( ! is_array( $f ) || empty( $f['message'] ) ) {
+			return;
+		}
+		$dismiss = wp_nonce_url( admin_url( 'admin-post.php?action=g2ab_dismiss_fatal' ), 'g2ab_dismiss_fatal' );
+		echo '<div class="notice notice-error"><p><strong>G2A Booking — a booking page hit a fatal error:</strong></p>'
+			. '<p style="font-family:monospace;white-space:pre-wrap;">'
+			. esc_html( $f['message'] . "\n@ " . ( $f['file'] ?? '' ) . ':' . ( $f['line'] ?? '' )
+				. ( ! empty( $f['url'] ) ? "\non " . $f['url'] : '' )
+				. ( ! empty( $f['tag'] ) ? "\nwhile rendering " . $f['tag'] : '' ) )
+			. '</p><p><a class="button" href="' . esc_url( $dismiss ) . '">' . esc_html__( 'Dismiss', 'g2a-booking' ) . '</a></p></div>';
+	}
+
+	/** Clear the stored fatal after the admin has read/dismissed it. */
+	public static function dismiss_fatal_notice() {
+		if ( current_user_can( 'manage_options' ) && check_admin_referer( 'g2ab_dismiss_fatal' ) ) {
+			delete_option( 'g2ab_last_frontend_fatal' );
+		}
+		wp_safe_redirect( wp_get_referer() ?: admin_url() );
+		exit;
 	}
 
 	/**
@@ -166,6 +202,16 @@ final class G2AB_Frontend {
 			$err['file'],
 			$err['line']
 		) );
+		// Persist it so the wp-admin notice (admin_fatal_notice) can show the
+		// exact cause — survives even when the front end is a blank 500.
+		update_option( 'g2ab_last_frontend_fatal', array(
+			'message' => (string) $err['message'],
+			'file'    => (string) $err['file'],
+			'line'    => (int) $err['line'],
+			'tag'     => (string) self::$active_render,
+			'time'    => time(),
+			'url'     => isset( $_SERVER['REQUEST_URI'] ) ? esc_url_raw( wp_unslash( $_SERVER['REQUEST_URI'] ) ) : '',
+		), false );
 		// Close any buffers the dying renderer left open, then emit recovery UI.
 		while ( ob_get_level() > 0 ) {
 			@ob_end_flush(); // phpcs:ignore
