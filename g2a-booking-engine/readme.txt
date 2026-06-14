@@ -4,7 +4,7 @@ Tags: booking, reservation, scheduling, appointments, shooting range, firearms, 
 Requires at least: 6.2
 Tested up to: 6.5
 Requires PHP: 8.0
-Stable tag: 1.14.5
+Stable tag: 1.14.6
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -206,6 +206,20 @@ Yes. REST API at `/wp-json/g2a-booking/v1/` covers bookings, forms, calendar, fr
 7. Migration wizard — dry-run preview before live import.
 
 == Changelog ==
+
+= 1.14.6 =
+**Cloudflare real-IP resolution for rate limiting.**
+
+* FIX: behind Cloudflare, every visitor was seen as Cloudflare's shared edge IP,
+  so the public REST rate limits (60/min for booking submit + availability)
+  collapsed onto one bucket and could throttle unrelated visitors. Cloudflare's
+  published ranges are now trusted by default (`g2ab_trust_cloudflare` defaults
+  to 1), so `CF-Connecting-IP` resolves the real visitor IP — only when
+  REMOTE_ADDR is genuinely a Cloudflare IP, so it cannot be spoofed.
+* FIX: `g2ab_cloudflare_ranges()` now has a hardcoded fallback and always caches
+  its result (live list or fallback), so the remote range fetch can never run a
+  blocking 10s HTTP call on the rate-limit hot path. Disable with
+  `update_option( 'g2ab_trust_cloudflare', 0 )` if not behind Cloudflare.
 
 = 1.14.5 =
 **Email + front-desk correctness fixes.**
