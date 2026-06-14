@@ -4,7 +4,7 @@ Tags: contact form, form builder, wordpress, submissions, inbox, ai, spam protec
 Requires at least: 6.2
 Tested up to: 6.9
 Requires PHP: 7.4
-Stable tag: 1.5.3
+Stable tag: 1.5.5
 License: GPL-2.0+
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -108,6 +108,14 @@ This plugin can connect to third-party services when enabled by the site adminis
 * Terms/Privacy: Depends on selected provider.
 
 == Changelog ==
+
+= 1.5.5 =
+* Fix: website forms (Contact, Firearms Transfer Request, etc.) submitted to admin-post.php and landed on a blank page with no confirmation. The plugin captures those theme forms at priority 1 — before the theme's redirect — and any output or error from its downstream actions (auto-responder / webhooks / AI) blocked that redirect. The capture is now fully output-buffered and wrapped in try/catch so the theme always redirects to the thank-you page.
+* Fix: every website submission was saved twice in the inbox (captured once by this plugin's admin_post hook and once by the theme). store() now de-duplicates identical submissions within a request.
+
+= 1.5.4 =
+* Fix: a duplicate install (plugin present in two folders, e.g. `wpistic-contact-form` and `wpistic-contact-form-main`) re-declared the plugin classes and fatally white-screened the whole site — contact forms, newsletter signup, and the settings page all stopped working. Added a duplicate-install guard that bails cleanly with an admin notice instead of fataling; the canonical distribution folder is now `wpistic-contact-form` so re-installing replaces the plugin instead of creating a second copy.
+* Fix: saving one Settings tab wiped the other tabs (and could make a just-checked box reappear unchecked) because all tabs share one option group and core nulls any option missing from the submitted form. Every other tab's stored values are now carried through the save.
 
 = 1.0.0 =
 * Initial WP.org publish build.

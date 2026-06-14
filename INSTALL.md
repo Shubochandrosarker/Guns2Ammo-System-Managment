@@ -9,12 +9,12 @@ All zips are at the repo root and can be uploaded directly via **WP Admin → Pl
 | Artifact | Filename | Current version |
 |---|---|---|
 | Theme | `WPistic-Theme-For-G2A-Version-1.8.9.zip` *(also in `releases/`)* | **1.27.0** |
-| Booking Engine plugin | `g2a-booking-engine.zip` | **1.14.3** |
+| Booking Engine plugin | `g2a-booking-engine.zip` | **1.14.4** |
 | Memberistic Membership Solutions plugin | `memberistic-membership-solutions.zip` | **1.46.0** |
-| WPistic Contact Form plugin | `wpistic-contact-form-main.zip` | **1.5.3** (DB schema 1.2.0) |
+| WPistic Contact Form plugin | `wpistic-contact-form.zip` | **1.5.5** (DB schema 1.2.0) |
 | G2A Theme Control plugin | `g2a-theme-control.zip` | **1.0.0** |
 | Verifyistic (age verification) plugin | `verifyistic.zip` | **1.4.0** |
-| Advanced FFL Checkout (G2A Edition) plugin | `advanced-ffl-checkout.zip` | **1.7.4** (DB schema 1.2.0) |
+| Advanced FFL Checkout (G2A Edition) plugin | `advanced-ffl-checkout.zip` | **1.7.5** (DB schema 1.2.0) |
 | Messageistic (SMS / local gateway) plugin | `messageistic.zip` | **0.5.1** |
 | G2A POS Core plugin | `g2a-pos-core.zip` | **3.1.2** (PHP 8.1+, vendors included) |
 
@@ -244,4 +244,4 @@ Every change lives in a separate commit on `claude/practical-hawking-LQW9g`. To 
 
 ## Source diffs
 
-The repo tracks extracted source under `guns2ammo/`, `g2a-booking-engine/`, `memberistic-membership-solutions/`, `wpistic-contact-form-main/`, `g2a-theme-control/`. Those mirror what's inside the zips. Future edits should land in the source dirs; rebuild the zips before releasing.
+The repo tracks extracted source under `guns2ammo/`, `g2a-booking-engine/`, `memberistic-membership-solutions/`, `wpistic-contact-form/`, `g2a-theme-control/`. Those mirror what's inside the zips. Future edits should land in the source dirs; rebuild the zips before releasing.

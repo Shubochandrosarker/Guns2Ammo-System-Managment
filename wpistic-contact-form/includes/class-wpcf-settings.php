@@ -320,6 +320,9 @@ class WPISTIC_CF_Settings {
 					<form method="post" action="options.php">
 						<?php
 						settings_fields( self::GROUP );
+						// Carry every other tab's current values through the POST so
+						// saving this tab doesn't wipe them (see method docblock).
+						$this->preserve_other_settings();
 						$method = 'render_tab_' . $tab;
 						if ( method_exists( $this, $method ) ) {
 							$this->$method();
@@ -331,6 +334,49 @@ class WPISTIC_CF_Settings {
 			</div>
 		</div>
 		<?php
+	}
+
+	/**
+	 * Re-post every registered option's CURRENT value as a hidden field.
+	 *
+	 * All tabs share one option group, and core's options.php nulls every
+	 * registered option that isn't present in the submitted form. Because each
+	 * tab only renders its own fields, saving one tab would otherwise wipe all
+	 * the others (and "checkbox comes back unchecked" symptoms). These hidden
+	 * inputs are emitted BEFORE the active tab's visible fields, so for the
+	 * active tab the visible field's value wins (PHP keeps the last value for a
+	 * repeated name) while every other tab keeps its stored value. Scalar
+	 * options only — there are no array options in this group.
+	 *
+	 * @return void
+	 */
+	private function preserve_other_settings() {
+		global $wp_registered_settings;
+		if ( empty( $wp_registered_settings ) || ! is_array( $wp_registered_settings ) ) {
+			return;
+		}
+		foreach ( $wp_registered_settings as $name => $args ) {
+			if ( ! is_array( $args ) ) {
+				continue;
+			}
+			// Match by registered group; fall back to our option prefix in case a
+			// WP build doesn't store the group on the entry (every option in this
+			// group is WPISTIC_CF_-prefixed, and options.php ignores any hidden
+			// field that isn't in the group allow-list anyway).
+			$in_group = ( ( $args['group'] ?? '' ) === self::GROUP ) || ( 0 === strpos( (string) $name, 'WPISTIC_CF_' ) );
+			if ( ! $in_group ) {
+				continue;
+			}
+			$value = get_option( $name, $args['default'] ?? '' );
+			if ( is_array( $value ) ) {
+				continue;
+			}
+			printf(
+				'<input type="hidden" name="%s" value="%s">',
+				esc_attr( (string) $name ),
+				esc_attr( (string) $value )
+			);
+		}
 	}
 
 	/* ------------------------------------------------------------------

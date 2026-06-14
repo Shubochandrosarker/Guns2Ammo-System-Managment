@@ -35,11 +35,15 @@ class G2A_Bridge {
 		}
 
 		// Only act on transfer-request forms — other G2A forms (contact, sell,
-		// reservation, support) reuse the same handler. A loose strpos('transfer')
-		// match swept those in, so we require a strict subject or an explicit form_type.
+		// reservation, support) reuse the same handler. The theme's transfer
+		// form posts g2a_subject="Firearms Transfer Request"; match any subject
+		// containing "transfer request" (covers "firearm(s) transfer request"
+		// and "ffl transfer request") or an explicit form_type. A bare
+		// strpos('transfer') was too loose, but "transfer request" is specific
+		// to the transfer form.
 		$subject   = strtolower( trim( sanitize_text_field( wp_unslash( $_POST['g2a_subject'] ?? '' ) ) ) );
 		$form_type = isset( $_POST['form_type'] ) ? sanitize_key( wp_unslash( $_POST['form_type'] ) ) : '';
-		$is_transfer_form = ( 'ffl transfer request' === $subject ) || ( 'ffl_transfer' === $form_type );
+		$is_transfer_form = ( false !== strpos( $subject, 'transfer request' ) ) || ( 'ffl_transfer' === $form_type );
 		if ( ! $is_transfer_form ) {
 			return;
 		}
@@ -49,39 +53,46 @@ class G2A_Bridge {
 			return;
 		}
 
-		global $wpdb;
-		$ref = apply_filters( 'wpistic_ffl_transfer_ref_prefix', 'G2A' ) . '-' . strtoupper( substr( uniqid( '', true ), -8 ) );
+		// Wrap all DB work so a missing table / schema drift can NEVER blank the
+		// shared admin-post.php request — the theme handler (priority 10) must
+		// still run and redirect the visitor to the thank-you page.
+		try {
+			global $wpdb;
+			$ref = apply_filters( 'wpistic_ffl_transfer_ref_prefix', 'G2A' ) . '-' . strtoupper( substr( uniqid( '', true ), -8 ) );
 
-		$wpdb->insert( DB::table( 'transfers' ), [ // phpcs:ignore WordPress.DB
-			'transfer_ref'     => $ref,
-			'order_id'         => 0,
-			'customer_id'      => get_current_user_id() ?: null,
-			'customer_name'    => trim( ( $fields['name'] ?? '' ) ),
-			'customer_email'   => $fields['email'],
-			'customer_phone'   => $fields['phone'] ?? '',
-			'dealer_id'        => 0,
-			'status'           => 'dealer_selected', // placeholder — admin promotes from here
-			'item_description' => $fields['item'] ?? $fields['firearm'] ?? $fields['details'] ?? '',
-			'item_make'        => $fields['make'] ?? '',
-			'item_model'       => $fields['model'] ?? '',
-			'item_caliber'     => $fields['caliber'] ?? '',
-			'item_type'        => $fields['type'] ?? 'handgun',
-		] );
-		$transfer_id = (int) $wpdb->insert_id;
-		if ( ! $transfer_id ) {
-			return;
+			$wpdb->insert( DB::table( 'transfers' ), [ // phpcs:ignore WordPress.DB
+				'transfer_ref'     => $ref,
+				'order_id'         => 0,
+				'customer_id'      => get_current_user_id() ?: null,
+				'customer_name'    => trim( ( $fields['name'] ?? '' ) ),
+				'customer_email'   => $fields['email'],
+				'customer_phone'   => $fields['phone'] ?? '',
+				'dealer_id'        => 0,
+				'status'           => 'dealer_selected', // placeholder — admin promotes from here
+				'item_description' => $fields['item'] ?? $fields['firearm'] ?? $fields['details'] ?? '',
+				'item_make'        => $fields['make'] ?? '',
+				'item_model'       => $fields['model'] ?? '',
+				'item_caliber'     => $fields['caliber'] ?? '',
+				'item_type'        => $fields['type'] ?? 'handgun',
+			] );
+			$transfer_id = (int) $wpdb->insert_id;
+			if ( ! $transfer_id ) {
+				return;
+			}
+
+			$wpdb->insert( DB::table( 'events' ), [ // phpcs:ignore WordPress.DB
+				'transfer_id' => $transfer_id,
+				'event_type'  => 'created',
+				'new_status'  => 'dealer_selected',
+				'notes'       => 'Created from theme Transfer Request form.',
+				'actor'       => 'theme-bridge',
+				'actor_ip'    => Token::client_ip(),
+			] );
+
+			do_action( 'wpistic_ffl_transfer_created', $transfer_id, 0 );
+		} catch ( \Throwable $e ) {
+			error_log( '[WpisticFFL G2A_Bridge] capture_transfer_request: ' . $e->getMessage() );
 		}
-
-		$wpdb->insert( DB::table( 'events' ), [ // phpcs:ignore WordPress.DB
-			'transfer_id' => $transfer_id,
-			'event_type'  => 'created',
-			'new_status'  => 'dealer_selected',
-			'notes'       => 'Created from theme Transfer Request form.',
-			'actor'       => 'theme-bridge',
-			'actor_ip'    => Token::client_ip(),
-		] );
-
-		do_action( 'wpistic_ffl_transfer_created', $transfer_id, 0 );
 	}
 
 	/**
