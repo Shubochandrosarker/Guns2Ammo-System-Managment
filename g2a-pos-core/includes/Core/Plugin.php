@@ -219,6 +219,16 @@ final class Plugin {
 	}
 
 	private static function maybe_upgrade(): void {
+		// Self-heal the minute-interval events: older versions scheduled them
+		// during activation before the 'minute' interval existed, so the queue
+		// worker and messaging flush never ran.
+		if ( ! wp_next_scheduled( self::CRON_HOOK ) ) {
+			wp_schedule_event( time() + MINUTE_IN_SECONDS, 'minute', self::CRON_HOOK );
+		}
+		if ( ! wp_next_scheduled( self::MESSAGING_FLUSH_HOOK ) ) {
+			wp_schedule_event( time() + MINUTE_IN_SECONDS, 'minute', self::MESSAGING_FLUSH_HOOK );
+		}
+
 		// Seed the default website knowledge pack once per pack version
 		// (guarded internally by option g2a_pos_brain_seeded_version).
 		WebsiteKnowledgeSeeder::maybe_seed();
@@ -258,6 +268,11 @@ final class Plugin {
 	}
 
 	public static function activate(): void {
+		// Register the custom 'minute' interval before scheduling — activation
+		// runs before our plugins_loaded boot, so without this the 'minute'
+		// events below would silently fail to schedule.
+		Cron::register_intervals();
+
 		Migrator::run();
 		Roles::register_roles();
 		Roles::register_caps();

@@ -38,11 +38,15 @@ final class OrderEngine {
 			return array( 'error' => 'Current user is not assigned to this open register session.' );
 		}
 
-		$compliance_state  = $payload['compliance_state'] ?? 'pending_review';
+		// Compliance state is never accepted from the request payload — new
+		// orders always start server-side at pending_review; the dedicated
+		// compliance endpoints (g2a_pos_manage_compliance) move it forward.
+		$compliance_state  = 'pending_review';
 		$payment_status    = sanitize_key( (string) ( $payload['payment_status'] ?? 'pending' ) );
 		$finalizing_states = array( 'paid', 'completed' );
 		$has_firearm       = false;
-		foreach ( $items as $item ) {
+		$subtotal          = 0.0;
+		foreach ( $items as $idx => $item ) {
 			$is_firearm = ( ( $item['item_type'] ?? '' ) === 'firearm' );
 			if ( $is_firearm ) {
 				$has_firearm = true;
@@ -54,10 +58,17 @@ final class OrderEngine {
 			if ( $is_firearm && $repo->serial_already_sold( $serial ) ) {
 				return array( 'error' => 'serial_number has already been sold in another POS order.' );
 			}
-			if ( $is_firearm && $compliance_state === 'clear' ) {
-				$compliance_state = 'pending_review';
-			}
+			// Recompute line totals server-side; clerks may override unit_price
+			// but the extension (unit_price × qty) is never trusted from the client.
+			$unit_price                  = (float) ( $item['unit_price'] ?? 0 );
+			$qty                         = (float) ( $item['quantity'] ?? 1 );
+			$items[ $idx ]['line_total'] = round( $unit_price * $qty, 2 );
+			$subtotal                   += $items[ $idx ]['line_total'];
 		}
+		$subtotal       = round( $subtotal, 2 );
+		$tax_total      = max( 0.0, (float) ( $payload['tax_total'] ?? 0 ) );
+		$discount_total = max( 0.0, (float) ( $payload['discount_total'] ?? 0 ) );
+		$grand_total    = round( $subtotal + $tax_total - $discount_total, 2 );
 
 		if ( $has_firearm && ! current_user_can( 'g2a_pos_process_firearm_sale' ) ) {
 			return array( 'error' => 'User lacks capability to process firearm sales.' );
@@ -93,10 +104,10 @@ final class OrderEngine {
 					'employee_id'         => $actor_id,
 					'location_id'         => $location_id,
 					'status'              => $payload['status'] ?? 'open',
-					'subtotal'            => (float) $payload['subtotal'],
-					'tax_total'           => (float) ( $payload['tax_total'] ?? 0 ),
-					'discount_total'      => (float) ( $payload['discount_total'] ?? 0 ),
-					'grand_total'         => (float) $payload['grand_total'],
+					'subtotal'            => $subtotal,
+					'tax_total'           => $tax_total,
+					'discount_total'      => $discount_total,
+					'grand_total'         => $grand_total,
 					'payment_status'      => $payment_status,
 					'payment_method'      => $payload['payment_method'] ?? '',
 					'compliance_state'    => $compliance_state,

@@ -31,12 +31,15 @@ final class StripeTerminal
         if ($amount_cents <= 0) {
             return ['error' => 'amount_cents must be positive.'];
         }
-        $params = array_merge([
+        // Only cosmetic keys may come from the caller; trusted defaults
+        // (amount, currency, capture_method, payment_method_types) always win.
+        $extra = array_intersect_key($extra, array_flip(['metadata', 'description', 'receipt_email']));
+        $params = array_merge($extra, [
             'amount' => $amount_cents,
             'currency' => $currency,
             'payment_method_types[]' => 'card_present',
             'capture_method' => 'manual',
-        ], $extra);
+        ]);
         return self::api('POST', '/v1/payment_intents', $params);
     }
 
@@ -69,7 +72,14 @@ final class StripeTerminal
     private static function api(string $method, string $path, array $params): array
     {
         $opt = (array) get_option('g2a_pos_stripe', []);
-        $sk = (string) ($opt['secret_key'] ?? '');
+        // SecretStore::open() unseals enc1:/enc2: values and passes legacy
+        // plaintext through unchanged, so existing installs keep working.
+        $raw_sk = (string) ($opt['secret_key'] ?? '');
+        try {
+            $sk = \G2A\POS\Support\SecretStore::open($raw_sk);
+        } catch (\Throwable $e) {
+            $sk = $raw_sk;
+        }
         if ($sk === '') {
             return ['error' => 'Stripe secret key not configured.'];
         }

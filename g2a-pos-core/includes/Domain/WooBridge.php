@@ -49,6 +49,10 @@ final class WooBridge {
 	}
 
 	public static function reduce_stock( array $items ): void {
+		if ( ! function_exists( 'wc_get_product' ) || ! function_exists( 'wc_update_product_stock' ) ) {
+			// WooCommerce inactive — nothing to decrement; POS order creation must not hard-fail.
+			return;
+		}
 		foreach ( $items as $item ) {
 			$product_id = (int) ( $item['variation_id'] ?? $item['product_id'] ?? 0 );
 			if ( $product_id <= 0 ) {
@@ -63,6 +67,23 @@ final class WooBridge {
 			$qty = (float) ( $item['quantity'] ?? 0 );
 			if ( $qty <= 0 ) {
 				continue;
+			}
+
+			// Clamp the decrement so managed stock never goes negative; log the shortfall.
+			$available = (float) ( $product->get_stock_quantity() ?? 0 );
+			if ( $qty > $available ) {
+				\G2A\POS\Support\Logger::warning(
+					'POS stock decrement clamped to available quantity',
+					array(
+						'product_id' => $product_id,
+						'requested'  => $qty,
+						'available'  => $available,
+					)
+				);
+				$qty = max( 0.0, $available );
+				if ( $qty <= 0 ) {
+					continue;
+				}
 			}
 
 			wc_update_product_stock( $product, $qty, 'decrease' );
