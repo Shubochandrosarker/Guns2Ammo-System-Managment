@@ -173,6 +173,24 @@ final class Stripe_Service {
 			wp_die( esc_html__( 'Stripe checkout is not enabled yet.', 'memberistic' ) );
 		}
 
+		// Throttle the public checkout endpoint per IP. The signup nonce is
+		// rendered on a public page (identical for all logged-out visitors),
+		// so without this a script could seed pending memberships and fire
+		// 'membership_created' mail to arbitrary addresses. 8 attempts / 10 min.
+		$mem_ip  = isset( $_SERVER['HTTP_CF_CONNECTING_IP'] ) && filter_var( wp_unslash( $_SERVER['HTTP_CF_CONNECTING_IP'] ), FILTER_VALIDATE_IP )
+			? sanitize_text_field( wp_unslash( $_SERVER['HTTP_CF_CONNECTING_IP'] ) )
+			: ( isset( $_SERVER['REMOTE_ADDR'] ) ? sanitize_text_field( wp_unslash( $_SERVER['REMOTE_ADDR'] ) ) : '0.0.0.0' );
+		$mem_rl_key = 'memberistic_checkout_rl_' . md5( $mem_ip );
+		$mem_hits   = (int) get_transient( $mem_rl_key );
+		if ( $mem_hits >= (int) apply_filters( 'memberistic_checkout_rate_limit', 8 ) ) {
+			wp_die(
+				esc_html__( 'Too many checkout attempts. Please wait a few minutes and try again.', 'memberistic' ),
+				esc_html__( 'Slow down', 'memberistic' ),
+				array( 'response' => 429 )
+			);
+		}
+		set_transient( $mem_rl_key, $mem_hits + 1, 10 * MINUTE_IN_SECONDS );
+
 		$plan_id       = isset( $_POST['plan_id'] ) ? absint( $_POST['plan_id'] ) : 0;
 		$billing_cycle = isset( $_POST['billing_cycle'] ) ? sanitize_key( wp_unslash( $_POST['billing_cycle'] ) ) : 'monthly';
 		$full_name     = isset( $_POST['full_name'] ) ? sanitize_text_field( wp_unslash( $_POST['full_name'] ) ) : '';
