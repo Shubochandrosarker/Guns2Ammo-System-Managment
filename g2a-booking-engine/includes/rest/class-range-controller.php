@@ -64,6 +64,15 @@ final class G2AB_REST_Range_Controller {
 		if ( ! $nonce || ! wp_verify_nonce( $nonce, 'wp_rest' ) ) {
 			return new WP_Error( 'g2ab_invalid_nonce', __( 'Please refresh the page and try again.', 'g2a-booking' ), array( 'status' => 403 ) );
 		}
+		// Per-IP throttle — /range/lookup and /range/self-checkin are public and
+		// match bookings by code or name+phone, so cap attempts to slow enumeration.
+		$ip   = function_exists( 'g2ab_get_client_ip' ) ? g2ab_get_client_ip() : (string) ( $_SERVER['REMOTE_ADDR'] ?? '' );
+		$key  = 'g2ab_rl_range_' . md5( $ip );
+		$hits = (int) get_transient( $key );
+		if ( $hits >= 10 ) {
+			return new WP_Error( 'g2ab_rate_limited', __( 'Too many attempts. Please wait a few minutes or see the front desk.', 'g2a-booking' ), array( 'status' => 429 ) );
+		}
+		set_transient( $key, $hits + 1, 10 * MINUTE_IN_SECONDS );
 		return true;
 	}
 

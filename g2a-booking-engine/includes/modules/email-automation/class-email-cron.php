@@ -53,14 +53,18 @@ class G2AB_Email_Cron {
 		$end_24   = gmdate( 'Y-m-d H:i:s', strtotime( $now ) + ( 25 * HOUR_IN_SECONDS ) );
 
 		$rows_24 = $wpdb->get_results( $wpdb->prepare(
-			"SELECT * FROM {$bk} WHERE start_at BETWEEN %s AND %s AND status IN ({$active_statuses}) AND id NOT IN ( SELECT booking_id FROM {$lg} WHERE booking_id IS NOT NULL AND event_type = %s )",
+			"SELECT * FROM {$bk} WHERE start_at BETWEEN %s AND %s AND status IN ({$active_statuses}) AND id NOT IN ( SELECT booking_id FROM {$lg} WHERE booking_id IS NOT NULL AND event_type = %s ) ORDER BY start_at ASC LIMIT 200",
 			$start_24, $end_24, self::LOG_24H
 		) ); // phpcs:ignore
 
 		if ( $rows_24 ) {
 			foreach ( $rows_24 as $b ) {
-				$this->engine->send_event( 'booking_reminder_24h', $b );
-				$this->log( $b->id, self::LOG_24H );
+				$res = $this->engine->send_event( 'booking_reminder_24h', $b );
+				// Only mark as sent when at least one recipient send succeeded,
+				// so a failed send is retried on the next tick.
+				if ( is_array( $res ) && in_array( true, $res, true ) ) {
+					$this->log( $b->id, self::LOG_24H );
+				}
 			}
 		}
 
@@ -69,14 +73,16 @@ class G2AB_Email_Cron {
 		$end_2   = gmdate( 'Y-m-d H:i:s', strtotime( $now ) + ( 135 * MINUTE_IN_SECONDS ) );
 
 		$rows_2 = $wpdb->get_results( $wpdb->prepare(
-			"SELECT * FROM {$bk} WHERE start_at BETWEEN %s AND %s AND status IN ({$active_statuses}) AND id NOT IN ( SELECT booking_id FROM {$lg} WHERE booking_id IS NOT NULL AND event_type = %s )",
+			"SELECT * FROM {$bk} WHERE start_at BETWEEN %s AND %s AND status IN ({$active_statuses}) AND id NOT IN ( SELECT booking_id FROM {$lg} WHERE booking_id IS NOT NULL AND event_type = %s ) ORDER BY start_at ASC LIMIT 200",
 			$start_2, $end_2, self::LOG_2H
 		) ); // phpcs:ignore
 
 		if ( $rows_2 ) {
 			foreach ( $rows_2 as $b ) {
-				$this->engine->send_event( 'booking_reminder_2h', $b );
-				$this->log( $b->id, self::LOG_2H );
+				$res = $this->engine->send_event( 'booking_reminder_2h', $b );
+				if ( is_array( $res ) && in_array( true, $res, true ) ) {
+					$this->log( $b->id, self::LOG_2H );
+				}
 			}
 		}
 	}

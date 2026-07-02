@@ -126,6 +126,15 @@ final class G2AB_REST_Bookings_Controller {
 		if ( $hits >= 30 ) {
 			return new WP_Error( 'g2ab_rate_limited', __( 'Too many booking attempts. Try again in a few minutes.', 'g2a-booking' ), array( 'status' => 429 ) );
 		}
+
+		// Successful guest bookings are ALSO capped per IP (this counter is never
+		// cleared). Each guest booking can create a subscriber account + email, so
+		// without this a script that completes bookings would bypass the attempt
+		// limit above and mass-create accounts for arbitrary addresses.
+		if ( (int) get_transient( $this->success_rate_limit_key() ) >= 5 ) {
+			return new WP_Error( 'g2ab_rate_limited', __( 'Too many bookings from this network. Please try again later or call us.', 'g2a-booking' ), array( 'status' => 429 ) );
+		}
+
 		set_transient( $key, $hits + 1, 10 * MINUTE_IN_SECONDS );
 		return true;
 	}
@@ -138,6 +147,24 @@ final class G2AB_REST_Bookings_Controller {
 	private function rate_limit_key( $resource_id ) {
 		$ip = function_exists( 'g2ab_get_client_ip' ) ? g2ab_get_client_ip() : (string) ( $_SERVER['REMOTE_ADDR'] ?? '' );
 		return 'g2ab_rl_' . md5( $ip . '|' . (int) $resource_id );
+	}
+
+	/**
+	 * Transient key for the per-IP SUCCESSFUL guest booking counter. Unlike the
+	 * attempt counter above, this one is incremented on success and never
+	 * cleared, capping how many accounts/bookings one IP can create per hour.
+	 */
+	private function success_rate_limit_key() {
+		$ip = function_exists( 'g2ab_get_client_ip' ) ? g2ab_get_client_ip() : (string) ( $_SERVER['REMOTE_ADDR'] ?? '' );
+		return 'g2ab_rls_' . md5( $ip );
+	}
+
+	/**
+	 * Count a successful guest booking toward the per-IP hourly success cap.
+	 */
+	private function bump_success_rate_limit() {
+		$key = $this->success_rate_limit_key();
+		set_transient( $key, (int) get_transient( $key ) + 1, HOUR_IN_SECONDS );
 	}
 
 	public function list_payment_methods() {
@@ -856,6 +883,7 @@ final class G2AB_REST_Bookings_Controller {
 		// person on the same shared/NAT IP) isn't penalised by earlier attempts.
 		if ( ! is_user_logged_in() ) {
 			delete_transient( $this->rate_limit_key( $resource_id ) );
+			$this->bump_success_rate_limit();
 		}
 
 		// Audit log (outside the transaction; cheap insert).
@@ -1310,6 +1338,7 @@ final class G2AB_REST_Bookings_Controller {
 
 		if ( ! is_user_logged_in() ) {
 			delete_transient( $this->rate_limit_key( 'event-' . $occurrence_id ) );
+			$this->bump_success_rate_limit();
 		}
 
 		$wpdb->insert( $wpdb->prefix . 'g2ab_logs', array(

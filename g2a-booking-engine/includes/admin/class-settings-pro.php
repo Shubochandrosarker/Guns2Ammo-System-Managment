@@ -44,6 +44,22 @@ final class G2AB_Admin_Settings_Pro {
 		return array_merge( $tabs, $module_tabs, $tail );
 	}
 
+	/**
+	 * Options rendered as masked password fields. Stored values are never echoed
+	 * back into the page; submitting the field empty keeps the saved value.
+	 */
+	const SECRET_OPTIONS = array(
+		'g2ab_stripe_secret_key',
+		'g2ab_stripe_webhook_secret',
+		'g2ab_paypal_secret',
+		'g2ab_fortis_user_api_key',
+		'g2ab_fortis_hmac_secret',
+		'g2ab_fortis_webhook_secret',
+		'g2ab_authnet_transaction_key',
+		'g2ab_authnet_signature_key',
+		'g2ab_twilio_token',
+	);
+
 	const GATEWAYS = array(
 		'stripe'         => array( 'label' => 'Stripe',              'color' => '#635BFF', 'logo' => 'S' ),
 		'paypal'         => array( 'label' => 'PayPal',              'color' => '#003087', 'logo' => 'P' ),
@@ -252,6 +268,16 @@ final class G2AB_Admin_Settings_Pro {
 		return '';
 	}
 
+	/**
+	 * Echo value/placeholder attributes for a masked secret input. The stored
+	 * secret is never rendered — an empty submit keeps it (see handle_save()).
+	 */
+	private function secret_input_attrs( $option, $empty_placeholder = '' ) {
+		$has_saved = '' !== (string) get_option( $option, '' );
+		$ph = $has_saved ? __( 'saved — enter new value to replace', 'g2a-booking' ) : $empty_placeholder;
+		echo 'value=""' . ( $ph ? ' placeholder="' . esc_attr( $ph ) . '"' : '' );
+	}
+
 	private function gateway_is_configured( $key ) {
 		switch ( $key ) {
 			case 'stripe':       return get_option( 'g2ab_stripe_publishable_key' ) && get_option( 'g2ab_stripe_secret_key' );
@@ -271,8 +297,8 @@ final class G2AB_Admin_Settings_Pro {
 			<div class="g2ab-set__field"><label class="g2ab-set__check"><input type="checkbox" name="g2ab_stripe_enabled" value="1" <?php checked( 1, (int) get_option( 'g2ab_stripe_enabled', 0 ) ); ?> /> <?php esc_html_e( 'Enable Stripe', 'g2a-booking' ); ?></label></div>
 			<div class="g2ab-set__field"><label class="g2ab-set__check"><input type="checkbox" name="g2ab_stripe_test_mode" value="1" <?php checked( 1, (int) get_option( 'g2ab_stripe_test_mode', 1 ) ); ?> /> <?php esc_html_e( 'Test mode (use pk_test_/sk_test_ keys)', 'g2a-booking' ); ?></label></div>
 			<div class="g2ab-set__field"><label><?php esc_html_e( 'Publishable Key', 'g2a-booking' ); ?></label><input type="text" name="g2ab_stripe_publishable_key" value="<?php echo esc_attr( get_option( 'g2ab_stripe_publishable_key', '' ) ); ?>" placeholder="pk_live_..." /></div>
-			<div class="g2ab-set__field"><label><?php esc_html_e( 'Secret Key', 'g2a-booking' ); ?></label><input type="password" name="g2ab_stripe_secret_key" value="<?php echo esc_attr( get_option( 'g2ab_stripe_secret_key', '' ) ); ?>" placeholder="sk_live_..." autocomplete="new-password" /></div>
-			<div class="g2ab-set__field"><label><?php esc_html_e( 'Webhook Signing Secret', 'g2a-booking' ); ?></label><input type="password" name="g2ab_stripe_webhook_secret" value="<?php echo esc_attr( get_option( 'g2ab_stripe_webhook_secret', '' ) ); ?>" placeholder="whsec_..." autocomplete="new-password" /><small><?php printf( esc_html__( 'Add a webhook in Stripe pointed at: %s', 'g2a-booking' ), '<code>' . esc_url( rest_url( G2AB_REST_NAMESPACE . '/webhooks/stripe' ) ) . '</code>' ); ?></small></div>
+			<div class="g2ab-set__field"><label><?php esc_html_e( 'Secret Key', 'g2a-booking' ); ?></label><input type="password" name="g2ab_stripe_secret_key" <?php $this->secret_input_attrs( 'g2ab_stripe_secret_key', 'sk_live_...' ); ?> autocomplete="new-password" /></div>
+			<div class="g2ab-set__field"><label><?php esc_html_e( 'Webhook Signing Secret', 'g2a-booking' ); ?></label><input type="password" name="g2ab_stripe_webhook_secret" <?php $this->secret_input_attrs( 'g2ab_stripe_webhook_secret', 'whsec_...' ); ?> autocomplete="new-password" /><small><?php printf( esc_html__( 'Add a webhook in Stripe pointed at: %s', 'g2a-booking' ), '<code>' . esc_url( rest_url( G2AB_REST_NAMESPACE . '/webhooks/stripe' ) ) . '</code>' ); ?></small></div>
 		</div>
 		<?php
 	}
@@ -284,7 +310,7 @@ final class G2AB_Admin_Settings_Pro {
 			<div class="g2ab-set__field"><label class="g2ab-set__check"><input type="checkbox" name="g2ab_paypal_enabled" value="1" <?php checked( 1, (int) get_option( 'g2ab_paypal_enabled', 0 ) ); ?> /> <?php esc_html_e( 'Enable PayPal', 'g2a-booking' ); ?></label></div>
 			<div class="g2ab-set__field"><label class="g2ab-set__check"><input type="checkbox" name="g2ab_paypal_test_mode" value="1" <?php checked( 1, (int) get_option( 'g2ab_paypal_test_mode', 1 ) ); ?> /> <?php esc_html_e( 'Sandbox mode', 'g2a-booking' ); ?></label></div>
 			<div class="g2ab-set__field"><label><?php esc_html_e( 'Client ID', 'g2a-booking' ); ?></label><input type="text" name="g2ab_paypal_client_id" value="<?php echo esc_attr( get_option( 'g2ab_paypal_client_id', '' ) ); ?>" /></div>
-			<div class="g2ab-set__field"><label><?php esc_html_e( 'Secret', 'g2a-booking' ); ?></label><input type="password" name="g2ab_paypal_secret" value="<?php echo esc_attr( get_option( 'g2ab_paypal_secret', '' ) ); ?>" autocomplete="new-password" /></div>
+			<div class="g2ab-set__field"><label><?php esc_html_e( 'Secret', 'g2a-booking' ); ?></label><input type="password" name="g2ab_paypal_secret" <?php $this->secret_input_attrs( 'g2ab_paypal_secret' ); ?> autocomplete="new-password" /></div>
 			<div class="g2ab-set__field"><label><?php esc_html_e( 'Webhook ID', 'g2a-booking' ); ?></label><input type="text" name="g2ab_paypal_webhook_id" value="<?php echo esc_attr( get_option( 'g2ab_paypal_webhook_id', '' ) ); ?>" /><small><?php printf( esc_html__( 'Webhook URL: %s', 'g2a-booking' ), '<code>' . esc_url( rest_url( G2AB_REST_NAMESPACE . '/webhooks/paypal' ) ) . '</code>' ); ?></small></div>
 		</div>
 		<?php
@@ -297,10 +323,10 @@ final class G2AB_Admin_Settings_Pro {
 			<div class="g2ab-set__field"><label class="g2ab-set__check"><input type="checkbox" name="g2ab_fortis_enabled" value="1" <?php checked( 1, (int) get_option( 'g2ab_fortis_enabled', 0 ) ); ?> /> <?php esc_html_e( 'Enable Fortis Pay', 'g2a-booking' ); ?></label></div>
 			<div class="g2ab-set__field"><label class="g2ab-set__check"><input type="checkbox" name="g2ab_fortis_test_mode" value="1" <?php checked( 1, (int) get_option( 'g2ab_fortis_test_mode', 1 ) ); ?> /> <?php esc_html_e( 'Sandbox mode', 'g2a-booking' ); ?></label></div>
 			<div class="g2ab-set__field"><label><?php esc_html_e( 'User ID', 'g2a-booking' ); ?></label><input type="text" name="g2ab_fortis_user_id" value="<?php echo esc_attr( get_option( 'g2ab_fortis_user_id', '' ) ); ?>" /><small><?php esc_html_e( 'Your merchant user ID from Fortis.', 'g2a-booking' ); ?></small></div>
-			<div class="g2ab-set__field"><label><?php esc_html_e( 'User API Key', 'g2a-booking' ); ?></label><input type="password" name="g2ab_fortis_user_api_key" value="<?php echo esc_attr( get_option( 'g2ab_fortis_user_api_key', '' ) ); ?>" autocomplete="new-password" /></div>
+			<div class="g2ab-set__field"><label><?php esc_html_e( 'User API Key', 'g2a-booking' ); ?></label><input type="password" name="g2ab_fortis_user_api_key" <?php $this->secret_input_attrs( 'g2ab_fortis_user_api_key' ); ?> autocomplete="new-password" /></div>
 			<div class="g2ab-set__field"><label><?php esc_html_e( 'Developer ID', 'g2a-booking' ); ?></label><input type="text" name="g2ab_fortis_developer_id" value="<?php echo esc_attr( get_option( 'g2ab_fortis_developer_id', '' ) ); ?>" /><small><?php esc_html_e( 'Plugin partner identifier — provided to your client when they sign up.', 'g2a-booking' ); ?></small></div>
-			<div class="g2ab-set__field"><label><?php esc_html_e( 'HMAC Secret', 'g2a-booking' ); ?></label><input type="password" name="g2ab_fortis_hmac_secret" value="<?php echo esc_attr( get_option( 'g2ab_fortis_hmac_secret', '' ) ); ?>" autocomplete="new-password" /><small><?php esc_html_e( 'Optional but recommended for production. Strengthens auth on /v2/transactions, /v2/payform, /v2/accountvault.', 'g2a-booking' ); ?></small></div>
-			<div class="g2ab-set__field"><label><?php esc_html_e( 'Webhook Secret', 'g2a-booking' ); ?></label><input type="password" name="g2ab_fortis_webhook_secret" value="<?php echo esc_attr( get_option( 'g2ab_fortis_webhook_secret', '' ) ); ?>" autocomplete="new-password" /><small><?php printf( esc_html__( 'Webhook URL: %s', 'g2a-booking' ), '<code>' . esc_url( rest_url( G2AB_REST_NAMESPACE . '/webhooks/fortis' ) ) . '</code>' ); ?></small></div>
+			<div class="g2ab-set__field"><label><?php esc_html_e( 'HMAC Secret', 'g2a-booking' ); ?></label><input type="password" name="g2ab_fortis_hmac_secret" <?php $this->secret_input_attrs( 'g2ab_fortis_hmac_secret' ); ?> autocomplete="new-password" /><small><?php esc_html_e( 'Optional but recommended for production. Strengthens auth on /v2/transactions, /v2/payform, /v2/accountvault.', 'g2a-booking' ); ?></small></div>
+			<div class="g2ab-set__field"><label><?php esc_html_e( 'Webhook Secret', 'g2a-booking' ); ?></label><input type="password" name="g2ab_fortis_webhook_secret" <?php $this->secret_input_attrs( 'g2ab_fortis_webhook_secret' ); ?> autocomplete="new-password" /><small><?php printf( esc_html__( 'Webhook URL: %s', 'g2a-booking' ), '<code>' . esc_url( rest_url( G2AB_REST_NAMESPACE . '/webhooks/fortis' ) ) . '</code>' ); ?></small></div>
 		</div>
 		<?php
 	}
@@ -312,8 +338,8 @@ final class G2AB_Admin_Settings_Pro {
 			<div class="g2ab-set__field"><label class="g2ab-set__check"><input type="checkbox" name="g2ab_authnet_enabled" value="1" <?php checked( 1, (int) get_option( 'g2ab_authnet_enabled', 0 ) ); ?> /> <?php esc_html_e( 'Enable Authorize.net', 'g2a-booking' ); ?></label></div>
 			<div class="g2ab-set__field"><label class="g2ab-set__check"><input type="checkbox" name="g2ab_authnet_test_mode" value="1" <?php checked( 1, (int) get_option( 'g2ab_authnet_test_mode', 1 ) ); ?> /> <?php esc_html_e( 'Sandbox mode', 'g2a-booking' ); ?></label></div>
 			<div class="g2ab-set__field"><label><?php esc_html_e( 'API Login ID', 'g2a-booking' ); ?></label><input type="text" name="g2ab_authnet_login_id" value="<?php echo esc_attr( get_option( 'g2ab_authnet_login_id', '' ) ); ?>" /></div>
-			<div class="g2ab-set__field"><label><?php esc_html_e( 'Transaction Key', 'g2a-booking' ); ?></label><input type="password" name="g2ab_authnet_transaction_key" value="<?php echo esc_attr( get_option( 'g2ab_authnet_transaction_key', '' ) ); ?>" autocomplete="new-password" /></div>
-			<div class="g2ab-set__field"><label><?php esc_html_e( 'Signature Key', 'g2a-booking' ); ?></label><input type="password" name="g2ab_authnet_signature_key" value="<?php echo esc_attr( get_option( 'g2ab_authnet_signature_key', '' ) ); ?>" autocomplete="new-password" /><small><?php esc_html_e( 'Required for webhook signature verification.', 'g2a-booking' ); ?></small></div>
+			<div class="g2ab-set__field"><label><?php esc_html_e( 'Transaction Key', 'g2a-booking' ); ?></label><input type="password" name="g2ab_authnet_transaction_key" <?php $this->secret_input_attrs( 'g2ab_authnet_transaction_key' ); ?> autocomplete="new-password" /></div>
+			<div class="g2ab-set__field"><label><?php esc_html_e( 'Signature Key', 'g2a-booking' ); ?></label><input type="password" name="g2ab_authnet_signature_key" <?php $this->secret_input_attrs( 'g2ab_authnet_signature_key' ); ?> autocomplete="new-password" /><small><?php esc_html_e( 'Required for webhook signature verification.', 'g2a-booking' ); ?></small></div>
 		</div>
 		<?php
 	}
@@ -399,7 +425,7 @@ final class G2AB_Admin_Settings_Pro {
 			<p class="g2ab-set__desc"><?php esc_html_e( 'Optional SMS reminders. Requires a Twilio account.', 'g2a-booking' ); ?></p>
 			<div class="g2ab-set__field"><label class="g2ab-set__check"><input type="checkbox" name="g2ab_sms_enabled" value="1" <?php checked( 1, (int) get_option( 'g2ab_sms_enabled', 0 ) ); ?> /> <?php esc_html_e( 'Enable SMS reminders', 'g2a-booking' ); ?></label></div>
 			<div class="g2ab-set__field"><label><?php esc_html_e( 'Twilio Account SID', 'g2a-booking' ); ?></label><input type="text" name="g2ab_twilio_sid" value="<?php echo esc_attr( get_option( 'g2ab_twilio_sid', '' ) ); ?>" /></div>
-			<div class="g2ab-set__field"><label><?php esc_html_e( 'Twilio Auth Token', 'g2a-booking' ); ?></label><input type="password" name="g2ab_twilio_token" value="<?php echo esc_attr( get_option( 'g2ab_twilio_token', '' ) ); ?>" autocomplete="new-password" /></div>
+			<div class="g2ab-set__field"><label><?php esc_html_e( 'Twilio Auth Token', 'g2a-booking' ); ?></label><input type="password" name="g2ab_twilio_token" <?php $this->secret_input_attrs( 'g2ab_twilio_token' ); ?> autocomplete="new-password" /></div>
 			<div class="g2ab-set__field"><label><?php esc_html_e( 'Twilio From Number', 'g2a-booking' ); ?></label><input type="text" name="g2ab_twilio_from" value="<?php echo esc_attr( get_option( 'g2ab_twilio_from', '' ) ); ?>" placeholder="+15555555555" /></div>
 		</div>
 		<?php
@@ -596,7 +622,10 @@ final class G2AB_Admin_Settings_Pro {
 				$val = sanitize_email( wp_unslash( $v ) );
 				if ( $val && is_email( $val ) ) update_option( $k, $val );
 			} elseif ( strpos( $k, '_secret' ) !== false || strpos( $k, '_key' ) !== false || strpos( $k, '_token' ) !== false || strpos( $k, '_password' ) !== false ) {
-				update_option( $k, sanitize_text_field( wp_unslash( $v ) ) );
+				$val = sanitize_text_field( wp_unslash( $v ) );
+				// Masked secret fields render empty — an empty submit keeps the stored value.
+				if ( '' === $val && in_array( $k, self::SECRET_OPTIONS, true ) ) continue;
+				update_option( $k, $val );
 			} elseif ( in_array( $k, array( 'g2ab_booking_page_url' ), true ) ) {
 				update_option( $k, esc_url_raw( wp_unslash( $v ) ) );
 			} elseif ( strpos( $k, '_message' ) !== false || strpos( $k, '_body' ) !== false ) {

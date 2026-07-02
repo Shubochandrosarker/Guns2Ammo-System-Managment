@@ -43,6 +43,7 @@ final class G2AB_Booking_Expiry_Cron
 			"SELECT id, uuid, status, payment_mode, start_at FROM {$bookings_table}
 			 WHERE status IN ('pending','reserved')
 			 AND payment_mode IN ('full','deposit')
+			 AND paid_amount <= 0
 			 AND created_at <= %s
 			 AND start_at >= %s
 			 LIMIT 200",

@@ -40,7 +40,9 @@ class G2AB_Email_Engine {
 
 		$tags = $this->build_tags( $booking, $context );
 		$subject = $this->merge( $tpl['subject'], $tags );
-		$body    = $this->merge( $tpl['body_html'], $tags );
+		// Customer-sourced values are escaped before substitution into the HTML
+		// body so stored markup in a booking can't inject HTML into inboxes.
+		$body    = $this->merge( $tpl['body_html'], $this->escape_customer_tags( $tags ) );
 		$body    = $this->wrap_html( $body, $subject );
 
 		$headers = array(
@@ -116,6 +118,19 @@ class G2AB_Email_Engine {
 			$out = str_replace( '{' . $k . '}', (string) $v, $out );
 		}
 		return $out;
+	}
+
+	/**
+	 * esc_html() the customer-sourced merge values for substitution into HTML
+	 * bodies. Admin-authored template markup is left untouched.
+	 */
+	private function escape_customer_tags( $tags ) {
+		foreach ( array( 'customer_name', 'customer_email', 'customer_phone' ) as $k ) {
+			if ( isset( $tags[ $k ] ) ) {
+				$tags[ $k ] = esc_html( (string) $tags[ $k ] );
+			}
+		}
+		return $tags;
 	}
 
 	/**
