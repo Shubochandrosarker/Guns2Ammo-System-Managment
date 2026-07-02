@@ -396,13 +396,20 @@ final class Stripe_Service {
 		$success_url = memberistic_get_page_url( 'thank_you_page_id', 'memberistic-thank-you', home_url( '/' ) );
 		$cancel_url  = memberistic_get_page_url( 'failed_payment_page_id', 'memberistic-payment-failed', home_url( '/' ) );
 
+		// Guard against a corrupted/unsupported admin currency setting that would
+		// make Stripe reject the whole checkout session.
+		$currency = strtolower( (string) memberistic_get_setting( 'currency', 'USD' ) );
+		if ( ! in_array( $currency, array( 'usd', 'eur', 'gbp', 'cad', 'aud' ), true ) ) {
+			$currency = 'usd';
+		}
+
 		$payload = array(
 			'mode'                                      => 'subscription',
 			'customer_email'                            => $email,
 			'success_url'                               => add_query_arg( array( 'memberistic_checkout' => 'success', 'membership_id' => $membership_id ), $success_url ),
 			'cancel_url'                                => add_query_arg( array( 'memberistic_checkout' => 'cancelled', 'membership_id' => $membership_id ), $cancel_url ),
 			'line_items[0][quantity]'                   => 1,
-			'line_items[0][price_data][currency]'       => strtolower( memberistic_get_setting( 'currency', 'USD' ) ),
+			'line_items[0][price_data][currency]'       => $currency,
 			'line_items[0][price_data][unit_amount]'    => (int) round( $amount * 100 ),
 			'line_items[0][price_data][recurring][interval]' => $interval,
 			'line_items[0][price_data][product_data][name]'  => $plan['name'] . ' Membership',

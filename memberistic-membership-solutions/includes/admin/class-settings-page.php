@@ -45,12 +45,25 @@ final class Settings_Page {
 
 		$action = empty( $_GET['memberistic_action'] ) ? '' : sanitize_key( wp_unslash( $_GET['memberistic_action'] ) );
 
-		if ( ! in_array( $action, array( 'create_pages', 'remap_pages' ), true ) ) {
+		if ( ! in_array( $action, array( 'create_pages', 'remap_pages', 'repair_logins' ), true ) ) {
 			return;
 		}
 
-		if ( ! memberistic_current_user_can( 'manage_memberistic_settings' ) || ! memberistic_verify_admin_nonce( 'memberistic_create_pages' ) ) {
+		// The page tools share one nonce; the login-repair tool uses its own.
+		$nonce_action = 'repair_logins' === $action ? 'memberistic_repair_logins' : 'memberistic_create_pages';
+		if ( ! memberistic_current_user_can( 'manage_memberistic_settings' ) || ! memberistic_verify_admin_nonce( $nonce_action ) ) {
 			wp_safe_redirect( memberistic_admin_url( 'memberistic-settings', array( 'memberistic_notice' => 'invalid_request', 'memberistic_notice_type' => 'error' ) ) );
+			exit;
+		}
+
+		if ( 'repair_logins' === $action ) {
+			$tally = \WordPressistic\Memberistic\Account_Provisioner::repair_all( true );
+			wp_safe_redirect( memberistic_admin_url( 'memberistic-settings', array(
+				'memberistic_notice'  => 'logins_repaired',
+				'memberistic_created' => (int) $tally['created'],
+				'memberistic_linked'  => (int) $tally['linked'],
+				'memberistic_emailed' => (int) $tally['emailed'],
+			) ) );
 			exit;
 		}
 

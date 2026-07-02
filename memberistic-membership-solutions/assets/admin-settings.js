@@ -168,8 +168,7 @@
 				h('div', null,
 					h('h1', null, __('Memberistic Settings', 'memberistic')),
 					h('p', { className: 'mb-app__sub' }, __('Brand, pages, payments, emails, and integration toggles. Changes save instantly to the same option as before.', 'memberistic'))
-				),
-				h('button', { type: 'submit', className: 'button button-primary', disabled: saving }, saving ? __('Saving…', 'memberistic') : __('Save changes', 'memberistic'))
+				)
 			),
 
 			error ? h('div', { className: 'mb-banner mb-banner--error' }, error) : null,

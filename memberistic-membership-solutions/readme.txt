@@ -4,7 +4,7 @@ Tags: membership, operations, staff dashboard, stripe, woocommerce, rest api
 Requires at least: 6.0
 Requires PHP: 8.0
 Tested up to: 6.7
-Stable tag: 1.46.0
+Stable tag: 1.9.9.4
 License: GPLv2 or later
 
 A modern membership operations engine for service businesses. Co-developed by WordPressistic and launch partner Guns 2 Ammo (https://guns2ammo.com).
@@ -69,6 +69,29 @@ Set Settings > Advanced > "Delete data on uninstall" to Yes before removing the 
 == Changelog ==
 
 See CHANGELOG.md for the full history.
+
+= 1.9.9.4 =
+**Sign Out now actually signs members out.**
+
+* FIX: **Members couldn't log out.** The theme filters the logout link to `/login/?action=logout` (the same way it does login and forgot-password), but the branded page didn't handle `logout` — so clicking "Sign Out" just landed back on the login page, still signed in. `/login/` now processes the logout action: it verifies the standard WordPress `log-out` nonce, clears the session, and redirects to the home page (or wherever `redirect_to` points). A stale logout link shows a one-tap "Sign Out" confirmation with a fresh link.
+* CHANGE: The account screen's "no membership" state now also shows a **Sign Out** link, so a signed-in visitor without a membership isn't stuck.
+
+= 1.9.9.3 =
+**Live-site hardening for the login fixes.**
+
+* FIX: **Forgot-password could still appear "dead" on the live site** because a page cache / CDN served the cached *login* HTML for `/login/?action=lostpassword` and the reset links too. The login surface (the login, forgot-password and reset views) now sends no-cache headers and sets `DONOTCACHEPAGE`, so caching plugins and CDNs keep it dynamic. After updating, clear your site cache once.
+* FIX: **"Set up member logins" notice would not clear** when a flagged membership had no email on file (the repair tool can't create a login without one). The count is now email-aware — only members that can actually be given a login are flagged — and provisioning falls back to a linked person's email when the primary row has none (common in imported data), so the notice clears once the real work is done.
+* CHANGE: **One Save button on the Settings screen** — the duplicate header "Save changes" button was removed; the sticky footer save bar remains.
+
+= 1.9.9.2 =
+**Critical login & password fixes — members can sign in, reset passwords, and reach their digital card.**
+
+* FIX: **Forgot/Reset password did nothing.** The branded /login/ page only ever drew the login form, so the theme's "Forgot password?" link (and the "set your password" links in welcome emails) dead-ended on /login/?action=lostpassword with no handler. /login/ is now a complete, theme-independent auth surface — it processes login, lost-password and reset-password actions itself, so the whole flow works even when wp-login.php is blocked or redirected by the theme.
+* FIX: **Password-reset and "set your password" email links now land on the working page.** WP builds those links with wp-login.php?action=rp, which bypasses the theme's URL filter; they're now rewritten to /login/?action=rp so every link reaches the handler above.
+* FIX: **Staff-added and imported members had no login.** Only Stripe checkout created a WP user account, so members added in the admin or via CSV had a membership but nothing to sign into and no way to set a password. New members are now given a WP account + a set-password email automatically (on activation and on staff create), and a one-click "Set up member logins" tool in the admin repairs the existing backlog — idempotent, and never emails a member twice.
+
+= 1.46.1 =
+Booking integration fixes. Member booking discounts now actually apply — they are read from the membership's PLAN settings (the memberships table has no settings column, so discounts were silently always empty). The renewal/expiry check is timezone-correct and no longer mis-parses a DATETIME renewal date as a "double time specification" (which had made active members read as not-bookable). Booking-form pages are exempted from content restriction so a mis-set "required plan" can never hide the lane-booking form. Member roles + active-plan meta are cleared on expiry — without stripping roles from a member who still holds another active membership. Content-gating membership resolution now matches the booking integration (honors email-linked memberships and rechecks renewal). Booking metadata carries the plan id (not the membership row id) for correct role assignment. Stripe checkout currency is validated against an allowlist.
 
 = 1.10.0 =
 Admin operations release. Members page gains server-side pagination, eight KPI cards (Total / Active / Pending / Past Due / Expired / Cancelled / New This Month with MoM growth % / Waiver Missing), and a bulk-action option to change waiver status for many memberships at once. Plans page is rebuilt as an animated card grid with per-plan member counts (total / active / other). Payments page gets pagination, six KPI cards (lifetime revenue, this-month revenue + MoM growth, new-member vs renewal payments, failed payments, visible-on-page), and a richer CSV export. Import flow now keeps every row: expired members import as expired, members with no matching plan import under a new "No Plan" sentinel plan with status = needs_review, members with no email still import. Order/payment imports never drop a row — orphan emails create a stub Instore member and emailless rows attach to a shared Instore Walk-in membership. Emails page becomes a React console with KPI cards (sent today/week/month, delivery rate, contact coverage) and a filterable, paginated directory; CSV export now includes 13 properly labelled columns including waiver dates and renewal info.

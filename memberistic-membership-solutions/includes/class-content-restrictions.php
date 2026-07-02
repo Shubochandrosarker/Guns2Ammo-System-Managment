@@ -37,6 +37,9 @@ final class Content_Restrictions {
 		add_filter( 'rest_prepare_page', array( self::class, 'filter_rest_response' ), 10, 2 );
 		add_action( 'memberistic_membership_created', array( self::class, 'sync_roles_for_membership' ) );
 		add_action( 'memberistic_membership_activated', array( self::class, 'sync_roles_for_membership' ) );
+		// On expiry, strip the member roles + active-plan meta so an expired member
+		// no longer reads as active to content restriction or the booking engine.
+		add_action( 'memberistic_membership_expired', array( self::class, 'clear_roles_for_membership' ) );
 	}
 
 	/**
@@ -63,7 +66,7 @@ final class Content_Restrictions {
 			if ( ! in_array( $post->post_type, array( 'post', 'page' ), true ) ) {
 				continue;
 			}
-			if ( self::is_memberistic_page( $post->ID ) ) {
+			if ( self::is_memberistic_page( $post->ID ) || self::is_booking_page( $post->ID ) ) {
 				continue;
 			}
 			$plans = array_filter( array_map( 'absint', (array) get_post_meta( $post->ID, '_memberistic_required_plans', true ) ) );
@@ -131,8 +134,9 @@ final class Content_Restrictions {
 		}
 		$post_id = get_queried_object_id();
 
-		// Never restrict Memberistic's own functional pages.
-		if ( self::is_memberistic_page( $post_id ) ) {
+		// Never restrict Memberistic's own functional pages — or a page hosting the
+		// booking form, since locking it would hide the lane-booking UI from guests.
+		if ( self::is_memberistic_page( $post_id ) || self::is_booking_page( $post_id ) ) {
 			return;
 		}
 
@@ -190,7 +194,7 @@ final class Content_Restrictions {
 			return $content;
 		}
 		$post_id = get_the_ID();
-		if ( ! $post_id || self::is_memberistic_page( $post_id ) ) {
+		if ( ! $post_id || self::is_memberistic_page( $post_id ) || self::is_booking_page( $post_id ) ) {
 			return $content;
 		}
 		$plans = array_filter( array_map( 'absint', (array) get_post_meta( $post_id, '_memberistic_required_plans', true ) ) );
@@ -226,7 +230,7 @@ final class Content_Restrictions {
 		if ( ! $post || ! ( $post instanceof \WP_Post ) ) {
 			return $response;
 		}
-		if ( self::is_memberistic_page( $post->ID ) ) {
+		if ( self::is_memberistic_page( $post->ID ) || self::is_booking_page( $post->ID ) ) {
 			return $response;
 		}
 		$plans = array_filter( array_map( 'absint', (array) get_post_meta( $post->ID, '_memberistic_required_plans', true ) ) );
@@ -294,11 +298,85 @@ final class Content_Restrictions {
 		if ( ! $user_id ) {
 			return false;
 		}
+		// Resolve via the same path the booking integration uses (primary_user_id
+		// OR email-linked person) so a legitimately active email-linked member is
+		// not wrongly treated as a non-member here.
+		// Booking_Engine's resolver is the authoritative bookable check (status +
+		// renewal + email-link). It's always loaded, so trust it exclusively — do
+		// NOT fall through to a status-only test that would re-admit an active-status
+		// but past-renewal (lazily-not-yet-expired) member.
+		if ( class_exists( '\\WordPressistic\\Memberistic\\Integrations\\Booking_Engine' ) ) {
+			$membership = \WordPressistic\Memberistic\Integrations\Booking_Engine::get_active_membership_for_user( $user_id );
+			return is_array( $membership ) && in_array( (int) $membership['plan_id'], $plan_ids, true );
+		}
+		// Fallback only when the integration class isn't available at all.
 		$membership = Memberships_Repository::get_by_user_id( $user_id );
-		if ( ! $membership || ! in_array( $membership['status'], array( 'active', 'comped', 'trial' ), true ) ) {
+		if ( ! is_array( $membership ) || ! in_array( $membership['status'], array( 'active', 'comped', 'trial' ), true ) ) {
 			return false;
 		}
 		return in_array( (int) $membership['plan_id'], $plan_ids, true );
+	}
+
+	/**
+	 * Strip the member roles + active-plan user-meta when a membership expires,
+	 * UNLESS the user still holds another active membership. Mirrors the
+	 * activation logic in sync_roles_for_membership() so an expired member stops
+	 * reading as active to both content restriction and the booking engine.
+	 *
+	 * @param int $membership_id Expired membership row id.
+	 */
+	public static function clear_roles_for_membership( $membership_id ) {
+		$membership = Memberships_Repository::get( absint( $membership_id ) );
+		if ( ! is_array( $membership ) || empty( $membership['primary_user_id'] ) ) {
+			return;
+		}
+		$user_id = (int) $membership['primary_user_id'];
+		// If the user still holds ANOTHER active membership (other than this expired
+		// one), keep their roles/meta. We can't use get_by_user_id() here: the
+		// scheduler sets this row's status to 'expired' BEFORE firing the hook, and
+		// that method returns only the newest row — which may be this expired one.
+		global $wpdb;
+		$survivor = $wpdb->get_var( $wpdb->prepare(
+			'SELECT 1 FROM ' . Memberships_Repository::table() . " WHERE primary_user_id = %d AND id <> %d AND status IN ( 'active', 'comped', 'trial' ) LIMIT 1",
+			$user_id,
+			(int) $membership['id']
+		) );
+		if ( $survivor ) {
+			return;
+		}
+		$user = get_user_by( 'id', $user_id );
+		if ( ! $user ) {
+			return;
+		}
+		if ( in_array( 'memberistic_member', (array) $user->roles, true ) ) {
+			$user->remove_role( 'memberistic_member' );
+		}
+		$plan = ! empty( $membership['plan_id'] ) ? Plans_Repository::get( (int) $membership['plan_id'] ) : null;
+		if ( is_array( $plan ) && ! empty( $plan['slug'] ) ) {
+			$role = 'memberistic_plan_' . sanitize_key( $plan['slug'] );
+			if ( in_array( $role, (array) $user->roles, true ) ) {
+				$user->remove_role( $role );
+			}
+		}
+		delete_user_meta( $user->ID, 'memberistic_active_plan_id' );
+		delete_user_meta( $user->ID, 'memberistic_active_plan_name' );
+	}
+
+	/**
+	 * Never restrict a page that hosts the booking-engine form — locking it would
+	 * hide the lane-booking UI from guests with no booking-engine-side evidence.
+	 * Filterable so operators can exempt additional pages.
+	 *
+	 * @param int $post_id Post ID.
+	 */
+	private static function is_booking_page( $post_id ) {
+		$is_booking = false;
+		$post       = get_post( $post_id );
+		if ( $post instanceof \WP_Post ) {
+			$content    = (string) $post->post_content;
+			$is_booking = has_shortcode( $content, 'g2a_lane_booking' ) || has_shortcode( $content, 'g2a_booking_form' );
+		}
+		return (bool) apply_filters( 'memberistic_restriction_exempt_post', $is_booking, $post_id );
 	}
 
 	private static function plan_names( $ids ) {

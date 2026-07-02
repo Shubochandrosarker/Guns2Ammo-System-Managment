@@ -1013,6 +1013,43 @@
 	text-transform: uppercase;
 }
 
+/* Auth feedback notices + secondary links (forgot-password / reset flows). */
+.memberistic-auth-notice {
+	border: 1px solid transparent;
+	border-radius: 4px;
+	font-size: 13.5px;
+	line-height: 1.5;
+	margin: 0 0 18px;
+	padding: 12px 14px;
+}
+
+.memberistic-auth-notice--success {
+	background: rgba(0, 200, 87, 0.12);
+	border-color: rgba(0, 200, 87, 0.4);
+	color: #aef0c4;
+}
+
+.memberistic-auth-notice--error {
+	background: rgba(255, 75, 31, 0.12);
+	border-color: rgba(255, 75, 31, 0.4);
+	color: #ffc7bb;
+}
+
+.memberistic-auth-back {
+	color: #b9b9b9;
+	display: inline-block;
+	font-size: 12px;
+	font-weight: 600;
+	letter-spacing: 0.04em;
+	margin-top: 12px;
+	text-align: center;
+	text-decoration: none;
+}
+
+.memberistic-auth-back:hover {
+	color: #fff;
+}
+
 /* Checkout page style aligned to Guns2Ammo UI v2 */
 .memberistic-co-shell {
 	color: #ececec;
