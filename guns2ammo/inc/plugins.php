@@ -19,8 +19,8 @@ function g2a_plugin_template_map() {
 		'page-templates/template-payment-failed.php' => 'memberistic_payment_failed',
 		'page-templates/template-staff.php'          => 'memberistic_staff_dashboard',
 		'page-templates/template-book-a-lane.php'    => 'g2a_lane_booking',
-		'page-templates/template-ccw.php'            => 'g2a_classes_booking',
-		'page-templates/template-ladies-tuesday.php' => 'g2a_ladies_tuesday_booking',
+		'page-templates/template-ccw.php'            => 'g2a_event_booking',
+		'page-templates/template-ladies-tuesday.php' => 'g2a_event_booking',
 	];
 }
 

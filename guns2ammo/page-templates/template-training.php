@@ -212,7 +212,16 @@ get_header();
       <span class="form-help">Schedule updated daily  Reservations confirmed by email</span>
     </div>
     <div>
-      <?php echo do_shortcode( '[g2a_events type="ccw" limit="12"]' ); ?>
+      <?php
+      // The current booking engine registers g2a_upcoming_events; older
+      // builds registered g2a_events. Render whichever exists instead of
+      // leaking raw shortcode text when neither is available.
+      if ( shortcode_exists( 'g2a_upcoming_events' ) ) {
+          echo do_shortcode( '[g2a_upcoming_events limit="12"]' );
+      } else {
+          echo g2a_plugin_section( 'g2a_events', ' type="ccw" limit="12"' );
+      }
+      ?>
     </div>
   </div>
 </section>

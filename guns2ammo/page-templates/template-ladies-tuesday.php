@@ -281,7 +281,7 @@ $g2a_ladies_events_shortcode = get_post_meta( $g2a_page_id, 'ladies_upcoming_eve
          no empty 00d 00h shell, no leaked shortcode text) -->
     <?php
     $g2a_lt_countdown = '';
-    if ( shortcode_exists( 'g2a_event_countdown' ) ) {
+    if ( shortcode_exists( 'g2a_event_banner' ) ) {
         $g2a_lt_countdown = trim( do_shortcode( '[g2a_event_banner style="spotlight" title="Next Ladies Tuesday"]' ) );
     }
     if ( '' !== $g2a_lt_countdown ) : ?>
@@ -395,7 +395,7 @@ $g2a_ladies_events_shortcode = get_post_meta( $g2a_page_id, 'ladies_upcoming_eve
         <p class="sub">Themed sessions and intro classes are added monthly. Standard Tuesdays are open floor &mdash; show up any time during open hours.</p>
 
         <div>
-          <?php echo do_shortcode( '[g2a_upcoming_events layout="card"]' ); ?>
+          <?php echo g2a_plugin_section( 'g2a_upcoming_events', ' layout="card"' ); ?>
         </div>
       </div>
     </section>
@@ -496,7 +496,7 @@ $g2a_ladies_events_shortcode = get_post_meta( $g2a_page_id, 'ladies_upcoming_eve
       </div>
     </section>
 
-    <?php if ( $g2a_ladies_events_shortcode ) : ?>
+    <?php if ( $g2a_ladies_events_shortcode && function_exists( 'g2a_has_booking' ) && g2a_has_booking() ) : ?>
       <section class="section g2a-plugin-host">
         <div class="container" style="max-width:1080px;">
           <?php echo do_shortcode( $g2a_ladies_events_shortcode ); ?>

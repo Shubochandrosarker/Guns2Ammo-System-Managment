@@ -403,10 +403,12 @@ get_header();
     <h2>YOUR INSTRUCTORS</h2>
     <p class="lede">Every Arizona CCW course at Guns 2 Ammo is taught by NRA-certified instructors who teach this material weekly — not occasionally. Safety-first, question-friendly, and zero ego. Students drive in from Mesa, Gilbert, Apache Junction, and across the East Valley for a reason.</p>
     <?php g2a_render_instructors(); ?>
-	  <span style="margin-top: 50px;" class="eyebrow">Upcomin Events</span>
+	  <?php if ( shortcode_exists( 'g2a_upcoming_events' ) ) : ?>
+	  <span style="margin-top: 50px;" class="eyebrow">Upcoming Events</span>
 	  <h2>Book Your Seat For Upcoming Events</h2>
 	 <p class="sub">Themed sessions and intro classes are added monthly. And Standard Tuesdays are open floor &mdash; show up any time during open hours.</p>
 	<?php echo do_shortcode( '[g2a_upcoming_events]' ); ?>
+	  <?php endif; ?>
 
   </div>
 
@@ -459,7 +461,7 @@ if ( function_exists( 'g2a_emit_jsonld' ) && function_exists( 'g2a_faq_schema' )
     <?php else : ?>
       <p class="rf-intro">Pick your course, tell us when you'd like to attend, and our team will confirm your seat by phone or email — usually within one business day. Guns 2 Ammo · 6030 E Main St #103, Mesa, AZ 85205.</p>
       <div>
-          <?php echo do_shortcode( '[g2a_event_booking]' ); ?>
+          <?php echo g2a_plugin_section( 'g2a_event_booking' ); ?>
         </div>
 	      
 
