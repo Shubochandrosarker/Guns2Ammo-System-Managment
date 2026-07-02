@@ -47,7 +47,7 @@ export default function InventoryImport() {
 
   useEffect(() => {
     get<{ adapters: Adapter[] }>('/inventory/import/adapters')
-      .then((r) => setAdapters(r?.adapters || []))
+      .then((r) => setAdapters(Array.isArray(r?.adapters) ? r.adapters : []))
       .catch((e) => setErr(errorMessage(e, 'Could not load import adapters')));
   }, []);
 

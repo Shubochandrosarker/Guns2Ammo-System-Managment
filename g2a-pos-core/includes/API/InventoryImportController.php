@@ -13,14 +13,18 @@ use WP_REST_Request;
 final class InventoryImportController {
 
 	public static function adapters( WP_REST_Request $req ) {
+		// AdapterRegistry::all() is keyed by slug; array_values() guarantees a
+		// JSON array (not an object) so the admin SPA can .map() over it.
 		return array(
-			'adapters' => array_map(
-				static fn( $a ) => array(
-					'slug'      => $a->slug(),
-					'label'     => $a->label(),
-					'signature' => $a->header_signature(),
-				),
-				AdapterRegistry::all()
+			'adapters' => array_values(
+				array_map(
+					static fn( $a ) => array(
+						'slug'      => $a->slug(),
+						'label'     => $a->label(),
+						'signature' => $a->header_signature(),
+					),
+					AdapterRegistry::all()
+				)
 			),
 		);
 	}

@@ -61,9 +61,19 @@ final class AgentService {
 		$tools    = ToolRegistry::specs();
 		$response = Gateway::chat( $messages, $tools );
 
+		// Surface a failed LLM call to the operator instead of an empty bubble:
+		// put the real reason (bad model/key/credits, see Gateway) into the
+		// assistant message and the response envelope.
+		$llm_ok  = ! empty( $response['ok'] );
+		$llm_err = $llm_ok ? null : (string) ( $response['error'] ?? 'agent_error' );
+		$content = (string) ( $response['content'] ?? '' );
+		if ( ! $llm_ok && $content === '' ) {
+			$content = '⚠️ The AI service returned an error: ' . $llm_err;
+		}
+
 		$assistant_msg    = array(
 			'role'              => 'assistant',
-			'content'           => $response['content'] ?? '',
+			'content'           => $content,
 			'tool_calls'        => $response['tool_calls'] ?? array(),
 			'citations'         => $citations,
 			'prompt_tokens'     => $response['prompt_tokens'] ?? null,
@@ -158,7 +168,9 @@ final class AgentService {
 
 		return array(
 			'message_id'      => $assistant_msg_id,
-			'content'         => $response['content'] ?? '',
+			'ok'              => $llm_ok,
+			'error'           => $llm_err,
+			'content'         => $content,
 			'tool_outcomes'   => $tool_outcomes,
 			'pending_actions' => $pending,
 			'citations'       => $citations,

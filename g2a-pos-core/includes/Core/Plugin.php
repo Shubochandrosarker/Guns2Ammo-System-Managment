@@ -223,12 +223,38 @@ final class Plugin {
 		// (guarded internally by option g2a_pos_brain_seeded_version).
 		WebsiteKnowledgeSeeder::maybe_seed();
 
+		// One-time migration: move the AI brain refresh from weekly to a nightly
+		// (daily) schedule and kick an immediate full-site crawl. Idempotent via
+		// its own option, so it also applies on a plugin-file replace where the
+		// activation hook does not run.
+		if ( get_option( 'g2a_pos_brain_cron_schedule' ) !== 'nightly-v1' ) {
+			wp_clear_scheduled_hook( WebsiteKnowledgeSeeder::CRON_HOOK );
+			wp_schedule_event( self::next_nightly_run(), 'daily', WebsiteKnowledgeSeeder::CRON_HOOK );
+			wp_schedule_single_event( time() + 2 * MINUTE_IN_SECONDS, WebsiteKnowledgeSeeder::CRON_HOOK );
+			update_option( 'g2a_pos_brain_cron_schedule', 'nightly-v1', false );
+		}
+
 		if ( get_option( 'g2a_pos_core_db_version' ) === G2A_POS_CORE_VERSION ) {
 			return;
 		}
 		Migrator::run();
 		Roles::register_roles();
 		Roles::register_caps();
+	}
+
+	/** Timestamp for the next ~3:15 AM in the site's timezone (true nightly run). */
+	private static function next_nightly_run(): int {
+		$tz = function_exists( 'wp_timezone' ) ? wp_timezone() : new \DateTimeZone( 'UTC' );
+		try {
+			$now = new \DateTimeImmutable( 'now', $tz );
+		} catch ( \Throwable $e ) {
+			return time() + 3 * HOUR_IN_SECONDS;
+		}
+		$run = $now->setTime( 3, 15 );
+		if ( $run <= $now ) {
+			$run = $run->modify( '+1 day' );
+		}
+		return $run->getTimestamp();
 	}
 
 	public static function activate(): void {
@@ -275,9 +301,11 @@ final class Plugin {
 			wp_schedule_event( time() + 2 * HOUR_IN_SECONDS, 'daily', self::WOO_CATALOG_SYNC_HOOK );
 		}
 		if ( ! wp_next_scheduled( self::BRAIN_SITE_REFRESH_HOOK ) ) {
-			// Weekly website-knowledge refresh for the AI brain.
-			wp_schedule_event( time() + 12 * HOUR_IN_SECONDS, 'weekly', self::BRAIN_SITE_REFRESH_HOOK );
+			// Nightly website-knowledge refresh (full-site crawl) for the AI brain.
+			wp_schedule_event( self::next_nightly_run(), 'daily', self::BRAIN_SITE_REFRESH_HOOK );
 		}
+		// Populate the brain shortly after install without blocking activation.
+		wp_schedule_single_event( time() + 2 * MINUTE_IN_SECONDS, self::BRAIN_SITE_REFRESH_HOOK );
 
 		WebsiteKnowledgeSeeder::maybe_seed();
 	}

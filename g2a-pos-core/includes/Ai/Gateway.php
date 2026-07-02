@@ -72,12 +72,29 @@ final class Gateway {
 				'latency_ms' => (int) ( ( microtime( true ) - $start ) * 1000 ),
 			);
 		}
-		$body   = json_decode( (string) wp_remote_retrieve_body( $res ), true ) ?: array();
+		$status  = (int) wp_remote_retrieve_response_code( $res );
+		$rawBody = (string) wp_remote_retrieve_body( $res );
+		$body    = json_decode( $rawBody, true );
+		if ( ! is_array( $body ) ) {
+			$body = array();
+		}
+		// OpenAI-compatible endpoints (OpenRouter, Ollama, vLLM, …) return the
+		// real failure reason under `error` (HTTP 4xx/5xx) — e.g. an invalid
+		// model slug, a bad/empty API key, or no credits. Surface it instead of
+		// a generic "malformed_response" so the misconfiguration is visible.
+		if ( $status >= 400 || isset( $body['error'] ) ) {
+			return array(
+				'ok'         => false,
+				'error'      => self::describe_api_error( $status, $body, $rawBody ),
+				'response'   => $body,
+				'latency_ms' => (int) ( ( microtime( true ) - $start ) * 1000 ),
+			);
+		}
 		$choice = $body['choices'][0]['message'] ?? null;
 		if ( ! $choice ) {
 			return array(
 				'ok'         => false,
-				'error'      => 'malformed_response',
+				'error'      => 'malformed_response: ' . self::snippet( $rawBody ),
 				'response'   => $body,
 				'latency_ms' => (int) ( ( microtime( true ) - $start ) * 1000 ),
 			);
@@ -124,6 +141,39 @@ final class Gateway {
 		// Ollama embeddings responses expose the vector at the top level instead.
 		$vec = $vec ?? ( $body['embedding'] ?? null );
 		return is_array( $vec ) ? $vec : null;
+	}
+
+	/**
+	 * Turn an OpenAI-compatible error envelope into a readable one-liner.
+	 *
+	 * @param array<string,mixed> $body Decoded JSON response body.
+	 */
+	private static function describe_api_error( int $status, array $body, string $rawBody ): string {
+		$err = $body['error'] ?? null;
+		if ( is_array( $err ) ) {
+			$msg  = trim( (string) ( $err['message'] ?? '' ) );
+			$code = trim( (string) ( $err['code'] ?? $err['type'] ?? '' ) );
+			$out  = 'HTTP ' . $status;
+			if ( $msg !== '' ) {
+				$out .= ': ' . $msg;
+			}
+			if ( $code !== '' ) {
+				$out .= ' [' . $code . ']';
+			}
+			return $msg === '' && $code === '' ? $out . ': ' . self::snippet( $rawBody ) : $out;
+		}
+		if ( is_string( $err ) && trim( $err ) !== '' ) {
+			return 'HTTP ' . $status . ': ' . trim( $err );
+		}
+		return 'HTTP ' . $status . ': ' . self::snippet( $rawBody );
+	}
+
+	private static function snippet( string $raw ): string {
+		$s = trim( (string) preg_replace( '/\s+/', ' ', $raw ) );
+		if ( $s === '' ) {
+			return 'empty response body';
+		}
+		return strlen( $s ) > 200 ? substr( $s, 0, 200 ) . '…' : $s;
 	}
 
 	/**
