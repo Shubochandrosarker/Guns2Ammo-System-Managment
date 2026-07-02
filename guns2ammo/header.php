@@ -6,6 +6,7 @@ if ( ! defined( 'ABSPATH' ) ) exit;
 ?><!doctype html>
 <html <?php language_attributes(); ?> class="g2a-loading">
 <head>
+	
 <meta charset="<?php bloginfo( 'charset' ); ?>">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#1A191E" id="g2a-theme-color">

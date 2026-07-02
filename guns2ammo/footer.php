@@ -123,7 +123,7 @@ $founded   = (int) $biz['founded_year'];
 				<li><a href="<?php echo esc_url( home_url( '/transfers/' ) ); ?>">Firearm Transfers</a></li>
 				<li><a href="<?php echo esc_url( home_url( '/sell-your-gun/' ) ); ?>">Sell Your Gun</a></li>
 				<li><a href="<?php echo esc_url( home_url( '/machine-gun/' ) ); ?>">Machine Gun Packages</a></li>
-				<li><a href="<?php echo esc_url( home_url( '/get-support/' ) ); ?>">Get Support</a></li>
+				<li><a href="<?php echo esc_url( home_url( '/get-live-support/' ) ); ?>">Get Live Support</a></li>
 			</ul>
 		</div>
 		<div data-reveal>

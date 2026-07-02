@@ -403,7 +403,13 @@ get_header();
     <h2>YOUR INSTRUCTORS</h2>
     <p class="lede">Every Arizona CCW course at Guns 2 Ammo is taught by NRA-certified instructors who teach this material weekly — not occasionally. Safety-first, question-friendly, and zero ego. Students drive in from Mesa, Gilbert, Apache Junction, and across the East Valley for a reason.</p>
     <?php g2a_render_instructors(); ?>
+	  <span style="margin-top: 50px;" class="eyebrow">Upcomin Events</span>
+	  <h2>Book Your Seat For Upcoming Events</h2>
+	 <p class="sub">Themed sessions and intro classes are added monthly. And Standard Tuesdays are open floor &mdash; show up any time during open hours.</p>
+	<?php echo do_shortcode( '[g2a_upcoming_events]' ); ?>
+
   </div>
+
 </section>
 <?php endif; ?>
 
@@ -452,53 +458,11 @@ if ( function_exists( 'g2a_emit_jsonld' ) && function_exists( 'g2a_faq_schema' )
       </div>
     <?php else : ?>
       <p class="rf-intro">Pick your course, tell us when you'd like to attend, and our team will confirm your seat by phone or email — usually within one business day. Guns 2 Ammo · 6030 E Main St #103, Mesa, AZ 85205.</p>
-      <form method="post" action="<?php echo esc_url( g2a_form_action_url() ); ?>">
-        <input type="hidden" name="action" value="g2a_reservation">
-        <input type="hidden" name="g2a_subject" id="ccw-subject" value="Arizona CCW Class Reservation">
-        <?php wp_nonce_field( 'g2a_reservation', 'g2a_nonce' ); ?>
-        <div class="rf-hp" aria-hidden="true"><label>Leave this empty<input type="text" name="g2a_hp" tabindex="-1" autocomplete="off"></label></div>
-        <div class="rf-grid">
-          <div>
-            <label class="form-label" for="ccw-name">Full Name</label>
-            <input class="field" id="ccw-name" name="g2a_name" required placeholder="Joseph Hartwell">
-          </div>
-          <div>
-            <label class="form-label" for="ccw-email">Email Address</label>
-            <input class="field" id="ccw-email" name="g2a_email" type="email" required placeholder="you@example.com">
-          </div>
-          <div>
-            <label class="form-label" for="ccw-phone">Phone Number</label>
-            <input class="field" id="ccw-phone" name="g2a_phone" required placeholder="(480) 555-0199">
-          </div>
-          <div>
-            <label class="form-label" for="ccw-course">Preferred Course</label>
-            <select class="field" id="ccw-course" name="g2a_course">
-              <option value="Classroom $85">AZ CCW — Classroom · $85 · Saturdays 11:30 AM</option>
-              <option value="Live Fire $149.99">AZ CCW + Live Fire · $149.99 · Monday Evenings</option>
-            </select>
-          </div>
-          <div>
-            <label class="form-label" for="ccw-date">Preferred Date</label>
-            <input class="field" id="ccw-date" name="g2a_date" type="date">
-          </div>
-          <div class="rf-full">
-            <label class="form-label" for="ccw-notes">Anything We Should Know?</label>
-            <textarea class="field" id="ccw-notes" name="g2a_notes" rows="3" placeholder="Questions, group bookings, rental needs, or who you're reserving for."></textarea>
-          </div>
+      <div>
+          <?php echo do_shortcode( '[g2a_event_booking]' ); ?>
         </div>
-        <div style="margin-top:22px; display:flex; gap:12px; align-items:center; flex-wrap:wrap;">
-          <button type="submit" class="btn btn-ember btn-arrow">Request My CCW Reservation</button>
-          <span class="form-help">No charge until confirmed · Free cancellation</span>
-        </div>
-      </form>
-      <script>
-      (function () {
-        var sel = document.getElementById('ccw-course'), sub = document.getElementById('ccw-subject');
-        if (!sel || !sub) return;
-        var sync = function () { sub.value = 'Arizona CCW Class Reservation — ' + sel.value; };
-        sel.addEventListener('change', sync); sync();
-      })();
-      </script>
+	      
+
     <?php endif; ?>
   </div>
 </section>
