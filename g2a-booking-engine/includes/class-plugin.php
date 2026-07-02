@@ -31,6 +31,27 @@ final class G2AB_Plugin
 		add_filter('cron_schedules', array($this, 'register_cron_intervals'));
 
 		add_action('g2ab_cleanup_expired_reservations', array($this, 'run_booking_expiry_cron'));
+
+		// Lightweight nonce refresh over admin-ajax. A logged-in member whose page
+		// was served from cache carries a stale wp_rest nonce; WP core then rejects
+		// their booking POST with "Cookie check failed" (rest_cookie_invalid_nonce).
+		// REST can't hand them a fresh nonce — a nonceless cookie-authenticated REST
+		// call hits the very same gate. admin-ajax runs in their authenticated
+		// context with no REST nonce gate, so it can mint a valid nonce to retry.
+		// Registered here (not in the frontend class) because is_admin() is true
+		// during admin-ajax, so the frontend singleton never boots for these calls.
+		add_action('wp_ajax_g2ab_refresh_nonce', array($this, 'ajax_refresh_nonce'));
+		add_action('wp_ajax_nopriv_g2ab_refresh_nonce', array($this, 'ajax_refresh_nonce'));
+	}
+
+	/**
+	 * Return a fresh wp_rest nonce for the current (cookie-authenticated) user.
+	 * Always uncached so a stale page cache can self-heal before retrying a booking.
+	 */
+	public function ajax_refresh_nonce()
+	{
+		nocache_headers();
+		wp_send_json(array('success' => true, 'data' => array('nonce' => wp_create_nonce('wp_rest'))));
 	}
 
 	public function __clone()
@@ -58,22 +79,10 @@ final class G2AB_Plugin
 	public function maybe_upgrade()
 	{
 		$current = get_option('g2ab_db_version', '0.0.0');
-		// Forward upgrade: run the normal installer + migrations.
 		if (version_compare($current, G2AB_DB_VERSION, '<')) {
 			$this->get_installer()->install();
 			update_option('g2ab_db_version', G2AB_DB_VERSION);
 			do_action('g2ab_after_db_upgrade', $current, G2AB_DB_VERSION);
-			return;
-		}
-		// Reconciliation: when a previous staging deploy bumped the option
-		// past the code's version, normalize it down so the Build Status
-		// panel shows what's actually shipping. The column-existence
-		// migration (slot_key) still runs every install regardless, so
-		// no schema work is skipped.
-		if (version_compare($current, G2AB_DB_VERSION, '>')) {
-			update_option('g2ab_db_version', G2AB_DB_VERSION);
-			$this->get_installer()->install(); // ensure slot_key / engines / etc.
-			do_action('g2ab_after_db_normalize', $current, G2AB_DB_VERSION);
 		}
 	}
 
@@ -93,10 +102,6 @@ final class G2AB_Plugin
 			if (class_exists('G2AB_Addon_Manager')) G2AB_Addon_Manager::instance();
 			if (class_exists('G2AB_Module_Loader')) G2AB_Module_Loader::instance();
 
-			// Events — custom post type + admin tab + banner-view shortcodes.
-			// Registered in admin and on the front end (the CPT must exist in both).
-			if (class_exists('G2AB_Events')) G2AB_Events::instance();
-
 			if (is_admin() && class_exists('G2AB_Admin')) {
 				G2AB_Admin::instance();
 				if (class_exists('G2AB_Admin_Dashboard'))          G2AB_Admin_Dashboard::instance();
@@ -110,21 +115,22 @@ final class G2AB_Plugin
 				if (class_exists('G2AB_Admin_Settings_Pro'))       G2AB_Admin_Settings_Pro::instance();
 				if (class_exists('G2AB_Admin_Manual_Booking'))     G2AB_Admin_Manual_Booking::instance();
 				if (class_exists('G2AB_Admin_Calendar'))           G2AB_Admin_Calendar::instance();
+				if (class_exists('G2AB_Admin_Frontdesk'))          G2AB_Admin_Frontdesk::instance();
+				if (class_exists('G2AB_Admin_Events'))             G2AB_Admin_Events::instance();
 				if (class_exists('G2AB_Admin_Shortcodes'))         G2AB_Admin_Shortcodes::instance();
-				// Front Desk admin page is intentionally not loaded — the
-				// Memberistic Staff Dashboard (/staff/) is the front desk for
-				// Guns 2 Ammo, so this duplicate screen is left disabled.
-				// if (class_exists('G2AB_Admin_Frontdesk'))       G2AB_Admin_Frontdesk::instance();
+				if (class_exists('G2AB_Admin_Range_Status'))       G2AB_Admin_Range_Status::instance();
+				if (class_exists('G2AB_Admin_Shooters'))           G2AB_Admin_Shooters::instance();
 			}
 
 			if (! is_admin() && class_exists('G2AB_Frontend')) {
 				G2AB_Frontend::instance();
 				if (class_exists('G2AB_Frontend_Shortcode_Events'))     G2AB_Frontend_Shortcode_Events::instance();
 				if (class_exists('G2AB_Frontend_Shortcode_Banner'))     G2AB_Frontend_Shortcode_Banner::instance();
+				if (class_exists('G2AB_Frontend_Shortcode_Event_Booking')) G2AB_Frontend_Shortcode_Event_Booking::instance();
+				if (class_exists('G2AB_Frontend_Shortcode_Events_Calendar')) G2AB_Frontend_Shortcode_Events_Calendar::instance();
+				if (class_exists('G2AB_Frontend_Self_Checkin'))         G2AB_Frontend_Self_Checkin::instance();
 				if (class_exists('G2AB_Frontend_Shortcode_Reschedule')) G2AB_Frontend_Shortcode_Reschedule::instance();
 				if (class_exists('G2AB_Frontend_Shortcode_Frontdesk'))  G2AB_Frontend_Shortcode_Frontdesk::instance();
-				if (class_exists('G2AB_Frontend_Shortcode_Staff_Console')) G2AB_Frontend_Shortcode_Staff_Console::instance();
-				if (class_exists('G2AB_Frontend_Shortcode_Member_Checkin')) G2AB_Frontend_Shortcode_Member_Checkin::instance();
 			}
 
 			if (class_exists('G2AB_Gateway_Manager')) G2AB_Gateway_Manager::instance();
@@ -139,7 +145,6 @@ final class G2AB_Plugin
 			}
 
 			do_action('g2ab_after_init', $this);
-			$this->maybe_sync_client_defaults_runtime();
 
 			if ($safe_mode) update_option('g2ab_safe_mode', 0);
 		} catch (\Throwable $e) {
@@ -151,18 +156,6 @@ final class G2AB_Plugin
 				'line'    => $e->getLine(),
 				'time'    => current_time('mysql'),
 			));
-		}
-	}
-
-	private function maybe_sync_client_defaults_runtime() {
-		$last_sync = (int) get_option( 'g2ab_client_defaults_last_sync', 0 );
-		$now       = time();
-		if ( $last_sync > 0 && ( $now - $last_sync ) < DAY_IN_SECONDS ) {
-			return;
-		}
-		if ( class_exists( 'G2AB_Activator' ) && is_callable( array( 'G2AB_Activator', 'sync_client_defaults' ) ) ) {
-			G2AB_Activator::sync_client_defaults();
-			update_option( 'g2ab_client_defaults_last_sync', $now );
 		}
 	}
 
@@ -178,8 +171,8 @@ final class G2AB_Plugin
 			'G2AB_REST_Admin_Bookings_Controller',
 			'G2AB_REST_Calendar_Controller',
 			'G2AB_REST_Frontdesk_Controller',
-			'G2AB_REST_Staff_Controller',
-			'G2AB_REST_Checkin_Controller',
+			'G2AB_REST_Range_Controller',
+			'G2AB_REST_Shooters_Controller',
 		);
 		foreach ($controllers as $c) {
 			if (class_exists($c)) {

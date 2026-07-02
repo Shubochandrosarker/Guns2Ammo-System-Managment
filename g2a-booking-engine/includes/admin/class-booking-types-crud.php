@@ -147,7 +147,6 @@ final class G2AB_Admin_Booking_Types_Crud {
 		if ( 'edit' === $action && ! $row ) { echo '<div class="wrap"><h1>Booking type not found</h1></div>'; return; }
 		$is_edit = (bool) $row;
 		$current_modes = $row ? array_filter( array_map( 'trim', explode( ',', (string) $row->payment_modes ) ) ) : array( 'full', 'in_store' );
-		$current_settings = $row ? ( json_decode( (string) $row->settings, true ) ?: array() ) : array();
 
 		// Forms dropdown.
 		$forms_table = $wpdb->prefix . 'g2ab_forms';
@@ -180,42 +179,6 @@ final class G2AB_Admin_Booking_Types_Crud {
 						<div class="g2ab-bt__field"><label><?php esc_html_e( 'Duration (minutes)', 'g2a-booking' ); ?> <span class="req">*</span></label><input type="number" name="duration_min" required min="5" max="1440" value="<?php echo esc_attr( $row->duration_min ?? 60 ); ?>" /></div>
 						<div class="g2ab-bt__field"><label><?php esc_html_e( 'Buffer Before (min)', 'g2a-booking' ); ?></label><input type="number" name="buffer_before" min="0" max="120" value="<?php echo esc_attr( $row->buffer_before ?? 0 ); ?>" /><small><?php esc_html_e( 'Time blocked before each booking starts.', 'g2a-booking' ); ?></small></div>
 						<div class="g2ab-bt__field"><label><?php esc_html_e( 'Buffer After (min)', 'g2a-booking' ); ?></label><input type="number" name="buffer_after" min="0" max="120" value="<?php echo esc_attr( $row->buffer_after ?? 10 ); ?>" /><small><?php esc_html_e( 'Time blocked after each booking ends.', 'g2a-booking' ); ?></small></div>
-					</div>
-
-					<div class="g2ab-bt__panel">
-						<h3><?php esc_html_e( 'CLASS / CCW SETUP', 'g2a-booking' ); ?></h3>
-						<p class="g2ab-bt__desc"><?php esc_html_e( 'Used for classes/events. Lane bookings can ignore these fields.', 'g2a-booking' ); ?></p>
-						<div class="g2ab-bt__field">
-							<label><?php esc_html_e( 'Instructor Name', 'g2a-booking' ); ?></label>
-							<input type="text" name="settings[event_instructor]" value="<?php echo esc_attr( $current_settings['event_instructor'] ?? '' ); ?>" placeholder="<?php esc_attr_e( 'e.g. Range Master John', 'g2a-booking' ); ?>" />
-						</div>
-						<div class="g2ab-bt__field">
-							<label><?php esc_html_e( 'Total Seats', 'g2a-booking' ); ?></label>
-							<input type="number" name="settings[event_total_seats]" min="1" max="200" value="<?php echo esc_attr( (int) ( $current_settings['event_total_seats'] ?? 12 ) ); ?>" />
-							<small><?php esc_html_e( 'Overrides classroom capacity for this booking type.', 'g2a-booking' ); ?></small>
-						</div>
-						<div class="g2ab-bt__field"><label><?php esc_html_e( 'Event Start Time', 'g2a-booking' ); ?></label><input type="time" name="settings[event_start_time]" value="<?php echo esc_attr( $current_settings['event_start_time'] ?? '' ); ?>" /></div>
-						<div class="g2ab-bt__field"><label><?php esc_html_e( 'Event End Time', 'g2a-booking' ); ?></label><input type="time" name="settings[event_end_time]" value="<?php echo esc_attr( $current_settings['event_end_time'] ?? '' ); ?>" /></div>
-						<div class="g2ab-bt__field">
-							<label><?php esc_html_e( 'Allowed Weekdays', 'g2a-booking' ); ?></label>
-							<div class="g2ab-bt__check-grid">
-								<?php
-								$days = array(
-									'0' => __( 'Sun', 'g2a-booking' ),
-									'1' => __( 'Mon', 'g2a-booking' ),
-									'2' => __( 'Tue', 'g2a-booking' ),
-									'3' => __( 'Wed', 'g2a-booking' ),
-									'4' => __( 'Thu', 'g2a-booking' ),
-									'5' => __( 'Fri', 'g2a-booking' ),
-									'6' => __( 'Sat', 'g2a-booking' ),
-								);
-								$selected_days = isset( $current_settings['event_weekdays'] ) && is_array( $current_settings['event_weekdays'] ) ? array_map( 'strval', $current_settings['event_weekdays'] ) : array( '2', '6' );
-								foreach ( $days as $day_key => $day_label ) :
-								?>
-									<label class="g2ab-bt__check"><input type="checkbox" name="settings[event_weekdays][]" value="<?php echo esc_attr( $day_key ); ?>" <?php checked( in_array( (string) $day_key, $selected_days, true ) ); ?> /> <?php echo esc_html( $day_label ); ?></label>
-								<?php endforeach; ?>
-							</div>
-						</div>
 					</div>
 
 					<div class="g2ab-bt__panel">
@@ -270,6 +233,7 @@ final class G2AB_Admin_Booking_Types_Crud {
 					<?php endif; ?>
 						<div class="g2ab-bt__field"><label><?php esc_html_e( 'SEO Landing Template', 'g2a-booking' ); ?></label>
 							<?php
+							$current_settings = $row ? ( json_decode( (string) $row->settings, true ) ?: array() ) : array();
 							$current_tpl = $current_settings['landing_template'] ?? '';
 							$tpl_list = class_exists( 'G2AB_Seo' ) ? G2AB_Seo::TEMPLATES : array();
 							?>
@@ -329,22 +293,8 @@ final class G2AB_Admin_Booking_Types_Crud {
 
 		$now = current_time( 'mysql' );
 		$settings_in = isset( $_POST['settings'] ) && is_array( $_POST['settings'] ) ? wp_unslash( $_POST['settings'] ) : array();
-		$settings_days = array();
-		if ( isset( $settings_in['event_weekdays'] ) && is_array( $settings_in['event_weekdays'] ) ) {
-			foreach ( $settings_in['event_weekdays'] as $day ) {
-				$day_int = (int) $day;
-				if ( $day_int >= 0 && $day_int <= 6 ) {
-					$settings_days[] = $day_int;
-				}
-			}
-		}
 		$settings = array(
 			'landing_template' => isset( $settings_in['landing_template'] ) ? sanitize_key( $settings_in['landing_template'] ) : '',
-			'event_instructor' => isset( $settings_in['event_instructor'] ) ? sanitize_text_field( $settings_in['event_instructor'] ) : '',
-			'event_total_seats' => isset( $settings_in['event_total_seats'] ) ? max( 1, min( 200, absint( $settings_in['event_total_seats'] ) ) ) : 12,
-			'event_start_time' => isset( $settings_in['event_start_time'] ) ? sanitize_text_field( $settings_in['event_start_time'] ) : '',
-			'event_end_time' => isset( $settings_in['event_end_time'] ) ? sanitize_text_field( $settings_in['event_end_time'] ) : '',
-			'event_weekdays' => array_values( array_unique( $settings_days ) ),
 		);
 		$data = array(
 			'name' => $name, 'slug' => $slug, 'category' => $cat,
@@ -456,7 +406,7 @@ final class G2AB_Admin_Booking_Types_Crud {
 .g2ab-bt{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;}
 .g2ab-bt__header{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:20px;background:linear-gradient(135deg,#0F1115 0%,#1A1F26 100%);color:#E8E8E8;padding:24px 28px;margin:20px 0 0;border-left:4px solid #D2691E;position:relative;overflow:hidden;}
 .g2ab-bt__header::before{content:"";position:absolute;inset:0;background-image:repeating-linear-gradient(45deg,rgba(74,93,58,.05) 0,rgba(74,93,58,.05) 2px,transparent 2px,transparent 8px);pointer-events:none;}
-.g2ab-bt__stencil{font-family:"Rajdhani","Oswald",Impact,sans-serif;font-size:30px;font-weight:700;letter-spacing:.12em;color:#fff;text-shadow:2px 2px 0 #4A5D3A;}
+.g2ab-bt__stencil{font-family:"Inter","Segoe UI",system-ui,-apple-system,sans-serif;font-size:30px;font-weight:700;letter-spacing:.04em;color:#fff;}
 .g2ab-bt__sub{margin:4px 0 0;color:#8A95A5;font-size:13px;text-transform:uppercase;letter-spacing:.08em;}
 .g2ab-bt__tabs{background:#fff;border:1px solid #d0d4d9;border-top:none;display:flex;flex-wrap:wrap;}
 .g2ab-bt__tabs a{padding:14px 20px;text-decoration:none;color:#3c434a;font-size:12px;font-weight:700;letter-spacing:.08em;border-right:1px solid #f0f1f3;display:inline-flex;align-items:center;gap:6px;}
@@ -481,7 +431,7 @@ final class G2AB_Admin_Booking_Types_Crud {
 .g2ab-bt__card-title{font-size:18px;margin:0 0 4px;color:#0F1115;}
 .g2ab-bt__card-slug{margin-bottom:10px;font-size:11px;color:#8A95A5;}
 .g2ab-bt__card-slug code{background:#f0f1f3;padding:2px 6px;border-radius:2px;color:#3c434a;}
-.g2ab-bt__card-price{font-family:"Rajdhani",sans-serif;font-size:32px;font-weight:700;color:#D2691E;margin-bottom:12px;line-height:1;}
+.g2ab-bt__card-price{font-family:"Inter","Segoe UI",system-ui,-apple-system,sans-serif;font-size:32px;font-weight:700;color:#D2691E;margin-bottom:12px;line-height:1;}
 .g2ab-bt__card-price small{font-size:13px;color:#8A95A5;font-weight:600;margin-left:4px;}
 .g2ab-bt__card-specs{margin:0 0 12px;display:grid;grid-template-columns:90px 1fr;gap:5px 12px;font-size:12px;}
 .g2ab-bt__card-specs dt{color:#8A95A5;text-transform:uppercase;font-size:10px;letter-spacing:.04em;align-self:center;}
@@ -501,7 +451,7 @@ final class G2AB_Admin_Booking_Types_Crud {
 .g2ab-bt__form{background:#fff;border:1px solid #d0d4d9;border-top:none;}
 .g2ab-bt__form-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:0;}
 .g2ab-bt__panel{padding:24px 28px;border-right:1px solid #f0f1f3;border-bottom:1px solid #f0f1f3;}
-.g2ab-bt__panel h3{font-family:"Rajdhani",sans-serif;font-size:13px;letter-spacing:.12em;color:#D2691E;margin:0 0 16px;font-weight:700;}
+.g2ab-bt__panel h3{font-family:"Inter","Segoe UI",system-ui,-apple-system,sans-serif;font-size:13px;letter-spacing:.12em;color:#D2691E;margin:0 0 16px;font-weight:700;}
 .g2ab-bt__desc{color:#8A95A5;font-size:12px;margin:0 0 12px;}
 .g2ab-bt__field{margin-bottom:16px;}
 .g2ab-bt__field label{display:block;font-size:11px;font-weight:700;letter-spacing:.06em;color:#3c434a;text-transform:uppercase;margin-bottom:6px;}

@@ -110,6 +110,11 @@ final class G2AB_Module_PMPro_Memberships {
 	}
 
 	public function filter_user_is_member( $allowed, $user_id, $booking_type ) {
+		// Membership filters are additive: if another provider already granted
+		// access, never revoke it here.
+		if ( $allowed ) {
+			return $allowed;
+		}
 		if ( ! $this->is_enabled() || ! $this->pmpro_active() || ! $user_id ) {
 			return $allowed;
 		}

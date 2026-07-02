@@ -273,7 +273,7 @@ final class G2AB_Admin_Resources_Crud {
 .g2ab-rs{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;}
 .g2ab-rs__header{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:20px;background:linear-gradient(135deg,#0F1115 0%,#1A1F26 100%);color:#E8E8E8;padding:24px 28px;margin:20px 0 0;border-left:4px solid #D2691E;position:relative;overflow:hidden;}
 .g2ab-rs__header::before{content:"";position:absolute;inset:0;background-image:repeating-linear-gradient(45deg,rgba(74,93,58,.05) 0,rgba(74,93,58,.05) 2px,transparent 2px,transparent 8px);pointer-events:none;}
-.g2ab-rs__stencil{font-family:"Rajdhani","Oswald",Impact,sans-serif;font-size:30px;font-weight:700;letter-spacing:.12em;color:#fff;text-shadow:2px 2px 0 #4A5D3A;}
+.g2ab-rs__stencil{font-family:"Inter","Segoe UI",system-ui,-apple-system,sans-serif;font-size:30px;font-weight:700;letter-spacing:.04em;color:#fff;}
 .g2ab-rs__sub{margin:4px 0 0;color:#8A95A5;font-size:13px;text-transform:uppercase;letter-spacing:.08em;}
 .g2ab-rs__tabs{background:#fff;border:1px solid #d0d4d9;border-top:none;display:flex;flex-wrap:wrap;}
 .g2ab-rs__tabs a{padding:14px 20px;text-decoration:none;color:#3c434a;font-size:12px;font-weight:700;letter-spacing:.08em;border-right:1px solid #f0f1f3;display:inline-flex;align-items:center;gap:6px;}
@@ -314,7 +314,7 @@ final class G2AB_Admin_Resources_Crud {
 .g2ab-rs__form{background:#fff;border:1px solid #d0d4d9;border-top:none;}
 .g2ab-rs__form-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:0;}
 .g2ab-rs__panel{padding:24px 28px;border-right:1px solid #f0f1f3;border-bottom:1px solid #f0f1f3;}
-.g2ab-rs__panel h3{font-family:"Rajdhani",sans-serif;font-size:13px;letter-spacing:.12em;color:#D2691E;margin:0 0 16px;font-weight:700;}
+.g2ab-rs__panel h3{font-family:"Inter","Segoe UI",system-ui,-apple-system,sans-serif;font-size:13px;letter-spacing:.12em;color:#D2691E;margin:0 0 16px;font-weight:700;}
 .g2ab-rs__field{margin-bottom:16px;}
 .g2ab-rs__field label{display:block;font-size:11px;font-weight:700;letter-spacing:.06em;color:#3c434a;text-transform:uppercase;margin-bottom:6px;}
 .g2ab-rs__field label .req{color:#C62828;}

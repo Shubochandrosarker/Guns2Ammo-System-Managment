@@ -9,7 +9,7 @@
  * Merge tags supported in subject + body:
  *   {customer_name}, {customer_email}, {customer_phone},
  *   {booking_id}, {uuid}, {resource_name}, {start_at}, {end_at},
- *   {duration}, {party_size}, {amount}, {amount_formatted}, {currency},
+ *   {duration}, {party_size}, {amount}, {currency},
  *   {business_name}, {business_phone}, {business_address},
  *   {invoice_url}, {pay_url}, {cancel_url},
  *   {site_url}, {date_now}, {brand_color}, {brand_logo_url}
@@ -35,27 +35,6 @@ class G2AB_Email_Engine {
 	 * + admin per template config.
 	 */
 	public function send_event( $event, $booking, $context = array() ) {
-		if ( self::is_disabled() ) {
-			do_action( 'g2ab_email_suppressed', $event, $booking, 'kill_switch' );
-			return false;
-		}
-
-		// Per-(booking, event) dedup. Without this, fast-fire chains
-		// like booking_created -> booking_confirmed -> booking_paid
-		// happening inside a single request can send a customer 3
-		// emails in 2 seconds (audit C33). Skipping a duplicate
-		// event for the same booking_id within 5 minutes is safe;
-		// the fast-fire case is always within a single request flow.
-		$booking_id = is_object( $booking ) ? (int) ( $booking->id ?? 0 ) : 0;
-		if ( $booking_id > 0 ) {
-			$dedup_key = 'g2ab_evt_' . md5( $event . '|' . $booking_id );
-			if ( false !== get_transient( $dedup_key ) ) {
-				do_action( 'g2ab_email_suppressed', $event, $booking, 'duplicate_event' );
-				return false;
-			}
-			set_transient( $dedup_key, 1, 5 * MINUTE_IN_SECONDS );
-		}
-
 		$tpl = $this->get_template( $event );
 		if ( empty( $tpl ) || empty( $tpl['enabled'] ) ) return false;
 
@@ -72,49 +51,21 @@ class G2AB_Email_Engine {
 		$attachments = apply_filters( 'g2ab_email_attachments', array(), $event, $booking, $context );
 
 		$results = array();
-		$override = self::recipient_override();
 
 		// Customer.
 		if ( ! empty( $tpl['recipient_customer'] ) && ! empty( $tags['customer_email'] ) ) {
-			$to = $override ? $override : $tags['customer_email'];
-			$customer_subject = $override ? '[REROUTED -> ' . $tags['customer_email'] . '] ' . $subject : $subject;
-			$results['customer'] = wp_mail( $to, $customer_subject, $body, $headers, $attachments );
+			$results['customer'] = wp_mail( $tags['customer_email'], $subject, $body, $headers, $attachments );
 		}
 
 		// Admin.
 		if ( ! empty( $tpl['recipient_admin'] ) ) {
-			$admin_email = $override ? $override : get_option( self::OPTION_ADMIN_TO, get_option( 'admin_email' ) );
+			$admin_email = get_option( self::OPTION_ADMIN_TO, get_option( 'admin_email' ) );
 			$admin_subject = '[Admin] ' . $subject;
 			$results['admin'] = wp_mail( $admin_email, $admin_subject, $body, $headers, $attachments );
 		}
 
 		do_action( 'g2ab_email_sent', $event, $booking, $tpl, $results );
 		return $results;
-	}
-
-	/**
-	 * Global kill-switch. Set the G2AB_EMAIL_DISABLED constant in
-	 * wp-config.php (recommended for staging/dev) or toggle the
-	 * g2ab_emails_disabled option from the admin to suppress all outbound
-	 * booking emails without changing template config.
-	 */
-	public static function is_disabled() {
-		if ( defined( 'G2AB_EMAIL_DISABLED' ) && G2AB_EMAIL_DISABLED ) {
-			return true;
-		}
-		return (bool) get_option( 'g2ab_emails_disabled', false );
-	}
-
-	/**
-	 * Optional staging override that reroutes every outbound recipient
-	 * to a single staff inbox. The original recipient is preserved in the
-	 * subject line so the staging mailbox stays auditable.
-	 */
-	public static function recipient_override() {
-		$value = defined( 'G2AB_EMAIL_OVERRIDE_RECIPIENT' )
-			? G2AB_EMAIL_OVERRIDE_RECIPIENT
-			: (string) get_option( 'g2ab_email_override_recipient', '' );
-		return ( $value && is_email( $value ) ) ? $value : '';
 	}
 
 	/**
@@ -127,38 +78,6 @@ class G2AB_Email_Engine {
 		}
 		$defaults = $this->default_templates();
 		return isset( $defaults[ $event ] ) ? $defaults[ $event ] : null;
-	}
-
-	/**
-	 * Seed the saved-template store with ENABLED defaults for the four
-	 * critical lifecycle events (created / confirmed / paid / cancelled)
-	 * when the store has never been populated. Runs once (guarded by the
-	 * g2ab_email_templates_seeded flag) so confirmation emails work out
-	 * of the box on a fresh install or after an upgrade, and the
-	 * templates are visible + editable in Settings → Email Automation.
-	 *
-	 * Existing saved templates are never overwritten.
-	 */
-	public static function maybe_seed_default_templates() {
-		if ( get_option( 'g2ab_email_templates_seeded' ) ) {
-			return;
-		}
-		$saved = get_option( self::OPTION_TEMPLATES, array() );
-		if ( ! is_array( $saved ) ) {
-			$saved = array();
-		}
-		$engine   = new self();
-		$defaults = $engine->default_templates();
-		foreach ( array( 'booking_created', 'booking_confirmed', 'booking_paid', 'booking_cancelled' ) as $event ) {
-			if ( isset( $saved[ $event ] ) || ! isset( $defaults[ $event ] ) ) {
-				continue;
-			}
-			$tpl            = $defaults[ $event ];
-			$tpl['enabled'] = 1;
-			$saved[ $event ] = $tpl;
-		}
-		update_option( self::OPTION_TEMPLATES, $saved );
-		update_option( 'g2ab_email_templates_seeded', 1 );
 	}
 
 	/**
@@ -180,15 +99,6 @@ class G2AB_Email_Engine {
 	 * Send a custom email (used by reminder cron + AI auto-reply).
 	 */
 	public function send_custom( $to, $subject, $body, $attachments = array() ) {
-		if ( self::is_disabled() ) {
-			do_action( 'g2ab_email_suppressed', 'custom', $to, 'kill_switch' );
-			return false;
-		}
-		$override = self::recipient_override();
-		if ( $override ) {
-			$subject = '[REROUTED -> ' . $to . '] ' . $subject;
-			$to      = $override;
-		}
 		$body = $this->wrap_html( $body, $subject );
 		$headers = array(
 			'Content-Type: text/html; charset=UTF-8',
@@ -199,23 +109,11 @@ class G2AB_Email_Engine {
 
 	/**
 	 * Merge {tags} into a string.
-	 *
-	 * SECURITY: substitution values are HTML-escaped. Pass an array of
-	 * tag names through $raw_tags to allow markup (e.g. {body_html}).
-	 * URL-shaped tag names ending in `_url`/`_link` get esc_url().
 	 */
-	public function merge( $template, $tags, $raw_tags = array() ) {
+	public function merge( $template, $tags ) {
 		$out = $template;
 		foreach ( $tags as $k => $v ) {
-			$val = (string) $v;
-			if ( in_array( $k, (array) $raw_tags, true ) ) {
-				$escaped = $val;
-			} elseif ( preg_match( '/(_url|_link)$/', $k ) ) {
-				$escaped = esc_url( $val );
-			} else {
-				$escaped = esc_html( $val );
-			}
-			$out = str_replace( '{' . $k . '}', $escaped, $out );
+			$out = str_replace( '{' . $k . '}', (string) $v, $out );
 		}
 		return $out;
 	}
@@ -234,43 +132,22 @@ class G2AB_Email_Engine {
 		$brand_logo  = get_option( self::OPTION_LOGO_URL, '' );
 
 		$uuid = isset( $booking['uuid'] ) ? $booking['uuid'] : '';
-		$invoice_url = '';
-		if ( $uuid ) {
-			$invoice_args = array( 'g2ab_invoice' => $uuid );
-			if ( function_exists( 'g2ab_invoice_sign_token' ) ) {
-				$invoice_args['t'] = g2ab_invoice_sign_token( $uuid );
-			}
-			$invoice_url = add_query_arg( $invoice_args, $site_url );
-		}
+		$invoice_url = $uuid ? add_query_arg( 'g2ab_invoice', $uuid, $site_url ) : '';
 		$pay_url     = isset( $context['pay_url'] ) ? $context['pay_url'] : '';
 		$cancel_url  = $uuid ? add_query_arg( array( 'g2ab_cancel' => $uuid ), $site_url ) : '';
 
-		// Prefer the dedicated bookings columns (customer_name/email/phone) and
-		// fall back to the JSON form payload. The earlier code only read a
-		// non-existent `fields` key, so every {customer_name}/{customer_phone}
-		// merge tag rendered blank (name fell through to "Guest"). This mirrors
-		// G2AB_Module_PDF_Invoices::resolve_booking(), which reads the columns
-		// first. `form_data` is the real column name; `fields` is kept in the
-		// fallback chain for any caller that still passes a pre-shaped array.
-		$customer_name  = isset( $booking['customer_name'] ) ? (string) $booking['customer_name'] : '';
-		$customer_email = isset( $booking['customer_email'] ) ? (string) $booking['customer_email'] : '';
-		$customer_phone = isset( $booking['customer_phone'] ) ? (string) $booking['customer_phone'] : '';
-
-		$raw_fields = $booking['form_data'] ?? ( $booking['fields'] ?? '' );
-		if ( ( '' === $customer_name || '' === $customer_email || '' === $customer_phone ) && ! empty( $raw_fields ) ) {
-			$fields = is_string( $raw_fields ) ? json_decode( $raw_fields, true ) : $raw_fields;
+		$customer_name  = '';
+		$customer_email = '';
+		$customer_phone = '';
+		if ( ! empty( $booking['fields'] ) ) {
+			$fields = is_string( $booking['fields'] ) ? json_decode( $booking['fields'], true ) : $booking['fields'];
 			if ( is_array( $fields ) ) {
-				if ( '' === $customer_name ) {
-					$customer_name = $fields['name'] ?? trim( ( $fields['first_name'] ?? '' ) . ' ' . ( $fields['last_name'] ?? '' ) );
-				}
-				if ( '' === $customer_email ) {
-					$customer_email = $fields['email'] ?? '';
-				}
-				if ( '' === $customer_phone ) {
-					$customer_phone = $fields['phone'] ?? '';
-				}
+				$customer_name  = $fields['name'] ?? trim( ( $fields['first_name'] ?? '' ) . ' ' . ( $fields['last_name'] ?? '' ) );
+				$customer_email = $fields['email'] ?? '';
+				$customer_phone = $fields['phone'] ?? '';
 			}
 		}
+		if ( empty( $customer_email ) && ! empty( $booking['customer_email'] ) ) $customer_email = $booking['customer_email'];
 
 		return array(
 			'customer_name'    => $customer_name ?: 'Guest',
@@ -284,7 +161,6 @@ class G2AB_Email_Engine {
 			'duration'         => isset( $booking['duration_min'] ) ? (int) $booking['duration_min'] : 60,
 			'party_size'       => isset( $booking['party_size'] ) ? (int) $booking['party_size'] : 1,
 			'amount'           => isset( $booking['amount'] ) ? number_format( (float) $booking['amount'], 2 ) : '0.00',
-			'amount_formatted' => $this->format_money( isset( $booking['amount'] ) ? $booking['amount'] : 0 ),
 			'currency'         => get_option( 'g2ab_currency', 'USD' ),
 			'business_name'    => $biz_name,
 			'business_phone'   => $biz_phone,
@@ -297,24 +173,6 @@ class G2AB_Email_Engine {
 			'brand_color'      => $brand_color,
 			'brand_logo_url'   => $brand_logo,
 		);
-	}
-
-	/**
-	 * Format a monetary amount using the configured g2ab_currency symbol.
-	 * Falls back to the raw amount when no symbol is mapped.
-	 */
-	private function format_money( $amount ) {
-		$currency = get_option( 'g2ab_currency', 'USD' );
-		$symbols = array(
-			'USD' => '$',
-			'CAD' => 'CA$',
-			'GBP' => '£',
-			'EUR' => '€',
-			'AUD' => 'A$',
-			'NZD' => 'NZ$',
-		);
-		$sym = isset( $symbols[ $currency ] ) ? $symbols[ $currency ] : '';
-		return $sym . number_format( (float) $amount, 2 );
 	}
 
 	private function format_dt( $iso ) {
@@ -340,7 +198,7 @@ class G2AB_Email_Engine {
 
 		$logo_html = $logo
 			? sprintf( '<img src="%s" alt="%s" style="max-height:48px;height:auto;display:block;" />', $logo, $biz )
-			: sprintf( '<strong style="color:#fff;font-family:Impact,Arial,sans-serif;font-size:24px;letter-spacing:.06em;">%s</strong>', $biz );
+			: sprintf( '<strong style="color:#fff;font-family:Inter,\'Segoe UI\',Arial,sans-serif;font-size:24px;letter-spacing:.06em;">%s</strong>', $biz );
 
 		return '<!doctype html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>' . esc_html( $subject ) . '</title></head>'
 			. '<body style="margin:0;padding:0;background:#F4F5F7;font-family:Arial,Helvetica,sans-serif;color:#0F1115;">'
@@ -351,18 +209,6 @@ class G2AB_Email_Engine {
 			. '<tr><td style="padding:32px;font-size:15px;line-height:1.6;color:#0F1115;">' . $inner . '</td></tr>'
 			. '<tr><td style="background:#F4F5F7;padding:20px 32px;border-top:1px solid #E2E5E9;">' . $footer . '</td></tr>'
 			. '</table></td></tr></table></body></html>';
-	}
-
-	/**
-	 * Closing support line appended to the customer-facing defaults. Tone
-	 * matches the booking-form support notice (g2ab_form_support_notice).
-	 */
-	private function support_footer_html() {
-		return '<p style="margin-top:24px;font-size:13px;color:#666;line-height:1.6;">'
-			. 'Having trouble with your booking? Send us a quick message and our team will take care of the rest '
-			. '&mdash; we want your experience at {business_name} to be effortless from the first click to the firing line. '
-			. '<a href="{site_url}contact/" style="color:{brand_color};font-weight:bold;">Contact us</a> or call {business_phone}. '
-			. 'Thanks for choosing {business_name} &mdash; your range partner.</p>';
 	}
 
 	/**
@@ -386,7 +232,7 @@ class G2AB_Email_Engine {
 					. '<tr><td style="padding:8px;"><strong>Party size</strong></td><td style="padding:8px;">{party_size}</td></tr>'
 					. '</table>'
 					. '<p><a href="{pay_url}" style="display:inline-block;background:{brand_color};color:#fff;padding:14px 28px;text-decoration:none;font-weight:bold;letter-spacing:.04em;text-transform:uppercase;">Complete Payment</a></p>'
-					. $this->support_footer_html(),
+					. '<p style="margin-top:24px;font-size:13px;color:#666;">Need to make changes? Reply to this email or call {business_phone}.</p>',
 			),
 			'booking_confirmed' => array(
 				'enabled'            => 1,
@@ -400,17 +246,16 @@ class G2AB_Email_Engine {
 					. '<p><strong>{resource_name}</strong><br>{start_at} ({duration} min)</p>'
 					. '<p>Arrive 10 minutes early for safety briefing. Bring valid photo ID.</p>'
 					. '<p>Address: {business_address}</p>'
-					. '<p style="margin-top:24px;"><a href="{cancel_url}" style="color:#C62828;font-size:13px;">Cancel reservation</a></p>'
-					. $this->support_footer_html(),
+					. '<p style="margin-top:24px;"><a href="{cancel_url}" style="color:#C62828;font-size:13px;">Cancel reservation</a></p>',
 			),
 			'booking_paid' => array(
 				'enabled'            => 1,
 				'recipient_customer' => 1,
 				'recipient_admin'    => 1,
-				'subject'            => 'Payment received — {amount_formatted} {currency}',
+				'subject'            => 'Payment received — ${amount} {currency}',
 				'body_html'          => '<h2 style="color:{brand_color};margin:0 0 16px;">Payment Received</h2>'
 					. '<p>Hi {customer_name},</p>'
-					. '<p>We received your payment of <strong>{amount_formatted} {currency}</strong> for confirmation <code>{uuid}</code>.</p>'
+					. '<p>We received your payment of <strong>${amount} {currency}</strong> for confirmation <code>{uuid}</code>.</p>'
 					. '<p>Your invoice is attached and available online:</p>'
 					. '<p><a href="{invoice_url}" style="display:inline-block;background:{brand_color};color:#fff;padding:14px 28px;text-decoration:none;font-weight:bold;text-transform:uppercase;letter-spacing:.04em;">View Invoice</a></p>'
 					. '<p style="margin-top:24px;font-size:13px;color:#666;">Thank you for your business.</p>',

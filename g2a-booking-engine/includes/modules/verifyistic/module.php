@@ -18,9 +18,7 @@ return array(
 	'category'       => 'integrations',
 	'icon'           => 'V',
 	'color'          => '#14b8a6',
-	// Active by default in the G2A bundle so age-verified visitors get their
-	// booking waiver auto-satisfied. Safe no-op when Verifyistic isn't active.
-	'default_active' => true,
+	'default_active' => false,
 	'bootstrap'      => 'G2AB_Module_Verifyistic',
 	'configure'      => 'admin.php?page=g2ab-settings&tab=verifyistic',
 );

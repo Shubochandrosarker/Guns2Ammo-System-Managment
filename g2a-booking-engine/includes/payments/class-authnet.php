@@ -73,16 +73,8 @@ final class G2AB_Gateway_Authnet {
 		}
 
 		$amount = round( (float) $amount, 2 );
-		$meta = json_decode( (string) ( $booking->metadata ?? '' ), true );
-		$confirm_token = is_array( $meta ) ? (string) ( $meta['confirm_token'] ?? '' ) : '';
-		$success_url = add_query_arg(
-			array_filter( array( 'g2ab_paid' => $booking->uuid, 'gw' => 'authnet', 'confirm_token' => $confirm_token ) ),
-			home_url( '/' )
-		);
-		$cancel_url  = add_query_arg(
-			array_filter( array( 'g2ab_cancel' => $booking->uuid, 'confirm_token' => $confirm_token ) ),
-			home_url( '/' )
-		);
+		$success_url = add_query_arg( array( 'g2ab_paid' => $booking->uuid, 'gw' => 'authnet' ), home_url( '/' ) );
+		$cancel_url  = add_query_arg( 'g2ab_cancel', $booking->uuid, home_url( '/' ) );
 
 		$customer_email = $booking->customer_email ?? '';
 		if ( empty( $customer_email ) && ! empty( $booking->form_data ) ) {
@@ -194,17 +186,10 @@ final class G2AB_Gateway_Authnet {
 
 		// Build redirect URL. Authorize.net hosted page is a POST endpoint, so we wrap it.
 		// We need to POST the token. Generate a self-submitting form URL via a tiny query handler.
-		// SECURITY: HMAC-sign (token, booking-uuid, expiry) so the wrapper
-		// can't be replayed with a stolen token against a different booking.
-		$exp = time() + 15 * MINUTE_IN_SECONDS;
-		$sig = hash_hmac( 'sha256', $token . '|' . $booking->uuid . '|' . $exp, wp_salt( 'auth' ) );
 		$wrapper = add_query_arg( array(
 			'g2ab_authnet_redirect' => 1,
 			'token'                 => rawurlencode( $token ),
 			'uuid'                  => rawurlencode( $booking->uuid ),
-			'b'                     => rawurlencode( $booking->uuid ),
-			'e'                     => $exp,
-			's'                     => $sig,
 		), home_url( '/' ) );
 
 		return array(
@@ -280,24 +265,11 @@ final class G2AB_Gateway_Authnet {
 			return array( 'handled' => true, 'type' => $type, 'reason' => 'duplicate_event', 'event_id' => $event_id );
 		}
 
-		// SECURITY: match an explicit allow-list of event types instead of
-		// substring sniffing — `net.authorize.payment.fraud.declined`
-		// previously matched the "payment" branch and was processed as a
-		// successful capture.
-		$type_norm = strtolower( (string) $type );
-		$refund_events = array(
-			'net.authorize.payment.refund.created',
-			'net.authorize.payment.void.created',
-		);
-		$success_events = array(
-			'net.authorize.payment.authcapture.created',
-			'net.authorize.payment.capture.created',
-			'net.authorize.payment.priorauthcapture.created',
-		);
-		if ( in_array( $type_norm, $refund_events, true ) ) {
+		if ( false !== stripos( $type, 'refund' ) || false !== stripos( $type, 'void' ) ) {
 			return $this->mark_booking_refunded( $transaction_id, $payload );
 		}
-		if ( in_array( $type_norm, $success_events, true ) ) {
+
+		if ( false !== stripos( $type, 'authcapture' ) || false !== stripos( $type, 'capture' ) || false !== stripos( $type, 'payment' ) ) {
 			return $this->mark_booking_paid_from_transaction( $transaction_id, $payload );
 		}
 
@@ -375,15 +347,25 @@ final class G2AB_Gateway_Authnet {
 			array( '%d' )
 		);
 
-		g2ab_payments_upsert_by_transaction( 'authnet', (string) $transaction_id, array(
-			'booking_id'       => (int) $booking->id,
+		$payments_table = $wpdb->prefix . 'g2ab_payments';
+		$existing = $wpdb->get_var( $wpdb->prepare( "SELECT id FROM {$payments_table} WHERE booking_id = %d AND gateway = 'authnet' ORDER BY id DESC LIMIT 1", (int) $booking->id ) );
+		$data = array(
+			'transaction_id'   => $transaction_id,
 			'amount'           => $amount,
 			'currency'         => strtoupper( $booking->currency ?? 'USD' ),
 			'status'           => 'succeeded',
 			'payment_method'   => 'card',
 			'gateway_response' => wp_json_encode( $details ),
 			'processed_at'     => current_time( 'mysql' ),
-		) );
+		);
+		if ( $existing ) {
+			$wpdb->update( $payments_table, $data, array( 'id' => (int) $existing ) );
+		} else {
+			$data['booking_id'] = (int) $booking->id;
+			$data['gateway']    = 'authnet';
+			$data['created_at'] = current_time( 'mysql' );
+			$wpdb->insert( $payments_table, $data );
+		}
 
 		$wpdb->insert( $wpdb->prefix . 'g2ab_logs', array(
 			'booking_id' => (int) $booking->id,
@@ -610,34 +592,15 @@ final class G2AB_Gateway_Authnet {
 /* ------------------------------------------------------------------ */
 add_action( 'init', function () {
 	if ( empty( $_GET['g2ab_authnet_redirect'] ) ) return;
-	$token   = isset( $_GET['token'] ) ? sanitize_text_field( wp_unslash( $_GET['token'] ) ) : '';
-	$booking = isset( $_GET['b'] ) ? sanitize_text_field( wp_unslash( $_GET['b'] ) ) : '';
-	$exp     = isset( $_GET['e'] ) ? (int) $_GET['e'] : 0;
-	$sig     = isset( $_GET['s'] ) ? sanitize_text_field( wp_unslash( $_GET['s'] ) ) : '';
-	if ( empty( $token ) || empty( $booking ) || empty( $sig ) ) wp_die( 'Missing parameters.' );
-	if ( $exp < time() ) wp_die( 'Payment link expired. Start over.' );
-
-	// SECURITY: redirect-link must be HMAC-signed by the server when the
-	// payment intent was created. This binds the token to the issuing
-	// booking and to a short expiry window — preventing an attacker who
-	// somehow learns a token from replaying it against the hosted page
-	// to apply a charge to the wrong card-on-file.
-	$expected = hash_hmac( 'sha256', $token . '|' . $booking . '|' . $exp, wp_salt( 'auth' ) );
-	if ( ! hash_equals( $expected, $sig ) ) wp_die( 'Invalid signature.' );
-
-	// Light per-IP rate-limit on the redirect handler itself.
-	$ip  = function_exists( 'g2ab_get_client_ip' ) ? g2ab_get_client_ip() : ( $_SERVER['REMOTE_ADDR'] ?? '' );
-	$bkt = 'g2ab_authnet_rd_' . md5( (string) $ip );
-	$hit = (int) get_transient( $bkt );
-	if ( $hit > 30 ) wp_die( 'Too many redirect attempts.' );
-	set_transient( $bkt, $hit + 1, MINUTE_IN_SECONDS );
+	$token = isset( $_GET['token'] ) ? sanitize_text_field( wp_unslash( $_GET['token'] ) ) : '';
+	if ( empty( $token ) ) wp_die( 'Missing token.' );
 
 	$test = 1 === (int) get_option( 'g2ab_authnet_test_mode', 1 );
 	$action = $test ? G2AB_Gateway_Authnet::HOSTED_TEST : G2AB_Gateway_Authnet::HOSTED_LIVE;
 
 	?><!doctype html>
 <html><head><meta charset="utf-8"><title>Redirecting to secure payment...</title>
-<style>body{font-family:Arial,sans-serif;background:#0F1115;color:#E8E8E8;padding:60px 20px;text-align:center;}h1{font-family:Impact,sans-serif;letter-spacing:.06em;}.s{margin-top:30px;color:#8A95A5;font-size:13px;}</style></head>
+<style>body{font-family:Arial,sans-serif;background:#0F1115;color:#E8E8E8;padding:60px 20px;text-align:center;}h1{font-family:'Inter','Segoe UI',sans-serif;letter-spacing:.06em;}.s{margin-top:30px;color:#8A95A5;font-size:13px;}</style></head>
 <body>
 <h1>REDIRECTING TO SECURE PAYMENT</h1>
 <p class="s">If you are not redirected within 3 seconds, click below.</p>

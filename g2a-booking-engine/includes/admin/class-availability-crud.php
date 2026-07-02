@@ -273,10 +273,10 @@ final class G2AB_Admin_Availability_Crud {
 		echo '<style>
 .g2ab-av{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;}
 .g2ab-av__header{background:linear-gradient(135deg,#0F1115 0%,#1A1F26 100%);color:#E8E8E8;padding:24px 28px;margin:20px 0 16px;border-left:4px solid #D2691E;}
-.g2ab-av__stencil{font-family:"Rajdhani","Oswald",Impact,sans-serif;font-size:30px;font-weight:700;letter-spacing:.12em;color:#fff;text-shadow:2px 2px 0 #4A5D3A;}
+.g2ab-av__stencil{font-family:"Inter","Segoe UI",system-ui,-apple-system,sans-serif;font-size:30px;font-weight:700;letter-spacing:.04em;color:#fff;}
 .g2ab-av__sub{margin:4px 0 0;color:#8A95A5;font-size:13px;text-transform:uppercase;letter-spacing:.08em;}
 .g2ab-av__panel{background:#fff;border:1px solid #d0d4d9;padding:24px 28px;margin-bottom:14px;}
-.g2ab-av__panel h3{font-family:"Rajdhani",sans-serif;font-size:13px;letter-spacing:.12em;color:#D2691E;margin:0 0 8px;font-weight:700;}
+.g2ab-av__panel h3{font-family:"Inter","Segoe UI",system-ui,-apple-system,sans-serif;font-size:13px;letter-spacing:.12em;color:#D2691E;margin:0 0 8px;font-weight:700;}
 .g2ab-av__desc{color:#8A95A5;font-size:12px;margin:0 0 16px;}
 .g2ab-av__hours{display:grid;gap:10px;}
 .g2ab-av__day{display:grid;grid-template-columns:180px 130px 30px 130px;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid #f0f1f3;}

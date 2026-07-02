@@ -1,13 +1,14 @@
 <?php
 /**
- * Admin: Shortcodes reference screen.
+ * Admin: Shortcodes reference.
  *
- * A read-only reference tab under the G2A Booking menu listing every
- * booking, event and form shortcode the plugin provides — with a
- * description, available attributes, and one-click copy.
+ * One place that lists every shortcode the plugin ships — booking forms,
+ * event banners (all formats), the events calendar, front-desk terminal and
+ * customer self-service — with a description, the useful attributes, and a
+ * one-click "copy" button. Saves staff from hunting through docs.
  *
  * @package G2AB
- * @since   1.5.0
+ * @since   1.6.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -16,10 +17,9 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 final class G2AB_Admin_Shortcodes {
 
-	const SLUG = 'g2ab-shortcodes';
-	const CAP  = 'manage_g2ab_bookings';
-
 	private static $instance = null;
+	const PAGE_SLUG = 'g2ab-shortcodes';
+	const CAP       = 'manage_g2ab_settings';
 
 	public static function instance() {
 		if ( null === self::$instance ) {
@@ -29,7 +29,7 @@ final class G2AB_Admin_Shortcodes {
 	}
 
 	private function __construct() {
-		add_action( 'admin_menu', array( $this, 'register_menu' ), 12 );
+		add_action( 'admin_menu', array( $this, 'register_menu' ), 11 );
 	}
 
 	public function register_menu() {
@@ -38,91 +38,114 @@ final class G2AB_Admin_Shortcodes {
 			__( 'Shortcodes', 'g2a-booking' ),
 			__( 'Shortcodes', 'g2a-booking' ),
 			self::CAP,
-			self::SLUG,
+			self::PAGE_SLUG,
 			array( $this, 'render' )
 		);
 	}
 
-	/**
-	 * The shortcode catalogue, grouped by section.
-	 *
-	 * @return array<string, array<int, array>>
-	 */
-	private function catalogue() {
+	private function groups() {
 		return array(
-			__( 'Booking Forms', 'g2a-booking' ) => array(
-				array(
-					'code' => '[g2a_lane_booking]',
-					'desc' => __( 'The full lane booking flow — date, time, lanes, shooter details and payment. Place it on the Book A Lane page.', 'g2a-booking' ),
-					'atts' => array(
-						'booking_type' => __( 'Booking type slug (default: lane-booking).', 'g2a-booking' ),
-						'form'         => __( 'Form slug to use (default: default-lane-booking).', 'g2a-booking' ),
-						'theme'        => __( 'Override the form theme/skin.', 'g2a-booking' ),
+			array(
+				'label' => __( 'Booking forms', 'g2a-booking' ),
+				'items' => array(
+					array(
+						'code'  => '[g2a_lane_booking]',
+						'title' => __( 'Unified booking form', 'g2a-booking' ),
+						'desc'  => __( 'The main two-column booking form. Shows a “What do you want to book?” switch (Lane / Events) automatically when you have upcoming events; otherwise it is just the lane flow.', 'g2a-booking' ),
+						'attrs' => array(
+							'booking_type' => __( 'Lane booking-type slug (default lane-booking).', 'g2a-booking' ),
+							'theme'        => __( 'Override the form theme.', 'g2a-booking' ),
+						),
 					),
-				),
-				array(
-					'code' => '[g2a_booking_form]',
-					'desc' => __( 'A class / course booking form for a specific booking type (e.g. CCW class, Ladies Tuesday).', 'g2a-booking' ),
-					'atts' => array(
-						'booking_type' => __( 'Booking type slug to book.', 'g2a-booking' ),
-						'form'         => __( 'Form slug to use.', 'g2a-booking' ),
-					),
-				),
-			),
-			__( 'Events', 'g2a-booking' ) => array(
-				array(
-					'code' => '[g2a_events_list]',
-					'desc' => __( 'Upcoming events as a vertical list — date block, details and a button per event.', 'g2a-booking' ),
-					'atts' => array(
-						'limit' => __( 'Maximum events to show (default: 10).', 'g2a-booking' ),
-						'title' => __( 'Optional heading shown above the list.', 'g2a-booking' ),
-					),
-				),
-				array(
-					'code' => '[g2a_events_calendar]',
-					'desc' => __( 'Upcoming events on a month calendar grid, with previous / next month navigation.', 'g2a-booking' ),
-					'atts' => array(
-						'title' => __( 'Optional heading.', 'g2a-booking' ),
-					),
-				),
-				array(
-					'code' => '[g2a_events_carousel]',
-					'desc' => __( 'Upcoming events as horizontal scrolling cards with arrow navigation.', 'g2a-booking' ),
-					'atts' => array(
-						'limit' => __( 'Maximum events to show (default: 12).', 'g2a-booking' ),
-						'title' => __( 'Optional heading.', 'g2a-booking' ),
-					),
-				),
-				array(
-					'code' => '[g2a_event_banner]',
-					'desc' => __( 'A single featured event banner — auto-features your first active class booking type.', 'g2a-booking' ),
-					'atts' => array(
-						'type' => __( 'Pin a specific booking type by slug (e.g. ccw-class).', 'g2a-booking' ),
-					),
-				),
-				array(
-					'code' => '[g2a_upcoming_events]',
-					'desc' => __( 'A compact list of upcoming class-based booking types.', 'g2a-booking' ),
-					'atts' => array(
-						'limit' => __( 'Maximum entries to show.', 'g2a-booking' ),
+					array(
+						'code'  => '[g2a_event_booking event="ladies-tuesday"]',
+						'title' => __( 'Event seat booking', 'g2a-booking' ),
+						'desc'  => __( 'Standalone event booking widget — pick an event, pick a date (live seats + price), reserve a seat. Lock it to one event with the event attribute; it then shows a header, intro and quick facts.', 'g2a-booking' ),
+						'attrs' => array(
+							'event'    => __( 'Event id or slug to lock the widget to one event.', 'g2a-booking' ),
+							'category' => __( 'Limit the event picker to a category.', 'g2a-booking' ),
+							'heading'  => __( 'Heading shown above the widget.', 'g2a-booking' ),
+							'intro'    => __( 'Optional sub-line under the heading.', 'g2a-booking' ),
+							'theme'    => __( 'dark (default) or light.', 'g2a-booking' ),
+						),
 					),
 				),
 			),
-			__( 'Front Desk & Member Actions', 'g2a-booking' ) => array(
-				array(
-					'code' => '[g2ab_frontdesk]',
-					'desc' => __( "Staff front-desk terminal — today's roster, search and quick check-in actions. Use on a staff-only page.", 'g2a-booking' ),
-					'atts' => array(),
+			array(
+				'label' => __( 'Events display', 'g2a-booking' ),
+				'items' => array(
+					array(
+						'code'  => '[g2a_events_calendar]',
+						'title' => __( 'Events calendar', 'g2a-booking' ),
+						'desc'  => __( 'A full month calendar of your events with an “upcoming events” sidebar and search. Clicking an event opens its landing page to book.', 'g2a-booking' ),
+						'attrs' => array(
+							'theme'        => __( 'dark (default) or light.', 'g2a-booking' ),
+							'category'     => __( 'Only show events in this category.', 'g2a-booking' ),
+							'show_sidebar' => __( 'yes (default) or no.', 'g2a-booking' ),
+							'heading'      => __( 'Optional heading above the calendar.', 'g2a-booking' ),
+						),
+					),
+					array(
+						'code'  => '[g2a_event_banner style="spotlight"]',
+						'title' => __( 'Featured event banner', 'g2a-booking' ),
+						'desc'  => __( 'A hero banner for one featured event with a live countdown. Three formats: spotlight (full hero), strip (compact one-row), ticket (event-ticket card).', 'g2a-booking' ),
+						'attrs' => array(
+							'style'     => __( 'spotlight | strip | ticket.', 'g2a-booking' ),
+							'id / slug' => __( 'Pick a specific event (otherwise the soonest is used).', 'g2a-booking' ),
+							'category'  => __( 'Pick the soonest event in a category.', 'g2a-booking' ),
+							'countdown' => __( 'yes (default) or no.', 'g2a-booking' ),
+							'accent'    => __( 'Override the accent colour, e.g. #D2691E.', 'g2a-booking' ),
+							'cta'       => __( 'Button text (default RESERVE A SEAT).', 'g2a-booking' ),
+						),
+					),
+					array(
+						'code'  => '[g2a_upcoming_events layout="list"]',
+						'title' => __( 'Upcoming events list', 'g2a-booking' ),
+						'desc'  => __( 'A clean, premium listing of upcoming events. Scope it per page with category or event so a CCW page shows only CCW dates and a Ladies page shows only Ladies nights.', 'g2a-booking' ),
+						'attrs' => array(
+							'layout'   => __( 'list (Amelia-style rows, default) or card.', 'g2a-booking' ),
+							'category' => __( 'Only this category — e.g. ccw-class, ladies, competition.', 'g2a-booking' ),
+							'event'    => __( 'A single event id/slug — shows that event\'s upcoming dates.', 'g2a-booking' ),
+							'theme'    => __( 'dark (default) or light.', 'g2a-booking' ),
+							'limit'    => __( 'How many to show (default 12).', 'g2a-booking' ),
+							'search'   => __( 'yes to force a search box (list auto-shows it past 6).', 'g2a-booking' ),
+						),
+					),
 				),
-				array(
-					'code' => '[g2ab_reschedule]',
-					'desc' => __( 'Lets a customer reschedule their booking from a link in their confirmation email.', 'g2a-booking' ),
-					'atts' => array(),
-				),
-				array(
-					'code' => '[g2ab_cancel_booking]',
-					'desc' => __( 'Lets a customer cancel their booking from a link in their confirmation email.', 'g2a-booking' ),
-					'atts' => array(),
+			),
+			array(
+				'label' => __( 'Staff & customer', 'g2a-booking' ),
+				'items' => array(
+					array(
+						'code'  => '[g2ab_frontdesk]',
+						'title' => __( 'Front desk terminal', 'g2a-booking' ),
+						'desc'  => __( 'Mounts the staff Front Desk (today’s roster, search, check-in, payments) on a public page for a desk laptop. Staff-capability gated. Alias: [g2ab_staff_console].', 'g2a-booking' ),
+						'attrs' => array(),
+					),
+					array(
+						'code'  => '[g2ab_range_console]',
+						'title' => __( 'Range Status console', 'g2a-booking' ),
+						'desc'  => __( 'Live lane map (in use / reserved / open), KPI cards, walk-in check-in, reservations and a payment feed for a desk laptop. Also at G2A Booking → Range Status. Staff-capability gated.', 'g2a-booking' ),
+						'attrs' => array(),
+					),
+					array(
+						'code'  => '[g2ab_self_checkin]',
+						'title' => __( 'Customer self check-in', 'g2a-booking' ),
+						'desc'  => __( 'The page customers reach from the QR poster: they find their booking (code, or name + phone), confirm their waiver, and check in. Also reachable at /?g2ab_checkin=1.', 'g2a-booking' ),
+						'attrs' => array(),
+					),
+					array(
+						'code'  => '[g2ab_reschedule]',
+						'title' => __( 'Reschedule booking', 'g2a-booking' ),
+						'desc'  => __( 'Customer self-service reschedule page (signed-token protected). Pair with the link in your confirmation emails.', 'g2a-booking' ),
+						'attrs' => array(),
+					),
+					array(
+						'code'  => '[g2ab_cancel_booking]',
+						'title' => __( 'Cancel booking', 'g2a-booking' ),
+						'desc'  => __( 'Customer self-service cancellation page (signed-token protected).', 'g2a-booking' ),
+						'attrs' => array(),
+					),
 				),
 			),
 		);
@@ -132,77 +155,78 @@ final class G2AB_Admin_Shortcodes {
 		if ( ! current_user_can( self::CAP ) ) {
 			wp_die( esc_html__( 'No permission.', 'g2a-booking' ) );
 		}
+		$this->print_styles();
 		?>
-		<div class="wrap g2ab-sc">
-			<h1><?php esc_html_e( 'Shortcodes', 'g2a-booking' ); ?></h1>
-			<p class="g2ab-sc__lead">
-				<?php esc_html_e( 'Drop any of these shortcodes into a page or post to display booking forms, events and front-desk tools. Click a code to copy it.', 'g2a-booking' ); ?>
-			</p>
+		<div class="wrap g2ab-admin g2ab-sc">
+			<div class="g2ab-sc__header">
+				<div>
+					<h1><span class="g2ab-sc__stencil"><?php esc_html_e( 'SHORTCODES', 'g2a-booking' ); ?></span></h1>
+					<p class="g2ab-sc__sub"><?php esc_html_e( 'Drop these into any page or post. Click a code to copy it.', 'g2a-booking' ); ?></p>
+				</div>
+			</div>
 
-			<?php foreach ( $this->catalogue() as $group => $items ) : ?>
-				<h2 class="g2ab-sc__group"><?php echo esc_html( $group ); ?></h2>
+			<?php foreach ( $this->groups() as $group ) : ?>
+				<h2 class="g2ab-sc__group"><?php echo esc_html( $group['label'] ); ?></h2>
 				<div class="g2ab-sc__grid">
-					<?php foreach ( $items as $item ) : ?>
-						<div class="g2ab-sc__card">
-							<button type="button" class="g2ab-sc__code" data-g2ab-copy="<?php echo esc_attr( $item['code'] ); ?>" title="<?php esc_attr_e( 'Click to copy', 'g2a-booking' ); ?>">
-								<code><?php echo esc_html( $item['code'] ); ?></code>
-								<span class="g2ab-sc__copy"><?php esc_html_e( 'Copy', 'g2a-booking' ); ?></span>
-							</button>
+					<?php foreach ( $group['items'] as $item ) : ?>
+						<article class="g2ab-sc__card">
+							<div class="g2ab-sc__code-row">
+								<code class="g2ab-sc__code"><?php echo esc_html( $item['code'] ); ?></code>
+								<button type="button" class="g2ab-sc__copy" data-copy="<?php echo esc_attr( $item['code'] ); ?>"><?php esc_html_e( 'Copy', 'g2a-booking' ); ?></button>
+							</div>
+							<h3 class="g2ab-sc__title"><?php echo esc_html( $item['title'] ); ?></h3>
 							<p class="g2ab-sc__desc"><?php echo esc_html( $item['desc'] ); ?></p>
-							<?php if ( ! empty( $item['atts'] ) ) : ?>
-								<table class="g2ab-sc__atts">
-									<?php foreach ( $item['atts'] as $name => $note ) : ?>
-										<tr>
-											<th><?php echo esc_html( $name ); ?></th>
-											<td><?php echo esc_html( $note ); ?></td>
-										</tr>
+							<?php if ( ! empty( $item['attrs'] ) ) : ?>
+								<table class="g2ab-sc__attrs">
+									<?php foreach ( $item['attrs'] as $name => $desc ) : ?>
+										<tr><th><?php echo esc_html( $name ); ?></th><td><?php echo esc_html( $desc ); ?></td></tr>
 									<?php endforeach; ?>
 								</table>
 							<?php endif; ?>
-						</div>
+						</article>
 					<?php endforeach; ?>
 				</div>
 			<?php endforeach; ?>
 		</div>
-
-		<style>
-		.g2ab-sc{max-width:1100px;}
-		.g2ab-sc__lead{font-size:14px;color:#50575e;margin:6px 0 18px;}
-		.g2ab-sc__group{font-size:15px;margin:26px 0 10px;color:#1d2327;border-bottom:1px solid #dcdcde;padding-bottom:8px;}
-		.g2ab-sc__grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(330px,1fr));gap:14px;}
-		.g2ab-sc__card{background:#fff;border:1px solid #dcdcde;border-radius:8px;padding:16px 18px;}
-		.g2ab-sc__code{display:flex;align-items:center;justify-content:space-between;gap:10px;width:100%;
-			background:#1d2327;border:0;border-radius:6px;padding:10px 12px;cursor:pointer;text-align:left;}
-		.g2ab-sc__code code{background:transparent;color:#7ad0ff;font-size:13px;font-weight:600;padding:0;}
-		.g2ab-sc__copy{font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:#fff;
-			background:#2271b1;border-radius:3px;padding:3px 8px;flex:0 0 auto;}
-		.g2ab-sc__code.is-copied .g2ab-sc__copy{background:#1e8a4c;}
-		.g2ab-sc__desc{font-size:13px;color:#3c434a;line-height:1.55;margin:10px 0 0;}
-		.g2ab-sc__atts{width:100%;border-collapse:collapse;margin-top:10px;}
-		.g2ab-sc__atts th{text-align:left;width:120px;vertical-align:top;padding:5px 8px 5px 0;
-			font-size:12px;color:#1d2327;font-family:monospace;}
-		.g2ab-sc__atts td{padding:5px 0;font-size:12px;color:#50575e;border-bottom:1px solid #f0f0f1;}
-		</style>
 		<script>
 		(function(){
-			document.querySelectorAll('[data-g2ab-copy]').forEach(function(btn){
-				btn.addEventListener('click',function(){
-					var text=btn.getAttribute('data-g2ab-copy');
-					var done=function(){
-						btn.classList.add('is-copied');
-						var c=btn.querySelector('.g2ab-sc__copy');
-						if(c){var o=c.textContent;c.textContent='Copied';setTimeout(function(){c.textContent=o;btn.classList.remove('is-copied');},1600);}
-					};
-					if(navigator.clipboard&&navigator.clipboard.writeText){
-						navigator.clipboard.writeText(text).then(done).catch(function(){done();});
-					}else{
-						var t=document.createElement('textarea');t.value=text;document.body.appendChild(t);
-						t.select();try{document.execCommand('copy');}catch(e){}document.body.removeChild(t);done();
-					}
+			document.querySelectorAll('.g2ab-sc__copy').forEach(function(btn){
+				btn.addEventListener('click', function(){
+					var t = btn.getAttribute('data-copy');
+					var done = function(){ var o = btn.textContent; btn.textContent = '<?php echo esc_js( __( 'Copied!', 'g2a-booking' ) ); ?>'; btn.classList.add('is-ok'); setTimeout(function(){ btn.textContent = o; btn.classList.remove('is-ok'); }, 1400); };
+					if (navigator.clipboard && navigator.clipboard.writeText) { navigator.clipboard.writeText(t).then(done, function(){ fallback(t); done(); }); }
+					else { fallback(t); done(); }
 				});
 			});
+			function fallback(t){ var ta = document.createElement('textarea'); ta.value = t; document.body.appendChild(ta); ta.select(); try{ document.execCommand('copy'); }catch(e){} document.body.removeChild(ta); }
 		})();
 		</script>
+		<?php
+	}
+
+	private function print_styles() {
+		?>
+		<style id="g2ab-sc-styles">
+		.g2ab-sc{--bg:#0F1115;--surface:#171B22;--surface2:#1E242E;--border:#2A323D;--text:#E8E8E8;--muted:#8A95A5;--orange:#D2691E;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;}
+		.g2ab-sc *{box-sizing:border-box;}
+		.g2ab-sc__header{margin:18px 0 8px;padding-bottom:14px;border-bottom:2px solid var(--border);}
+		.g2ab-sc__stencil{font-family:"Inter","Segoe UI",system-ui,-apple-system,sans-serif;font-size:30px;font-weight:700;letter-spacing:.06em;color:#fff;text-transform:uppercase;}
+		.g2ab-sc h1{margin:0;padding:0;}
+		.g2ab-sc__sub{margin:4px 0 0;color:var(--muted);font-size:13px;}
+		.g2ab-sc h2.g2ab-sc__group{font-family:"Inter","Segoe UI",system-ui,-apple-system,sans-serif;font-size:16px;letter-spacing:.06em;text-transform:uppercase;color:var(--orange)!important;margin:26px 0 12px;}
+		.g2ab-sc__grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(330px,1fr));gap:16px;}
+		.g2ab-sc__card{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:16px 18px;}
+		.g2ab-sc__code-row{display:flex;align-items:center;gap:10px;margin-bottom:10px;}
+		.g2ab-sc__code{flex:1;background:var(--bg);border:1px solid var(--border);border-left:3px solid var(--orange);border-radius:5px;padding:9px 11px;font-family:"SF Mono",Monaco,Consolas,monospace;font-size:13px;color:#F2C18A;overflow-x:auto;white-space:nowrap;}
+		.g2ab-sc__copy{flex:none;background:var(--surface2);border:1px solid var(--border);color:var(--text);border-radius:5px;padding:8px 14px;font-size:12px;font-weight:700;cursor:pointer;transition:all .12s ease;}
+		.g2ab-sc__copy:hover{border-color:var(--orange);color:#fff;}
+		.g2ab-sc__copy.is-ok{background:#1f7a37;border-color:#1f7a37;color:#fff;}
+		.g2ab-sc h3.g2ab-sc__title{margin:0 0 6px;color:#fff!important;font-size:16px;font-weight:700;}
+		.g2ab-sc__desc{margin:0 0 12px;color:var(--muted);font-size:13px;line-height:1.5;}
+		.g2ab-sc__attrs{width:100%;border-collapse:collapse;font-size:12px;}
+		.g2ab-sc__attrs th{text-align:left;vertical-align:top;color:var(--orange);font-family:"SF Mono",Monaco,Consolas,monospace;font-weight:600;padding:4px 10px 4px 0;white-space:nowrap;}
+		.g2ab-sc__attrs td{vertical-align:top;color:var(--text);padding:4px 0;}
+		</style>
 		<?php
 	}
 }

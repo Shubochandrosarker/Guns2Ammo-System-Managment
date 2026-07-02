@@ -25,20 +25,6 @@ final class G2AB_Frontend {
 	private static $instance = null;
 	private $enqueued = false;
 
-	/**
-	 * Tag of the booking shortcode currently mid-render, or null when nothing
-	 * is rendering. Read by the shutdown fatal-catcher so a NON-catchable fatal
-	 * (out-of-memory, max_execution_time, deep recursion) raised inside a
-	 * booking shortcode can never leave the visitor on a pure-white page —
-	 * try/catch alone cannot intercept those.
-	 *
-	 * @var string|null
-	 */
-	private static $active_render = null;
-
-	/** True once the shutdown fatal-catcher has been registered. */
-	private static $shutdown_hooked = false;
-
 	public static function instance() {
 		if ( null === self::$instance ) {
 			self::$instance = new self();
@@ -47,205 +33,15 @@ final class G2AB_Frontend {
 	}
 
 	private function __construct() {
-		// Every booking shortcode is wrapped in guard() so a runtime fatal in
-		// the render path — a stale DB schema after an update, a malformed
-		// option, or (most often) a third-party filter callback hooked onto
-		// g2ab_booking_display_pricing / g2ab_user_is_member that throws —
-		// degrades to a small inline notice instead of white-screening the
-		// whole page. This is what made the Lane Booking + Ladies Tuesday
-		// pages render blank after a plugin update.
-		add_shortcode( 'g2a_lane_booking', $this->guard( 'render_lane_booking' ) );
-		add_shortcode( 'g2a_ladies_tuesday_booking', $this->guard( 'render_ladies_tuesday_booking' ) );
-		add_shortcode( 'g2a_classes_booking', $this->guard( 'render_classes_booking' ) );
-		add_shortcode( 'g2a_resource_booking', $this->guard( 'render_resource_booking' ) );
-		add_shortcode( 'g2a_booking_form', $this->guard( 'render_booking_form' ) );
+		add_shortcode( 'g2a_lane_booking', array( $this, 'render_lane_booking' ) );
+		add_shortcode( 'g2a_booking_form', array( $this, 'render_booking_form' ) );
 		add_action( 'wp_enqueue_scripts', array( $this, 'register_assets' ), 5 );
 		add_action( 'wp_enqueue_scripts', array( $this, 'maybe_enqueue_return_assets' ), 20 );
-		// Surface the last booking-page fatal in wp-admin so a site owner can
-		// read the exact cause without enabling WP_DEBUG or hunting log files.
-		add_action( 'admin_notices', array( __CLASS__, 'admin_fatal_notice' ) );
-		add_action( 'admin_post_g2ab_dismiss_fatal', array( __CLASS__, 'dismiss_fatal_notice' ) );
-	}
-
-	/**
-	 * Admin notice: if a booking shortcode fataled on the front end, show the
-	 * captured message/file/line here so it can be reported + fixed precisely.
-	 *
-	 * @return void
-	 */
-	public static function admin_fatal_notice() {
-		if ( ! current_user_can( 'manage_options' ) ) {
-			return;
-		}
-		$f = get_option( 'g2ab_last_frontend_fatal' );
-		if ( ! is_array( $f ) || empty( $f['message'] ) ) {
-			return;
-		}
-		$dismiss = wp_nonce_url( admin_url( 'admin-post.php?action=g2ab_dismiss_fatal' ), 'g2ab_dismiss_fatal' );
-		echo '<div class="notice notice-error"><p><strong>G2A Booking — a booking page hit a fatal error:</strong></p>'
-			. '<p style="font-family:monospace;white-space:pre-wrap;">'
-			. esc_html( $f['message'] . "\n@ " . ( $f['file'] ?? '' ) . ':' . ( $f['line'] ?? '' )
-				. ( ! empty( $f['url'] ) ? "\non " . $f['url'] : '' )
-				. ( ! empty( $f['tag'] ) ? "\nwhile rendering " . $f['tag'] : '' ) )
-			. '</p><p><a class="button" href="' . esc_url( $dismiss ) . '">' . esc_html__( 'Dismiss', 'g2a-booking' ) . '</a></p></div>';
-	}
-
-	/** Clear the stored fatal after the admin has read/dismissed it. */
-	public static function dismiss_fatal_notice() {
-		if ( current_user_can( 'manage_options' ) && check_admin_referer( 'g2ab_dismiss_fatal' ) ) {
-			delete_option( 'g2ab_last_frontend_fatal' );
-		}
-		wp_safe_redirect( wp_get_referer() ?: admin_url() );
-		exit;
-	}
-
-	/**
-	 * Wrap a shortcode renderer in a fatal guard.
-	 *
-	 * Returns a closure suitable for add_shortcode(). Any \Throwable raised
-	 * while rendering is logged, any half-written output buffer the renderer
-	 * opened is discarded, and a friendly inline message is returned so the
-	 * surrounding page still renders. Admins see the underlying error to aid
-	 * debugging; visitors see a reassuring fallback with a call to action.
-	 *
-	 * @param string $method Public render method on this class.
-	 * @return callable
-	 */
-	private function guard( $method ) {
-		return function ( $atts = array(), $content = '', $tag = '' ) use ( $method ) {
-			$ob_level = ob_get_level();
-			self::begin_render( $tag ? $tag : $method );
-			try {
-				$html = $this->{$method}( $atts, $content, $tag );
-				self::end_render();
-				return $html;
-			} catch ( \Throwable $e ) {
-				self::end_render();
-				// Drop any partial markup the renderer left buffered so the
-				// page isn't left with an unbalanced output buffer.
-				while ( ob_get_level() > $ob_level ) {
-					ob_end_clean();
-				}
-				error_log( sprintf(
-					'[G2AB] shortcode %s failed: %s @ %s:%d',
-					$method,
-					$e->getMessage(),
-					$e->getFile(),
-					$e->getLine()
-				) );
-				return self::error_box( $method, $e->getMessage() . ' @ ' . basename( $e->getFile() ) . ':' . $e->getLine() );
-			}
-		};
-	}
-
-	/**
-	 * Mark the start of a booking-shortcode render and arm the safety net.
-	 *
-	 * Raises the memory + time limits for the duration of the render (a heavy
-	 * page can otherwise tip the widget into an out-of-memory / timeout fatal
-	 * that try/catch cannot catch) and registers a one-time shutdown handler
-	 * that recovers the page from any such non-catchable fatal.
-	 *
-	 * Public + static so the Events shortcodes can share the same net.
-	 *
-	 * @param string $tag Shortcode tag (for diagnostics).
-	 * @return void
-	 */
-	public static function begin_render( $tag ) {
-		self::$active_render = (string) $tag;
-
-		if ( function_exists( 'wp_raise_memory_limit' ) ) {
-			wp_raise_memory_limit( 'g2ab_booking' );
-		}
-		$current = function_exists( 'wp_convert_hr_to_bytes' )
-			? wp_convert_hr_to_bytes( (string) ini_get( 'memory_limit' ) )
-			: 0;
-		if ( $current > 0 && $current < 268435456 ) {
-			@ini_set( 'memory_limit', '256M' ); // phpcs:ignore WordPress.PHP.IniSet
-		}
-		// Give a slow shared host headroom without removing the limit entirely
-		// (which would let a genuine infinite loop hang instead of erroring).
-		@set_time_limit( 120 ); // phpcs:ignore
-
-		if ( ! self::$shutdown_hooked ) {
-			self::$shutdown_hooked = true;
-			register_shutdown_function( array( __CLASS__, 'handle_fatal_shutdown' ) );
-		}
-	}
-
-	/** Mark a render as completed cleanly so the shutdown net stays silent. */
-	public static function end_render() {
-		self::$active_render = null;
-	}
-
-	/**
-	 * Last line of defence: if the request is aborting on a fatal that struck
-	 * while a booking shortcode was mid-render, the page would otherwise go
-	 * pure white. Flush buffers, print a visible notice and reveal the page
-	 * (dismiss the theme preloader) so the visitor always sees *something*.
-	 *
-	 * @return void
-	 */
-	public static function handle_fatal_shutdown() {
-		if ( null === self::$active_render ) {
-			return; // render finished cleanly — nothing to recover.
-		}
-		$err    = error_get_last();
-		$fatals = array( E_ERROR, E_PARSE, E_CORE_ERROR, E_COMPILE_ERROR, E_USER_ERROR, E_RECOVERABLE_ERROR );
-		if ( ! $err || ! in_array( $err['type'], $fatals, true ) ) {
-			return; // not a fatal — normal shutdown.
-		}
-		error_log( sprintf(
-			'[G2AB] FATAL during shortcode %s: %s @ %s:%d',
-			self::$active_render,
-			$err['message'],
-			$err['file'],
-			$err['line']
-		) );
-		// Persist it so the wp-admin notice (admin_fatal_notice) can show the
-		// exact cause — survives even when the front end is a blank 500.
-		update_option( 'g2ab_last_frontend_fatal', array(
-			'message' => (string) $err['message'],
-			'file'    => (string) $err['file'],
-			'line'    => (int) $err['line'],
-			'tag'     => (string) self::$active_render,
-			'time'    => time(),
-			'url'     => isset( $_SERVER['REQUEST_URI'] ) ? esc_url_raw( wp_unslash( $_SERVER['REQUEST_URI'] ) ) : '',
-		), false );
-		// Close any buffers the dying renderer left open, then emit recovery UI.
-		while ( ob_get_level() > 0 ) {
-			@ob_end_flush(); // phpcs:ignore
-		}
-		echo self::error_box( self::$active_render, $err['message'] . ' @ ' . $err['file'] . ':' . $err['line'] ); // phpcs:ignore WordPress.Security.EscapeOutput
-		echo '<script>document.documentElement.classList.remove("g2a-loading");var _p=document.getElementById("g2a-preloader");if(_p&&_p.parentNode){_p.parentNode.removeChild(_p);}</script>';
-	}
-
-	/**
-	 * Build the inline error/notice box shared by the catch handler and the
-	 * shutdown net. The real error is shown to admins, or to anyone who adds
-	 * `?g2ab_debug=1` to the URL (so a site owner can capture the cause without
-	 * touching wp-config). Everyone else sees a reassuring fallback. Inline
-	 * styles keep it readable even when no theme CSS loaded.
-	 *
-	 * @param string $where  Shortcode/method that failed.
-	 * @param string $detail Underlying error detail.
-	 * @return string
-	 */
-	public static function error_box( $where, $detail ) {
-		$show = ( function_exists( 'current_user_can' ) && current_user_can( 'manage_options' ) )
-			|| ( isset( $_GET['g2ab_debug'] ) && '1' === $_GET['g2ab_debug'] ); // phpcs:ignore WordPress.Security.NonceVerification
-		if ( $show ) {
-			$body = sprintf(
-				/* translators: 1: shortcode/method, 2: underlying error */
-				__( 'Booking widget error in %1$s: %2$s', 'g2a-booking' ),
-				(string) $where,
-				(string) $detail
-			);
-		} else {
-			$body = __( 'The booking form is temporarily unavailable. Please refresh the page, or call us and our team will book you right in.', 'g2a-booking' );
-		}
-		return '<div class="g2ab g2ab-error" style="margin:24px auto;max-width:680px;padding:16px 20px;border:1px solid #cc3333;border-radius:8px;background:#fff;color:#a00000;font:14px/1.5 system-ui,-apple-system,sans-serif;">'
-			. '<p style="margin:0;">' . esc_html( $body ) . '</p></div>';
+		// Mark booking pages uncacheable EARLY (before render) so the wp_rest nonce
+		// embedded in the form can't be served stale from a full-page/edge cache and
+		// 403 the booking POST. The mid-render call in render_lane_booking() is too
+		// late for page caches that snapshot at the end of the request.
+		add_action( 'template_redirect', array( $this, 'maybe_mark_booking_page_uncacheable' ) );
 	}
 
 	public function register_assets() {
@@ -297,6 +93,30 @@ final class G2AB_Frontend {
 	}
 
 	/**
+	 * If the current singular view contains a booking shortcode, force it to be
+	 * uncacheable so its embedded wp_rest nonce stays fresh. Runs at
+	 * template_redirect — early enough for page-cache plugins — and emits a
+	 * no-store header for edge/CDN caches that ignore DONOTCACHEPAGE.
+	 */
+	public function maybe_mark_booking_page_uncacheable() {
+		if ( is_admin() ) {
+			return;
+		}
+		$post = get_post();
+		if ( ! $post instanceof WP_Post ) {
+			return;
+		}
+		$content = (string) $post->post_content;
+		if ( ! has_shortcode( $content, 'g2a_lane_booking' ) && ! has_shortcode( $content, 'g2a_booking_form' ) ) {
+			return;
+		}
+		$this->mark_booking_page_dynamic();
+		if ( ! headers_sent() ) {
+			header( 'Cache-Control: no-store, no-cache, must-revalidate, max-age=0' );
+		}
+	}
+
+	/**
 	 * Read all design-token options and return a sanitised tokens array.
 	 *
 	 * Each token has a sensible default that matches the reference design
@@ -304,16 +124,18 @@ final class G2AB_Frontend {
 	 */
 	private function get_design_tokens() {
 		$tokens = array(
+			// Defaults match the Guns2Ammo dark/orange identity. These are only
+			// fallbacks — any value saved in the Form Customizer still wins.
 			'theme'           => sanitize_key( get_option( 'g2ab_form_theme', 'midnight' ) ),
 			'layout'          => sanitize_key( get_option( 'g2ab_form_layout', 'split' ) ),
-			'primary'         => $this->sanitize_color( get_option( 'g2ab_form_primary', '#5B7BFF' ) ),
-			'accent'          => $this->sanitize_color( get_option( 'g2ab_form_accent', '#7C9CFF' ) ),
-			'bg'              => $this->sanitize_color( get_option( 'g2ab_form_bg', '#0B1020' ) ),
-			'surface'         => $this->sanitize_color( get_option( 'g2ab_form_surface', '#121833' ) ),
-			'surface2'        => $this->sanitize_color( get_option( 'g2ab_form_surface2', '#0E1530' ) ),
+			'primary'         => $this->sanitize_color( get_option( 'g2ab_form_primary', '#D2691E' ) ),
+			'accent'          => $this->sanitize_color( get_option( 'g2ab_form_accent', '#F9A825' ) ),
+			'bg'              => $this->sanitize_color( get_option( 'g2ab_form_bg', '#0F1115' ) ),
+			'surface'         => $this->sanitize_color( get_option( 'g2ab_form_surface', '#171B22' ) ),
+			'surface2'        => $this->sanitize_color( get_option( 'g2ab_form_surface2', '#1E242E' ) ),
 			'text'            => $this->sanitize_color( get_option( 'g2ab_form_text', '#FFFFFF' ) ),
-			'muted'           => $this->sanitize_color( get_option( 'g2ab_form_muted', '#8B93B4' ) ),
-			'border'          => $this->sanitize_color( get_option( 'g2ab_form_border', 'rgba(255,255,255,0.08)' ) ),
+			'muted'           => $this->sanitize_color( get_option( 'g2ab_form_muted', '#8A95A5' ) ),
+			'border'          => $this->sanitize_color( get_option( 'g2ab_form_border', 'rgba(255,255,255,0.10)' ) ),
 			'radius'          => $this->sanitize_radius( get_option( 'g2ab_form_radius', '16' ) ),
 			'radius_pill'     => $this->sanitize_radius( get_option( 'g2ab_form_radius_pill', '999' ) ),
 			'font'            => sanitize_key( get_option( 'g2ab_form_font', 'inter' ) ),
@@ -329,21 +151,8 @@ final class G2AB_Frontend {
 			'continue_label'  => sanitize_text_field( get_option( 'g2ab_form_continue_label', __( 'Continue', 'g2a-booking' ) ) ),
 			'submit_label'    => sanitize_text_field( get_option( 'g2ab_form_submit_label', '' ) ),
 			'shadow'          => sanitize_text_field( get_option( 'g2ab_form_shadow', '0 30px 80px rgba(8,12,32,0.45)' ) ),
-			'support_notice'  => wp_kses_post( get_option( 'g2ab_form_support_notice', self::default_support_notice() ) ),
 		);
 		return apply_filters( 'g2ab_form_design_tokens', $tokens );
-	}
-
-	/**
-	 * Default copy for the support note rendered under the booking widget.
-	 * Editable (or blankable to hide) via Settings → Form Customizer
-	 * (g2ab_form_support_notice).
-	 */
-	public static function default_support_notice() {
-		return 'Having trouble booking your lane? Send us a quick message and our team will take care of the rest '
-			. '— we want your experience at Guns 2 Ammo to be effortless from the first click to the firing line. '
-			. 'Thanks for choosing Guns 2 Ammo — your range partner. '
-			. '<a href="/contact/">Contact Us</a>';
 	}
 
 	private function sanitize_color( $value ) {
@@ -444,17 +253,10 @@ final class G2AB_Frontend {
 				'booking_type' => 'lane-booking',
 				'form'         => 'default-lane-booking',
 				'theme'        => '',
-				// Event-driven mode: when source="events", the calendar only
-				// allows dates/times that have a published Event of event_type.
-				'source'       => '',
-				'event_type'   => '',
 			),
 			$atts,
 			'g2a_lane_booking'
 		);
-
-		$event_source = ( 'events' === sanitize_key( $atts['source'] ) );
-		$event_type   = sanitize_key( $atts['event_type'] );
 
 		$this->mark_booking_page_dynamic();
 		$this->enqueue_assets();
@@ -479,22 +281,6 @@ final class G2AB_Frontend {
 
 		$resource_type  = $this->resource_type_for_booking_type( $booking_type );
 		$resource_label = $this->resource_label_for_type( $resource_type );
-
-		// Event-gating may also be declared on the booking type's own settings
-		// (or by the bundled ladies-tuesday convention), so a plain
-		// [g2a_lane_booking booking_type="ladies-tuesday"] gates too. The
-		// shortcode `source="events"` attribute always wins when present.
-		if ( ! $event_source ) {
-			$bt_settings = isset( $booking_type->settings ) ? json_decode( (string) $booking_type->settings, true ) : array();
-			$bt_settings = is_array( $bt_settings ) ? $bt_settings : array();
-			if ( ! empty( $bt_settings['event_source'] ) && 'events' === sanitize_key( (string) $bt_settings['event_source'] ) ) {
-				$event_source = true;
-				$event_type   = $event_type ?: sanitize_key( (string) ( $bt_settings['event_type'] ?? '' ) );
-			} elseif ( 'ladies-tuesday' === sanitize_title( (string) $booking_type->slug ) ) {
-				$event_source = true;
-				$event_type   = $event_type ?: 'ladies-day';
-			}
-		}
 
 		$resources = $wpdb->get_results( $wpdb->prepare(
 			"SELECT id, name, slug, capacity FROM {$wpdb->prefix}g2ab_resources WHERE type = %s AND is_active = 1 ORDER BY sort_order ASC, name ASC",
@@ -543,8 +329,27 @@ final class G2AB_Frontend {
 		$price_total      = (float) $display_pric['total'];
 		$price_label      = $price_total <= 0 ? __( 'FREE', 'g2a-booking' ) : sprintf( '$%s', number_format( $price_total, 2 ) );
 
+		// Unified "what do you want to book?" switch — only shown when there are
+		// published events with upcoming dates. The lane flow below is unchanged;
+		// the event mode mounts the self-contained [g2a_event_booking] widget.
+		$event_widget = ( class_exists( 'G2AB_Events' ) ) ? do_shortcode( '[g2a_event_booking]' ) : '';
+		$has_events   = ( '' !== trim( (string) $event_widget ) && false === strpos( $event_widget, 'g2ab-evb--empty' ) );
+		$switch_id    = $instance_id . '-switch';
+
 		ob_start();
+
+		if ( $has_events ) :
 		?>
+		<div class="g2ab-unified g2ab-theme-<?php echo esc_attr( $tokens['theme'] ); ?>" id="<?php echo esc_attr( $switch_id ); ?>" style="<?php echo esc_attr( $this->build_css_vars( $tokens ) ); ?>">
+			<div class="g2ab-unified__switch">
+				<span class="g2ab-unified__q"><?php esc_html_e( 'What do you want to book?', 'g2a-booking' ); ?></span>
+				<div class="g2ab-unified__opts" role="tablist">
+					<button type="button" class="g2ab-unified__opt is-active" data-mode="lane"><?php esc_html_e( 'Lane / Range Time', 'g2a-booking' ); ?></button>
+					<button type="button" class="g2ab-unified__opt" data-mode="event"><?php esc_html_e( 'Events &amp; Classes', 'g2a-booking' ); ?></button>
+				</div>
+			</div>
+			<div class="g2ab-unified__panel" data-mode-panel="lane">
+		<?php endif; ?>
 		<div id="<?php echo esc_attr( $instance_id ); ?>"
 			class="g2ab g2ab-booking g2ab-theme-<?php echo esc_attr( $tokens['theme'] ); ?> g2ab-layout-<?php echo esc_attr( $tokens['layout'] ); ?> <?php echo $tokens['animations'] ? 'g2ab-animate' : 'g2ab-static'; ?>"
 			data-booking-type-id="<?php echo (int) $booking_type->id; ?>"
@@ -554,8 +359,6 @@ final class G2AB_Frontend {
 			data-duration="<?php echo (int) $booking_type->duration_min; ?>"
 			data-today="<?php echo esc_attr( $today ); ?>"
 			data-max-days="<?php echo (int) $max_days; ?>"
-			data-event-source="<?php echo $event_source ? '1' : '0'; ?>"
-			data-event-type="<?php echo esc_attr( $event_type ); ?>"
 			style="<?php echo esc_attr( $this->build_css_vars( $tokens ) ); ?>">
 
 			<div class="g2ab-shell">
@@ -667,7 +470,6 @@ final class G2AB_Frontend {
 							</div>
 							<div class="g2ab-pick__slots">
 								<p class="g2ab-pick__hint" data-slots-hint><?php esc_html_e( 'Pick a date to see available times', 'g2a-booking' ); ?></p>
-								<div class="g2ab-slots-notice" data-slots-notice hidden role="status" aria-live="polite"></div>
 								<div class="g2ab-slots" data-slots></div>
 							</div>
 						</div>
@@ -717,43 +519,53 @@ final class G2AB_Frontend {
 					     ───────────────────────────────────────────────── -->
 					<section class="g2ab-stage__panel" data-stage="done">
 						<div class="g2ab-done">
-							<canvas class="g2ab-done__confetti" data-confetti aria-hidden="true"></canvas>
 							<div class="g2ab-done__check" aria-hidden="true">
 								<svg viewBox="0 0 64 64" width="64" height="64"><circle cx="32" cy="32" r="30" fill="none" stroke="currentColor" stroke-width="3"/><path d="M20 33 L29 42 L45 24" fill="none" stroke="currentColor" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/></svg>
 							</div>
 							<h3 class="g2ab-done__title"><?php esc_html_e( 'Booking confirmed', 'g2a-booking' ); ?></h3>
 							<p class="g2ab-done__msg" data-done-msg></p>
-							<div class="g2ab-done__recap" data-done-recap hidden>
-								<div class="g2ab-done__recap-row"><span class="g2ab-done__recap-lbl"><?php esc_html_e( 'Lane', 'g2a-booking' ); ?></span><span class="g2ab-done__recap-val" data-done-resource></span></div>
-								<div class="g2ab-done__recap-row"><span class="g2ab-done__recap-lbl"><?php esc_html_e( 'When', 'g2a-booking' ); ?></span><span class="g2ab-done__recap-val" data-done-when></span></div>
-								<div class="g2ab-done__recap-row"><span class="g2ab-done__recap-lbl"><?php esc_html_e( 'Party', 'g2a-booking' ); ?></span><span class="g2ab-done__recap-val" data-done-party></span></div>
-							</div>
 							<p class="g2ab-done__id"><?php esc_html_e( 'Confirmation:', 'g2a-booking' ); ?> <code data-done-uuid></code></p>
-							<div class="g2ab-done__actions">
-								<button type="button" class="g2ab-btn g2ab-btn--primary g2ab-done__again" data-action="book-another">
-									<span class="g2ab-done__again-icon" aria-hidden="true">
-										<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>
-									</span>
-									<span><?php esc_html_e( 'Book Another Lane', 'g2a-booking' ); ?></span>
-								</button>
-								<a class="g2ab-btn g2ab-btn--ghost g2ab-done__home" href="<?php echo esc_url( home_url( '/' ) ); ?>"><?php esc_html_e( 'Done', 'g2a-booking' ); ?></a>
-							</div>
 						</div>
 					</section>
 
 				</main>
 			</div>
-
-			<?php if ( '' !== trim( wp_strip_all_tags( $tokens['support_notice'] ) ) ) : ?>
-				<aside class="g2ab-support-note">
-					<span class="g2ab-support-note__icon" aria-hidden="true">
-						<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg>
-					</span>
-					<div class="g2ab-support-note__body"><?php echo wp_kses_post( wpautop( $tokens['support_notice'] ) ); ?></div>
-				</aside>
-			<?php endif; ?>
 		</div>
 		<?php $this->render_inline_bootstrap( $instance_id ); ?>
+		<?php if ( $has_events ) : ?>
+			</div><!-- /lane panel -->
+			<div class="g2ab-unified__panel" data-mode-panel="event" hidden>
+				<?php echo $event_widget; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?>
+			</div>
+		</div><!-- /g2ab-unified -->
+		<style>
+		.g2ab-unified{max-width:980px;margin:24px auto;font-family:var(--g2ab-font,'Inter',system-ui,sans-serif);}
+		.g2ab-unified__switch{display:flex;flex-wrap:wrap;align-items:center;gap:12px 16px;background:var(--g2ab-surface,#171B22);border:1px solid var(--g2ab-border,#2A323D);border-top:4px solid var(--g2ab-primary,#D2691E);border-radius:12px 12px 0 0;padding:16px 20px;}
+		.g2ab-unified__q{font-size:13px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--g2ab-text,#E8E8E8);}
+		.g2ab-unified__opts{display:inline-flex;gap:8px;background:var(--g2ab-bg,#0F1115);padding:4px;border-radius:999px;border:1px solid var(--g2ab-border,#2A323D);}
+		.g2ab-unified__opt{appearance:none;border:none;background:transparent;color:var(--g2ab-muted,#8A95A5);padding:8px 18px;border-radius:999px;font-size:13px;font-weight:700;cursor:pointer;transition:all .15s ease;}
+		.g2ab-unified__opt.is-active{background:var(--g2ab-primary,#D2691E);color:#fff;}
+		.g2ab-unified__panel{margin-top:-1px;}
+		.g2ab-unified__panel[hidden]{display:none;}
+		.g2ab-unified .g2ab-evb{margin-top:0;border-radius:0 0 12px 12px;border-top:none;max-width:none;}
+		</style>
+		<script>
+		(function(){
+			var root = document.getElementById(<?php echo wp_json_encode( $switch_id ); ?>);
+			if (!root || root.dataset.switchBooted) return;
+			root.dataset.switchBooted = '1';
+			var opts = root.querySelectorAll('.g2ab-unified__opt');
+			var panels = root.querySelectorAll('[data-mode-panel]');
+			opts.forEach(function(btn){
+				btn.addEventListener('click', function(){
+					var mode = btn.getAttribute('data-mode');
+					opts.forEach(function(b){ b.classList.toggle('is-active', b===btn); });
+					panels.forEach(function(p){ p.hidden = (p.getAttribute('data-mode-panel') !== mode); });
+				});
+			});
+		})();
+		</script>
+		<?php endif; ?>
 		<?php
 		return ob_get_clean();
 	}
@@ -762,14 +574,7 @@ final class G2AB_Frontend {
 	 * Build a `style=""` attribute value with CSS custom properties.
 	 */
 	private function build_css_vars( $tokens ) {
-		// The `site` and `ladies` skins define their full palette in CSS
-		// (so they can react to the host theme's light/dark mode). Inline
-		// color vars would defeat that cascade — emit shape/typography only.
-		$inherits = in_array( $tokens['theme'], array( 'site', 'ladies' ), true );
-		$vars = $inherits ? array(
-			'--g2ab-radius'      => $tokens['radius'] . 'px',
-			'--g2ab-radius-pill' => $tokens['radius_pill'] . 'px',
-		) : array(
+		$vars = array(
 			'--g2ab-primary'  => $tokens['primary'],
 			'--g2ab-accent'   => $tokens['accent'],
 			'--g2ab-bg'       => $tokens['bg'],
@@ -910,50 +715,6 @@ final class G2AB_Frontend {
 		) );
 	}
 
-	public function render_ladies_tuesday_booking( $atts = array() ) {
-		$atts = shortcode_atts(
-			array(
-				'booking_type' => 'ladies-tuesday',
-				'form'         => 'ladies-tuesday-booking',
-				'theme'        => '',
-				// Ladies Tuesday is event-gated by default: bookings are only
-				// offered on dates/times that have a published "ladies-day"
-				// Event. Override with source="" to fall back to the open grid.
-				'source'       => 'events',
-				'event_type'   => 'ladies-day',
-			),
-			$atts,
-			'g2a_ladies_tuesday_booking'
-		);
-		return $this->render_lane_booking( $atts );
-	}
-
-	public function render_classes_booking( $atts = array() ) {
-		$atts = shortcode_atts(
-			array(
-				'booking_type' => 'ccw-class',
-				'form'         => 'default-class-booking',
-				'theme'        => '',
-			),
-			$atts,
-			'g2a_classes_booking'
-		);
-		return $this->render_lane_booking( $atts );
-	}
-
-	public function render_resource_booking( $atts = array() ) {
-		$atts = shortcode_atts(
-			array(
-				'booking_type' => 'resource-booking',
-				'form'         => 'default-resource-booking',
-				'theme'        => '',
-			),
-			$atts,
-			'g2a_resource_booking'
-		);
-		return $this->render_lane_booking( $atts );
-	}
-
 	private function render_error( $msg ) {
 		return '<div class="g2ab g2ab-error"><p>' . esc_html( $msg ) . '</p></div>';
 	}
@@ -991,24 +752,16 @@ final class G2AB_Frontend {
 	private function render_inline_bootstrap( $instance_id ) {
 		$config = array(
 			'rest_url'    => esc_url_raw( rest_url( G2AB_REST_NAMESPACE . '/' ) ),
+			'ajax_url'    => esc_url_raw( admin_url( 'admin-ajax.php' ) ),
 			'nonce'       => wp_create_nonce( 'wp_rest' ),
 			'instance_id' => $instance_id,
 			'i18n'        => array(
 				'loading'  => __( 'Loading available times…', 'g2a-booking' ),
 				'no_slots' => __( 'No times available on this date.', 'g2a-booking' ),
-				'load_failed' => __( 'We couldn\'t load times just now — please refresh the page and try again.', 'g2a-booking' ),
 				'closed'   => __( 'Closed on this date.', 'g2a-booking' ),
 				'submitting' => __( 'Reserving…', 'g2a-booking' ),
 				'failed'   => __( 'Could not complete booking. Please try again.', 'g2a-booking' ),
 				'pick_first' => __( 'Please choose a date and time first.', 'g2a-booking' ),
-				'loading_dates' => __( 'Loading available dates…', 'g2a-booking' ),
-				'no_events'  => __( 'No upcoming dates are open right now — please check back soon.', 'g2a-booking' ),
-				'pick_event' => __( 'Pick a highlighted date to see available times', 'g2a-booking' ),
-				/* translators: 1: number of available slots, 2: human date */
-				'slots_available'    => __( '%1$s time slots available on %2$s', 'g2a-booking' ),
-				/* translators: %s human date */
-				'slot_available_one' => __( '1 time slot available on %s', 'g2a-booking' ),
-				'fully_booked'       => __( 'Fully booked for this date — try another day', 'g2a-booking' ),
 				'months'   => array(
 					__( 'January', 'g2a-booking' ), __( 'February', 'g2a-booking' ), __( 'March', 'g2a-booking' ), __( 'April', 'g2a-booking' ),
 					__( 'May', 'g2a-booking' ), __( 'June', 'g2a-booking' ), __( 'July', 'g2a-booking' ), __( 'August', 'g2a-booking' ),
@@ -1023,16 +776,14 @@ final class G2AB_Frontend {
 		// below never runs (page-builder removes the script, JS minifier
 		// breaks the IIFE, etc). Without this, the form would submit as
 		// GET and dump all fields into the URL.
-		//
-		// IMPORTANT: only preventDefault() here — never stopPropagation().
-		// This is a capture-phase listener, so stopPropagation() would block
-		// the event from ever reaching the per-instance submit handler below
-		// and the "Reserve" button would silently do nothing.
 		if (!window.__g2abFormGuard) {
 			window.__g2abFormGuard = true;
 			document.addEventListener('submit', function(e){
 				var form = e.target;
 				if (form && form.nodeType === 1 && (form.classList.contains('g2ab-form') || form.getAttribute('data-g2ab-form') === '1')) {
+					// preventDefault stops the native GET submit. Do NOT stopPropagation
+					// here — that would also keep the per-instance AJAX submit handler
+					// (bound on the same form) from ever receiving the event.
 					e.preventDefault();
 				}
 			}, true);
@@ -1045,24 +796,7 @@ final class G2AB_Frontend {
 
 			var $ = function(sel, ctx){ return (ctx || root).querySelector(sel); };
 			var $$ = function(sel, ctx){ return Array.prototype.slice.call((ctx || root).querySelectorAll(sel)); };
-			// Public GET endpoints must NOT carry a nonce: pages are often served
-			// from a page cache, so the nonce baked into the HTML can be stale —
-			// and WordPress core rejects ANY REST request bearing an invalid
-			// X-WP-Nonce with a 403 before the route even runs. That is what made
-			// logged-out guests see "No times available" on every date while
-			// logged-in users (who bypass the page cache) saw slots normally.
-			function headers(hasBody){ var h = {}; if (hasBody !== false) { h['Content-Type'] = 'application/json'; if (config.nonce) h['X-WP-Nonce'] = config.nonce; } return h; }
-			// Fetch a fresh wp_rest nonce just-in-time (used before POSTs so a
-			// cached page's stale nonce can never fail the booking submit).
-			function freshNonce(){
-				return fetch(config.rest_url + 'session', { headers: { 'Accept': 'application/json' }, cache: 'no-store' })
-					.then(function(r){ return r.json(); })
-					.then(function(json){
-						if (json && json.success && json.data && json.data.nonce) { config.nonce = json.data.nonce; }
-						return config.nonce;
-					})
-					.catch(function(){ return config.nonce; });
-			}
+			function headers(hasBody){ var h = {}; if (hasBody !== false) h['Content-Type'] = 'application/json'; if (config.nonce) h['X-WP-Nonce'] = config.nonce; return h; }
 			function pad(n){ return n < 10 ? '0'+n : ''+n; }
 			function ymd(d){ return d.getFullYear() + '-' + pad(d.getMonth()+1) + '-' + pad(d.getDate()); }
 
@@ -1078,17 +812,6 @@ final class G2AB_Frontend {
 				viewYear: 0,
 				viewMonth: 0
 			};
-
-			// ── event-driven mode ───────────────────────────────────
-			// When data-event-source="1" the calendar only unlocks dates that
-			// have a published Event of data-event-type, and time slots come
-			// straight from each event's window (not the open business-hours
-			// grid). Used by Ladies Tuesday.
-			var eventMode    = root.dataset.eventSource === '1';
-			var eventType    = root.dataset.eventType || '';
-			var eventDates   = null;   // Set of 'YYYY-MM-DD' strings, null until loaded.
-			var eventByDate  = {};     // { 'YYYY-MM-DD': { title, slots:[…] } }
-			var eventLoading = false;
 
 			// ── stage navigation ────────────────────────────────────
 			function showStage(name){
@@ -1126,16 +849,8 @@ final class G2AB_Frontend {
 					var isPast = iso < today;
 					var isTooFar = cellDate > maxDate;
 					var disabled = isPast || isTooFar;
-					var isEvent = false;
-					if (eventMode) {
-						// In event mode a date is bookable only if it's in the
-						// loaded event set. Until the set loads, everything is
-						// locked so users can't click a date with no times.
-						isEvent = eventDates ? eventDates.has(iso) : false;
-						if (!isEvent) disabled = true;
-					}
 					var selected = iso === state.date;
-					var cls = 'g2ab-cal__cell' + (disabled ? ' is-disabled' : ' is-clickable') + (selected ? ' is-selected' : '') + (isEvent ? ' is-event' : '');
+					var cls = 'g2ab-cal__cell' + (disabled ? ' is-disabled' : ' is-clickable') + (selected ? ' is-selected' : '');
 					html += '<button class="' + cls + '" type="button" data-date="' + iso + '"' + (disabled ? ' disabled' : '') + '>' + d + '</button>';
 				}
 				grid.innerHTML = html;
@@ -1148,112 +863,6 @@ final class G2AB_Frontend {
 				renderCalendar();
 			}
 
-			// ── event-map loading (event mode only) ─────────────────
-			// Pulls the dates + per-date slot windows for the configured event
-			// type once per resource, then re-renders the calendar and jumps
-			// to the first month that has a bookable date.
-			function loadEventMap(done){
-				if (!eventMode || !state.resourceId) { if (done) done(); return; }
-				eventLoading = true;
-				var hint = $('[data-slots-hint]');
-				if (hint) { hint.style.display = ''; hint.textContent = config.i18n.loading_dates || config.i18n.loading; }
-				var url = config.rest_url + 'event-availability'
-					+ '?resource_id=' + encodeURIComponent(state.resourceId)
-					+ '&event_type=' + encodeURIComponent(eventType)
-					+ '&booking_type_id=' + encodeURIComponent(parseInt(root.dataset.bookingTypeId, 10) || 0);
-				fetch(url, { headers: headers(false) })
-					.then(function(r){ return r.json(); })
-					.then(function(json){
-						var data = (json && json.success) ? json.data : null;
-						eventByDate = (data && data.by_date && typeof data.by_date === 'object') ? data.by_date : {};
-						var list = (data && data.dates && data.dates.length) ? data.dates : [];
-						eventDates = new Set(list);
-						eventLoading = false;
-						// Jump the calendar to the first available month.
-						if (list.length) {
-							var first = list[0].split('-');
-							state.viewYear = parseInt(first[0], 10);
-							state.viewMonth = parseInt(first[1], 10) - 1;
-						}
-						renderCalendar();
-						if (hint) {
-							hint.style.display = '';
-							hint.textContent = list.length ? (config.i18n.pick_event || config.i18n.pick_first) : (config.i18n.no_events || config.i18n.no_slots);
-						}
-						if (done) done();
-					})
-					.catch(function(){
-						eventLoading = false;
-						eventDates = new Set();
-						eventByDate = {};
-						renderCalendar();
-						if (hint) { hint.style.display = ''; hint.textContent = config.i18n.no_events || config.i18n.no_slots; }
-						if (done) done();
-					});
-			}
-
-			// Availability notice rendered above the slot grid: shows how many
-			// slots are still open on the selected date, or a "fully booked"
-			// line when every slot is taken. Hidden when no date is selected.
-			function updateSlotsNotice(slots){
-				var note = $('[data-slots-notice]');
-				if (!note) return;
-				if (!state.date || !slots || !slots.length) {
-					note.hidden = true;
-					note.textContent = '';
-					note.className = 'g2ab-slots-notice';
-					return;
-				}
-				var avail = 0;
-				for (var i = 0; i < slots.length; i++) { if (slots[i].available) avail++; }
-				var dateLabel = state.date;
-				try {
-					dateLabel = new Date(state.date + 'T12:00:00').toLocaleDateString(undefined, { weekday:'short', month:'short', day:'numeric' });
-				} catch (e) {}
-				if (avail === 0) {
-					note.textContent = config.i18n.fully_booked;
-					note.className = 'g2ab-slots-notice is-full';
-				} else if (avail === 1) {
-					note.textContent = (config.i18n.slot_available_one || '1 slot on %s').replace('%s', dateLabel);
-					note.className = 'g2ab-slots-notice';
-				} else {
-					note.textContent = (config.i18n.slots_available || '%1$s slots on %2$s').replace('%1$s', avail).replace('%2$s', dateLabel);
-					note.className = 'g2ab-slots-notice';
-				}
-				note.hidden = false;
-			}
-
-			// Render an array of slot objects into the slots box.
-			function renderSlots(slots){
-				var box = $('[data-slots]');
-				var hint = $('[data-slots-hint]');
-				if (!box) return;
-				if (hint) hint.style.display = 'none';
-				box.innerHTML = '';
-				updateSlotsNotice(slots);
-				if (!slots || !slots.length) { box.innerHTML = '<p class="g2ab-muted">' + config.i18n.no_slots + '</p>'; return; }
-				slots.forEach(function(slot){
-					var btn = document.createElement('button');
-					btn.type = 'button';
-					btn.className = 'g2ab-slot';
-					btn.textContent = slot.label;
-					btn.disabled = !slot.available;
-					btn.dataset.start = slot.start;
-					btn.dataset.end = slot.end;
-					if (slot.available) {
-						btn.addEventListener('click', function(){
-							$$('.g2ab-slot', box).forEach(function(s){ s.classList.remove('is-selected'); });
-							btn.classList.add('is-selected');
-							state.slot = { start: slot.start, end: slot.end, label: slot.label };
-							updateSummary();
-							var go = $('[data-go-form]');
-							if (go) go.disabled = false;
-						});
-					}
-					box.appendChild(btn);
-				});
-			}
-
 			// ── slot loading ────────────────────────────────────────
 			function loadSlots(){
 				var box = $('[data-slots]');
@@ -1261,33 +870,43 @@ final class G2AB_Frontend {
 				if (!box) return;
 				if (!state.resourceId || !state.date) {
 					box.innerHTML = '';
-					updateSlotsNotice(null);
-					if (hint) { hint.style.display = ''; hint.textContent = (eventMode ? (config.i18n.pick_event || config.i18n.pick_first) : config.i18n.pick_first) || 'Pick a date'; }
-					return;
-				}
-				// Event mode: slots come from the pre-loaded event window — no
-				// per-date round-trip, and never the open business-hours grid.
-				if (eventMode) {
-					var entry = eventByDate[state.date];
-					renderSlots(entry ? entry.slots : []);
+					if (hint) { hint.style.display = ''; hint.textContent = config.i18n.pick_first || 'Pick a date'; }
 					return;
 				}
 				if (hint) { hint.style.display = ''; hint.textContent = config.i18n.loading; }
 				box.innerHTML = '';
-				updateSlotsNotice(null);
 				fetch(config.rest_url + 'availability?resource_id=' + encodeURIComponent(state.resourceId) + '&date=' + encodeURIComponent(state.date) + '&duration=' + encodeURIComponent(root.dataset.duration || 60), { headers: headers(false) })
 					.then(function(r){ return r.json(); })
 					.then(function(json){
 						var data = json && json.success ? json.data : null;
-						// A failed request is NOT the same as an empty day — say so,
-						// instead of telling the guest there are no times.
-						if (!data) { if (hint) hint.style.display = 'none'; box.innerHTML = '<p class="g2ab-muted">' + (config.i18n.load_failed || config.i18n.no_slots) + '</p>'; return; }
-						if (data.closed) { if (hint) hint.style.display = 'none'; box.innerHTML = '<p class="g2ab-muted">' + config.i18n.closed + '</p>'; return; }
-						renderSlots(data.slots);
+						if (hint) hint.style.display = 'none';
+						if (!data) { box.innerHTML = '<p class="g2ab-muted">' + config.i18n.no_slots + '</p>'; return; }
+						if (data.closed) { box.innerHTML = '<p class="g2ab-muted">' + config.i18n.closed + '</p>'; return; }
+						if (!data.slots || !data.slots.length) { box.innerHTML = '<p class="g2ab-muted">' + config.i18n.no_slots + '</p>'; return; }
+						data.slots.forEach(function(slot){
+							var btn = document.createElement('button');
+							btn.type = 'button';
+							btn.className = 'g2ab-slot';
+							btn.textContent = slot.label;
+							btn.disabled = !slot.available;
+							btn.dataset.start = slot.start;
+							btn.dataset.end = slot.end;
+							if (slot.available) {
+								btn.addEventListener('click', function(){
+									$$('.g2ab-slot', box).forEach(function(s){ s.classList.remove('is-selected'); });
+									btn.classList.add('is-selected');
+									state.slot = { start: slot.start, end: slot.end, label: slot.label };
+									updateSummary();
+									var go = $('[data-go-form]');
+									if (go) go.disabled = false;
+								});
+							}
+							box.appendChild(btn);
+						});
 					})
 					.catch(function(){
 						if (hint) hint.style.display = 'none';
-						box.innerHTML = '<p class="g2ab-muted">' + (config.i18n.load_failed || config.i18n.no_slots) + '</p>';
+						box.innerHTML = '<p class="g2ab-muted">' + config.i18n.no_slots + '</p>';
 					});
 			}
 
@@ -1318,13 +937,7 @@ final class G2AB_Frontend {
 					state.resourceName = chip.dataset.resourceName || '';
 					state.slot = null;
 					var go = $('[data-go-form]'); if (go) go.disabled = true;
-					if (eventMode) {
-						// Availability is per-resource, so re-pull the event map.
-						state.date = '';
-						loadEventMap(function(){ loadSlots(); });
-					} else {
-						loadSlots();
-					}
+					loadSlots();
 					updateSummary();
 				});
 			});
@@ -1367,14 +980,8 @@ final class G2AB_Frontend {
 					event.preventDefault();
 					var errEl = $('[data-form-error]', form);
 					var submit = form.querySelector('button[type="submit"]');
-					// Stash the resting label on the dataset on first submit
-					// so the "Book Another Lane" reset can restore it after
-					// the success path leaves the button in its "Reserving…"
-					// state.
-					if (submit && !submit.dataset.labelOriginal) {
-						submit.dataset.labelOriginal = submit.textContent;
-					}
-					var originalLabel = submit ? (submit.dataset.labelOriginal || submit.textContent) : '';
+					var originalLabel = submit ? submit.textContent : '';
+					try {
 					if (!state.resourceId || !state.slot) {
 						if (errEl) { errEl.textContent = config.i18n.pick_first; errEl.hidden = false; }
 						return;
@@ -1394,18 +1001,35 @@ final class G2AB_Frontend {
 						party_size: parseInt(fields.party_size || 1, 10),
 						fields: fields
 					});
-					function postBooking(){
-						return fetch(config.rest_url + 'bookings', { method: 'POST', headers: headers(true), body: payload })
-							.then(function(r){ return r.json().then(function(j){ return {ok:r.ok, status:r.status, body:j}; }); });
+					function postBooking(nonce){
+						var h = { 'Content-Type': 'application/json' };
+						if (nonce) h['X-WP-Nonce'] = nonce;
+						return fetch(config.rest_url + 'bookings', { method: 'POST', headers: h, credentials: 'same-origin', body: payload })
+							.then(function(r){ return r.json().then(function(j){ return {ok:r.ok, status:r.status, body:j}; }, function(){ return {ok:r.ok, status:r.status, body:null}; }); });
 					}
-					// Always grab a fresh nonce first: the one rendered into the
-					// page may be hours old if the page came from a cache, and a
-					// stale nonce 403s the booking for logged-out guests.
-					freshNonce().then(postBooking)
+					function isStaleNonce(res){
+						return res && res.status === 403 && res.body && (res.body.code === 'g2ab_invalid_nonce' || res.body.code === 'rest_cookie_invalid_nonce');
+					}
+					postBooking(config.nonce)
 					.then(function(res){
-						var nonceFailed = res && !res.ok && res.body && (res.body.code === 'g2ab_invalid_nonce' || res.body.code === 'rest_cookie_invalid_nonce');
-						if (nonceFailed) { return freshNonce().then(postBooking); }
-						return res;
+						// If the page's nonce was stale (e.g. served from a full-page
+						// cache), grab a fresh one from the uncached endpoint and retry
+						// the booking POST once before giving up.
+						if (!isStaleNonce(res)) return res;
+						// Refresh via admin-ajax (NOT the REST /nonce route): a logged-in
+						// member's nonceless REST call hits the same cookie-nonce gate and
+						// also returns "Cookie check failed". admin-ajax runs in their
+						// authenticated context and mints a nonce valid for them.
+						var ajaxBase = config.ajax_url || (window.location.origin + '/wp-admin/admin-ajax.php');
+						var refreshUrl = ajaxBase + (ajaxBase.indexOf('?') === -1 ? '?' : '&') + 'action=g2ab_refresh_nonce';
+						return fetch(refreshUrl, { headers: { 'Accept': 'application/json' }, credentials: 'same-origin' })
+							.then(function(r){ return r.json(); })
+							.then(function(j){
+								var fresh = j && j.data && j.data.nonce ? j.data.nonce : '';
+								if (fresh) config.nonce = fresh;
+								return postBooking(fresh || config.nonce);
+							})
+							.catch(function(){ return res; });
 					})
 					.then(function(res){
 						if (!res.ok || !res.body || !res.body.success) {
@@ -1417,139 +1041,20 @@ final class G2AB_Frontend {
 						var msgEl = $('[data-done-msg]'); var uuidEl = $('[data-done-uuid]');
 						if (msgEl) msgEl.textContent = data.message || '';
 						if (uuidEl) uuidEl.textContent = data.uuid || '';
-						populateRecap(fields);
 						showStage('done');
-						fireConfetti();
 					})
 					.catch(function(err){
 						if (errEl) { errEl.textContent = err.message || config.i18n.failed; errEl.hidden = false; }
 						if (submit) { submit.disabled = false; submit.textContent = originalLabel; }
 					});
+					} catch (e) {
+						// Surface any synchronous error on-screen instead of leaving the
+						// button silently stuck — turns a "dead button" into a readable
+						// message and re-enables the button so it can be retried.
+						if (errEl) { errEl.textContent = (e && e.message) ? ('Booking error: ' + e.message) : config.i18n.failed; errEl.hidden = false; }
+						if (submit) { submit.disabled = false; submit.textContent = originalLabel; }
+					}
 				});
-			}
-
-			// ── done stage helpers ──────────────────────────────────
-			// Pretty-prints the data already in `state` + the field map into the
-			// confirmation recap card. Robust to missing fields: each row is
-			// individually hidden when its source value is empty.
-			function populateRecap(fields) {
-				var recap = $('[data-done-recap]'); if (!recap) return;
-				var resourceEl = $('[data-done-resource]');
-				var whenEl     = $('[data-done-when]');
-				var partyEl    = $('[data-done-party]');
-				if (resourceEl) resourceEl.textContent = state.resourceName || '—';
-				if (whenEl && state.slot) {
-					try {
-						var dt = new Date(state.slot.start.replace(' ', 'T'));
-						whenEl.textContent = dt.toLocaleDateString(undefined, { weekday: 'long', month: 'short', day: 'numeric' }) + ' · ' + state.slot.label;
-					} catch (e) { whenEl.textContent = state.slot.start; }
-				}
-				if (partyEl && fields) {
-					var n = parseInt(fields.party_size || 1, 10);
-					partyEl.textContent = n + (n === 1 ? ' shooter' : ' shooters');
-				}
-				recap.hidden = false;
-			}
-
-			// Lightweight canvas confetti. Burst once, ~110 particles, ~1.5s
-			// settle. Skips on prefers-reduced-motion. No external dep.
-			function fireConfetti() {
-				if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
-				var cvs = $('[data-confetti]'); if (!cvs) return;
-				var doneEl = cvs.parentElement; if (!doneEl) return;
-				var w = doneEl.clientWidth, h = doneEl.clientHeight;
-				cvs.width  = w * (window.devicePixelRatio || 1);
-				cvs.height = h * (window.devicePixelRatio || 1);
-				cvs.style.width = w + 'px'; cvs.style.height = h + 'px';
-				var ctx = cvs.getContext('2d');
-				ctx.scale(window.devicePixelRatio || 1, window.devicePixelRatio || 1);
-				var brand = getComputedStyle(doneEl).getPropertyValue('--g2ab-primary').trim() || '#E8802F';
-				var accent = getComputedStyle(doneEl).getPropertyValue('--g2ab-accent').trim() || '#C9A84C';
-				var palette = [brand, accent, '#ffffff', '#5B7BFF', '#9DE05B'];
-				var parts = [];
-				var N = 110;
-				for (var i = 0; i < N; i++) {
-					parts.push({
-						x: w / 2 + (Math.random() - 0.5) * 30,
-						y: h * 0.35,
-						vx: (Math.random() - 0.5) * 8,
-						vy: -Math.random() * 9 - 4,
-						g: 0.32 + Math.random() * 0.18,
-						w: 5 + Math.random() * 6,
-						h: 8 + Math.random() * 10,
-						r: Math.random() * Math.PI,
-						vr: (Math.random() - 0.5) * 0.35,
-						c: palette[(Math.random() * palette.length) | 0],
-						life: 0
-					});
-				}
-				var start = performance.now();
-				var maxLife = 1500;
-				function frame(t) {
-					var elapsed = t - start;
-					ctx.clearRect(0, 0, w, h);
-					var alive = false;
-					for (var i = 0; i < parts.length; i++) {
-						var p = parts[i];
-						p.x += p.vx; p.y += p.vy; p.vy += p.g; p.r += p.vr; p.life = elapsed;
-						if (p.life >= maxLife || p.y > h + 40) continue;
-						alive = true;
-						ctx.save();
-						ctx.globalAlpha = Math.max(0, 1 - (p.life / maxLife));
-						ctx.translate(p.x, p.y); ctx.rotate(p.r);
-						ctx.fillStyle = p.c;
-						ctx.fillRect(-p.w / 2, -p.h / 2, p.w, p.h);
-						ctx.restore();
-					}
-					if (alive) requestAnimationFrame(frame);
-					else ctx.clearRect(0, 0, w, h);
-				}
-				requestAnimationFrame(frame);
-			}
-
-			// Reset just enough state for a SECOND booking by the same user,
-			// pre-filling the resource + date so the second flow takes 2
-			// clicks instead of 5. Time slot is intentionally cleared (the
-			// previous slot is now taken). The form values from the first
-			// booking are preserved so the customer doesn't have to retype
-			// their name/email/phone.
-			function bookAnother() {
-				// Clear the previous slot — staying on the same date so the
-				// customer doesn't have to navigate the calendar again.
-				state.slot = null;
-				// Reset the submit button + error region so the form can
-				// fire again. The "Continue" button is enabled by slot
-				// selection, so it's reset implicitly.
-				var form = root.querySelector('[data-form]');
-				if (form) {
-					var submit = form.querySelector('button[type="submit"]');
-					if (submit) {
-						submit.disabled = false;
-						// Restore the resting label captured on first submit
-						// (the success path leaves it at "Reserving…").
-						if (submit.dataset.labelOriginal) {
-							submit.textContent = submit.dataset.labelOriginal;
-						}
-					}
-					var errEl = form.querySelector('[data-form-error]');
-					if (errEl) { errEl.hidden = true; errEl.textContent = ''; }
-				}
-				var go = $('[data-go-form]'); if (go) go.disabled = true;
-				// Re-pull availability for the same date so the just-booked
-				// slot is visually marked taken and the customer can pick a
-				// different one.
-				if (state.date) {
-					try { loadSlots(); } catch (e) {}
-				}
-				showStage('time');
-				// Smooth-scroll the booking root into view so the next pick
-				// is obvious on mobile.
-				try { root.scrollIntoView({ behavior: 'smooth', block: 'start' }); } catch (e) {}
-			}
-
-			var againBtn = root.querySelector('[data-action="book-another"]');
-			if (againBtn) {
-				againBtn.addEventListener('click', function () { bookAnother(); });
 			}
 
 			// ── boot ────────────────────────────────────────────────
@@ -1557,7 +1062,6 @@ final class G2AB_Frontend {
 			state.viewYear = now.getFullYear();
 			state.viewMonth = now.getMonth();
 			renderCalendar();
-			if (eventMode) { loadEventMap(); }
 			showStage('time');
 		})(<?php echo wp_json_encode( $config ); ?>);
 		</script>

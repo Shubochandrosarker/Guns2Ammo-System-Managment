@@ -74,41 +74,19 @@ final class G2AB_REST_Calendar_Controller {
 		register_rest_route( G2AB_REST_NAMESPACE, '/bookings/(?P<uuid>[a-f0-9-]{36})/customer-reschedule', array(
 			'methods'             => WP_REST_Server::CREATABLE,
 			'callback'            => array( $this, 'customer_reschedule' ),
-			'permission_callback' => array( $this, 'permission_token_gated' ),
+			'permission_callback' => '__return_true', // gated by confirm_token
 		) );
 
 		register_rest_route( G2AB_REST_NAMESPACE, '/bookings/(?P<uuid>[a-f0-9-]{36})/customer-cancel', array(
 			'methods'             => WP_REST_Server::CREATABLE,
 			'callback'            => array( $this, 'customer_cancel' ),
-			'permission_callback' => array( $this, 'permission_token_gated' ),
+			'permission_callback' => '__return_true', // gated by confirm_token
 		) );
 	}
 
 	/* ---------------------------------------------------------------------
 	 * Permission helpers
 	 * ------------------------------------------------------------------- */
-
-	/**
-	 * Token-gated public routes (customer reschedule + cancel). The handler
-	 * itself validates confirm_token; this layer adds a cheap per-IP rate
-	 * limit so UUID enumeration is not free.
-	 */
-	public function permission_token_gated( WP_REST_Request $request ) {
-		list( $hits_cap, $window ) = (array) apply_filters( 'g2ab_token_gated_rate_limit', array( 60, 60 ) );
-		$ip   = function_exists( 'g2ab_get_client_ip' ) ? g2ab_get_client_ip() : (string) ( $_SERVER['REMOTE_ADDR'] ?? '' );
-		$key  = 'g2ab_rltkn_' . md5( $ip );
-		$hits = (int) get_transient( $key );
-		if ( $hits >= max( 1, (int) $hits_cap ) ) {
-			return new WP_Error( 'g2ab_rate_limited', __( 'Too many requests. Try again shortly.', 'g2a-booking' ), array( 'status' => 429 ) );
-		}
-		static $seen = array();
-		$rid = spl_object_id( $request );
-		if ( ! isset( $seen[ $rid ] ) ) {
-			$seen[ $rid ] = true;
-			set_transient( $key, $hits + 1, max( 5, (int) $window ) );
-		}
-		return true;
-	}
 
 	public function permission_admin_read( WP_REST_Request $request ) {
 		if ( ! current_user_can( 'manage_g2ab_bookings' ) ) {
@@ -172,15 +150,18 @@ final class G2AB_REST_Calendar_Controller {
 		$bt       = $wpdb->prefix . 'g2ab_booking_types';
 		$rt       = $wpdb->prefix . 'g2ab_resources';
 
+		$ev       = $wpdb->prefix . 'g2ab_events';
 		$sql = "SELECT b.id, b.uuid, b.customer_name, b.customer_email, b.party_size,
 		               b.start_at, b.end_at, b.status, b.payment_mode, b.total_amount,
 		               b.paid_amount, b.notes, b.cancel_reason, b.original_start_at,
-		               b.resource_id, b.booking_type_id, b.source,
+		               b.resource_id, b.booking_type_id, b.source, b.event_id,
 		               bt.name AS booking_type_name, bt.category AS booking_type_category,
-		               r.name AS resource_name, r.type AS resource_type
+		               r.name AS resource_name, r.type AS resource_type,
+		               e.title AS event_title, e.color AS event_color, e.category AS event_category
 		          FROM {$bookings} b
 		          LEFT JOIN {$bt} bt ON bt.id = b.booking_type_id
 		          LEFT JOIN {$rt} r ON r.id  = b.resource_id
+		          LEFT JOIN {$ev} e ON e.id  = b.event_id
 		         WHERE b.start_at < %s AND b.end_at > %s";
 
 		$params = array( $end, $start );
@@ -582,10 +563,11 @@ final class G2AB_REST_Calendar_Controller {
 				'customer_email' => $row->customer_email,
 				'party_size'     => (int) $row->party_size,
 				'resource_id'    => (int) $row->resource_id,
-				'resource_name'  => $row->resource_name,
-				'resource_type'  => $row->resource_type,
-				'booking_type'   => $row->booking_type_name,
-				'category'       => $row->booking_type_category,
+				'resource_name'  => ! empty( $row->event_id ) ? ( $row->event_title ?: __( 'Event', 'g2a-booking' ) ) : $row->resource_name,
+				'resource_type'  => ! empty( $row->event_id ) ? __( 'Event', 'g2a-booking' ) : $row->resource_type,
+				'booking_type'   => ! empty( $row->event_id ) ? ( $row->event_title ?: $row->booking_type_name ) : $row->booking_type_name,
+				'category'       => ! empty( $row->event_id ) ? ( $row->event_category ?: 'event' ) : $row->booking_type_category,
+				'is_event'       => ! empty( $row->event_id ),
 				'source'         => $row->source,
 				'notes'          => $row->notes,
 				'cancel_reason'  => $row->cancel_reason,
@@ -594,9 +576,9 @@ final class G2AB_REST_Calendar_Controller {
 	}
 
 	private function event_title( $row ) {
-		$name = $row->customer_name ?: __( 'Guest', 'g2a-booking' );
-		$res  = $row->resource_name ?: '';
-		return $res ? sprintf( '%s — %s', $name, $res ) : $name;
+		$name  = $row->customer_name ?: __( 'Guest', 'g2a-booking' );
+		$label = ! empty( $row->event_title ) ? $row->event_title : ( $row->resource_name ?: '' );
+		return $label ? sprintf( '%s — %s', $name, $label ) : $name;
 	}
 
 	private function iso_local( $sql_dt ) {

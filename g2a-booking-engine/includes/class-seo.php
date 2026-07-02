@@ -17,6 +17,7 @@ final class G2AB_Seo {
 
 	private static $instance = null;
 	private $current_type = null;
+	private $current_event = null;
 
 	const TEMPLATES = array(
 		'tactical_lane'      => array( 'label' => 'Tactical Lane Range',     'category' => 'lane',       'icon' => '◎', 'color' => '#D2691E' ),
@@ -34,12 +35,17 @@ final class G2AB_Seo {
 
 	private function __construct() {
 		add_action( 'init', array( $this, 'add_rewrite_rules' ) );
+		// Flush rewrite rules once per plugin version so /event/{slug}/ (and the
+		// sitemap) actually resolve after an update — otherwise the landing pages
+		// 404 until someone manually re-saves Permalinks.
+		add_action( 'init', array( $this, 'maybe_flush_rewrites' ), 11 );
 		add_filter( 'query_vars', array( $this, 'add_query_vars' ) );
+		// Real events (g2ab_events) get a clean, responsive landing page. This
+		// runs before the booking-type template fallback below.
+		add_action( 'template_redirect', array( $this, 'maybe_render_event_landing' ), 5 );
 		add_filter( 'template_include', array( $this, 'maybe_load_template' ), 99 );
-		add_filter( 'pre_handle_404', array( $this, 'prevent_event_404' ), 10, 2 );
 		add_action( 'wp_head', array( $this, 'inject_head' ), 1 );
 		add_action( 'init', array( $this, 'add_sitemap_endpoint' ) );
-		add_action( 'init', array( $this, 'maybe_flush_rewrites_for_version' ), 20 );
 		add_action( 'template_redirect', array( $this, 'maybe_serve_sitemap' ) );
 
 		// Flush rewrites on activation hook from main plugin.
@@ -54,6 +60,28 @@ final class G2AB_Seo {
 		flush_rewrite_rules();
 	}
 
+	/**
+	 * Keep the /event/{slug}/ rewrite alive — self-healing.
+	 *
+	 * Flushes when the plugin version changes OR when our rule has gone
+	 * missing from the live rewrite table (e.g. another plugin or a permalink
+	 * re-save wiped it). Without the missing-rule check, a one-time version
+	 * gate would leave every event landing page 404'ing until someone manually
+	 * re-saved Permalinks. Runs at most once per page load, then no-ops.
+	 */
+	public function maybe_flush_rewrites() {
+		$rules     = get_option( 'rewrite_rules' );
+		$has_rule  = is_array( $rules ) && array_key_exists( '^event/([^/]+)/?$', $rules );
+		$ver_match = ( get_option( 'g2ab_seo_rewrites_version' ) === G2AB_VERSION );
+		if ( $has_rule && $ver_match ) {
+			return;
+		}
+		$this->add_rewrite_rules();
+		$this->add_sitemap_endpoint();
+		flush_rewrite_rules( false );
+		update_option( 'g2ab_seo_rewrites_version', G2AB_VERSION );
+	}
+
 	public function add_rewrite_rules() {
 		add_rewrite_rule( '^event/([^/]+)/?$', 'index.php?g2ab_event=$matches[1]', 'top' );
 	}
@@ -66,31 +94,6 @@ final class G2AB_Seo {
 	public function add_sitemap_endpoint() {
 		add_rewrite_rule( '^g2a-events-sitemap\.xml$', 'index.php?g2ab_sitemap=1', 'top' );
 		add_rewrite_tag( '%g2ab_sitemap%', '1' );
-	}
-
-	public function maybe_flush_rewrites_for_version() {
-		$key = 'g2ab_rewrite_version';
-		if ( get_option( $key ) === G2AB_VERSION ) {
-			return;
-		}
-		$this->add_rewrite_rules();
-		$this->add_sitemap_endpoint();
-		flush_rewrite_rules( false );
-		update_option( $key, G2AB_VERSION );
-	}
-
-	public function prevent_event_404( $preempt, $wp_query ) {
-		$slug = get_query_var( 'g2ab_event' );
-		if ( empty( $slug ) ) {
-			return $preempt;
-		}
-		$type = $this->fetch_type( sanitize_title( $slug ) );
-		if ( ! $type ) {
-			return $preempt;
-		}
-		$wp_query->is_404 = false;
-		status_header( 200 );
-		return true;
 	}
 
 	public function maybe_serve_sitemap() {
@@ -108,6 +111,196 @@ final class G2AB_Seo {
 		}
 		echo '</urlset>';
 		exit;
+	}
+
+	/**
+	 * If the /event/{slug}/ slug matches a real Event, render a clean,
+	 * responsive landing page (hero + description + booking widget) and exit
+	 * before the legacy booking-type template machinery runs.
+	 */
+	public function maybe_render_event_landing() {
+		$slug = get_query_var( 'g2ab_event' );
+		if ( empty( $slug ) || ! class_exists( 'G2AB_Events' ) ) {
+			return;
+		}
+		$event = G2AB_Events::get_event( sanitize_title( $slug ) );
+		if ( ! $event || 'publish' !== $event->status ) {
+			return; // fall through to booking-type fallback / 404.
+		}
+		$this->current_event = $event;
+		add_filter( 'document_title_parts', array( $this, 'override_event_title' ) );
+		add_action( 'wp_head', array( $this, 'inject_event_head' ), 1 );
+
+		status_header( 200 );
+		nocache_headers();
+		get_header();
+		$this->render_event_landing_page( $event );
+		get_footer();
+		exit;
+	}
+
+	public function override_event_title( $parts ) {
+		if ( $this->current_event ) {
+			$parts['title'] = $this->current_event->title;
+		}
+		return $parts;
+	}
+
+	public function inject_event_head() {
+		$ev = $this->current_event;
+		if ( ! $ev ) {
+			return;
+		}
+		$url  = home_url( '/event/' . $ev->slug . '/' );
+		$desc = $ev->summary ? $ev->summary : wp_trim_words( wp_strip_all_tags( (string) $ev->description ), 30 );
+		$next = G2AB_Events::next_occurrence( $ev->id );
+
+		echo '<link rel="canonical" href="' . esc_url( $url ) . '" />' . "\n";
+		echo '<meta name="description" content="' . esc_attr( $desc ) . '" />' . "\n";
+		echo '<meta property="og:type" content="event" />' . "\n";
+		echo '<meta property="og:title" content="' . esc_attr( $ev->title ) . '" />' . "\n";
+		echo '<meta property="og:description" content="' . esc_attr( $desc ) . '" />' . "\n";
+		echo '<meta property="og:url" content="' . esc_url( $url ) . '" />' . "\n";
+		if ( $ev->image_url ) {
+			echo '<meta property="og:image" content="' . esc_url( $ev->image_url ) . '" />' . "\n";
+		}
+
+		$schema = array(
+			'@context' => 'https://schema.org',
+			'@type'    => 'Event',
+			'name'     => $ev->title,
+			'description' => $desc,
+			'eventStatus' => 'https://schema.org/EventScheduled',
+			'eventAttendanceMode' => 'https://schema.org/OfflineEventAttendanceMode',
+			'url'      => $url,
+		);
+		if ( $next ) {
+			$schema['startDate'] = gmdate( 'c', strtotime( $next->start_at ) );
+			$schema['endDate']   = gmdate( 'c', strtotime( $next->end_at ) );
+		}
+		if ( $ev->location ) {
+			$schema['location'] = array( '@type' => 'Place', 'name' => $ev->location );
+		}
+		if ( (int) $ev->is_free === 1 || (float) $ev->price <= 0 ) {
+			$schema['offers'] = array( '@type' => 'Offer', 'price' => '0', 'priceCurrency' => get_option( 'g2ab_currency', 'USD' ), 'availability' => 'https://schema.org/InStock' );
+		} else {
+			$schema['offers'] = array( '@type' => 'Offer', 'price' => (string) number_format( (float) $ev->price, 2, '.', '' ), 'priceCurrency' => get_option( 'g2ab_currency', 'USD' ), 'availability' => 'https://schema.org/InStock', 'url' => $url );
+		}
+		echo '<script type="application/ld+json">' . wp_json_encode( $schema, JSON_UNESCAPED_SLASHES ) . '</script>' . "\n";
+	}
+
+	/**
+	 * The actual landing markup. Fully responsive, Guns2Ammo dark/orange.
+	 */
+	public function render_event_landing_page( $ev ) {
+		$next     = G2AB_Events::next_occurrence( $ev->id );
+		$accent   = $ev->color ? $ev->color : '#D2691E';
+		$is_free  = ( (int) $ev->is_free === 1 || (float) $ev->price <= 0 );
+		$cat      = G2AB_Events::category_label( $ev->category );
+		$has_img  = ! empty( $ev->image_url );
+		$theme    = apply_filters( 'g2ab_event_landing_theme', get_option( 'g2ab_event_landing_theme', 'light' ), $ev );
+		$theme    = ( 'dark' === $theme ) ? 'dark' : 'light';
+
+		// Solid, theme-driven palette — no transparent layers, so a theme's own
+		// page-title hero can never bleed through and muddy the text.
+		if ( 'light' === $theme ) {
+			$bg = '#F6F7FA'; $surface = '#FFFFFF'; $surface2 = '#F0F3F8'; $border = '#E3E8F0';
+			$text = '#161B22'; $muted = '#5B6678'; $heroBg = 'linear-gradient(180deg,#FFFFFF 0%,#F1F4F9 100%)';
+			$heroText = '#13181F'; $heroSub = '#4A5568'; $statBg = '#FFFFFF'; $green = '#1F9E54';
+		} else {
+			$bg = '#0B0D11'; $surface = '#15191F'; $surface2 = '#1C2229'; $border = '#2A323D';
+			$text = '#EDEFF2'; $muted = '#9AA4B2'; $heroBg = 'linear-gradient(160deg,#0B0D11 0%,#161B22 60%,#0B0D11 100%)';
+			$heroText = '#FFFFFF'; $heroSub = '#C7D0DC'; $statBg = '#1C2229'; $green = '#36C26B';
+		}
+		?>
+		<style>
+		.g2ab-elp{--bg:<?php echo esc_attr( $bg ); ?>;--surface:<?php echo esc_attr( $surface ); ?>;--surface2:<?php echo esc_attr( $surface2 ); ?>;--border:<?php echo esc_attr( $border ); ?>;--text:<?php echo esc_attr( $text ); ?>;--muted:<?php echo esc_attr( $muted ); ?>;--accent:<?php echo esc_attr( $accent ); ?>;--green:<?php echo esc_attr( $green ); ?>;background:var(--bg);color:var(--text);font-family:'Inter',system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;margin:0;position:relative;z-index:1;}
+		.g2ab-elp *{box-sizing:border-box;}
+		.g2ab-elp__hero{position:relative;background:<?php echo $has_img ? "url('" . esc_url( $ev->image_url ) . "') center/cover" : $heroBg; // phpcs:ignore ?>;padding:0;border-bottom:3px solid var(--accent);overflow:hidden;}
+		.g2ab-elp__hero-scrim{position:relative;<?php if ( $has_img ) : ?>background:linear-gradient(180deg,rgba(8,10,14,.62),rgba(8,10,14,.82));<?php endif; ?>padding:74px 20px 64px;text-align:center;}
+		<?php if ( $has_img ) : ?>.g2ab-elp__hero .g2ab-elp__title{color:#fff;}.g2ab-elp__hero .g2ab-elp__summary{color:#E6EAF0;}.g2ab-elp__hero .g2ab-elp__stat{background:rgba(255,255,255,.12);border-color:rgba(255,255,255,.22);}.g2ab-elp__hero .g2ab-elp__stat-k{color:#D7DEE8;}.g2ab-elp__hero .g2ab-elp__stat-v{color:#fff;}.g2ab-elp__hero .g2ab-elp__flag{color:#E6EAF0;border-color:rgba(255,255,255,.3);}<?php endif; ?>
+		.g2ab-elp__hero-inner{position:relative;max-width:900px;margin:0 auto;}
+		.g2ab-elp__eyebrow{display:inline-flex;align-items:center;gap:8px;color:var(--accent);font-family:'Inter','Segoe UI',system-ui,-apple-system,sans-serif;font-size:13px;font-weight:700;letter-spacing:.26em;text-transform:uppercase;margin-bottom:14px;opacity:0;animation:g2ab-elp-up .6s ease .05s forwards;}
+		.g2ab-elp__eyebrow::before,.g2ab-elp__eyebrow::after{content:"";width:26px;height:2px;background:var(--accent);opacity:.7;}
+		.g2ab-elp__title{margin:0 auto 14px;max-width:18ch;font-family:'Inter','Segoe UI',system-ui,-apple-system,sans-serif;font-size:clamp(32px,6vw,58px);line-height:1.03;font-weight:700;letter-spacing:.01em;text-transform:uppercase;color:<?php echo esc_attr( $heroText ); ?>;opacity:0;animation:g2ab-elp-up .6s ease .12s forwards;}
+		.g2ab-elp__summary{margin:0 auto;max-width:620px;color:<?php echo esc_attr( $heroSub ); ?>;font-size:clamp(15px,2.1vw,18px);line-height:1.55;opacity:0;animation:g2ab-elp-up .6s ease .2s forwards;}
+		.g2ab-elp__strip{display:flex;flex-wrap:wrap;justify-content:center;gap:12px;margin:28px auto 0;max-width:760px;opacity:0;animation:g2ab-elp-up .6s ease .3s forwards;}
+		.g2ab-elp__stat{min-width:118px;background:<?php echo esc_attr( $statBg ); ?>;border:1px solid var(--border);border-radius:12px;padding:13px 18px;text-align:left;box-shadow:0 6px 18px rgba(20,28,46,.06);}
+		.g2ab-elp__stat-k{display:block;font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);font-weight:700;margin-bottom:4px;}
+		.g2ab-elp__stat-v{display:block;font-family:'Inter','Segoe UI',system-ui,-apple-system,sans-serif;font-size:21px;font-weight:700;color:var(--text);line-height:1.1;}
+		.g2ab-elp__stat-v.is-accent{color:var(--accent);}
+		.g2ab-elp__stat-v.is-green{color:var(--green);}
+		.g2ab-elp__flags{display:flex;flex-wrap:wrap;justify-content:center;gap:8px;margin:18px auto 0;opacity:0;animation:g2ab-elp-up .6s ease .38s forwards;}
+		.g2ab-elp__flag{font-size:11px;letter-spacing:.05em;color:var(--muted);border:1px solid var(--border);border-radius:999px;padding:5px 12px;background:var(--surface);}
+		.g2ab-elp__flag--gold{color:#C98A1B;border-color:rgba(201,138,27,.4);}
+		@keyframes g2ab-elp-up{from{opacity:0;transform:translateY(12px);}to{opacity:1;transform:translateY(0);}}
+		.g2ab-elp__wrap{max-width:1080px;margin:0 auto;padding:42px 20px 72px;display:grid;grid-template-columns:1.2fr .92fr;gap:36px;align-items:start;}
+		@media (max-width:880px){.g2ab-elp__wrap{grid-template-columns:1fr;gap:24px;padding-top:30px;}}
+		.g2ab-elp__back{display:inline-flex;align-items:center;gap:6px;margin:0 0 22px;color:var(--muted);text-decoration:none;font-size:13px;font-weight:600;}
+		.g2ab-elp__back:hover{color:var(--accent);}
+		.g2ab-elp__body h2{font-family:'Inter','Segoe UI',system-ui,-apple-system,sans-serif;font-size:22px;letter-spacing:.04em;text-transform:uppercase;color:var(--text);margin:0 0 14px;display:flex;align-items:center;gap:12px;}
+		.g2ab-elp__body h2::before{content:"";width:26px;height:3px;background:var(--accent);border-radius:2px;}
+		.g2ab-elp__desc{color:var(--muted);font-size:15.5px;line-height:1.78;}
+		.g2ab-elp__desc p{margin:0 0 14px;}
+		.g2ab-elp__dates{margin-top:26px;}
+		.g2ab-elp__date-pill{display:inline-flex;align-items:baseline;gap:8px;background:var(--surface);border:1px solid var(--border);border-left:3px solid var(--accent);border-radius:8px;padding:8px 14px;margin:0 8px 8px 0;font-size:13px;color:var(--text);}
+		.g2ab-elp__date-pill b{font-family:'Inter','Segoe UI',system-ui,-apple-system,sans-serif;}
+		.g2ab-elp__date-pill small{color:var(--green);font-weight:700;}
+		.g2ab-elp__book{position:sticky;top:20px;}
+		@media (max-width:880px){.g2ab-elp__book{position:static;}}
+		.g2ab-elp .g2ab-evb{margin-top:0;max-width:none;}
+		</style>
+		<div class="g2ab-elp g2ab-elp--<?php echo esc_attr( $theme ); ?>">
+			<header class="g2ab-elp__hero">
+				<div class="g2ab-elp__hero-scrim">
+					<div class="g2ab-elp__hero-inner">
+						<span class="g2ab-elp__eyebrow"><?php echo esc_html( strtoupper( $cat ) ); ?></span>
+						<h1 class="g2ab-elp__title"><?php echo esc_html( $ev->title ); ?></h1>
+						<?php if ( $ev->summary ) : ?><p class="g2ab-elp__summary"><?php echo esc_html( $ev->summary ); ?></p><?php endif; ?>
+						<div class="g2ab-elp__strip">
+							<?php if ( $next ) : ?>
+							<div class="g2ab-elp__stat"><span class="g2ab-elp__stat-k"><?php esc_html_e( 'Next date', 'g2a-booking' ); ?></span><span class="g2ab-elp__stat-v"><?php echo esc_html( G2AB_Events::format_local( $next->start_at, 'D, M j' ) ); ?></span></div>
+							<div class="g2ab-elp__stat"><span class="g2ab-elp__stat-k"><?php esc_html_e( 'Time', 'g2a-booking' ); ?></span><span class="g2ab-elp__stat-v"><?php echo esc_html( G2AB_Events::format_local( $next->start_at, 'g:i A' ) ); ?></span></div>
+							<?php endif; ?>
+							<div class="g2ab-elp__stat"><span class="g2ab-elp__stat-k"><?php esc_html_e( 'Price', 'g2a-booking' ); ?></span><span class="g2ab-elp__stat-v is-accent"><?php echo $is_free ? esc_html__( 'FREE', 'g2a-booking' ) : '$' . esc_html( number_format( (float) $ev->price, 2 ) ); ?></span></div>
+							<?php if ( $next ) : ?>
+							<div class="g2ab-elp__stat"><span class="g2ab-elp__stat-k"><?php esc_html_e( 'Seats left', 'g2a-booking' ); ?></span><span class="g2ab-elp__stat-v <?php echo (int) $next->seats_left > 0 ? 'is-green' : 'is-accent'; ?>"><?php echo (int) $next->seats_left > 0 ? (int) $next->seats_left : esc_html__( 'Full', 'g2a-booking' ); ?></span></div>
+							<?php endif; ?>
+						</div>
+						<div class="g2ab-elp__flags">
+							<span class="g2ab-elp__flag">⏱ <?php echo (int) $ev->duration_min; ?> <?php esc_html_e( 'min', 'g2a-booking' ); ?></span>
+							<?php if ( $ev->location ) : ?><span class="g2ab-elp__flag">⌖ <?php echo esc_html( $ev->location ); ?></span><?php endif; ?>
+							<?php if ( (int) $ev->requires_waiver ) : ?><span class="g2ab-elp__flag">⚠ <?php esc_html_e( 'Waiver required', 'g2a-booking' ); ?></span><?php endif; ?>
+							<?php if ( (int) $ev->members_only ) : ?><span class="g2ab-elp__flag g2ab-elp__flag--gold">★ <?php esc_html_e( 'Members only', 'g2a-booking' ); ?></span><?php endif; ?>
+						</div>
+					</div>
+				</div>
+			</header>
+
+			<div class="g2ab-elp__wrap">
+				<div class="g2ab-elp__body">
+					<a class="g2ab-elp__back" href="<?php echo esc_url( home_url( '/' ) ); ?>">← <?php esc_html_e( 'Back to site', 'g2a-booking' ); ?></a>
+					<?php if ( trim( (string) $ev->description ) !== '' ) : ?>
+						<h2><?php esc_html_e( 'About this event', 'g2a-booking' ); ?></h2>
+						<div class="g2ab-elp__desc"><?php echo wp_kses_post( wpautop( $ev->description ) ); ?></div>
+					<?php endif; ?>
+					<?php
+					$upcoming = G2AB_Events::get_occurrences( $ev->id, array( 'upcoming_only' => true, 'limit' => 8 ) );
+					if ( count( $upcoming ) > 1 ) : ?>
+						<div class="g2ab-elp__dates">
+							<h2><?php esc_html_e( 'Upcoming dates', 'g2a-booking' ); ?></h2>
+							<?php foreach ( $upcoming as $o ) : ?>
+								<span class="g2ab-elp__date-pill"><b><?php echo esc_html( G2AB_Events::format_local( $o->start_at, 'D, M j · g:i A' ) ); ?></b> <small><?php echo (int) $o->seats_left > 0 ? (int) $o->seats_left . ' ' . esc_html__( 'left', 'g2a-booking' ) : esc_html__( 'full', 'g2a-booking' ); ?></small></span>
+							<?php endforeach; ?>
+						</div>
+					<?php endif; ?>
+				</div>
+				<div class="g2ab-elp__book">
+					<?php echo do_shortcode( '[g2a_event_booking event="' . (int) $ev->id . '" theme="' . esc_attr( $theme ) . '" heading="' . esc_attr( $ev->title ) . '"]' ); ?>
+				</div>
+			</div>
+		</div>
+		<?php
 	}
 
 	public function maybe_load_template( $template ) {
@@ -622,11 +815,10 @@ final class G2AB_Seo {
 	}
 
 	private function render_booking_widget( $variant ) {
-		$slug = $this->current_type && ! empty( $this->current_type->slug ) ? $this->current_type->slug : 'lane-booking';
 		?>
 		<section id="book" class="g2ab-lp__book">
 			<h2 class="g2ab-lp__h2"><span class="g2ab-lp__h2-num">03</span> RESERVE YOUR SPOT</h2>
-			<?php echo do_shortcode( '[g2a_booking_form booking_type="' . esc_attr( $slug ) . '"]' ); ?>
+			<?php echo do_shortcode( '[g2a_lane_booking]' ); ?>
 		</section>
 		<?php
 	}
@@ -664,18 +856,18 @@ final class G2AB_Seo {
 		.g2ab-lp__hero-camo{position:absolute;inset:0;opacity:.06;background-image:repeating-linear-gradient(45deg,transparent 0,transparent 10px,#4A5D3A 10px,#4A5D3A 14px),repeating-linear-gradient(-45deg,transparent 0,transparent 16px,var(--accent) 16px,var(--accent) 19px);pointer-events:none;}
 		.g2ab-lp__hero-grid{position:absolute;inset:0;background-image:linear-gradient(rgba(255,255,255,.04) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.04) 1px,transparent 1px);background-size:48px 48px;pointer-events:none;}
 		.g2ab-lp__hero-inner{position:relative;max-width:1100px;margin:0 auto;text-align:center;}
-		.g2ab-lp__hero-kicker{display:inline-block;background:var(--accent);color:#fff;padding:6px 14px;font-family:"Rajdhani","Oswald",Impact,sans-serif;font-size:11px;letter-spacing:.18em;font-weight:700;margin-bottom:18px;border-radius:2px;}
-		.g2ab-lp__hero-title{font-family:"Rajdhani","Oswald",Impact,sans-serif;font-size:clamp(40px,7vw,72px);line-height:1.05;letter-spacing:.04em;text-transform:uppercase;color:#fff;margin:0 0 18px;text-shadow:3px 3px 0 #4A5D3A;}
+		.g2ab-lp__hero-kicker{display:inline-block;background:var(--accent);color:#fff;padding:6px 14px;font-family:"Inter","Segoe UI",system-ui,-apple-system,sans-serif;font-size:11px;letter-spacing:.18em;font-weight:700;margin-bottom:18px;border-radius:2px;}
+		.g2ab-lp__hero-title{font-family:"Inter","Segoe UI",system-ui,-apple-system,sans-serif;font-size:clamp(40px,7vw,72px);line-height:1.05;letter-spacing:.04em;text-transform:uppercase;color:#fff;margin:0 0 18px;}
 		.g2ab-lp__hero-sub{font-size:clamp(15px,2vw,18px);color:#8A95A5;max-width:720px;margin:0 auto 28px;line-height:1.6;}
-		.g2ab-lp__hero-cta{display:inline-flex;align-items:center;gap:14px;background:var(--accent);color:#fff !important;padding:18px 32px;text-decoration:none;font-family:"Rajdhani","Oswald",Impact,sans-serif;font-size:16px;letter-spacing:.16em;font-weight:700;text-transform:uppercase;border-radius:2px;border:2px solid var(--accent);transition:all .15s ease;}
+		.g2ab-lp__hero-cta{display:inline-flex;align-items:center;gap:14px;background:var(--accent);color:#fff !important;padding:18px 32px;text-decoration:none;font-family:"Inter","Segoe UI",system-ui,-apple-system,sans-serif;font-size:16px;letter-spacing:.16em;font-weight:700;text-transform:uppercase;border-radius:2px;border:2px solid var(--accent);transition:all .15s ease;}
 		.g2ab-lp__hero-cta:hover{background:transparent;color:var(--accent) !important;letter-spacing:.2em;}
 		.g2ab-lp__facts{background:#0F1115;color:#E8E8E8;padding:0;}
 		.g2ab-lp__quick-facts{max-width:1100px;margin:0 auto;display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));}
 		.g2ab-lp__quick-facts>div{padding:24px;text-align:center;border-right:1px solid #2A323D;}
 		.g2ab-lp__quick-facts>div:last-child{border-right:none;}
-		.g2ab-lp__quick-facts strong{display:block;font-family:"Rajdhani","Oswald",sans-serif;font-size:28px;font-weight:700;color:#D2691E;line-height:1;}
+		.g2ab-lp__quick-facts strong{display:block;font-family:"Inter","Segoe UI",system-ui,-apple-system,sans-serif;font-size:28px;font-weight:700;color:#D2691E;line-height:1;}
 		.g2ab-lp__quick-facts span{display:block;font-size:10px;color:#8A95A5;letter-spacing:.16em;margin-top:6px;font-weight:700;}
-		.g2ab-lp__h2{font-family:"Rajdhani","Oswald",Impact,sans-serif;font-size:32px;letter-spacing:.06em;text-transform:uppercase;color:#0F1115;margin:0 0 28px;display:flex;align-items:center;gap:12px;}
+		.g2ab-lp__h2{font-family:"Inter","Segoe UI",system-ui,-apple-system,sans-serif;font-size:32px;letter-spacing:.06em;text-transform:uppercase;color:#0F1115;margin:0 0 28px;display:flex;align-items:center;gap:12px;}
 		.g2ab-lp__h2-num{display:inline-flex;align-items:center;justify-content:center;width:36px;height:36px;background:#D2691E;color:#fff;font-size:14px;font-weight:700;border-radius:3px;}
 		.g2ab-lp__features{padding:64px 24px;background:#fff;}
 		.g2ab-lp__features-grid{max-width:1100px;margin:0 auto;display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:20px;}
@@ -687,17 +879,17 @@ final class G2AB_Seo {
 		.g2ab-lp__curriculum .g2ab-lp__h2{color:#fff;}
 		.g2ab-lp__curriculum-list{max-width:900px;margin:0 auto;list-style:none;padding:0;counter-reset:curr;}
 		.g2ab-lp__curriculum-list li{counter-increment:curr;padding:18px 22px 18px 70px;border-left:3px solid #D2691E;background:#1A1F26;margin-bottom:12px;position:relative;font-size:14px;line-height:1.6;}
-		.g2ab-lp__curriculum-list li::before{content:counter(curr,decimal-leading-zero);position:absolute;left:18px;top:18px;font-family:"Rajdhani",sans-serif;font-size:24px;font-weight:700;color:#D2691E;}
+		.g2ab-lp__curriculum-list li::before{content:counter(curr,decimal-leading-zero);position:absolute;left:18px;top:18px;font-family:"Inter","Segoe UI",system-ui,-apple-system,sans-serif;font-size:24px;font-weight:700;color:#D2691E;}
 		.g2ab-lp__tiers{padding:64px 24px;background:#fff;}
 		.g2ab-lp__tier-grid{max-width:1100px;margin:0 auto;display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:20px;}
 		.g2ab-lp__tier{position:relative;padding:32px 28px;background:#f8f9fa;border:1px solid #d0d4d9;text-align:center;border-top:4px solid #8A95A5;}
 		.g2ab-lp__tier.is-popular{border-top-color:#D2691E;background:#fffbe6;transform:scale(1.05);box-shadow:0 8px 32px rgba(0,0,0,.08);}
 		.g2ab-lp__tier-flag{position:absolute;top:0;right:0;background:#D2691E;color:#fff;padding:5px 14px;font-size:10px;letter-spacing:.1em;font-weight:700;}
-		.g2ab-lp__tier h3{margin:0 0 12px;font-family:"Rajdhani",sans-serif;font-size:22px;letter-spacing:.08em;}
-		.g2ab-lp__tier-price{font-family:"Rajdhani",sans-serif;font-size:48px;font-weight:700;color:#D2691E;line-height:1;}
+		.g2ab-lp__tier h3{margin:0 0 12px;font-family:"Inter","Segoe UI",system-ui,-apple-system,sans-serif;font-size:22px;letter-spacing:.08em;}
+		.g2ab-lp__tier-price{font-family:"Inter","Segoe UI",system-ui,-apple-system,sans-serif;font-size:48px;font-weight:700;color:#D2691E;line-height:1;}
 		.g2ab-lp__tier-price small{font-size:14px;color:#8A95A5;font-weight:400;margin-left:4px;}
 		.g2ab-lp__tier p{color:#3c434a;font-size:14px;margin:18px 0 24px;line-height:1.6;}
-		.g2ab-lp__btn{display:inline-block;background:#0F1115;color:#fff !important;padding:12px 28px;text-decoration:none;font-family:"Rajdhani",sans-serif;font-size:13px;letter-spacing:.12em;font-weight:700;text-transform:uppercase;border-radius:2px;}
+		.g2ab-lp__btn{display:inline-block;background:#0F1115;color:#fff !important;padding:12px 28px;text-decoration:none;font-family:"Inter","Segoe UI",system-ui,-apple-system,sans-serif;font-size:13px;letter-spacing:.12em;font-weight:700;text-transform:uppercase;border-radius:2px;}
 		.g2ab-lp__btn:hover{background:#D2691E;}
 		.g2ab-lp__book{padding:64px 24px;background:#f0f1f3;}
 		.g2ab-lp__book .g2ab-lp__h2{justify-content:center;}
@@ -705,11 +897,11 @@ final class G2AB_Seo {
 		.g2ab-lp__faq-list{max-width:880px;margin:0 auto;}
 		.g2ab-lp__faq{background:#f8f9fa;margin-bottom:8px;border-left:3px solid #D2691E;padding:0;}
 		.g2ab-lp__faq summary{padding:18px 22px;cursor:pointer;font-weight:600;font-size:15px;color:#0F1115;list-style:none;position:relative;}
-		.g2ab-lp__faq summary::after{content:"+";position:absolute;right:22px;top:18px;font-family:"Rajdhani",sans-serif;font-size:22px;color:#D2691E;font-weight:700;}
+		.g2ab-lp__faq summary::after{content:"+";position:absolute;right:22px;top:18px;font-family:"Inter","Segoe UI",system-ui,-apple-system,sans-serif;font-size:22px;color:#D2691E;font-weight:700;}
 		.g2ab-lp__faq[open] summary::after{content:"−";}
 		.g2ab-lp__faq p{padding:0 22px 20px;margin:0;color:#3c434a;line-height:1.7;font-size:14px;}
 		.g2ab-lp__cta-strip{padding:64px 24px;background:linear-gradient(135deg,#D2691E 0%,#0F1115 100%);text-align:center;color:#fff;}
-		.g2ab-lp__cta-strip h2{font-family:"Rajdhani","Oswald",Impact,sans-serif;font-size:36px;letter-spacing:.08em;text-transform:uppercase;margin:0 0 24px;color:#fff;}
+		.g2ab-lp__cta-strip h2{font-family:"Inter","Segoe UI",system-ui,-apple-system,sans-serif;font-size:36px;letter-spacing:.08em;text-transform:uppercase;margin:0 0 24px;color:#fff;}
 		.g2ab-lp__cta-strip .g2ab-lp__hero-cta{background:#fff;color:#0F1115 !important;border-color:#fff;}
 		.g2ab-lp__cta-strip .g2ab-lp__hero-cta:hover{background:transparent;color:#fff !important;}
 		';

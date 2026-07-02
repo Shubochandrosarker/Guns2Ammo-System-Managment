@@ -74,16 +74,8 @@ final class G2AB_Gateway_Fortis {
 		if ( ! $this->is_available() ) return new WP_Error( 'fortis_unconfigured', 'Fortis Pay is not configured.' );
 
 		$amount_cents = (int) round( $amount * 100 );
-		$meta = json_decode( (string) ( $booking->metadata ?? '' ), true );
-		$confirm_token = is_array( $meta ) ? (string) ( $meta['confirm_token'] ?? '' ) : '';
-		$success = add_query_arg(
-			array_filter( array( 'g2ab_paid' => $booking->uuid, 'gw' => 'fortis', 'confirm_token' => $confirm_token ) ),
-			home_url( '/' )
-		);
-		$cancel  = add_query_arg(
-			array_filter( array( 'g2ab_cancel' => $booking->uuid, 'confirm_token' => $confirm_token ) ),
-			home_url( '/' )
-		);
+		$success = add_query_arg( array( 'g2ab_paid' => $booking->uuid, 'gw' => 'fortis' ), home_url( '/' ) );
+		$cancel  = add_query_arg( array( 'g2ab_cancel' => $booking->uuid ), home_url( '/' ) );
 
 		$payload = array(
 			'transaction_amount' => $amount_cents,
@@ -297,22 +289,8 @@ final class G2AB_Gateway_Fortis {
 
 		$wpdb->update( $bt, array( 'status' => 'paid', 'paid_amount' => $amount, 'updated_at' => current_time( 'mysql' ) ), array( 'id' => $booking->id ), array( '%s', '%f', '%s' ), array( '%d' ) );
 
-		// SECURITY/CORRECTNESS: match an existing payment row by the transaction id
-		// reported by Fortis FIRST (which may have been pre-recorded with a temp
-		// id at create_intent time). Fall back to the latest pending row only
-		// when no precise match exists. Previously we always updated the most
-		// recent row, which could overwrite a different retry attempt.
 		$pt = $wpdb->prefix . 'g2ab_payments';
-		$existing = $wpdb->get_var( $wpdb->prepare(
-			"SELECT id FROM {$pt} WHERE booking_id = %d AND gateway = 'fortis' AND transaction_id = %s LIMIT 1",
-			$booking->id, $tx_id
-		) );
-		if ( ! $existing ) {
-			$existing = $wpdb->get_var( $wpdb->prepare(
-				"SELECT id FROM {$pt} WHERE booking_id = %d AND gateway = 'fortis' AND status IN ('pending','processing') ORDER BY id DESC LIMIT 1",
-				$booking->id
-			) );
-		}
+		$existing = $wpdb->get_var( $wpdb->prepare( "SELECT id FROM {$pt} WHERE booking_id = %d AND gateway = 'fortis' ORDER BY id DESC LIMIT 1", $booking->id ) );
 		if ( $existing ) {
 			$wpdb->update( $pt, array(
 				'transaction_id' => $tx_id,
@@ -321,19 +299,6 @@ final class G2AB_Gateway_Fortis {
 				'gateway_response' => wp_json_encode( $tx ),
 				'processed_at' => current_time( 'mysql' ),
 			), array( 'id' => $existing ), array( '%s', '%s', '%f', '%s', '%s' ), array( '%d' ) );
-		} else {
-			// No row matched — insert a new one so the payment is at least audited.
-			$wpdb->insert( $pt, array(
-				'booking_id' => $booking->id,
-				'gateway' => 'fortis',
-				'transaction_id' => $tx_id,
-				'status' => 'succeeded',
-				'amount' => $amount,
-				'currency' => strtoupper( $booking->currency ?? 'USD' ),
-				'gateway_response' => wp_json_encode( $tx ),
-				'processed_at' => current_time( 'mysql' ),
-				'created_at' => current_time( 'mysql' ),
-			) );
 		}
 
 		$wpdb->insert( $wpdb->prefix . 'g2ab_logs', array(

@@ -324,7 +324,7 @@ final class G2AB_Admin_Reports {
 		echo '<style>
 .g2ab-rp{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;}
 .g2ab-rp__header{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:18px;background:linear-gradient(135deg,#0F1115 0%,#1A1F26 100%);color:#E8E8E8;padding:24px 28px;margin:20px 0 16px;border-left:4px solid #D2691E;}
-.g2ab-rp__stencil{font-family:"Rajdhani","Oswald",Impact,sans-serif;font-size:30px;font-weight:700;letter-spacing:.12em;color:#fff;text-shadow:2px 2px 0 #4A5D3A;}
+.g2ab-rp__stencil{font-family:"Inter","Segoe UI",system-ui,-apple-system,sans-serif;font-size:30px;font-weight:700;letter-spacing:.04em;color:#fff;}
 .g2ab-rp__sub{margin:4px 0 0;color:#8A95A5;font-size:13px;text-transform:uppercase;letter-spacing:.08em;}
 .g2ab-rp__range{display:flex;gap:8px;align-items:center;background:rgba(255,255,255,.06);padding:10px 14px;flex-wrap:wrap;}
 .g2ab-rp__range label{font-size:10px;color:#8A95A5;letter-spacing:.08em;font-weight:700;}
@@ -335,11 +335,11 @@ final class G2AB_Admin_Reports {
 .g2ab-rp__kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px;margin-bottom:16px;}
 .g2ab-rp__kpi{background:#fff;border:1px solid #d0d4d9;padding:16px 18px;border-top:3px solid #D2691E;}
 .g2ab-rp__kpi span{display:block;font-size:10px;color:#8A95A5;letter-spacing:.1em;font-weight:700;}
-.g2ab-rp__kpi strong{display:block;font-family:"Rajdhani",sans-serif;font-size:26px;color:#0F1115;font-weight:700;line-height:1.1;margin-top:6px;}
+.g2ab-rp__kpi strong{display:block;font-family:"Inter","Segoe UI",system-ui,-apple-system,sans-serif;font-size:26px;color:#0F1115;font-weight:700;line-height:1.1;margin-top:6px;}
 .g2ab-rp__row{display:grid;grid-template-columns:1.4fr 1fr;gap:14px;margin-bottom:14px;}
 @media (max-width:1000px){.g2ab-rp__row{grid-template-columns:1fr;}}
 .g2ab-rp__panel{background:#fff;border:1px solid #d0d4d9;padding:18px 22px;}
-.g2ab-rp__panel h3{font-family:"Rajdhani",sans-serif;font-size:13px;letter-spacing:.12em;color:#D2691E;margin:0 0 14px;font-weight:700;}
+.g2ab-rp__panel h3{font-family:"Inter","Segoe UI",system-ui,-apple-system,sans-serif;font-size:13px;letter-spacing:.12em;color:#D2691E;margin:0 0 14px;font-weight:700;}
 .g2ab-rp__chart-foot{display:flex;justify-content:space-between;font-size:11px;color:#8A95A5;letter-spacing:.04em;margin-top:6px;}
 .g2ab-rp__chart-foot strong{color:#0F1115;}
 .g2ab-rp__table{width:100%;border-collapse:collapse;font-size:13px;}

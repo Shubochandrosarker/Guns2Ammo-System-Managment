@@ -28,10 +28,8 @@ final class G2AB_Activator {
 		self::set_default_options();
 		self::register_roles_and_caps();
 		self::seed_initial_data();
-		self::apply_client_defaults_existing();
 		self::merge_default_active_modules();
 		self::schedule_events();
-		self::ensure_checkin_page();
 
 		set_transient( 'g2ab_activation_redirect', 1, 30 );
 		flush_rewrite_rules();
@@ -91,21 +89,10 @@ final class G2AB_Activator {
 			'g2ab_business_name'            => 'Guns 2 Ammo',
 			'g2ab_business_phone'           => '',
 			'g2ab_business_address'         => 'Mesa, Arizona',
-			'g2ab_lane_hourly_price'        => 20,
-			'g2ab_lane_extra_shooter_fee'   => 15,
-			'g2ab_ladies_tuesday_lane_price'=> 0,
-			'g2ab_form_title'               => 'Book Your Lane',
-			'g2ab_form_subtitle'            => 'Guns 2 Ammo Range Booking',
-			'g2ab_form_description'         => 'Members receive included lane time with qualifying plans plus discounted rentals and priority booking access.',
 		);
 		foreach ( $defaults as $key => $value ) {
 			add_option( $key, $value );
 		}
-	}
-
-	public static function sync_client_defaults() {
-		self::apply_client_defaults_existing();
-		self::seed_default_events();
 	}
 
 	private static function register_roles_and_caps() {
@@ -139,19 +126,6 @@ final class G2AB_Activator {
 			) );
 		}
 
-		// Walk-in customer: assigned to guests who book a lane without
-		// buying a membership. Visible in the WP user list as
-		// "Walk-in Customer" so staff can filter walk-ins separately
-		// from members + administrators. When the same email later
-		// buys a membership, the role is replaced with the matching
-		// memberistic_* role (see Memberistic Content_Restrictions::
-		// sync_roles_for_membership() — it now also strips g2a_walkin).
-		if ( null === get_role( 'g2a_walkin' ) ) {
-			add_role( 'g2a_walkin', __( 'Walk-in Customer', 'g2a-booking' ), array(
-				'read' => true,
-			) );
-		}
-
 		$admin = get_role( 'administrator' );
 		if ( $admin ) {
 			foreach ( array_keys( $caps ) as $cap ) {
@@ -180,7 +154,7 @@ final class G2AB_Activator {
 				'name'        => sprintf( __( 'Lane %d', 'g2a-booking' ), $i ),
 				'slug'        => $slug,
 				'type'        => 'lane',
-				'capacity'    => 3,
+				'capacity'    => 1,
 				'description' => __( 'Indoor shooting range lane.', 'g2a-booking' ),
 				'settings'    => wp_json_encode( array( 'allowed_calibers' => array( 'pistol', 'rifle' ) ) ),
 				'sort_order'  => $i,
@@ -209,25 +183,14 @@ final class G2AB_Activator {
 
 		// Booking types.
 		$types = array(
-			array( 'name' => __( 'Lane Booking', 'g2a-booking' ), 'slug' => 'lane-booking', 'category' => 'lane', 'duration_min' => 60, 'buffer_after' => 10, 'base_price' => 20.00, 'deposit_amount' => 0.00, 'payment_modes' => 'full,in_store', 'requires_waiver' => 1, 'members_only' => 0, 'member_discount' => 0.00 ),
-			array( 'name' => __( 'Ladies Tuesday', 'g2a-booking' ), 'slug' => 'ladies-tuesday', 'category' => 'lane', 'duration_min' => 60, 'buffer_after' => 10, 'base_price' => 0.00, 'deposit_amount' => 0.00, 'payment_modes' => 'free', 'requires_waiver' => 1, 'members_only' => 0, 'member_discount' => 0.00 ),
-			array( 'name' => __( 'Arizona CCW Course', 'g2a-booking' ), 'slug' => 'ccw-class', 'category' => 'class', 'duration_min' => 240, 'buffer_after' => 0, 'base_price' => 99.00, 'deposit_amount' => 25.00, 'payment_modes' => 'full,deposit', 'requires_waiver' => 1, 'members_only' => 0, 'member_discount' => 0.00 ),
+			array( 'name' => __( 'Lane Booking', 'g2a-booking' ), 'slug' => 'lane-booking', 'category' => 'lane', 'duration_min' => 60, 'buffer_after' => 10, 'base_price' => 25.00, 'deposit_amount' => 0.00, 'payment_modes' => 'full,in_store', 'requires_waiver' => 1, 'members_only' => 0, 'member_discount' => 20.00 ),
+			array( 'name' => __( 'CCW Class', 'g2a-booking' ), 'slug' => 'ccw-class', 'category' => 'class', 'duration_min' => 240, 'buffer_after' => 0, 'base_price' => 99.00, 'deposit_amount' => 25.00, 'payment_modes' => 'full,deposit', 'requires_waiver' => 1, 'members_only' => 0, 'member_discount' => 10.00, 'capacity_mode' => 'party_size' ),
 			array( 'name' => __( 'Member Lane Booking', 'g2a-booking' ), 'slug' => 'member-lane-booking', 'category' => 'membership', 'duration_min' => 60, 'buffer_after' => 10, 'base_price' => 0.00, 'deposit_amount' => 0.00, 'payment_modes' => 'free', 'requires_waiver' => 1, 'members_only' => 1, 'member_discount' => 0.00 ),
 		);
 		foreach ( $types as $bt ) {
 			$exists = $wpdb->get_var( $wpdb->prepare( "SELECT id FROM {$booking_types_table} WHERE slug = %s", $bt['slug'] ) );
 			if ( $exists ) continue;
-			$default_settings = array();
-			if ( 'ccw-class' === $bt['slug'] ) {
-				$default_settings = array(
-					'event_instructor'  => 'G2A Certified Instructor',
-					'event_total_seats' => 12,
-					'event_start_time'  => '09:00',
-					'event_end_time'    => '17:00',
-					'event_weekdays'    => array( 2, 6 ),
-				);
-			}
-			$bt['settings']   = wp_json_encode( $default_settings );
+			$bt['settings']   = wp_json_encode( array() );
 			$bt['is_active']  = 1;
 			$bt['created_at'] = $now;
 			$bt['updated_at'] = $now;
@@ -253,7 +216,7 @@ final class G2AB_Activator {
 				array( 'field_key' => 'customer_name', 'field_type' => 'text', 'label' => __( 'Full Name', 'g2a-booking' ), 'placeholder' => 'John Doe', 'is_required' => 1, 'sort_order' => 1 ),
 				array( 'field_key' => 'customer_email', 'field_type' => 'email', 'label' => __( 'Email', 'g2a-booking' ), 'placeholder' => 'you@example.com', 'is_required' => 1, 'sort_order' => 2 ),
 				array( 'field_key' => 'customer_phone', 'field_type' => 'phone', 'label' => __( 'Phone', 'g2a-booking' ), 'placeholder' => '(555) 555-5555', 'is_required' => 1, 'sort_order' => 3 ),
-				array( 'field_key' => 'party_size', 'field_type' => 'number', 'label' => __( 'Number of Shooters', 'g2a-booking' ), 'validation' => wp_json_encode( array( 'min' => 1, 'max' => 3 ) ), 'is_required' => 1, 'sort_order' => 4 ),
+				array( 'field_key' => 'party_size', 'field_type' => 'number', 'label' => __( 'Number of Shooters', 'g2a-booking' ), 'validation' => wp_json_encode( array( 'min' => 1, 'max' => 4 ) ), 'is_required' => 1, 'sort_order' => 4 ),
 				array( 'field_key' => 'experience_level', 'field_type' => 'dropdown', 'label' => __( 'Experience Level', 'g2a-booking' ), 'options' => wp_json_encode( array(
 					array( 'value' => 'beginner', 'label' => __( 'Beginner', 'g2a-booking' ) ),
 					array( 'value' => 'intermediate', 'label' => __( 'Intermediate', 'g2a-booking' ) ),
@@ -269,150 +232,19 @@ final class G2AB_Activator {
 			}
 		}
 
-		// Business hours defaults from client doc.
+		// Business hours Mon-Sat 10am-8pm.
 		$rule_count = (int) $wpdb->get_var( "SELECT COUNT(*) FROM {$rules_table} WHERE rule_type = 'business_hours'" );
 		if ( 0 === $rule_count ) {
-			$hours_map = array(
-				1 => array( '10:00:00', '18:00:00' ), // Mon
-				2 => array( '10:00:00', '18:00:00' ), // Tue
-				3 => array( '10:00:00', '18:00:00' ), // Wed
-				4 => array( '10:00:00', '18:00:00' ), // Thu
-				5 => array( '10:00:00', '19:00:00' ), // Fri
-				6 => array( '10:00:00', '19:00:00' ), // Sat
-				0 => array( '12:00:00', '18:00:00' ), // Sun
-			);
-			foreach ( $hours_map as $dow => $times ) {
+			for ( $dow = 1; $dow <= 6; $dow++ ) {
 				$wpdb->insert( $rules_table, array(
 					'rule_type'   => 'business_hours',
 					'day_of_week' => $dow,
-					'start_time'  => $times[0],
-					'end_time'    => $times[1],
+					'start_time'  => '10:00:00',
+					'end_time'    => '20:00:00',
 					'priority'    => 10,
 					'is_active'   => 1,
 					'created_at'  => $now,
 				) );
-			}
-		}
-
-		self::seed_default_events();
-	}
-
-	public static function seed_default_events() {
-		$defaults = array(
-			array(
-				'title'        => 'Arizona CCW Course',
-				'type'         => 'ccw',
-				'date'         => wp_date( 'Y-m-d', strtotime( '+7 days', current_time( 'timestamp' ) ) ),
-				'time'         => '09:00 AM',
-				'end'          => '01:00 PM',
-				'location'     => 'Guns 2 Ammo - Training Classroom',
-				'price'        => '$99',
-				'instructor'   => 'G2A Certified Instructor',
-				'seats'        => 12,
-				'booking_slug' => 'ccw-class',
-			),
-			array(
-				'title'        => 'Ladies Tuesday Free Lane Hour',
-				'type'         => 'ladies-day',
-				'date'         => wp_date( 'Y-m-d', strtotime( 'next tuesday', current_time( 'timestamp' ) ) ),
-				'time'         => '10:00 AM',
-				'end'          => '06:00 PM',
-				'location'     => 'Guns 2 Ammo - Range Lanes',
-				'price'        => 'Free 1-hour lane time',
-				'instructor'   => '',
-				'seats'        => 18,
-				'booking_slug' => 'ladies-tuesday',
-			),
-		);
-
-		foreach ( $defaults as $event ) {
-			$existing = get_page_by_title( $event['title'], OBJECT, 'g2a_events' );
-			if ( $existing ) {
-				continue;
-			}
-			$post_id = wp_insert_post(
-				array(
-					'post_title'   => $event['title'],
-					'post_type'    => 'g2a_events',
-					'post_status'  => 'publish',
-					'post_content' => '',
-				),
-				true
-			);
-			if ( is_wp_error( $post_id ) || ! $post_id ) {
-				continue;
-			}
-			update_post_meta( $post_id, '_g2ab_event_date', $event['date'] );
-			update_post_meta( $post_id, '_g2ab_event_time', $event['time'] );
-			update_post_meta( $post_id, '_g2ab_event_end', $event['end'] );
-			update_post_meta( $post_id, '_g2ab_event_location', $event['location'] );
-			update_post_meta( $post_id, '_g2ab_event_price', $event['price'] );
-			update_post_meta( $post_id, '_g2ab_event_type', $event['type'] );
-			update_post_meta( $post_id, '_g2ab_event_instructor', $event['instructor'] );
-			update_post_meta( $post_id, '_g2ab_event_seats', (int) $event['seats'] );
-			update_post_meta( $post_id, '_g2ab_event_booking_type_slug', $event['booking_slug'] );
-			update_post_meta( $post_id, '_g2ab_event_cta_label', 'Book Now' );
-			update_post_meta( $post_id, '_g2ab_event_cta_url', add_query_arg( 'type', $event['booking_slug'], home_url( '/book-a-lane/' ) ) );
-		}
-	}
-
-	public static function apply_client_defaults_existing() {
-		global $wpdb;
-		$now = current_time( 'mysql' );
-		$booking_types_table = $wpdb->prefix . 'g2ab_booking_types';
-		$rules_table         = $wpdb->prefix . 'g2ab_availability_rules';
-
-		update_option( 'g2ab_lane_hourly_price', 20 );
-		update_option( 'g2ab_lane_extra_shooter_fee', 15 );
-		update_option( 'g2ab_ladies_tuesday_lane_price', 0 );
-		update_option( 'g2ab_form_subtitle', 'Guns 2 Ammo Range Booking' );
-		update_option( 'g2ab_form_description', 'Members receive included lane time with qualifying plans plus discounted rentals and priority booking access.' );
-
-		$wpdb->update( $booking_types_table, array( 'base_price' => 20.00, 'updated_at' => $now ), array( 'slug' => 'lane-booking' ), array( '%f', '%s' ), array( '%s' ) );
-
-		$exists_ladies = (int) $wpdb->get_var( $wpdb->prepare( "SELECT id FROM {$booking_types_table} WHERE slug = %s LIMIT 1", 'ladies-tuesday' ) );
-		if ( ! $exists_ladies ) {
-			$wpdb->insert( $booking_types_table, array(
-				'name'           => 'Ladies Tuesday',
-				'slug'           => 'ladies-tuesday',
-				'category'       => 'lane',
-				'duration_min'   => 60,
-				'buffer_before'  => 0,
-				'buffer_after'   => 10,
-				'base_price'     => 0.00,
-				'deposit_amount' => 0.00,
-				'payment_modes'  => 'free',
-				'requires_waiver'=> 1,
-				'members_only'   => 0,
-				'member_discount'=> 0.00,
-				'capacity_mode'  => 'booking_count',
-				'settings'       => wp_json_encode( array() ),
-				'is_active'      => 1,
-				'created_at'     => $now,
-				'updated_at'     => $now,
-			) );
-		}
-
-		$hours_map = array(
-			1 => array( '10:00:00', '18:00:00' ),
-			2 => array( '10:00:00', '18:00:00' ),
-			3 => array( '10:00:00', '18:00:00' ),
-			4 => array( '10:00:00', '18:00:00' ),
-			5 => array( '10:00:00', '19:00:00' ),
-			6 => array( '10:00:00', '19:00:00' ),
-			0 => array( '12:00:00', '18:00:00' ),
-		);
-		foreach ( $hours_map as $dow => $times ) {
-			$rule_id = (int) $wpdb->get_var( $wpdb->prepare(
-				"SELECT id FROM {$rules_table} WHERE rule_type = 'business_hours' AND day_of_week = %d ORDER BY id ASC LIMIT 1",
-				$dow
-			) );
-			if ( $rule_id ) {
-				$wpdb->update( $rules_table, array(
-					'start_time' => $times[0],
-					'end_time'   => $times[1],
-					'is_active'  => 1,
-				), array( 'id' => $rule_id ), array( '%s', '%s', '%d' ), array( '%d' ) );
 			}
 		}
 	}
@@ -488,33 +320,6 @@ final class G2AB_Activator {
 			if ( ! $next ) {
 				wp_schedule_event( time() + MINUTE_IN_SECONDS, $recurrence, $hook );
 			}
-		}
-	}
-
-	/**
-	 * Create the member-facing /check-in/ landing page on first activation
-	 * so the staff dashboard's QR code points somewhere real. Idempotent:
-	 * if the option already names a page (and it exists), do nothing.
-	 */
-	private static function ensure_checkin_page() {
-		$slug = (string) get_option( 'g2ab_checkin_page_slug', 'check-in' );
-		// Bail if a page with our shortcode already exists.
-		$existing = get_page_by_path( $slug );
-		if ( $existing && false !== strpos( (string) $existing->post_content, '[g2ab_member_checkin' ) ) {
-			return;
-		}
-		$page_id = wp_insert_post( array(
-			'post_title'   => __( 'Check In', 'g2a-booking' ),
-			'post_name'    => $slug,
-			'post_status'  => 'publish',
-			'post_type'    => 'page',
-			'post_content' => '[g2ab_member_checkin]',
-			'comment_status'=> 'closed',
-			'ping_status'  => 'closed',
-			'post_author'  => 1,
-		), true );
-		if ( ! is_wp_error( $page_id ) ) {
-			update_option( 'g2ab_checkin_page_id', (int) $page_id );
 		}
 	}
 }

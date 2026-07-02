@@ -67,10 +67,11 @@ final class G2AB_Admin {
 .g2ab-admin .g2ab-dash__btn--danger:hover,.g2ab-admin .g2ab-mod__btn--danger:hover,.g2ab-admin .g2ab-set__btn--danger:hover,.g2ab-admin .g2ab-bt__btn--danger:hover,.g2ab-admin .g2ab-rs__btn--danger:hover,.g2ab-admin .g2ab-fb__btn--danger:hover,.g2ab-admin .g2ab-av__btn--danger:hover,.g2ab-admin .g2ab-rp__btn--danger:hover,.g2ab-admin .g2ab-pl__btn--danger:hover{background:#C62828!important;color:#ffffff!important;border-color:#C62828!important;}
 .g2ab-admin .g2ab-set__btn--ghost{background:transparent!important;color:#0f2044!important;border-color:#c8d1e0!important;}
 .g2ab-admin .g2ab-set__btn--ghost:hover{background:#f0f3f9!important;color:#0f2044!important;border-color:#0f2044!important;}
-.g2ab-admin .button.button-primary,.g2ab-wrap .button.button-primary{background:#0f2044!important;border-color:#0f2044!important;color:#ffffff!important;text-shadow:none!important;box-shadow:0 8px 18px rgba(15,32,68,.16)!important;}
-.g2ab-admin .button.button-primary:hover,.g2ab-admin .button.button-primary:focus,.g2ab-wrap .button.button-primary:hover,.g2ab-wrap .button.button-primary:focus{background:#1a3a7a!important;border-color:#1a3a7a!important;color:#ffffff!important;}
-.g2ab-admin .button:not(.button-primary),.g2ab-wrap .button:not(.button-primary){color:#0f2044!important;border-color:#c8d1e0!important;}
-.g2ab-admin .button:not(.button-primary):hover,.g2ab-admin .button:not(.button-primary):focus,.g2ab-wrap .button:not(.button-primary):hover,.g2ab-wrap .button:not(.button-primary):focus{color:#0f2044!important;border-color:#0f2044!important;background:#f6f9fc!important;}
+/* WP primary buttons (e.g. FILTER, UPDATE STATUS) must keep white text on the navy fill. */
+.g2ab-admin .button-primary,.g2ab-wrap .button-primary{color:#fff!important;}
+/* The booking-detail header is a dark gradient; its title/stencil must be light, not the
+   global navy that the admin theme otherwise forces on .g2ab-mod__stencil (MISSION BRIEF). */
+.g2ab-admin .g2ab-mod__detail-head .g2ab-mod__stencil,.g2ab-admin .g2ab-mod__detail-head h1,.g2ab-admin .g2ab-mod__detail-head h1 span{color:#fff!important;-webkit-text-fill-color:#fff!important;}
 ';
 		wp_add_inline_style( 'g2ab-admin-inline', $button_normalize );
 	}
@@ -368,7 +369,7 @@ final class G2AB_Admin {
 			.g2ab-empty__inner{background:linear-gradient(135deg,#0F1115 0%,#1F242C 60%,#2A3038 100%);color:#fff;padding:48px 40px;border-radius:14px;border:1px solid rgba(255,255,255,.06);position:relative;overflow:hidden;}
 			.g2ab-empty__inner::before{content:"";position:absolute;top:-50%;right:-10%;width:50%;height:200%;background:radial-gradient(ellipse at center,rgba(74,93,58,.18) 0%,transparent 60%);pointer-events:none;}
 			.g2ab-empty__eyebrow{position:relative;z-index:1;display:inline-block;font-size:11px;letter-spacing:.18em;font-weight:700;color:#D2691E;margin-bottom:10px;}
-			.g2ab-empty__title{position:relative;z-index:1;color:#fff !important;font-size:30px;line-height:1.15;margin:0 0 8px;font-weight:800;letter-spacing:-.01em;font-family:"Rajdhani","Oswald","Inter",sans-serif;padding:0;}
+			.g2ab-empty__title{position:relative;z-index:1;color:#fff !important;font-size:30px;line-height:1.15;margin:0 0 8px;font-weight:800;letter-spacing:-.01em;font-family:"Inter","Segoe UI",system-ui,-apple-system,sans-serif;padding:0;}
 			.g2ab-empty__sub{position:relative;z-index:1;font-size:14px;color:rgba(255,255,255,.65);margin:0;max-width:540px;line-height:1.55;}
 		</style>';
 	}

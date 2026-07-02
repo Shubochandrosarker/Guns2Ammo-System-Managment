@@ -12,13 +12,13 @@ require_once __DIR__ . '/class-pmpro-settings.php';
 return array(
 	'id'             => 'pmpro_memberships',
 	'name'           => 'Paid Memberships Pro Discounts',
-	'desc'           => 'Map PMPro membership levels to booking discounts, including 100% member pricing for free bookings. Activate this only if you run Paid Memberships Pro.',
+	'desc'           => 'Map PMPro membership levels to booking discounts, including 100% member pricing for free bookings.',
 	'tier'           => 'free',
 	'status'         => 'active',
 	'category'       => 'integrations',
 	'icon'           => 'P',
 	'color'          => '#179BD7',
-	'default_active' => false,
+	'default_active' => true,
 	'bootstrap'      => 'G2AB_Module_PMPro_Memberships',
 	'configure'      => 'admin.php?page=g2ab-settings&tab=pmpro_memberships',
 );

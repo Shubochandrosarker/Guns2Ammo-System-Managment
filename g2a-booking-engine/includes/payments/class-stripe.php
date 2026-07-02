@@ -49,16 +49,8 @@ final class G2AB_Gateway_Stripe {
 
 		$amount_cents = (int) round( $amount * 100 );
 		$currency = strtolower( $booking->currency ?? 'usd' );
-		$meta = json_decode( (string) ( $booking->metadata ?? '' ), true );
-		$confirm_token = is_array( $meta ) ? (string) ( $meta['confirm_token'] ?? '' ) : '';
-		$success = add_query_arg(
-			array_filter( array( 'g2ab_paid' => $booking->uuid, 'confirm_token' => $confirm_token ) ),
-			home_url( '/' )
-		);
-		$cancel  = add_query_arg(
-			array_filter( array( 'g2ab_cancel' => $booking->uuid, 'confirm_token' => $confirm_token ) ),
-			home_url( '/' )
-		);
+		$success = add_query_arg( array( 'g2ab_paid' => $booking->uuid ), home_url( '/' ) );
+		$cancel  = add_query_arg( array( 'g2ab_cancel' => $booking->uuid ), home_url( '/' ) );
 
 		$body = array(
 			'mode' => 'payment',
@@ -288,17 +280,30 @@ final class G2AB_Gateway_Stripe {
 			'updated_at' => current_time( 'mysql' ),
 		), array( 'id' => $booking->id ), array( '%s', '%f', '%s' ), array( '%d' ) );
 
-		// Upsert payment row (race-safe against concurrent webhook deliveries
-		// via the UNIQUE KEY (gateway, transaction_id) added in DB v1.5.0).
-		g2ab_payments_upsert_by_transaction( 'stripe', (string) $session['id'], array(
-			'booking_id'       => (int) $booking->id,
-			'amount'           => $amount,
-			'currency'         => $currency,
-			'status'           => 'succeeded',
-			'payment_method'   => 'card',
-			'gateway_response' => wp_json_encode( $session ),
-			'processed_at'     => current_time( 'mysql' ),
-		) );
+		// Update or insert payment row.
+		$pt = $wpdb->prefix . 'g2ab_payments';
+		$existing = $wpdb->get_var( $wpdb->prepare( "SELECT id FROM {$pt} WHERE transaction_id = %s LIMIT 1", $session['id'] ) );
+		if ( $existing ) {
+			$wpdb->update( $pt, array(
+				'status' => 'succeeded',
+				'amount' => $amount,
+				'gateway_response' => wp_json_encode( $session ),
+				'processed_at' => current_time( 'mysql' ),
+			), array( 'id' => $existing ), array( '%s', '%f', '%s', '%s' ), array( '%d' ) );
+		} else {
+			$wpdb->insert( $pt, array(
+				'booking_id' => $booking->id,
+				'gateway' => 'stripe',
+				'transaction_id' => $session['id'],
+				'amount' => $amount,
+				'currency' => $currency,
+				'status' => 'succeeded',
+				'payment_method' => 'card',
+				'gateway_response' => wp_json_encode( $session ),
+				'processed_at' => current_time( 'mysql' ),
+				'created_at' => current_time( 'mysql' ),
+			) );
+		}
 
 		// Audit log.
 		$wpdb->insert( $wpdb->prefix . 'g2ab_logs', array(

@@ -440,24 +440,6 @@ final class G2AB_Migration_Admin {
 			exit;
 		}
 
-		// Size cap (25 MB) to deter resource-exhaustion uploads.
-		$size = (int) ( $_FILES['g2ab_csv']['size'] ?? 0 );
-		if ( $size <= 0 || $size > 25 * 1024 * 1024 ) {
-			wp_safe_redirect( add_query_arg( array( 'page' => self::PAGE_SLUG, 'step' => 1, 'csv_error' => 'toobig' ), admin_url( 'admin.php' ) ) );
-			exit;
-		}
-		// MIME / extension validation — server-side sniff.
-		if ( ! function_exists( 'wp_check_filetype_and_ext' ) ) {
-			require_once ABSPATH . 'wp-admin/includes/file.php';
-		}
-		$orig_name = isset( $_FILES['g2ab_csv']['name'] ) ? sanitize_file_name( $_FILES['g2ab_csv']['name'] ) : 'upload.csv';
-		$check = wp_check_filetype_and_ext( $_FILES['g2ab_csv']['tmp_name'], $orig_name );
-		$allowed = array( 'text/csv', 'text/plain', 'application/csv', 'application/vnd.ms-excel' );
-		if ( ! in_array( (string) ( $check['type'] ?? '' ), $allowed, true ) ) {
-			wp_safe_redirect( add_query_arg( array( 'page' => self::PAGE_SLUG, 'step' => 1, 'csv_error' => 'badmime' ), admin_url( 'admin.php' ) ) );
-			exit;
-		}
-
 		// Move into uploads with unique filename.
 		$upload = wp_upload_dir();
 		$dir = trailingslashit( $upload['basedir'] ) . 'g2ab-migration/';

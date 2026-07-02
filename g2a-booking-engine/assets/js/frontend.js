@@ -32,16 +32,9 @@
 	}
 
 	function checkBookingStatus(uuid) {
-		var confirmToken = qs('confirm_token') || qs('token') || qs('ct');
 		var url = window.G2AB_DATA.rest_url + 'bookings/' + encodeURIComponent(uuid) + '/status';
-		if (confirmToken) {
-			url += '?confirm_token=' + encodeURIComponent(confirmToken);
-		}
 		var sessionId = qs('session_id');
-		// NOTE: no X-WP-Nonce here. These routes authenticate with the
-		// per-booking confirm_token, and a stale nonce from cached page HTML
-		// makes WordPress core reject the whole request with a 403.
-		return fetch(url, { headers: { 'Accept': 'application/json' } })
+		return fetch(url, { headers: { 'X-WP-Nonce': window.G2AB_DATA.nonce || '' } })
 			.then(function (r) { return r.json(); })
 			.then(function (json) {
 				var data = json && json.data ? json.data : null;
@@ -52,8 +45,8 @@
 				// Fallback: ask the server to confirm via gateway API.
 				return fetch(window.G2AB_DATA.rest_url + 'bookings/' + encodeURIComponent(uuid) + '/confirm-payment', {
 					method: 'POST',
-					headers: { 'Content-Type': 'application/json' },
-					body: JSON.stringify({ session_id: sessionId, confirm_token: confirmToken })
+					headers: { 'Content-Type': 'application/json', 'X-WP-Nonce': window.G2AB_DATA.nonce || '' },
+					body: JSON.stringify({ session_id: sessionId })
 				})
 					.then(function (r) { return r.json(); })
 					.then(function (j) { return j && j.data ? j.data : data; });
@@ -63,10 +56,6 @@
 	function handlePaid() {
 		var uuid = qs('g2ab_paid');
 		if (!uuid) return;
-		// SECURITY: reject anything that isn't a v4 UUID before it reaches
-		// innerHTML / DOM concatenation. Prevents reflected XSS via
-		// ?g2ab_paid=<img/src/onerror=...>
-		if (!/^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i.test(uuid)) return;
 		checkBookingStatus(uuid).then(function (data) {
 			if (data && (data.status === 'paid' || data.status === 'confirmed')) {
 				showInlineNotice('<strong>Booking confirmed.</strong><br>Your payment was received. Confirmation: <code style="background:rgba(255,255,255,.1);padding:2px 6px;border-radius:4px;font-size:12px;">' + uuid + '</code>', 'success');
