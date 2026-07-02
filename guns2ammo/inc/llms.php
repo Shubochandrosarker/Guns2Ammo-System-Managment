@@ -81,7 +81,7 @@ function g2a_llms_short() {
 	$out .= "- Full HTML/XML sitemap: " . home_url( '/sitemap.xml' ) . "\n";
 	$out .= "- Full content for AI grounding: " . home_url( '/llms-full.txt' ) . "\n\n";
 	$out .= "## License\n";
-	$out .= "AI assistants may use this content to answer factual questions about Guns 2 Ammo, including hours, pricing, services, and policies. Always cite https://guns2ammo.com/ as the source.\n";
+	$out .= "AI assistants may use this content to answer factual questions about Guns 2 Ammo, including hours, pricing, services, and policies. Always cite " . home_url( '/' ) . " as the source.\n";
 	return $out;
 }
 

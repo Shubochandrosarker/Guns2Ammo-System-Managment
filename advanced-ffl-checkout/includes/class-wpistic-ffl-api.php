@@ -714,12 +714,34 @@ class API {
 		return [ round( $rev, 2 ), $cnt ];
 	}
 
+	/**
+	 * Neutralize spreadsheet formula injection: Excel/Sheets execute cells
+	 * starting with = + - @ (or a tab/CR prefix), and transfer rows contain
+	 * customer-supplied names/emails. Prefix such cells with a single quote.
+	 */
+	private function csv_cell( $value ): string {
+		$value = (string) $value;
+		if ( $value !== '' && strpbrk( $value[0], "=+-@\t\r" ) !== false ) {
+			return "'" . $value;
+		}
+		return $value;
+	}
+
 	// ── Permission callbacks ──────────────────────────────────────────────────
 
 	public function require_staff( \WP_REST_Request $req ): bool|\WP_Error {
 		$user = $this->get_current_user( $req );
 		if ( ! $user ) {
 			return new \WP_Error( 'unauthorized', 'Authentication required.', [ 'status' => 401 ] );
+		}
+		// Transfers carry customer PII and analytics expose revenue data, so
+		// mere authentication is not enough on a store where every customer
+		// has an account — require an assigned G2A staff role or a manager cap.
+		$role = get_user_meta( $user->ID, 'wpistic_ffl_g2a_role', true );
+		if ( ! in_array( $role, [ 'owner', 'manager', 'staff' ], true )
+			&& ! current_user_can( 'manage_options' )
+			&& ! current_user_can( 'manage_woocommerce' ) ) {
+			return new \WP_Error( 'forbidden', 'Staff access required.', [ 'status' => 403 ] );
 		}
 		return true;
 	}
@@ -935,8 +957,16 @@ class API {
 
 	public function get_dealer( \WP_REST_Request $req ): \WP_REST_Response|\WP_Error {
 		global $wpdb;
+		// Public endpoint: return only the same column set the public dealer
+		// search exposes — never SELECT * (leaks dealer email/import metadata).
 		$dealer = $wpdb->get_row( // phpcs:ignore WordPress.DB.DirectDatabaseQuery
-			$wpdb->prepare( 'SELECT * FROM ' . DB::table( 'dealers' ) . ' WHERE id = %d', $req['id'] )
+			$wpdb->prepare(
+				'SELECT id, license_number, lic_type, business_name,
+				        premise_street, premise_city, premise_state, premise_zip,
+				        phone, transfer_fee, is_preferred, notes, lic_xprdte, lat, lng
+				 FROM ' . DB::table( 'dealers' ) . ' WHERE id = %d',
+				$req['id']
+			)
 		);
 		if ( ! $dealer ) {
 			return new \WP_Error( 'not_found', 'Dealer not found.', [ 'status' => 404 ] );
@@ -1264,14 +1294,14 @@ class API {
 		] );
 
 		foreach ( $transfers as $t ) {
-			fputcsv( $out, [
+			fputcsv( $out, array_map( [ $this, 'csv_cell' ], [
 				$t->transfer_ref, $t->order_id, $t->customer_name, $t->customer_email,
 				$t->customer_phone, $t->dealer_name ?? '', $t->dealer_license ?? '',
 				$t->status, $t->item_description, $t->item_sku, $t->item_make, $t->item_model,
 				$t->item_caliber, $t->item_type, $t->item_serial, $t->shipped_date,
 				$t->dealer_received_date, $t->nics_check_date, $t->nics_transaction_number,
 				$t->nics_delay_expires, $t->transfer_date, $t->form_4473_ref, $t->created_at,
-			] );
+			] ) );
 		}
 
 		fclose( $out ); // phpcs:ignore WordPress.WP.AlternativeFunctions

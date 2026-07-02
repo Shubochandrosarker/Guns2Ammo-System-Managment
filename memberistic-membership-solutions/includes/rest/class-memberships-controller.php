@@ -989,6 +989,14 @@ final class Memberships_Controller extends REST_Controller {
 			)
 		);
 
+		// Give the new member a WP login + a "set your password" email so they
+		// can sign in and reach their digital card. Staff-created members used
+		// to get a membership row with no account at all. Only provisions when
+		// an email is on file; idempotent and won't email twice.
+		if ( ! empty( $params['email'] ) && is_email( (string) $params['email'] ) ) {
+			\WordPressistic\Memberistic\Account_Provisioner::ensure_user_for_membership( (int) $membership_id, true );
+		}
+
 		$response = rest_ensure_response( \WordPressistic\Memberistic\Database\Memberships_Repository::get_with_summary( $membership_id ) );
 		$response->set_status( 201 );
 

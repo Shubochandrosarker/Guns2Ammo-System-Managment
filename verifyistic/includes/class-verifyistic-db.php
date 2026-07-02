@@ -188,22 +188,21 @@ class Verifyistic_DB {
 
     /**
      * Get client IP.
+     *
+     * Delegates to the trusted-proxy-aware resolver in
+     * Verifyistic_Security so the IP stored in compliance logs cannot be
+     * spoofed via arbitrary X-Forwarded-For / X-Real-IP headers (this
+     * class previously trusted them blindly).
      */
     private static function get_client_ip() {
-        $ip_keys = array( 'HTTP_CF_CONNECTING_IP', 'HTTP_X_FORWARDED_FOR', 'HTTP_X_REAL_IP', 'REMOTE_ADDR' );
-        foreach ( $ip_keys as $key ) {
-            if ( ! empty( $_SERVER[ $key ] ) ) {
-                $ip = sanitize_text_field( wp_unslash( $_SERVER[ $key ] ) );
-                // Handle comma-separated IPs
-                if ( strpos( $ip, ',' ) !== false ) {
-                    $ip = trim( explode( ',', $ip )[0] );
-                }
-                if ( filter_var( $ip, FILTER_VALIDATE_IP ) ) {
-                    return $ip;
-                }
+        if ( class_exists( 'Verifyistic_Security' ) && method_exists( 'Verifyistic_Security', 'client_ip' ) ) {
+            $ip = Verifyistic_Security::client_ip();
+            if ( is_string( $ip ) && filter_var( $ip, FILTER_VALIDATE_IP ) ) {
+                return $ip;
             }
         }
-        return '0.0.0.0';
+        $ip = isset( $_SERVER['REMOTE_ADDR'] ) ? sanitize_text_field( wp_unslash( $_SERVER['REMOTE_ADDR'] ) ) : '';
+        return filter_var( $ip, FILTER_VALIDATE_IP ) ? $ip : '0.0.0.0';
     }
 
     /**

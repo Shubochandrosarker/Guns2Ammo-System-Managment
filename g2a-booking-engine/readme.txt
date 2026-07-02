@@ -4,7 +4,7 @@ Tags: booking, reservation, scheduling, appointments, shooting range, firearms, 
 Requires at least: 6.2
 Tested up to: 6.5
 Requires PHP: 8.0
-Stable tag: 1.14.6
+Stable tag: 1.9.9.2
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -207,92 +207,107 @@ Yes. REST API at `/wp-json/g2a-booking/v1/` covers bookings, forms, calendar, fr
 
 == Changelog ==
 
-= 1.14.6 =
-**Cloudflare real-IP resolution for rate limiting.**
+= 1.9.9.1 =
+**Premium polish: clean typography, reorganised dashboard, and a brand-new Shooters CRM.**
 
-* FIX: behind Cloudflare, every visitor was seen as Cloudflare's shared edge IP,
-  so the public REST rate limits (60/min for booking submit + availability)
-  collapsed onto one bucket and could throttle unrelated visitors. Cloudflare's
-  published ranges are now trusted by default (`g2ab_trust_cloudflare` defaults
-  to 1), so `CF-Connecting-IP` resolves the real visitor IP — only when
-  REMOTE_ADDR is genuinely a Cloudflare IP, so it cannot be spoofed.
-* FIX: `g2ab_cloudflare_ranges()` now has a hardcoded fallback and always caches
-  its result (live list or fallback), so the remote range fetch can never run a
-  blocking 10s HTTP call on the rate-limit hot path. Disable with
-  `update_option( 'g2ab_trust_cloudflare', 0 )` if not behind Cloudflare.
+* CHANGE: **new typeface across the whole plugin.** The condensed stencil/military font (Rajdhani / Oswald / Impact) is gone — every screen, button, price and heading now uses a clean, modern **Inter** stack on both the storefront and the admin. Booking widgets, event lists, banners, landing pages, invoices and emails all read crisp and smart.
+* NEW: **Shooters CRM** (G2A Booking → Shooters). Every client is a shooter, so the Customers tab is reframed as a proper CRM: animated KPI cards (total · new · returning rate · at-risk · lapsed), a 12-month **growth** chart, a **lifecycle mix** breakdown, live search + segment filters (VIP / New / Active / At Risk / Lapsed), animated shooter cards, and a slide-in profile with full booking history and lifetime value.
+* NEW: **Win-them-back churn list.** Shooters who have gone quiet (60+ days) are surfaced automatically, highest-value first, each with a one-tap **Send offer** email — so lapsed customers can be pulled back instead of forgotten.
+* CHANGE: **Dashboard reorganised, Amelia-style.** Scope tabs split the numbers that used to be mixed together — **Overview · Lanes · Events · Classes** — each with its own KPIs (with trend %), revenue trend chart, status mix, upcoming list and a **Top trends** table. A 7D / 30D / 90D / 1Y period selector drives the whole view.
+* CHANGE: **Bookings roster reorganised by type.** A tabbed list — **All · Lanes · Events · Classes** — in a clean light table with shooter avatars, type chips, status badges, live search, status filter and CSV export. The booking detail view is rebuilt to match, keeping full intel, status control and the audit log.
+* All metrics flow through one shared analytics layer, so the Dashboard, the Shooters CRM and the Bookings roster always agree. No schema changes — everything is derived live from existing bookings.
 
-= 1.14.5 =
-**Email + front-desk correctness fixes.**
+= 1.9.9 =
+**Premium UI pass: cleaner event displays, light theme, landing fixes.**
 
-* FIX: Customer-facing email merge tags (`{customer_name}`, `{customer_phone}`)
-  rendered blank and the name fell through to "Guest". `build_tags()` read a
-  non-existent `fields` key instead of the real `customer_name`/`customer_email`/
-  `customer_phone` columns and the `form_data` JSON payload. It now reads the
-  dedicated columns first and falls back to `form_data`, matching the PDF
-  invoice renderer.
-* FIX: Lifecycle emails were silently dropped when a `g2ab_booking_*` hook
-  fired with a booking object that had no populated `uuid` — `resolve_booking()`
-  fell through to `absint( $object )` (=== 0) and returned null. It now accepts
-  any object as-is.
-* FIX: The front-desk terminal shortcode rendered an empty shell because its
-  inline roster script was registered with an empty-string `src` (`''`), which
-  causes WordPress to drop the `wp_add_inline_script()` payload. Now registered
-  with the boolean `false` sentinel, matching the stylesheet registration.
-* FIX: `uninstall.php` now also drops the `g2ab_checkins` and
-  `g2ab_booking_activity` tables (previously left orphaned on data-removal
-  uninstall).
+* FIX: **event landing pages 404'd** when the site's rewrite rules got cleared (by another plugin or a permalink re-save). The `/event/{slug}/` rule now self-heals — it re-registers automatically the moment it goes missing, so landing pages keep resolving.
+* FIX: **event landing hero text was hard to read** (the theme's own page title could show through). The hero is now a solid, opaque block with crisp text.
+* NEW: **light theme** across the event displays — the landing page defaults to a clean light look (set `g2ab_event_landing_theme` to `dark` to switch back), and `[g2a_event_booking]`, `[g2a_upcoming_events]` and `[g2a_events_calendar]` all take `theme="light"`.
+* CHANGE: **[g2a_upcoming_events]** rebuilt — a clean, premium **list** layout (Amelia-style rows: date · name · status · price · button) plus a refined **card** layout (`layout="card"`). Scope a page with `category="ccw-class"` or `event="…"` so a CCW page shows only CCW dates and a Ladies page shows only Ladies nights. Optional search box.
+* CHANGE: **[g2a_event_booking]** now has a proper header, intro line and quick-facts (price · dates · seats) instead of a bare dropdown.
+* FIX: contrast — Range Status console title/headings and the Events “Dates & Times” heading now render clearly on any admin colour scheme.
 
-= 1.12.4 =
-**Lifecycle, payment, and invoice correctness fixes.**
+= 1.6.1 =
+**New: Staff Range Status console + QR self check-in.**
 
-* FIX: `{invoice_url}` merge tag in customer emails now includes the signed
-  `t=` token. Previously customers clicking the link were hit with a 403
-  because the renderer requires a valid HMAC token for guest access.
-* FIX: Email automation handlers now normalize the `g2ab_booking_*` hook
-  argument. Hooks fired with a booking id (vs. a row) used to collapse to
-  `[0 => 123]` inside `build_tags()`, blanking every merge tag in the
-  rendered email. A `resolve_booking()` helper now fetches the row by id
-  when needed, mirroring the PDF Invoices module.
-* FIX: Verifyistic auto-accept now satisfies the waiver requirement at the
-  REST validation layer via `g2ab_waiver_satisfied`. Previously the
-  enrichment ran POST-insert, so age-verified visitors were still blocked
-  by the controller's pre-insert waiver check.
-* FIX: Invoice "Pay Now" CTA (`?g2ab_pay={uuid}`) is now handled. Resolves
-  the booking, redirects to the existing WooCommerce pay-for-order URL if
-  a WC order exists, otherwise forwards to the public booking page so the
-  frontend script can resume the pay flow.
-* FIX: WooCommerce gateway billing prefill referenced a non-existent
-  `$booking->fields` column. Switched to the real `form_data` JSON column
-  and prefer the canonical `customer_*` row columns where present.
-* FIX: Hardcoded `$` currency symbol in invoice HTML and `booking_paid`
-  email templates now respects the `g2ab_currency` option (USD, CAD, GBP,
-  EUR, AUD, NZD). New `{amount_formatted}` merge tag exposes the
-  currency-aware value to custom templates.
-* FIX: PDF Lite generator transliterates accented characters via
-  `iconv('UTF-8','ASCII//TRANSLIT//IGNORE')` instead of stripping them to
-  spaces, so names like "José" / "Renée" render correctly. Falls back to
-  the legacy strip when iconv is unavailable.
-* PERF: Email reminder cron's `NOT IN (SELECT booking_id FROM g2ab_logs)`
-  subquery now has a composite `(event_type, booking_id)` index. New
-  installs already had this in dbDelta; existing installs get a one-shot
-  self-healing ALTER on the next admin/cron tick (guarded by the
-  `g2ab_logs_idx_v1` option flag).
-* NEW: Memberistic module now fires a fail-safe on `g2ab_booking_created`
-  that upserts the customer's email into the People_Repository when
-  present, so the booking-to-person link doesn't silently disappear when
-  the upstream plugin is misconfigured. No-op when Memberistic isn't
-  installed.
-* Version bumped to 1.12.4. Schema version stays at 1.6.1 (no new tables;
-  the index already lives in the dbDelta CREATE TABLE for fresh installs).
+* NEW: **Range Status console** (G2A Booking → Range Status, or `[g2ab_range_console]`) — a live operations board for the desk: a real-time lane map (in use / reserved / open with occupant, end time and waiver status), KPI cards (lanes in use, open lanes, checked in, today’s revenue), one-tap **walk-in** booking + check-in on any open lane, today’s reservations and a live payment feed. Polls every 20s.
+* NEW: **QR self check-in** — the console shows a printable QR poster; customers scan it to open a mobile **self check-in** page (`[g2ab_self_checkin]` / `/?g2ab_checkin=1`), find their booking by code or name+phone, have their waiver validated, and check in without staff.
 
-= 1.12.3 =
-* FIX: Manual Booking (Bookings → Manual Booking) failed for every staff
-  member with "Invalid start time." The admin form uses an HTML5
-  <input type="datetime-local">, whose browser-submitted value carries a
-  literal "T" separator (YYYY-MM-DDTHH:MM); the REST controller only accepted
-  the space-separated form and rejected the request before it ever reached the
-  database. The controller now normalises the "T" separator to a space, so
-  phone, walk-in, and staff bookings save correctly.
+= 1.6.0 =
+**Events: instant payment, member discounts, public calendar, redesigned displays + a Shortcodes tab.**
+
+* FIX: **event date/time changed after saving** — occurrence times are stored in your site timezone but were displayed through a UTC conversion that shifted them (e.g. 10:00 AM showing as 3:00 AM). All event displays now show the exact time you entered.
+* NEW: **instant payment for paid events** — booking a paid class/event now takes payment immediately through your active online gateway (Stripe → PayPal → any card gateway). It only falls back to “pay at the front desk” when no online gateway is configured.
+* NEW: **per-event member discount** — set a member discount (%) right on the event edit page, or a fixed member price (0 = free for members). Members are charged the discounted price at checkout.
+* NEW: **[g2a_events_calendar]** — a public month calendar of your events with an “upcoming events” sidebar and search (Amelia-style).
+* CHANGE: **admin Calendar** now opens in **month view** by default, adds a list view, and shows class/event bookings by **event name** instead of “null”.
+* CHANGE: **event banner** is now three customizable, animated formats — `style="spotlight"` (full hero + countdown), `style="strip"` (compact), `style="ticket"` (event-ticket card) — with an `accent` colour option.
+* CHANGE: **event landing page** hero redesigned — premium, clean layout with a next-date / time / price / seats stat strip and subtle animations.
+* CHANGE: **upcoming events list** text cleaned up and made easier to read.
+* NEW: **Shortcodes** admin page (G2A Booking → Shortcodes) listing every shortcode with its attributes and a one-click copy button.
+
+= 1.5.0 =
+**New: full Events system (Amelia-style) + unified booking form + Guns2Ammo restyle.**
+
+* NEW: **Events** — schedule seat-limited activities (Ladies Night, CCW classes, competitions) with specific dates/times, a seat count per date, and a single price each (free *or* paid). Manage them under **G2A Booking → Events**: create an event, then add as many dates/times as you like, each with its own seats and an optional price override.
+* NEW: **Event booking** — customers pick an event, pick a date (with live seats-remaining and price), and reserve a seat. Free events auto-confirm; paid events take payment online (Stripe) or reserve for pay-at-the-desk. Seats are reserved race-safely so a date can never be oversold.
+* NEW: **Unified booking form** — the booking form now has a *"What do you want to book?"* switch: **Lane / Range Time** (the existing lane flow, unchanged) or **Events & Classes**. The switch only appears when you have upcoming events.
+* NEW: **Event displays** — a responsive `/event/{slug}/` landing page (hero, description, booking widget, OpenGraph + Event schema), plus reworked `[g2a_event_banner]` (featured event hero with countdown + seats) and `[g2a_upcoming_events]` (event cards) that read real events. New `[g2a_event_booking]` widget for embedding the booking flow anywhere.
+* CHANGE: the booking form now defaults to the **Guns2Ammo dark/orange** look. Any colours you saved in the Form Customizer still take priority.
+* FIX: form section titles could render dark-on-dark on some themes (a theme's heading colour overrode the form's); titles now set their own colour.
+* Data: adds `g2ab_events` + `g2ab_event_occurrences` tables and links event bookings into the normal bookings table, so the front desk, calendar, payments and emails all handle event seats with no extra setup. Schema upgrades automatically on update.
+
+= 1.4.6 =
+**Admin Calendar and Front Desk now render (verified live).**
+
+* FIX: **Admin Calendar** stayed blank even after 1.4.5 bundled FullCalendar. The init script was attached to an empty-`src` script handle, which WordPress does not emit, so the calendar never initialised. The init now attaches to the real FullCalendar handle and runs whether the DOM is still loading or already ready — the week/month grid renders.
+* FIX: **Front Desk** roster never appeared because a stray escaped quote in the inline script produced a JavaScript syntax error (`Invalid or unexpected token`), aborting the whole desk script. The script now parses and the roster, totals, search, and per-booking actions all load.
+
+= 1.4.5 =
+**Admin fixes (Phase 1): Manual Booking, Calendar, Staff page, event landing, and dark UI.**
+
+* FIX: **Manual Booking** "Invalid start time" — the date/time picker submits an ISO value (`2026-06-28T18:00`); the server now normalises the `T` separator so staff bookings save.
+* FIX: **Admin Calendar** rendered blank because FullCalendar was loaded from a CDN that a firewall/security plugin can block. FullCalendar is now **bundled with the plugin** (no external request), and the calendar shows a clear message if the library is ever blocked instead of a silent blank.
+* FIX: **Staff terminal page** showed the literal text `[g2ab_staff_console]` — that shortcode is now registered (alias of `[g2ab_frontdesk]`), so the staff console renders.
+* FIX: **Event landing pages** (`/event/{slug}/`) 404'd after updates because rewrite rules weren't flushed; they now flush automatically once per version.
+* FIX: **Dark-on-dark admin UI** — the "FILTER" / "UPDATE STATUS" buttons and the "MISSION BRIEF" booking-detail title now render in readable white on their dark backgrounds.
+* Front Desk: error messages now stay on screen so a failed roster load shows its reason instead of a blank page.
+
+= 1.4.4 =
+**Hardening / diagnostics for the booking submit button.**
+
+* The booking submit no longer silently dies on an unexpected error: any synchronous failure is now caught and shown on-screen (and the button is re-enabled) instead of leaving a non-responsive "Reserve my lane" button.
+* The page-level form safety-net now only prevents the native form submit; it no longer stops event propagation, which guarantees the AJAX submit handler always receives the click.
+* The nonce-refresh URL falls back to the standard `admin-ajax.php` path if the localized value is ever missing (e.g. a stale cached page).
+* No change to the normal booking flow — these only affect error/edge cases.
+
+= 1.4.3 =
+**Fix "Cookie check failed" for logged-in members at booking submit.**
+
+* FIX: logged-in members got *"Cookie check failed"* when clicking "Reserve my lane," while guests booked fine. When a logged-in user's browser sends the WordPress auth cookie with the booking request, WP core requires a valid `wp_rest` nonce; if the booking page was served from cache the embedded nonce is stale, so WP rejects the request (`rest_cookie_invalid_nonce`) before the plugin runs. The 1.4.1 self-heal couldn't recover it because it refreshed the nonce over the REST API, which hits the same cookie-nonce gate for logged-in users.
+* The nonce is now refreshed over **admin-ajax** (`wp_ajax_g2ab_refresh_nonce`), which runs in the member's authenticated context with no REST nonce gate, so it can mint a valid nonce; the booking form fetches it and retries the submit once, transparently. Guests are unaffected.
+
+= 1.4.2 =
+**Critical booking fix — multi-shooter lane bookings + Memberistic integration.**
+
+* FIX (CRITICAL, the live outage): booking a lane for more than one shooter was rejected with "Party size exceeds the resource capacity of 1." Lanes are seeded with capacity 1 (one lane) but the booking form invites 1–4 shooters, and the capacity check was applied to every booking type. The party-size-vs-capacity check now only applies to resources that actually count people (capacity_mode = party_size, e.g. classrooms); for a single lane, party size is the number of shooters sharing that lane and no longer blocks the booking. This is independent of the cookie/age-verification fixes in 1.4.1.
+* FIX: post-booking hooks (g2ab_booking_created / g2ab_booking_status_changed) are now wrapped so a fault in any listener (membership, corporate enrollment, email, third-party) can no longer turn an already-saved booking into a 500 the customer sees as a failure.
+* FIX: member detection no longer trusts the stale `memberistic_active_plan_id` user-meta (which isn't cleared on expiry), so an expired member no longer keeps member pricing or members-only access. Live membership status is resolved authoritatively through the `g2ab_user_is_member` filter (Memberistic / PMPro).
+* ADD: the booking waiver gate now honors a `g2ab_waiver_satisfied` filter, so a membership plugin can auto-satisfy the waiver for a customer who already has a signed waiver on file.
+* FIX: corrected a wrong repository method call in the bundled (optional) Memberistic module.
+
+= 1.4.1 =
+**Booking reliability — "cookies won't let me book a lane" fix.**
+
+* FIX (the reported issue): The Verifyistic age-verification gate rejected returning customers who still held a valid age-verification cookie. The freshness window defaulted to 60 minutes, so any verification older than an hour was discarded and the booking POST was refused with a 403 — even though the customer's cookie was present and long-lived. The default is now 525600 (≈1 year), which lets the Verifyistic cookie's own expiry govern trust. Set it lower only if you deliberately want to force re-verification sooner.
+* FIX: "Require age verification before booking" now fails OPEN when the Verifyistic plugin/backend isn't actually loaded, instead of silently blocking every guest booking. The gate is only enforced when there is a verification backend to enforce against, so compliance is preserved when it can function.
+* FIX: The booking form now self-heals a stale `wp_rest` nonce. If a page was served from a full-page/CDN cache with an expired nonce, the form fetches a fresh nonce from a new uncached `/wp-json/g2a-booking/v1/nonce` endpoint and retries the booking once, instead of failing with "Invalid or missing nonce."
+* FIX: Booking pages are now marked uncacheable early (at `template_redirect`, with a `Cache-Control: no-store` header) so the embedded nonce can't be cached stale by edge caches that ignore `DONOTCACHEPAGE`.
+* FIX: The guest booking rate-limiter no longer locks out legitimate customers who share one public IP (range Wi-Fi / NAT / mobile CGNAT). The cap is far more generous and a successful booking now clears the counter, so only repeated failed attempts accumulate.
+* FIX: The age-verification request guard now anchors on the plugin's REST namespace, so a `/bookings` route in another plugin can't trip it, and stale-vs-missing verification cookies now return distinct, diagnosable error codes.
+* FIX: Public bookings only prefer Stripe when Stripe is actually configured and available, so a payable booking is never handed to a disabled gateway.
+* FIX: Membership (PMPro) eligibility filter is now additive — it can no longer revoke access that another membership provider already granted.
+* FIX: The seeded CCW Class booking type now uses `party_size` capacity counting (seats, not bookings) on fresh installs.
 
 = 1.4.0 =
 **Front Desk + Check-in.**

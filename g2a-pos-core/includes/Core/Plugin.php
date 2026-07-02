@@ -219,9 +219,30 @@ final class Plugin {
 	}
 
 	private static function maybe_upgrade(): void {
+		// Self-heal the minute-interval events: older versions scheduled them
+		// during activation before the 'minute' interval existed, so the queue
+		// worker and messaging flush never ran.
+		if ( ! wp_next_scheduled( self::CRON_HOOK ) ) {
+			wp_schedule_event( time() + MINUTE_IN_SECONDS, 'minute', self::CRON_HOOK );
+		}
+		if ( ! wp_next_scheduled( self::MESSAGING_FLUSH_HOOK ) ) {
+			wp_schedule_event( time() + MINUTE_IN_SECONDS, 'minute', self::MESSAGING_FLUSH_HOOK );
+		}
+
 		// Seed the default website knowledge pack once per pack version
 		// (guarded internally by option g2a_pos_brain_seeded_version).
 		WebsiteKnowledgeSeeder::maybe_seed();
+
+		// One-time migration: move the AI brain refresh from weekly to a nightly
+		// (daily) schedule and kick an immediate full-site crawl. Idempotent via
+		// its own option, so it also applies on a plugin-file replace where the
+		// activation hook does not run.
+		if ( get_option( 'g2a_pos_brain_cron_schedule' ) !== 'nightly-v1' ) {
+			wp_clear_scheduled_hook( WebsiteKnowledgeSeeder::CRON_HOOK );
+			wp_schedule_event( self::next_nightly_run(), 'daily', WebsiteKnowledgeSeeder::CRON_HOOK );
+			wp_schedule_single_event( time() + 2 * MINUTE_IN_SECONDS, WebsiteKnowledgeSeeder::CRON_HOOK );
+			update_option( 'g2a_pos_brain_cron_schedule', 'nightly-v1', false );
+		}
 
 		if ( get_option( 'g2a_pos_core_db_version' ) === G2A_POS_CORE_VERSION ) {
 			return;
@@ -231,7 +252,27 @@ final class Plugin {
 		Roles::register_caps();
 	}
 
+	/** Timestamp for the next ~3:15 AM in the site's timezone (true nightly run). */
+	private static function next_nightly_run(): int {
+		$tz = function_exists( 'wp_timezone' ) ? wp_timezone() : new \DateTimeZone( 'UTC' );
+		try {
+			$now = new \DateTimeImmutable( 'now', $tz );
+		} catch ( \Throwable $e ) {
+			return time() + 3 * HOUR_IN_SECONDS;
+		}
+		$run = $now->setTime( 3, 15 );
+		if ( $run <= $now ) {
+			$run = $run->modify( '+1 day' );
+		}
+		return $run->getTimestamp();
+	}
+
 	public static function activate(): void {
+		// Register the custom 'minute' interval before scheduling — activation
+		// runs before our plugins_loaded boot, so without this the 'minute'
+		// events below would silently fail to schedule.
+		Cron::register_intervals();
+
 		Migrator::run();
 		Roles::register_roles();
 		Roles::register_caps();
@@ -275,9 +316,11 @@ final class Plugin {
 			wp_schedule_event( time() + 2 * HOUR_IN_SECONDS, 'daily', self::WOO_CATALOG_SYNC_HOOK );
 		}
 		if ( ! wp_next_scheduled( self::BRAIN_SITE_REFRESH_HOOK ) ) {
-			// Weekly website-knowledge refresh for the AI brain.
-			wp_schedule_event( time() + 12 * HOUR_IN_SECONDS, 'weekly', self::BRAIN_SITE_REFRESH_HOOK );
+			// Nightly website-knowledge refresh (full-site crawl) for the AI brain.
+			wp_schedule_event( self::next_nightly_run(), 'daily', self::BRAIN_SITE_REFRESH_HOOK );
 		}
+		// Populate the brain shortly after install without blocking activation.
+		wp_schedule_single_event( time() + 2 * MINUTE_IN_SECONDS, self::BRAIN_SITE_REFRESH_HOOK );
 
 		WebsiteKnowledgeSeeder::maybe_seed();
 	}

@@ -397,7 +397,7 @@ final class G2AB_Admin_Forms_List {
 		echo '<style>
 .g2ab-fb{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;}
 .g2ab-fb__header{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:20px;background:linear-gradient(135deg,#0F1115 0%,#1A1F26 100%);color:#E8E8E8;padding:24px 28px;margin:20px 0 16px;border-left:4px solid #D2691E;}
-.g2ab-fb__stencil{font-family:"Rajdhani","Oswald",Impact,sans-serif;font-size:30px;font-weight:700;letter-spacing:.12em;color:#fff;text-shadow:2px 2px 0 #4A5D3A;}
+.g2ab-fb__stencil{font-family:"Inter","Segoe UI",system-ui,-apple-system,sans-serif;font-size:30px;font-weight:700;letter-spacing:.04em;color:#fff;}
 .g2ab-fb__sub{margin:4px 0 0;color:#8A95A5;font-size:13px;text-transform:uppercase;letter-spacing:.06em;}
 .g2ab-fb__btn{display:inline-flex;align-items:center;gap:6px;padding:9px 16px;background:#fff;color:#0F1115;border:1px solid #d0d4d9;text-decoration:none;font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;border-radius:2px;cursor:pointer;}
 .g2ab-fb__btn:hover{background:#f8f9fa;color:#D2691E;}
@@ -419,7 +419,7 @@ final class G2AB_Admin_Forms_List {
 .g2ab-fb__editor{display:grid;grid-template-columns:1fr 240px;gap:14px;}
 @media (max-width:1000px){.g2ab-fb__editor{grid-template-columns:1fr;}}
 .g2ab-fb__panel{background:#fff;border:1px solid #d0d4d9;padding:20px 24px;margin-bottom:14px;}
-.g2ab-fb__panel h3{font-family:"Rajdhani",sans-serif;font-size:13px;letter-spacing:.12em;color:#D2691E;margin:0 0 14px;font-weight:700;}
+.g2ab-fb__panel h3{font-family:"Inter","Segoe UI",system-ui,-apple-system,sans-serif;font-size:13px;letter-spacing:.12em;color:#D2691E;margin:0 0 14px;font-weight:700;}
 .g2ab-fb__panel h3 small{color:#8A95A5;font-weight:400;letter-spacing:0;text-transform:none;font-size:11px;margin-left:8px;}
 .g2ab-fb__panel--editor{background:#fffbe6;border-left:4px solid #D2691E;}
 .g2ab-fb__field{margin-bottom:12px;}

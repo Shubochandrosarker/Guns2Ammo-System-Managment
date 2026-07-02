@@ -212,75 +212,10 @@ final class Shortcodes {
 	}
 
 	public static function login_placeholder() {
-		$plans_url = \WordPressistic\Memberistic\memberistic_get_page_url( 'plans_page_id', 'memberistic-plans', home_url( '/' ) );
-		$lost_url  = wp_lostpassword_url();
-		$redirect  = \WordPressistic\Memberistic\memberistic_get_page_url( 'account_page_id', 'account', home_url( '/account/' ) );
-
-		// CRITICAL: the form must POST to wp-login.php (the canonical
-		// WP auth endpoint), NOT to wp_login_url() — themes that filter
-		// `login_url` (the Guns 2 Ammo theme does, to surface /login/
-		// in customer emails) would otherwise rewrite the action to
-		// /login/ and the credential POST would land on the page that
-		// renders the form, never reaching the auth handler. Use the
-		// `login_post` scheme so site_url skips the login_url filter.
-		$login_action = site_url( 'wp-login.php', 'login_post' );
-
-		ob_start();
-		?>
-		<div class="memberistic-frontend memberistic-auth-shell">
-			<div class="memberistic-auth-card">
-				<div class="memberistic-auth-logo"><span class="memberistic-auth-mark"></span><?php esc_html_e( 'MEMBERS HUB', 'memberistic' ); ?></div>
-				<h2 class="memberistic-auth-title"><?php esc_html_e( 'MEMBER LOGIN', 'memberistic' ); ?></h2>
-				<p class="memberistic-auth-sub"><?php esc_html_e( 'Welcome back. Access your range account.', 'memberistic' ); ?></p>
-
-				<form class="memberistic-auth-form" method="post" action="<?php echo esc_url( $login_action ); ?>">
-					<input type="hidden" name="redirect_to" value="<?php echo esc_attr( $redirect ); ?>">
-
-					<label class="memberistic-auth-label" for="memberistic_user_login"><?php esc_html_e( 'Email Address', 'memberistic' ); ?></label>
-					<input class="memberistic-auth-field" id="memberistic_user_login" type="text" name="log" autocomplete="username" required>
-
-					<label class="memberistic-auth-label" for="memberistic_user_pass"><?php esc_html_e( 'Password', 'memberistic' ); ?></label>
-					<input class="memberistic-auth-field" id="memberistic_user_pass" type="password" name="pwd" autocomplete="current-password" required>
-
-					<div class="memberistic-auth-row">
-						<label class="memberistic-auth-check"><input type="checkbox" name="rememberme" value="forever"> <?php esc_html_e( 'Remember me', 'memberistic' ); ?></label>
-						<a class="memberistic-auth-forgot" href="<?php echo esc_url( $lost_url ); ?>"><?php esc_html_e( 'Forgot password?', 'memberistic' ); ?></a>
-					</div>
-
-					<button class="memberistic-auth-btn memberistic-auth-btn--primary" type="submit"><?php esc_html_e( 'Sign In', 'memberistic' ); ?></button>
-
-					<div class="memberistic-auth-divider"><?php esc_html_e( 'OR', 'memberistic' ); ?></div>
-					<a class="memberistic-auth-btn memberistic-auth-btn--secondary" href="<?php echo esc_url( $plans_url ); ?>"><?php esc_html_e( 'Join As A Member', 'memberistic' ); ?></a>
-					<?php
-					// Dynamic "From $X.XX/mo - Cancel Anytime" line. Was hardcoded
-					// to "$29.99/mo" (Defender tier) and went stale every time
-					// pricing changed. Now reads the minimum active monthly price
-					// and silently drops the line when no active plans are
-					// published (rather than printing a misleading placeholder).
-					$active_plans = Plans_Repository::get_all( array( 'status' => 'active' ) );
-					$min_monthly  = null;
-					foreach ( (array) $active_plans as $ap ) {
-						$price = isset( $ap['monthly_price'] ) ? (float) $ap['monthly_price'] : 0.0;
-						if ( $price > 0 && ( null === $min_monthly || $price < $min_monthly ) ) {
-							$min_monthly = $price;
-						}
-					}
-					if ( null !== $min_monthly ) {
-						$currency = (string) \WordPressistic\Memberistic\memberistic_get_setting( 'currency', 'USD' );
-						$symbol   = 'USD' === $currency ? '$' : '';
-						$line     = sprintf(
-							/* translators: %s: formatted plan price (e.g. $29.99) */
-							__( 'From %s/mo - Cancel Anytime', 'memberistic' ),
-							$symbol . number_format_i18n( $min_monthly, 2 )
-						);
-						echo '<div class="memberistic-auth-alt">' . esc_html( $line ) . '</div>';
-					}
-					?>
-				</form>
-			</div>
-		</div>
-		<?php
-		return ob_get_clean();
+		// The full auth surface (login + forgot-password + reset-password) lives
+		// in the Auth handler so the branded /login/ page can process every auth
+		// action the theme funnels to it — not just render the login form.
+		return Auth::render();
 	}
 
 	public static function thank_you() {

@@ -119,7 +119,7 @@ final class G2AB_Admin_Payments_List {
 						<tbody>
 							<?php foreach ( $rows as $p ) : ?>
 								<tr>
-									<td><?php echo esc_html( mysql2date( 'M j · g:i A', ( ! empty( $p->processed_at ) && '0000-00-00 00:00:00' !== $p->processed_at ) ? $p->processed_at : $p->created_at ) ); ?></td>
+									<td><?php echo esc_html( mysql2date( 'M j · g:i A', $p->created_at ) ); ?></td>
 									<td><a href="<?php echo esc_url( admin_url( 'admin.php?page=g2ab-bookings-list&view=detail&booking_id=' . $p->booking_id ) ); ?>">#<?php echo (int) $p->booking_id; ?></a></td>
 									<td><?php echo esc_html( $p->customer_name ?: '—' ); ?></td>
 									<td><span class="g2ab-pl__pill g2ab-pl__pill--<?php echo esc_attr( $p->gateway ); ?>"><?php echo esc_html( strtoupper( str_replace( '_', ' ', $p->gateway ) ) ); ?></span></td>
@@ -184,12 +184,11 @@ final class G2AB_Admin_Payments_List {
 			fputcsv( $out, array( 'No payments match the current filter' ) );
 		} else {
 			foreach ( $rows as $r ) {
-				$line = array(
+				fputcsv( $out, array(
 					$r['id'], $r['booking_id'], $r['booking_uuid'], $r['customer_name'], $r['customer_email'],
 					$r['gateway'], $r['transaction_id'], $r['amount'], $r['currency'], $r['status'],
 					$r['payment_method'], $r['refund_amount'], $r['processed_at'], $r['created_at'],
-				);
-				fputcsv( $out, array_map( array( 'G2AB_Admin_Bookings_List', 'csv_escape' ), $line ) );
+				) );
 			}
 		}
 
@@ -201,12 +200,12 @@ final class G2AB_Admin_Payments_List {
 		echo '<style>
 .g2ab-pl{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;}
 .g2ab-pl__header{background:linear-gradient(135deg,#0F1115 0%,#1A1F26 100%);color:#E8E8E8;padding:24px 28px;margin:20px 0 16px;border-left:4px solid #D2691E;}
-.g2ab-pl__stencil{font-family:"Rajdhani","Oswald",Impact,sans-serif;font-size:30px;font-weight:700;letter-spacing:.12em;color:#fff;text-shadow:2px 2px 0 #4A5D3A;}
+.g2ab-pl__stencil{font-family:"Inter","Segoe UI",system-ui,-apple-system,sans-serif;font-size:30px;font-weight:700;letter-spacing:.04em;color:#fff;}
 .g2ab-pl__sub{margin:4px 0 0;color:#8A95A5;font-size:13px;text-transform:uppercase;letter-spacing:.08em;}
 .g2ab-pl__kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px;margin-bottom:16px;}
 .g2ab-pl__kpi{background:#fff;border:1px solid #d0d4d9;padding:16px 18px;border-top:3px solid #D2691E;}
 .g2ab-pl__kpi-lbl{display:block;font-size:10px;color:#8A95A5;letter-spacing:.1em;font-weight:700;}
-.g2ab-pl__kpi-val{display:block;font-family:"Rajdhani",sans-serif;font-size:28px;color:#0F1115;font-weight:700;line-height:1.1;margin-top:6px;}
+.g2ab-pl__kpi-val{display:block;font-family:"Inter","Segoe UI",system-ui,-apple-system,sans-serif;font-size:28px;color:#0F1115;font-weight:700;line-height:1.1;margin-top:6px;}
 .g2ab-pl__notice{background:#fffbe6;border-left:4px solid #D2691E;padding:14px 18px;margin-bottom:14px;}
 .g2ab-pl__notice strong{display:block;font-size:11px;color:#D2691E;letter-spacing:.08em;margin-bottom:4px;}
 .g2ab-pl__notice p{margin:0;color:#3c434a;font-size:13px;}

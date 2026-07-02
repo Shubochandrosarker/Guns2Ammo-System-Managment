@@ -50,13 +50,9 @@ final class G2AB_REST_Admin_Bookings_Controller {
 		$booking_type_id = (int) $request->get_param( 'booking_type_id' );
 		$resource_id     = (int) $request->get_param( 'resource_id' );
 		$start_at        = sanitize_text_field( (string) $request->get_param( 'start_at' ) );
-		// The Manual Booking form uses an <input type="datetime-local">, whose
-		// browser-submitted .value carries a literal "T" separator
-		// (YYYY-MM-DDTHH:MM) rather than the space-separated form this method
-		// validates and stores. Without this normalisation every manual booking
-		// failed the regex below with "Invalid start time." Trim and collapse
-		// the separator so both "T" and space inputs are accepted.
-		$start_at = str_replace( 'T', ' ', trim( $start_at ) );
+		// An <input type="datetime-local"> submits "Y-m-dTH:i" (a "T" separator and
+		// no seconds), so normalise the "T" to a space before the validation below.
+		$start_at        = str_replace( 'T', ' ', $start_at );
 		$party_size      = max( 1, (int) ( $request->get_param( 'party_size' ) ?: 1 ) );
 		$payment_mode    = sanitize_key( (string) ( $request->get_param( 'payment_mode' ) ?: 'in_store' ) );
 		$source          = sanitize_key( (string) ( $request->get_param( 'source' ) ?: 'admin' ) );

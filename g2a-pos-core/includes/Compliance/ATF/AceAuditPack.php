@@ -175,7 +175,7 @@ final class AceAuditPack {
 		foreach ( $rows as $row ) {
 			$line = array();
 			foreach ( $cols as $c ) {
-				$line[] = (string) ( $row[ $c ] ?? '' );
+				$line[] = self::csv_cell( (string) ( $row[ $c ] ?? '' ) );
 			}
 			fputcsv( $fh, $line );
 		}
@@ -183,5 +183,14 @@ final class AceAuditPack {
 		$out = (string) stream_get_contents( $fh );
 		fclose( $fh );
 		return $out;
+	}
+
+	/** Neutralise spreadsheet formula injection (same approach as CrmController::csv_cell). */
+	private static function csv_cell( $value ): string {
+		$value = (string) $value;
+		if ( $value !== '' && in_array( $value[0], array( '=', '+', '-', '@', "\t", "\r" ), true ) ) {
+			return "'" . $value;
+		}
+		return $value;
 	}
 }

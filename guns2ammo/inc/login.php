@@ -163,13 +163,22 @@ function g2a_login_guard_wp_login() {
 	if ( defined( 'XMLRPC_REQUEST' ) || defined( 'WP_CLI' ) || wp_doing_ajax() || ( defined( 'REST_REQUEST' ) && REST_REQUEST ) ) {
 		return;
 	}
-	// CRITICAL: allow ALL POST requests through. The member login
-	// form on /login/ posts credentials to wp-login.php; bouncing
-	// those POSTs back to /login/ breaks every member sign-in.
-	// POSTs to wp-login.php are by design intentional auth attempts —
-	// either a real login or an attacker, and WP itself rate-limits
-	// + locks accounts on repeated failures, so we don't need to.
+	// CRITICAL: allow POST requests through. The member login form on
+	// /login/ posts credentials to wp-login.php; bouncing those POSTs
+	// back to /login/ breaks every member sign-in. WordPress core has NO
+	// built-in login rate limiting, so we throttle repeated failures per
+	// IP ourselves (see g2a_login_record_failure below) before letting
+	// the POST proceed.
 	if ( 'POST' === strtoupper( (string) ( $_SERVER['REQUEST_METHOD'] ?? '' ) ) ) {
+		$g2a_fails = (int) get_transient( 'g2a_login_fails_' . md5( g2a_login_client_ip() ) );
+		if ( $g2a_fails >= (int) apply_filters( 'g2a_login_max_failures', 20 ) ) {
+			status_header( 429 );
+			wp_die(
+				esc_html__( 'Too many failed sign-in attempts. Please wait 15 minutes and try again.', 'guns2ammo' ),
+				esc_html__( 'Slow down', 'guns2ammo' ),
+				array( 'response' => 429 )
+			);
+		}
 		return;
 	}
 	// Allow the bypass query param (set by /g2a-admin-login/).
@@ -235,3 +244,32 @@ function g2a_login_guard_wp_admin() {
  *    Settings → Permalinks click required).
  * ============================================================ */
 add_action( 'after_switch_theme', 'flush_rewrite_rules' );
+
+/* ============================================================
+ * 7. Login brute-force throttle. WordPress core does NOT rate-
+ *    limit sign-in attempts; this counts failures per IP (behind
+ *    Cloudflare, CF-Connecting-IP is the real client) and the
+ *    wp-login guard above blocks POSTs once the cap is hit.
+ *    Counter resets on success or after 15 minutes.
+ * ============================================================ */
+function g2a_login_client_ip() {
+	if ( ! empty( $_SERVER['HTTP_CF_CONNECTING_IP'] ) ) {
+		$ip = sanitize_text_field( wp_unslash( $_SERVER['HTTP_CF_CONNECTING_IP'] ) );
+		if ( filter_var( $ip, FILTER_VALIDATE_IP ) ) {
+			return $ip;
+		}
+	}
+	return isset( $_SERVER['REMOTE_ADDR'] ) ? sanitize_text_field( wp_unslash( $_SERVER['REMOTE_ADDR'] ) ) : '0.0.0.0';
+}
+
+add_action( 'wp_login_failed', 'g2a_login_record_failure' );
+function g2a_login_record_failure() {
+	$key   = 'g2a_login_fails_' . md5( g2a_login_client_ip() );
+	$fails = (int) get_transient( $key );
+	set_transient( $key, $fails + 1, 15 * MINUTE_IN_SECONDS );
+}
+
+add_action( 'wp_login', 'g2a_login_clear_failures' );
+function g2a_login_clear_failures() {
+	delete_transient( 'g2a_login_fails_' . md5( g2a_login_client_ip() ) );
+}

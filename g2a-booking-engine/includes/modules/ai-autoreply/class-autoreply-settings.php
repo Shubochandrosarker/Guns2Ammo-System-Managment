@@ -81,7 +81,8 @@ class G2AB_AutoReply_Settings {
 
 				<div class="g2ab-ai__row">
 					<label>API Key</label>
-					<input type="password" name="api_key" value="<?php echo esc_attr( get_option( G2AB_OpenRouter_Client::OPTION_KEY, '' ) ); ?>" placeholder="sk-..." autocomplete="off" />
+					<?php $key_saved = '' !== (string) get_option( G2AB_OpenRouter_Client::OPTION_KEY, '' ); ?>
+					<input type="password" name="api_key" value="" placeholder="<?php echo esc_attr( $key_saved ? __( 'saved — enter new value to replace', 'g2a-booking' ) : 'sk-...' ); ?>" autocomplete="off" />
 					<div class="g2ab-ai__hint" id="g2ab-ai-keys-link">
 						<?php if ( ! empty( $current_cfg['keys_url'] ) ) : ?>
 							Get your key at <a href="<?php echo esc_url( $current_cfg['keys_url'] ); ?>" target="_blank" rel="noopener"><?php echo esc_html( wp_parse_url( $current_cfg['keys_url'], PHP_URL_HOST ) ); ?></a>.
@@ -268,7 +269,11 @@ class G2AB_AutoReply_Settings {
 			$provider = 'openrouter';
 		}
 		update_option( G2AB_OpenRouter_Client::OPTION_PROVIDER, $provider );
-		update_option( G2AB_OpenRouter_Client::OPTION_KEY, sanitize_text_field( wp_unslash( $_POST['api_key'] ?? '' ) ) );
+		$api_key = sanitize_text_field( wp_unslash( $_POST['api_key'] ?? '' ) );
+		if ( '' !== $api_key ) {
+			// The field renders masked/empty — an empty submit keeps the stored key.
+			update_option( G2AB_OpenRouter_Client::OPTION_KEY, $api_key );
+		}
 
 		if ( 'custom' === $provider ) {
 			update_option( G2AB_OpenRouter_Client::OPTION_ENDPOINT, esc_url_raw( wp_unslash( $_POST['endpoint'] ?? '' ) ) );

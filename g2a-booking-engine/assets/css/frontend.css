@@ -55,63 +55,6 @@
 		var(--g2ab-bg);
 }
 
-/* ===== Site theme ========================================================
-   Inherits the host theme's design tokens (Guns2Ammo brass/ember), so the
-   widget follows the site automatically — INCLUDING its light/dark mode
-   (html[data-theme]). Falls back to a tasteful dark when the tokens are
-   absent (plugin used on another theme). */
-.g2ab-booking.g2ab-theme-site {
-	--g2ab-primary:  var(--color-ember, #E8802F);
-	--g2ab-accent:   var(--color-brass, #C9A84C);
-	--g2ab-bg:       var(--color-surface-1, #211F26);
-	--g2ab-surface:  var(--color-gunmetal, #26252C);
-	--g2ab-surface2: var(--color-surface-2, #2B2932);
-	--g2ab-text:     var(--color-white, #F7F7F9);
-	--g2ab-muted:    var(--color-silver, #A7A6AE);
-	--g2ab-border:   var(--color-hairline, rgba(255,255,255,0.085));
-	--g2ab-shadow:   0 30px 80px rgba(0,0,0,0.35);
-	--g2ab-font:     var(--font-body, "Inter","Segoe UI",Roboto,Helvetica,Arial,sans-serif);
-	background:
-		radial-gradient(120% 80% at 80% 0%, color-mix(in srgb, var(--g2ab-accent) 10%, transparent) 0%, transparent 50%),
-		radial-gradient(120% 80% at 0% 100%, color-mix(in srgb, var(--g2ab-primary) 9%, transparent) 0%, transparent 55%),
-		var(--g2ab-bg);
-}
-html[data-theme="light"] .g2ab-booking.g2ab-theme-site {
-	--g2ab-shadow: 0 24px 60px rgba(40, 30, 8, 0.12);
-}
-
-/* ===== Ladies Tuesday skin ===============================================
-   A deliberately different look for the Ladies Tuesday event flow: warm
-   rose-gold over plum, same structure. Applied via shortcode theme="ladies"
-   (or the host theme's design-token filter on the Ladies Tuesday page).
-   Light-mode aware. */
-.g2ab-booking.g2ab-theme-ladies {
-	--g2ab-primary:  #E25C8E;
-	--g2ab-accent:   #E8B4C8;
-	--g2ab-bg:       #241522;
-	--g2ab-surface:  #2E1B2A;
-	--g2ab-surface2: #281725;
-	--g2ab-text:     #FAF4F8;
-	--g2ab-muted:    #BA9FAE;
-	--g2ab-border:   rgba(255, 235, 245, 0.10);
-	--g2ab-shadow:   0 30px 80px rgba(28, 8, 22, 0.5);
-	background:
-		radial-gradient(120% 80% at 80% 0%, rgba(232, 180, 200, 0.12) 0%, transparent 50%),
-		radial-gradient(120% 80% at 0% 100%, rgba(226, 92, 142, 0.14) 0%, transparent 55%),
-		var(--g2ab-bg);
-}
-html[data-theme="light"] .g2ab-booking.g2ab-theme-ladies {
-	--g2ab-primary:  #C2447A;
-	--g2ab-accent:   #9C5C7C;
-	--g2ab-bg:       #FAF2F6;
-	--g2ab-surface:  #FFFFFF;
-	--g2ab-surface2: #F6EAF0;
-	--g2ab-text:     #311F2A;
-	--g2ab-muted:    #7E6470;
-	--g2ab-border:   rgba(60, 20, 44, 0.12);
-	--g2ab-shadow:   0 24px 60px rgba(60, 20, 44, 0.12);
-}
-
 /* ===== Layout shell ====================================================== */
 .g2ab-shell {
 	display: grid;
@@ -156,6 +99,9 @@ html[data-theme="light"] .g2ab-booking.g2ab-theme-ladies {
 	margin: 4px 0 8px;
 	line-height: 1.15;
 	letter-spacing: -0.01em;
+	/* Force our own colour so a theme's h2/h3 heading colour can't win and
+	   render the title dark-on-dark. */
+	color: var(--g2ab-text);
 }
 .g2ab-aside__subtitle {
 	color: var(--g2ab-muted);
@@ -226,6 +172,7 @@ html[data-theme="light"] .g2ab-booking.g2ab-theme-ladies {
 	font-weight: 700;
 	margin: 0;
 	letter-spacing: -0.01em;
+	color: var(--g2ab-text);
 }
 .g2ab-stage__meta {
 	margin: 0;
@@ -371,31 +318,6 @@ html[data-theme="light"] .g2ab-booking.g2ab-theme-ladies {
 	color: #fff;
 	box-shadow: 0 6px 14px color-mix(in srgb, var(--g2ab-primary) 35%, transparent);
 }
-/* Event-driven calendar: bookable event dates get an accent ring + dot so
-   it's obvious only the highlighted days are open (e.g. Ladies Tuesday). */
-.g2ab-cal__cell.is-event {
-	position: relative;
-	font-weight: 700;
-	color: var(--g2ab-text);
-	box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--g2ab-accent, var(--g2ab-primary)) 55%, transparent);
-}
-.g2ab-cal__cell.is-event::after {
-	content: "";
-	position: absolute;
-	bottom: 5px; left: 50%;
-	width: 4px; height: 4px;
-	transform: translateX(-50%);
-	border-radius: 50%;
-	background: var(--g2ab-accent, var(--g2ab-primary));
-}
-.g2ab-cal__cell.is-event:hover {
-	background: color-mix(in srgb, var(--g2ab-accent, var(--g2ab-primary)) 20%, transparent);
-}
-.g2ab-cal__cell.is-event.is-selected {
-	color: #fff;
-	box-shadow: 0 6px 14px color-mix(in srgb, var(--g2ab-primary) 35%, transparent);
-}
-.g2ab-cal__cell.is-event.is-selected::after { background: #fff; }
 
 /* ===== Slots ============================================================= */
 .g2ab-pick__hint {
@@ -554,82 +476,28 @@ html[data-theme="light"] .g2ab-booking.g2ab-theme-ladies {
 .g2ab-done {
 	display: flex; flex-direction: column; align-items: center;
 	text-align: center;
-	gap: 14px;
-	padding: 48px 24px 32px;
-	position: relative;
-	overflow: hidden;
+	gap: 12px;
+	padding: 40px 20px;
 }
-.g2ab-done__confetti {
-	position: absolute; inset: 0;
-	width: 100%; height: 100%;
-	pointer-events: none;
-	z-index: 1;
-}
-.g2ab-done > :not(.g2ab-done__confetti) { position: relative; z-index: 2; }
 .g2ab-done__check {
 	color: var(--g2ab-primary);
-	animation: g2ab-pop .55s cubic-bezier(.2,.9,.3,1.4) both;
-}
-.g2ab-done__check svg {
-	filter: drop-shadow(0 6px 18px rgba(0,0,0,.18));
-}
-.g2ab-done__check svg path {
-	stroke-dasharray: 60;
-	stroke-dashoffset: 60;
-	animation: g2ab-draw .6s .25s cubic-bezier(.2,.9,.3,1) forwards;
+	animation: g2ab-pop .45s cubic-bezier(.2,.9,.3,1.4) both;
 }
 @keyframes g2ab-pop {
 	from { opacity: 0; transform: scale(.7); }
 	to   { opacity: 1; transform: scale(1); }
 }
-@keyframes g2ab-draw {
-	to { stroke-dashoffset: 0; }
-}
 .g2ab-done__title {
 	font-size: clamp(22px, 2.4vw, 28px);
 	margin: 0; font-weight: 700;
 	letter-spacing: -0.01em;
-	animation: g2ab-rise .5s .2s cubic-bezier(.2,.9,.3,1) both;
-}
-.g2ab-done__msg {
-	color: var(--g2ab-muted); margin: 0; max-width: 480px;
-	animation: g2ab-rise .5s .3s cubic-bezier(.2,.9,.3,1) both;
-}
-@keyframes g2ab-rise {
-	from { opacity: 0; transform: translateY(8px); }
-	to   { opacity: 1; transform: translateY(0); }
-}
-.g2ab-done__recap {
-	display: grid;
-	grid-template-columns: minmax(56px, max-content) 1fr;
-	gap: 6px 18px;
-	width: min(440px, 100%);
-	margin: 4px 0 6px;
-	padding: 14px 18px;
-	background: var(--g2ab-surface2);
-	border: 1px solid var(--g2ab-border);
-	border-radius: 12px;
-	text-align: left;
-	animation: g2ab-rise .5s .4s cubic-bezier(.2,.9,.3,1) both;
-}
-.g2ab-done__recap-row { display: contents; }
-.g2ab-done__recap-lbl {
-	font-size: 11px;
-	letter-spacing: .12em;
-	text-transform: uppercase;
-	color: var(--g2ab-muted);
-	align-self: center;
-}
-.g2ab-done__recap-val {
-	font-size: 14px;
 	color: var(--g2ab-text);
-	font-weight: 600;
 }
+.g2ab-done__msg { color: var(--g2ab-muted); margin: 0; max-width: 480px; }
 .g2ab-done__id {
 	color: var(--g2ab-muted);
 	font-size: 13px;
 	margin: 0;
-	animation: g2ab-rise .5s .5s cubic-bezier(.2,.9,.3,1) both;
 }
 .g2ab-done__id code {
 	background: var(--g2ab-surface2);
@@ -638,51 +506,6 @@ html[data-theme="light"] .g2ab-booking.g2ab-theme-ladies {
 	font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
 	font-size: 12px;
 	color: var(--g2ab-text);
-}
-.g2ab-done__actions {
-	display: flex;
-	flex-wrap: wrap;
-	justify-content: center;
-	gap: 10px;
-	margin-top: 14px;
-	width: 100%;
-	max-width: 440px;
-	animation: g2ab-rise .5s .6s cubic-bezier(.2,.9,.3,1) both;
-}
-.g2ab-done__again {
-	display: inline-flex; align-items: center; gap: 8px;
-	padding: 12px 22px;
-	font-weight: 600;
-	letter-spacing: .01em;
-	border-radius: 999px;
-	transition: transform .18s cubic-bezier(.2,.9,.3,1.4), box-shadow .18s ease;
-	box-shadow: 0 4px 16px color-mix(in srgb, var(--g2ab-primary) 35%, transparent);
-}
-.g2ab-done__again:hover {
-	transform: translateY(-1px) scale(1.02);
-	box-shadow: 0 8px 24px color-mix(in srgb, var(--g2ab-primary) 45%, transparent);
-}
-.g2ab-done__again:active { transform: translateY(0) scale(.99); }
-.g2ab-done__again-icon {
-	display: inline-flex; align-items: center; justify-content: center;
-	width: 22px; height: 22px;
-	border-radius: 999px;
-	background: rgba(255,255,255,.18);
-}
-.g2ab-done__home {
-	padding: 12px 22px;
-	border-radius: 999px;
-	font-weight: 500;
-}
-
-@media (prefers-reduced-motion: reduce) {
-	.g2ab-done__check, .g2ab-done__check svg path,
-	.g2ab-done__title, .g2ab-done__msg,
-	.g2ab-done__recap, .g2ab-done__id, .g2ab-done__actions {
-		animation: none;
-	}
-	.g2ab-done__confetti { display: none; }
-	.g2ab-done__again { transition: none; }
 }
 
 /* ===== Error fallback ==================================================== */
@@ -698,142 +521,3 @@ html[data-theme="light"] .g2ab-booking.g2ab-theme-ladies {
 	margin: 0 auto;
 }
 .g2ab-error p { margin: 0; color: var(--g2ab-muted, #8B93B4); }
-
-/* ===== Mobile responsiveness hardening =================================== */
-@media (max-width: 640px) {
-	.g2ab-booking {
-		padding: 14px;
-		border-radius: 14px;
-	}
-
-	.g2ab-stage {
-		min-height: 0;
-		padding: 16px;
-	}
-
-	.g2ab-slots {
-		grid-template-columns: 1fr;
-		max-height: none;
-		overflow-y: visible;
-		padding-right: 0;
-	}
-
-	.g2ab-stage__foot {
-		flex-wrap: wrap;
-		align-items: stretch;
-	}
-
-	.g2ab-stage__summary {
-		margin-right: 0;
-		width: 100%;
-	}
-
-	.g2ab-btn {
-		width: 100%;
-		justify-content: center;
-	}
-
-	.g2ab-resource-grid {
-		display: grid;
-		grid-template-columns: 1fr;
-	}
-
-	.g2ab-chip {
-		width: 100%;
-		text-align: center;
-	}
-
-	.g2ab-done__id code {
-		display: inline-block;
-		max-width: 100%;
-		overflow-wrap: anywhere;
-		word-break: break-word;
-	}
-}
-
-@media (max-width: 1024px) {
-	.g2ab-shell {
-		grid-template-columns: 1fr;
-	}
-	.g2ab-stage {
-		min-height: 0;
-	}
-	.g2ab-pick {
-		grid-template-columns: 1fr;
-	}
-	.g2ab-stage__foot {
-		flex-wrap: wrap;
-	}
-	.g2ab-stage__summary {
-		width: 100%;
-		margin-right: 0;
-	}
-}
-
-/* ===== Slot availability notice (above the time-slot grid) ============== */
-.g2ab-slots-notice {
-	display: inline-flex;
-	align-items: center;
-	gap: 8px;
-	margin: 0 0 12px;
-	padding: 6px 14px;
-	border-radius: var(--g2ab-radius-pill, 999px);
-	font-size: 12.5px;
-	font-weight: 600;
-	letter-spacing: .01em;
-	line-height: 1.4;
-	color: var(--g2ab-text, #fff);
-	background: color-mix(in srgb, var(--g2ab-primary, #5B7BFF) 14%, transparent);
-	border: 1px solid color-mix(in srgb, var(--g2ab-primary, #5B7BFF) 32%, transparent);
-}
-.g2ab-slots-notice::before {
-	content: "";
-	width: 7px;
-	height: 7px;
-	border-radius: 50%;
-	background: var(--g2ab-primary, #5B7BFF);
-	flex: 0 0 auto;
-}
-.g2ab-slots-notice.is-full {
-	color: var(--g2ab-text, #fff);
-	background: color-mix(in srgb, #C62828 13%, transparent);
-	border-color: color-mix(in srgb, #C62828 38%, transparent);
-}
-.g2ab-slots-notice.is-full::before { background: #C62828; }
-.g2ab-slots-notice[hidden] { display: none; }
-
-/* ===== Support note (under the booking widget) =========================== */
-.g2ab-support-note {
-	display: flex;
-	align-items: flex-start;
-	gap: 14px;
-	margin-top: 18px;
-	padding: 16px 20px;
-	border-radius: var(--g2ab-radius, 16px);
-	background: var(--g2ab-surface, #121833);
-	border: 1px solid var(--g2ab-border, rgba(255,255,255,0.08));
-	color: var(--g2ab-muted, #8B93B4);
-	font-family: var(--g2ab-font, "Inter","Segoe UI",sans-serif);
-	font-size: 13.5px;
-	line-height: 1.65;
-}
-.g2ab-support-note__icon {
-	flex: 0 0 auto;
-	width: 36px;
-	height: 36px;
-	display: inline-grid;
-	place-items: center;
-	border-radius: 50%;
-	background: color-mix(in srgb, var(--g2ab-primary, #5B7BFF) 16%, transparent);
-	color: var(--g2ab-primary, #5B7BFF);
-	margin-top: 2px;
-}
-.g2ab-support-note__body p { margin: 0 0 8px; }
-.g2ab-support-note__body p:last-child { margin-bottom: 0; }
-.g2ab-support-note__body a {
-	color: var(--g2ab-primary, #5B7BFF);
-	font-weight: 600;
-	text-decoration: underline;
-	text-underline-offset: 2px;
-}
-.g2ab-support-note__body a:hover { color: var(--g2ab-accent, #7C9CFF); }

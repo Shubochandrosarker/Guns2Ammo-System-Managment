@@ -275,7 +275,24 @@ function memberistic_admin_notices() {
 		'pages_remapped'      => __( 'Branded Memberistic pages were created and mapped successfully.', 'memberistic' ),
 	);
 
-	$message = $messages[ $notice ] ?? __( 'Memberistic notice.', 'memberistic' );
+	if ( 'logins_repaired' === $notice ) {
+		$created = isset( $_GET['memberistic_created'] ) ? absint( wp_unslash( $_GET['memberistic_created'] ) ) : 0;
+		$linked  = isset( $_GET['memberistic_linked'] ) ? absint( wp_unslash( $_GET['memberistic_linked'] ) ) : 0;
+		$emailed = isset( $_GET['memberistic_emailed'] ) ? absint( wp_unslash( $_GET['memberistic_emailed'] ) ) : 0;
+		if ( $created || $linked ) {
+			$message = sprintf(
+				/* translators: 1: accounts created, 2: set-password emails sent, 3: accounts linked */
+				__( 'Member logins repaired: %1$d new account(s) created, %2$d set-password email(s) sent, %3$d existing account(s) linked.', 'memberistic' ),
+				$created,
+				$emailed,
+				$linked
+			);
+		} else {
+			$message = __( 'All members already have a login — nothing to repair.', 'memberistic' );
+		}
+	} else {
+		$message = $messages[ $notice ] ?? __( 'Memberistic notice.', 'memberistic' );
+	}
 
 	printf(
 		'<div class="notice notice-%1$s is-dismissible"><p>%2$s</p></div>',

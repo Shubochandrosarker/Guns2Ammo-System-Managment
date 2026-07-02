@@ -46,22 +46,25 @@ final class BoundBookExporter {
 		foreach ( $rows as $row ) {
 			fputcsv(
 				$fh,
-				array(
-					(string) ( $row['entry_number'] ?? '' ),
-					(string) ( $row['acq_date'] ?? '' ),
-					(string) ( $row['manufacturer'] ?? '' ),
-					(string) ( $row['importer'] ?? '' ),
-					(string) ( $row['model'] ?? '' ),
-					(string) ( $row['serial_number'] ?? '' ),
-					(string) ( $row['caliber'] ?? '' ),
-					(string) ( $row['firearm_type'] ?? '' ),
-					(string) ( $row['acq_source_name'] ?? '' ),
-					(string) ( $row['acq_source_address'] ?? '' ),
-					(string) ( $row['acq_source_ffl'] ?? '' ),
-					(string) ( $row['disp_date'] ?? '' ),
-					(string) ( $row['disp_buyer_name'] ?? '' ),
-					(string) ( $row['disp_buyer_address'] ?? '' ),
-					( $row['disp_buyer_ffl'] ?? '' ) ?: ( isset( $row['disp_form4473_id'] ) ? '4473#' . $row['disp_form4473_id'] : '' ),
+				array_map(
+					array( self::class, 'csv_cell' ),
+					array(
+						(string) ( $row['entry_number'] ?? '' ),
+						(string) ( $row['acq_date'] ?? '' ),
+						(string) ( $row['manufacturer'] ?? '' ),
+						(string) ( $row['importer'] ?? '' ),
+						(string) ( $row['model'] ?? '' ),
+						(string) ( $row['serial_number'] ?? '' ),
+						(string) ( $row['caliber'] ?? '' ),
+						(string) ( $row['firearm_type'] ?? '' ),
+						(string) ( $row['acq_source_name'] ?? '' ),
+						(string) ( $row['acq_source_address'] ?? '' ),
+						(string) ( $row['acq_source_ffl'] ?? '' ),
+						(string) ( $row['disp_date'] ?? '' ),
+						(string) ( $row['disp_buyer_name'] ?? '' ),
+						(string) ( $row['disp_buyer_address'] ?? '' ),
+						( $row['disp_buyer_ffl'] ?? '' ) ?: ( isset( $row['disp_form4473_id'] ) ? '4473#' . $row['disp_form4473_id'] : '' ),
+					)
 				)
 			);
 		}
@@ -116,25 +119,28 @@ final class BoundBookExporter {
 		foreach ( $rows as $row ) {
 			fputcsv(
 				$fh,
-				array(
-					(string) ( $row['entry_number'] ?? '' ),
-					(string) ( $row['manufacturer'] ?? '' ),
-					(string) ( $row['importer'] ?? '' ),
-					(string) ( $row['country_of_manufacture'] ?? '' ),
-					(string) ( $row['model'] ?? '' ),
-					(string) ( $row['serial_number'] ?? '' ),
-					(string) ( $row['firearm_type'] ?? '' ),
-					(string) ( $row['caliber'] ?? '' ),
-					self::format_date( $row['acq_date'] ?? null ),
-					(string) ( $row['acq_source_name'] ?? '' ),
-					(string) ( $row['acq_source_address'] ?? '' ),
-					self::strip_ffl( $row['acq_source_ffl'] ?? '' ),
-					self::format_date( $row['disp_date'] ?? null ),
-					(string) ( $row['disp_buyer_name'] ?? '' ),
-					(string) ( $row['disp_buyer_address'] ?? '' ),
-					self::strip_ffl( $row['disp_buyer_ffl'] ?? '' ),
-					(string) ( $row['disp_form4473_id'] ?? '' ),
-					(string) ( $row['notes'] ?? '' ),
+				array_map(
+					array( self::class, 'csv_cell' ),
+					array(
+						(string) ( $row['entry_number'] ?? '' ),
+						(string) ( $row['manufacturer'] ?? '' ),
+						(string) ( $row['importer'] ?? '' ),
+						(string) ( $row['country_of_manufacture'] ?? '' ),
+						(string) ( $row['model'] ?? '' ),
+						(string) ( $row['serial_number'] ?? '' ),
+						(string) ( $row['firearm_type'] ?? '' ),
+						(string) ( $row['caliber'] ?? '' ),
+						self::format_date( $row['acq_date'] ?? null ),
+						(string) ( $row['acq_source_name'] ?? '' ),
+						(string) ( $row['acq_source_address'] ?? '' ),
+						self::strip_ffl( $row['acq_source_ffl'] ?? '' ),
+						self::format_date( $row['disp_date'] ?? null ),
+						(string) ( $row['disp_buyer_name'] ?? '' ),
+						(string) ( $row['disp_buyer_address'] ?? '' ),
+						self::strip_ffl( $row['disp_buyer_ffl'] ?? '' ),
+						(string) ( $row['disp_form4473_id'] ?? '' ),
+						(string) ( $row['notes'] ?? '' ),
+					)
 				)
 			);
 		}
@@ -198,6 +204,15 @@ final class BoundBookExporter {
 		$dom->formatOutput       = true;
 		$dom->loadXML( $xml->asXML() );
 		return (string) $dom->saveXML();
+	}
+
+	/** Neutralise spreadsheet formula injection (same approach as CrmController::csv_cell). */
+	private static function csv_cell( $value ): string {
+		$value = (string) $value;
+		if ( $value !== '' && in_array( $value[0], array( '=', '+', '-', '@', "\t", "\r" ), true ) ) {
+			return "'" . $value;
+		}
+		return $value;
 	}
 
 	private static function format_date( $value ): string {

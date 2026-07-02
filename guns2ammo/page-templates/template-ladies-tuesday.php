@@ -281,8 +281,8 @@ $g2a_ladies_events_shortcode = get_post_meta( $g2a_page_id, 'ladies_upcoming_eve
          no empty 00d 00h shell, no leaked shortcode text) -->
     <?php
     $g2a_lt_countdown = '';
-    if ( shortcode_exists( 'g2a_event_countdown' ) ) {
-        $g2a_lt_countdown = trim( do_shortcode( '[g2a_event_countdown type="ladies-day" title="Next Ladies Tuesday"]' ) );
+    if ( shortcode_exists( 'g2a_event_banner' ) ) {
+        $g2a_lt_countdown = trim( do_shortcode( '[g2a_event_banner style="spotlight" title="Next Ladies Tuesday"]' ) );
     }
     if ( '' !== $g2a_lt_countdown ) : ?>
     <section class="lt-count">
@@ -395,7 +395,7 @@ $g2a_ladies_events_shortcode = get_post_meta( $g2a_page_id, 'ladies_upcoming_eve
         <p class="sub">Themed sessions and intro classes are added monthly. Standard Tuesdays are open floor &mdash; show up any time during open hours.</p>
 
         <div>
-          <?php echo do_shortcode( '[g2a_events type="ladies-day" limit="12"]' ); ?>
+          <?php echo g2a_plugin_section( 'g2a_upcoming_events', ' layout="card"' ); ?>
         </div>
       </div>
     </section>
@@ -496,7 +496,7 @@ $g2a_ladies_events_shortcode = get_post_meta( $g2a_page_id, 'ladies_upcoming_eve
       </div>
     </section>
 
-    <?php if ( $g2a_ladies_events_shortcode ) : ?>
+    <?php if ( $g2a_ladies_events_shortcode && function_exists( 'g2a_has_booking' ) && g2a_has_booking() ) : ?>
       <section class="section g2a-plugin-host">
         <div class="container" style="max-width:1080px;">
           <?php echo do_shortcode( $g2a_ladies_events_shortcode ); ?>
@@ -510,7 +510,12 @@ $g2a_ladies_events_shortcode = get_post_meta( $g2a_page_id, 'ladies_upcoming_eve
       <div class="container" style="max-width:1080px;">
         <span class="eyebrow" style="margin-bottom:14px;">Reservations</span>
         <h2 style="font-family:var(--font-display);font-size:clamp(34px,5vw,56px);color:var(--color-white);letter-spacing:0.02em;margin-bottom:24px;">RESERVE YOUR TUESDAY LANE</h2>
-        <?php echo g2a_plugin_section( 'g2a_ladies_tuesday_booking', ' booking_type="ladies-tuesday" form="ladies-tuesday-booking"' ); ?>
+        
+		  <?php echo do_shortcode( '[g2a_event_booking event="ladies-tuesday"]' ); ?>
+		  
+		  <div>
+          <?php echo do_shortcode( '[g2a_upcoming_events layout="list"]' ); ?>
+        </div>
       </div>
     </section>
     <?php else :

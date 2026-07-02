@@ -10,6 +10,7 @@ namespace WordPressistic\Memberistic\Integrations;
 use WordPressistic\Memberistic\Database\Activity_Repository;
 use WordPressistic\Memberistic\Database\Memberships_Repository;
 use WordPressistic\Memberistic\Database\People_Repository;
+use WordPressistic\Memberistic\Database\Plans_Repository;
 
 if ( ! defined( 'ABSPATH' ) ) {
 	exit;
@@ -39,9 +40,8 @@ final class Booking_Engine {
 			return $discount;
 		}
 
-		$plan_settings = ! empty( $membership['settings'] ) ? json_decode( (string) $membership['settings'], true ) : array();
-		$rules         = is_array( $plan_settings ) && isset( $plan_settings['booking_discounts'] ) && is_array( $plan_settings['booking_discounts'] ) ? $plan_settings['booking_discounts'] : array();
-		$key           = (string) absint( $booking_type_id );
+		$rules = self::plan_booking_rules( $membership );
+		$key   = (string) absint( $booking_type_id );
 
 		if ( isset( $rules[ $key ] ) ) {
 			return max( 0, (float) $rules[ $key ] );
@@ -88,7 +88,9 @@ final class Booking_Engine {
 		$pricing['discount_amount']         = max( (float) ( $pricing['discount_amount'] ?? 0 ), $discount );
 		$pricing['total']                   = max( 0, round( $subtotal - (float) $pricing['discount_amount'], 2 ) );
 		$pricing['member_discount_percent'] = min( 100, $percent );
-		$pricing['membership_level_id']     = (int) $membership['id'];
+		// Carry the PLAN id (not the membership row id) — the booking engine looks
+		// this up against the plans table for role/label assignment.
+		$pricing['membership_level_id']     = (int) ( $membership['plan_id'] ?? 0 );
 		$pricing['membership_source']       = 'memberistic';
 		$pricing['discount_label']          = sprintf(
 			/* translators: %s: discount percentage */
@@ -247,8 +249,7 @@ final class Booking_Engine {
 
 	private static function discount_percent_for_booking_type( $membership, $booking_type ) {
 		$booking_type_id = isset( $booking_type->id ) ? (int) $booking_type->id : 0;
-		$settings        = ! empty( $membership['settings'] ) ? json_decode( (string) $membership['settings'], true ) : array();
-		$rules           = is_array( $settings ) && isset( $settings['booking_discounts'] ) && is_array( $settings['booking_discounts'] ) ? $settings['booking_discounts'] : array();
+		$rules           = self::plan_booking_rules( $membership );
 		$key             = (string) $booking_type_id;
 
 		if ( isset( $rules[ $key ] ) ) {
@@ -262,6 +263,28 @@ final class Booking_Engine {
 		return isset( $booking_type->member_discount ) ? max( 0, (float) $booking_type->member_discount ) : 0;
 	}
 
+	/**
+	 * Booking discount rules for a membership, read from its PLAN's settings.
+	 * The memberistic_memberships table has no `settings` column — only
+	 * memberistic_plans does — so resolve the plan to read the rules. Without
+	 * this, $rules was always empty and members never got their plan discount.
+	 *
+	 * @param array $membership Membership row (must include plan_id).
+	 * @return array<string,mixed> Map of booking_type_id|'default' => percent.
+	 */
+	private static function plan_booking_rules( $membership ) {
+		$plan_id = isset( $membership['plan_id'] ) ? (int) $membership['plan_id'] : 0;
+		if ( ! $plan_id ) {
+			return array();
+		}
+		$plan     = Plans_Repository::get( $plan_id );
+		$settings = ( is_array( $plan ) && ! empty( $plan['settings'] ) ) ? json_decode( (string) $plan['settings'], true ) : array();
+		if ( ! is_array( $settings ) || empty( $settings['booking_discounts'] ) || ! is_array( $settings['booking_discounts'] ) ) {
+			return array();
+		}
+		return $settings['booking_discounts'];
+	}
+
 	private static function membership_is_bookable( $membership ) {
 		if ( ! is_array( $membership ) || empty( $membership['status'] ) ) {
 			return false;
@@ -271,11 +294,23 @@ final class Booking_Engine {
 			return false;
 		}
 
-		if ( empty( $membership['renewal_date'] ) || '0000-00-00' === $membership['renewal_date'] ) {
+		// No / zero renewal date = non-expiring. Catch both the DATE ('0000-00-00')
+		// and the DATETIME ('0000-00-00 00:00:00') zero values.
+		$renewal_raw = (string) ( $membership['renewal_date'] ?? '' );
+		if ( '' === $renewal_raw || 0 === strpos( $renewal_raw, '0000-00-00' ) ) {
 			return true;
 		}
 
-		return strtotime( (string) $membership['renewal_date'] . ' 23:59:59' ) >= time();
+		// renewal_date is a DATETIME ('Y-m-d H:i:s'), so take only the date part and
+		// compare the END of that day in SITE time. Appending ' 23:59:59' to the full
+		// value would be a "double time specification" and throw. Using wp_timezone()
+		// avoids a server-UTC vs site-TZ mismatch that could expire a member early.
+		$date_part = substr( $renewal_raw, 0, 10 );
+		$renewal   = \DateTime::createFromFormat( 'Y-m-d H:i:s', $date_part . ' 23:59:59', wp_timezone() );
+		if ( ! $renewal ) {
+			return true; // unparseable → be permissive rather than locking a member out
+		}
+		return $renewal->getTimestamp() >= time();
 	}
 
 	private static function get_g2ab_booking( $booking_id ) {

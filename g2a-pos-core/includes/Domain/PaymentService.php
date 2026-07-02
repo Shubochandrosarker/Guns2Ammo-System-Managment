@@ -6,6 +6,7 @@ use G2A\POS\Database\AuditLogRepository;
 use G2A\POS\Database\InventoryRepository;
 use G2A\POS\Database\OrderRepository;
 use G2A\POS\Database\QueueRepository;
+use G2A\POS\Database\TenderRepository;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -30,9 +31,24 @@ final class PaymentService {
 				break;
 			}
 		}
-		$compliance = sanitize_key( (string) ( $payload['compliance_state'] ?? $order['compliance_state'] ) );
+		// Compliance state is never accepted from the payment payload — it can
+		// only change via the dedicated compliance endpoints/admin screens.
+		$compliance = sanitize_key( (string) ( $order['compliance_state'] ?? 'pending_review' ) );
 		if ( $has_firearm && in_array( $payment_status, array( 'paid', 'completed' ), true ) && ! in_array( $compliance, array( 'approved', 'cleared' ), true ) ) {
 			return array( 'error' => 'Firearm sale cannot be finalized until compliance is approved.' );
+		}
+
+		// Tender reconciliation: an order can only flip to paid/completed once
+		// captured tender lines cover the grand total.
+		if ( in_array( $payment_status, array( 'paid', 'completed' ), true ) ) {
+			$captured = ( new TenderRepository() )->captured_total( $order_id );
+			if ( $captured + 0.01 < (float) ( $order['grand_total'] ?? 0 ) ) {
+				return array(
+					'error'       => 'Captured tenders do not cover the order total; order left pending.',
+					'captured'    => round( $captured, 2 ),
+					'grand_total' => (float) ( $order['grand_total'] ?? 0 ),
+				);
+			}
 		}
 
 		$repo->update_states(

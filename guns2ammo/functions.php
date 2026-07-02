@@ -7,7 +7,7 @@
 
 if ( ! defined( 'ABSPATH' ) ) exit;
 
-define( 'G2A_VERSION', '1.27.0' );
+define( 'G2A_VERSION', '1.27.4' );
 define( 'G2A_DIR', get_stylesheet_directory() );
 define( 'G2A_URI', get_stylesheet_directory_uri() );
 
@@ -504,7 +504,7 @@ function g2a_route_frontend_newsletter() {
 	if ( is_admin() || empty( $_POST['g2a_newsletter'] ) ) {
 		return;
 	}
-	$email  = isset( $_POST['email'] ) ? wp_unslash( $_POST['email'] ) : '';
+	$email  = isset( $_POST['email'] ) ? sanitize_email( wp_unslash( $_POST['email'] ) ) : '';
 	$source = isset( $_POST['source'] ) ? sanitize_text_field( wp_unslash( $_POST['source'] ) ) : 'footer';
 
 	if ( ! g2a_verify_form_request( 'g2a_newsletter' ) ) {

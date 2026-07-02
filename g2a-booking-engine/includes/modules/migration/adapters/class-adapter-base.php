@@ -171,29 +171,13 @@ abstract class G2AB_Migration_Adapter_Base {
 	 */
 	protected function table_exists( $table_name ) {
 		global $wpdb;
-		$full = $this->prefixed_table( $table_name );
+		$full = $wpdb->prefix . ltrim( $table_name, $wpdb->prefix );
 		return (bool) $wpdb->get_var( $wpdb->prepare( 'SHOW TABLES LIKE %s', $full ) );
-	}
-
-	/**
-	 * Prefix a table name exactly once.
-	 *
-	 * Note: ltrim( $name, $wpdb->prefix ) is wrong — ltrim's second argument
-	 * is a character mask, not a string prefix, so it strips stray leading
-	 * characters. Use a real prefix check instead.
-	 */
-	protected function prefixed_table( $table_name ) {
-		global $wpdb;
-		$table_name = (string) $table_name;
-		$bare = ( 0 === strpos( $table_name, $wpdb->prefix ) )
-			? substr( $table_name, strlen( $wpdb->prefix ) )
-			: $table_name;
-		return $wpdb->prefix . $bare;
 	}
 
 	protected function column_exists( $table_name, $column_name ) {
 		global $wpdb;
-		$full = $this->prefixed_table( $table_name );
+		$full = $wpdb->prefix . ltrim( $table_name, $wpdb->prefix );
 		return (bool) $wpdb->get_var( $wpdb->prepare( "SHOW COLUMNS FROM {$full} LIKE %s", $column_name ) );
 	}
 

@@ -19,7 +19,8 @@ final class Crypto {
 
 	public static function encrypt( string $plaintext ): string {
 		if ( ! self::available() ) {
-			return $plaintext;
+			// Fail closed — never silently persist PII as plaintext.
+			throw new \RuntimeException( 'libsodium is required to encrypt PII at rest.' );
 		}
 		$kek         = self::kek();
 		$dek         = random_bytes( SODIUM_CRYPTO_SECRETBOX_KEYBYTES );
@@ -41,8 +42,14 @@ final class Crypto {
 	}
 
 	public static function decrypt( string $payload ): ?string {
-		if ( ! self::available() || ! str_starts_with( $payload, self::VERSION . '.' ) ) {
-			return $payload;
+		if ( ! str_starts_with( $payload, self::VERSION . '.' ) ) {
+			return $payload; // Legacy plaintext value.
+		}
+		if ( ! self::available() ) {
+			// Fail closed — do not hand ciphertext back to callers as if it
+			// were plaintext. Callers already handle null (corrupt payload).
+			error_log( 'G2A POS Crypto: libsodium unavailable; cannot decrypt sealed payload.' );
+			return null;
 		}
 		$parts = explode( '.', $payload );
 		if ( count( $parts ) !== 5 ) {

@@ -5,8 +5,12 @@ namespace G2A\POS\Wholesalers\Lipseys;
 /**
  * Thin client for the Lipsey's Cloud API (https://api.lipseys.com).
  *
- * Auth flow: POST /api/Integration/Authentication/Login { Email, Password } -> { Token }
- * Token is then sent as the `Token` request header for subsequent calls.
+ * Auth flow: POST /api/Integration/Authentication/Login { Email, Password } -> token.
+ * Lipsey's wraps responses in an envelope ({ token|data, success, authorized,
+ * errors }) and returns HTTP 200 even when auth is rejected, so the token is
+ * extracted defensively and failures are reported from the body (see
+ * extractToken()/describeAuthFailure()). The token is then sent as the `Token`
+ * request header for subsequent calls.
  *
  * Endpoints used (verified against Lipsey's Postman collection):
  *   POST /api/Integration/Authentication/Login    -> auth, returns { Token }
@@ -49,7 +53,10 @@ final class LipseysApiClient {
 			$this->baseUrl . '/api/Integration/Authentication/Login',
 			array(
 				'timeout' => 30,
-				'headers' => array( 'Content-Type' => 'application/json' ),
+				'headers' => array(
+					'Content-Type' => 'application/json',
+					'Accept'       => 'application/json',
+				),
 				'body'    => wp_json_encode(
 					array(
 						'Email'    => $this->email,
@@ -61,14 +68,101 @@ final class LipseysApiClient {
 		if ( is_wp_error( $res ) ) {
 			throw new \RuntimeException( 'lipseys_auth_http_error: ' . $res->get_error_message() );
 		}
-		$code  = (int) wp_remote_retrieve_response_code( $res );
-		$body  = json_decode( (string) wp_remote_retrieve_body( $res ), true );
-		$token = (string) ( $body['token'] ?? $body['Token'] ?? '' );
-		if ( $code !== 200 || $token === '' ) {
-			throw new \RuntimeException( 'lipseys_auth_failed: HTTP ' . $code );
+		$code    = (int) wp_remote_retrieve_response_code( $res );
+		$rawBody = (string) wp_remote_retrieve_body( $res );
+		$body    = json_decode( $rawBody, true );
+		if ( ! is_array( $body ) ) {
+			$body = array();
 		}
-		set_transient( $key, $token, self::TOKEN_TTL );
-		return $token;
+
+		$token = self::extractToken( $body );
+		if ( $token !== '' ) {
+			set_transient( $key, $token, self::TOKEN_TTL );
+			return $token;
+		}
+
+		// Lipsey's returns HTTP 200 even when authentication is rejected — e.g.
+		// wrong email/password, or API access not yet enabled on the dealer
+		// account. The real reason lives in the response envelope, not the
+		// status line, so surface it instead of a bare "HTTP <code>".
+		throw new \RuntimeException( 'lipseys_auth_failed: ' . self::describeAuthFailure( $code, $body, $rawBody ) );
+	}
+
+	/**
+	 * Pull the session token out of a Lipsey's login response. The token has
+	 * been observed under several casings/nestings across environments:
+	 * top-level `token`/`Token`, nested under `data`, or `data` returned as a
+	 * bare token string. Check them all rather than assume one shape.
+	 *
+	 * @param array<string,mixed> $body Decoded JSON response body.
+	 */
+	private static function extractToken( array $body ): string {
+		$candidates = array(
+			$body['token'] ?? null,
+			$body['Token'] ?? null,
+		);
+
+		$data = $body['data'] ?? $body['Data'] ?? null;
+		if ( is_array( $data ) ) {
+			$candidates[] = $data['token'] ?? null;
+			$candidates[] = $data['Token'] ?? null;
+		} elseif ( is_string( $data ) ) {
+			$candidates[] = $data;
+		}
+
+		foreach ( $candidates as $candidate ) {
+			if ( is_string( $candidate ) && trim( $candidate ) !== '' ) {
+				return trim( $candidate );
+			}
+		}
+		return '';
+	}
+
+	/**
+	 * Compose an actionable failure reason from the Lipsey's response envelope
+	 * (`errors[]`, `authorized`, `success`), falling back to the HTTP status and
+	 * a short raw-body snippet when the body carries no structured detail.
+	 *
+	 * @param array<string,mixed> $body Decoded JSON response body.
+	 */
+	private static function describeAuthFailure( int $code, array $body, string $rawBody ): string {
+		$parts = array( 'HTTP ' . $code );
+
+		if ( array_key_exists( 'authorized', $body ) && ! $body['authorized'] ) {
+			$parts[] = 'authorized=false';
+		}
+		if ( array_key_exists( 'success', $body ) && ! $body['success'] ) {
+			$parts[] = 'success=false';
+		}
+
+		$errors = $body['errors'] ?? $body['Errors'] ?? array();
+		if ( is_string( $errors ) && $errors !== '' ) {
+			$errors = array( $errors );
+		}
+		if ( is_array( $errors ) && array() !== $errors ) {
+			$messages = array();
+			foreach ( $errors as $error ) {
+				if ( is_string( $error ) ) {
+					$messages[] = $error;
+				} elseif ( is_array( $error ) ) {
+					$messages[] = (string) ( $error['message'] ?? $error['Message'] ?? wp_json_encode( $error ) );
+				}
+			}
+			$messages = array_filter( array_map( 'trim', $messages ) );
+			if ( array() !== $messages ) {
+				$parts[] = implode( '; ', $messages );
+			}
+		}
+
+		// Nothing structured to report — attach a trimmed snippet of the raw body.
+		if ( 1 === count( $parts ) ) {
+			$snippet = trim( (string) preg_replace( '/\s+/', ' ', $rawBody ) );
+			$parts[] = $snippet === ''
+				? 'empty response body'
+				: 'body: ' . ( strlen( $snippet ) > 200 ? substr( $snippet, 0, 200 ) . '…' : $snippet );
+		}
+
+		return implode( ' — ', $parts );
 	}
 
 	public function validateItem( string $sku ): array {

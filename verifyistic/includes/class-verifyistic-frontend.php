@@ -124,18 +124,21 @@ class Verifyistic_Frontend {
      * Output inline CSS with admin-configured values.
      */
     private function output_dynamic_css() {
-        $popup_bg     = get_option( 'verifyistic_popup_bg_color', '#0f172a' );
-        $overlay_clr  = get_option( 'verifyistic_overlay_color', '#000000' );
-        $opacity      = (int) get_option( 'verifyistic_overlay_opacity', 80 );
-        $font_clr     = get_option( 'verifyistic_font_color', '#f8fafc' );
-        $btn_yes      = get_option( 'verifyistic_btn_yes_color', '#14b8a6' );
-        $btn_no       = get_option( 'verifyistic_btn_no_color', '#475569' );
-        $btn_yes_txt  = get_option( 'verifyistic_btn_yes_text_color', '#ffffff' );
-        $btn_no_txt   = get_option( 'verifyistic_btn_no_text_color', '#ffffff' );
+        // Re-validate every stored value at output time: options are hex-
+        // sanitized on save, but legacy/imported values bypass that, and an
+        // unvalidated string here breaks out of the CSS context.
+        $popup_bg     = sanitize_hex_color( get_option( 'verifyistic_popup_bg_color', '#0f172a' ) ) ?: '#0f172a';
+        $overlay_clr  = sanitize_hex_color( get_option( 'verifyistic_overlay_color', '#000000' ) ) ?: '#000000';
+        $opacity      = min( 100, max( 0, (int) get_option( 'verifyistic_overlay_opacity', 80 ) ) );
+        $font_clr     = sanitize_hex_color( get_option( 'verifyistic_font_color', '#f8fafc' ) ) ?: '#f8fafc';
+        $btn_yes      = sanitize_hex_color( get_option( 'verifyistic_btn_yes_color', '#14b8a6' ) ) ?: '#14b8a6';
+        $btn_no       = sanitize_hex_color( get_option( 'verifyistic_btn_no_color', '#475569' ) ) ?: '#475569';
+        $btn_yes_txt  = sanitize_hex_color( get_option( 'verifyistic_btn_yes_text_color', '#ffffff' ) ) ?: '#ffffff';
+        $btn_no_txt   = sanitize_hex_color( get_option( 'verifyistic_btn_no_text_color', '#ffffff' ) ) ?: '#ffffff';
         $btn_style    = get_option( 'verifyistic_btn_style', 'rounded' );
-        $popup_width  = (int) get_option( 'verifyistic_popup_width', 480 );
-        $logo_width   = (int) get_option( 'verifyistic_logo_max_width', 160 );
-        $accent       = get_option( 'verifyistic_accent_color', '#14b8a6' );
+        $popup_width  = min( 2000, max( 200, (int) get_option( 'verifyistic_popup_width', 480 ) ) );
+        $logo_width   = min( 1000, max( 40, (int) get_option( 'verifyistic_logo_max_width', 160 ) ) );
+        $accent       = sanitize_hex_color( get_option( 'verifyistic_accent_color', '#14b8a6' ) ) ?: '#14b8a6';
 
         $overlay_rgba = $this->hex_to_rgba( $overlay_clr, $opacity / 100 );
 
@@ -160,10 +163,12 @@ class Verifyistic_Frontend {
             --vfy-accent:      {$accent};
         }";
 
-        // Custom CSS
-        $custom = get_option( 'verifyistic_custom_css', '' );
+        // Custom CSS — strip anything that could escape the style context.
+        $custom = (string) get_option( 'verifyistic_custom_css', '' );
         if ( $custom ) {
-            $css .= "\n/* Verifyistic Custom CSS */\n" . $custom;
+            $custom = wp_strip_all_tags( $custom );
+            $custom = str_replace( array( '</', '<', 'expression(' ), '', $custom );
+            $css   .= "\n/* Verifyistic Custom CSS */\n" . $custom;
         }
 
         wp_add_inline_style( 'verifyistic-frontend', $css );

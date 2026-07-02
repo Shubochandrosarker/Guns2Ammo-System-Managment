@@ -85,7 +85,11 @@ final class G2AB_REST_Frontdesk_Controller {
 	 * Permissions
 	 * ------------------------------------------------------------------- */
 
-	public function permission_read() {
+	public function permission_read( WP_REST_Request $request ) {
+		$nonce = $request->get_header( 'X-WP-Nonce' );
+		if ( ! $nonce || ! wp_verify_nonce( $nonce, 'wp_rest' ) ) {
+			return new WP_Error( 'g2ab_invalid_nonce', __( 'Invalid or missing nonce.', 'g2a-booking' ), array( 'status' => 403 ) );
+		}
 		if ( ! current_user_can( 'manage_g2ab_bookings' ) ) {
 			return new WP_Error( 'g2ab_forbidden', __( 'Forbidden.', 'g2a-booking' ), array( 'status' => 403 ) );
 		}

@@ -1,13 +1,16 @@
 <?php
 /**
- * Events — a custom post type with an admin tab under G2A Booking, plus
- * three front-end banner views (list, calendar, carousel) each exposed as
- * its own shortcode.
+ * G2AB_Events — data access + helpers for the Events system.
  *
- * Shortcodes:
- *   [g2a_events_list]      — vertical list view
- *   [g2a_events_calendar]  — month calendar grid
- *   [g2a_events_carousel]  — horizontal scrolling event cards
+ * An "event" is a scheduled, seat-limited activity (Ladies Night, a CCW
+ * class, a competition). Each event owns one or more *occurrences* — a
+ * specific date/time with its own seat count and (optionally) its own price.
+ * Booking an occurrence creates a normal row in `g2ab_bookings` that carries
+ * `event_id` + `event_occurrence_id` so the rest of the engine (front desk,
+ * calendar, payments, email) treats it like any other booking.
+ *
+ * This mirrors the model the user asked for (Amelia-style events): pick an
+ * event, pick a date/time, reserve a seat — free or paid, single price.
  *
  * @package G2AB
  * @since   1.5.0
@@ -19,885 +22,434 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 final class G2AB_Events {
 
-	const CPT = 'g2a_events';
+	/** Booking statuses that still occupy a seat. */
+	const ACTIVE_STATUSES = array( 'pending', 'reserved', 'confirmed', 'paid', 'completed' );
 
-	/** @var G2AB_Events|null */
-	private static $instance = null;
-
-	public static function instance() {
-		if ( null === self::$instance ) {
-			self::$instance = new self();
-		}
-		return self::$instance;
+	public static function table() {
+		global $wpdb;
+		return $wpdb->prefix . 'g2ab_events';
 	}
 
-	private function __construct() {
-		$this->register_cpt();
-
-		add_action( 'add_meta_boxes', array( $this, 'add_meta_box' ) );
-		add_action( 'save_post_' . self::CPT, array( $this, 'save_meta' ), 10, 2 );
-		add_filter( 'manage_' . self::CPT . '_posts_columns', array( $this, 'admin_columns' ) );
-		add_action( 'manage_' . self::CPT . '_posts_custom_column', array( $this, 'admin_column_value' ), 10, 2 );
-
-		// Guarded so an event with malformed meta or a date-math edge case can
-		// never white-screen the Ladies Tuesday / events pages (see guard()).
-		add_shortcode( 'g2a_events_list', $this->guard( 'render_list' ) );
-		add_shortcode( 'g2a_events_calendar', $this->guard( 'render_calendar' ) );
-		add_shortcode( 'g2a_events_carousel', $this->guard( 'render_carousel' ) );
-		add_shortcode( 'g2a_events', $this->guard( 'render_events_shortcode' ) );
-		add_shortcode( 'g2a_event_countdown', $this->guard( 'render_event_countdown' ) );
+	public static function occ_table() {
+		global $wpdb;
+		return $wpdb->prefix . 'g2ab_event_occurrences';
 	}
+
+	/* ────────────────────────────────────────────────────────────────
+	 * Reads
+	 * ──────────────────────────────────────────────────────────────── */
 
 	/**
-	 * Wrap an event shortcode renderer so a runtime fatal degrades to an
-	 * empty string (front-end) / inline admin notice instead of blanking the
-	 * whole page. Discards any partial output buffer the renderer opened.
+	 * List events.
 	 *
-	 * @param string $method Public render method on this class.
-	 * @return callable
+	 * @param array $args status, category, limit, include_drafts, search.
+	 * @return array of event rows (objects).
 	 */
-	private function guard( $method ) {
-		return function ( $atts = array(), $content = '', $tag = '' ) use ( $method ) {
-			$ob_level    = ob_get_level();
-			$has_net     = class_exists( 'G2AB_Frontend' );
-			if ( $has_net ) {
-				// Share the Frontend safety net: raised memory/time limits + the
-				// shutdown catcher for non-catchable fatals (OOM/timeout).
-				G2AB_Frontend::begin_render( $tag ? $tag : $method );
-			}
-			try {
-				$html = $this->{$method}( $atts, $content, $tag );
-				if ( $has_net ) {
-					G2AB_Frontend::end_render();
-				}
-				return $html;
-			} catch ( \Throwable $e ) {
-				if ( $has_net ) {
-					G2AB_Frontend::end_render();
-				}
-				while ( ob_get_level() > $ob_level ) {
-					ob_end_clean();
-				}
-				error_log( sprintf(
-					'[G2AB] event shortcode %s failed: %s @ %s:%d',
-					$method,
-					$e->getMessage(),
-					$e->getFile(),
-					$e->getLine()
-				) );
-				if ( $has_net ) {
-					return G2AB_Frontend::error_box( $method, $e->getMessage() . ' @ ' . basename( $e->getFile() ) . ':' . $e->getLine() );
-				}
-				return ( function_exists( 'current_user_can' ) && current_user_can( 'manage_options' ) )
-					? '<div class="g2ab g2ab-error"><p>' . esc_html( $method . ': ' . $e->getMessage() ) . '</p></div>'
-					: '';
-			}
-		};
-	}
+	public static function get_events( $args = array() ) {
+		global $wpdb;
+		$args = wp_parse_args( $args, array(
+			'status'   => 'publish',
+			'category' => '',
+			'search'   => '',
+			'limit'    => 100,
+			'orderby'  => 'sort_order',
+		) );
 
-	/* ------------------------------------------------------------------ */
-	/* Custom post type                                                   */
-	/* ------------------------------------------------------------------ */
+		$where = array( '1=1' );
+		$prep  = array();
 
-	private function register_cpt() {
-		register_post_type(
-			self::CPT,
-			array(
-				'labels'              => array(
-					'name'               => __( 'Events', 'g2a-booking' ),
-					'singular_name'      => __( 'Event', 'g2a-booking' ),
-					'menu_name'          => __( 'Events', 'g2a-booking' ),
-					'add_new'            => __( 'Add Event', 'g2a-booking' ),
-					'add_new_item'       => __( 'Add New Event', 'g2a-booking' ),
-					'edit_item'          => __( 'Edit Event', 'g2a-booking' ),
-					'new_item'           => __( 'New Event', 'g2a-booking' ),
-					'view_item'          => __( 'View Event', 'g2a-booking' ),
-					'search_items'       => __( 'Search Events', 'g2a-booking' ),
-					'all_items'          => __( 'Events', 'g2a-booking' ),
-					'not_found'          => __( 'No events created yet.', 'g2a-booking' ),
-					'not_found_in_trash' => __( 'No events in trash.', 'g2a-booking' ),
-				),
-				'public'              => false,
-				'show_ui'             => true,
-				'show_in_menu'        => 'g2ab-bookings',
-				'show_in_rest'        => true,
-				'publicly_queryable'  => false,
-				'exclude_from_search' => true,
-				'rewrite'             => false,
-				'has_archive'         => false,
-				'menu_icon'           => 'dashicons-tickets-alt',
-				'supports'            => array( 'title', 'editor', 'thumbnail', 'excerpt' ),
-				'capability_type'     => 'post',
-			)
-		);
-	}
+		if ( $args['status'] && 'any' !== $args['status'] ) {
+			$where[] = 'status = %s';
+			$prep[]  = sanitize_key( $args['status'] );
+		}
+		if ( $args['category'] ) {
+			$where[] = 'category = %s';
+			$prep[]  = sanitize_key( $args['category'] );
+		}
+		if ( $args['search'] ) {
+			$where[] = '(title LIKE %s OR summary LIKE %s)';
+			$like    = '%' . $wpdb->esc_like( $args['search'] ) . '%';
+			$prep[]  = $like;
+			$prep[]  = $like;
+		}
 
-	/* ------------------------------------------------------------------ */
-	/* Admin — event details meta box                                     */
-	/* ------------------------------------------------------------------ */
+		$order = 'sort_order' === $args['orderby'] ? 'sort_order ASC, title ASC' : 'created_at DESC';
+		$table = self::table();
+		$sql   = "SELECT * FROM {$table} WHERE " . implode( ' AND ', $where ) . " ORDER BY {$order} LIMIT %d";
+		$prep[] = max( 1, (int) $args['limit'] );
 
-	public function add_meta_box() {
-		add_meta_box(
-			'g2ab_event_details',
-			__( 'Event Details', 'g2a-booking' ),
-			array( $this, 'render_meta_box' ),
-			self::CPT,
-			'normal',
-			'high'
-		);
+		return $wpdb->get_results( $wpdb->prepare( $sql, $prep ) ); // phpcs:ignore
 	}
 
 	/**
-	 * Field definitions: meta key => [ label, type, placeholder ].
+	 * Fetch a single event by numeric id or slug.
 	 */
-	private function fields() {
-		return array(
-			'_g2ab_event_date'      => array( __( 'Event date', 'g2a-booking' ), 'date', '' ),
-			'_g2ab_event_time'      => array( __( 'Start time', 'g2a-booking' ), 'text', 'e.g. 10:00 AM' ),
-			'_g2ab_event_type'      => array( __( 'Event type', 'g2a-booking' ), 'text', 'e.g. ccw' ),
-			'_g2ab_event_instructor'=> array( __( 'Instructor', 'g2a-booking' ), 'text', 'e.g. John Doe' ),
-			'_g2ab_event_seats'     => array( __( 'Total seats', 'g2a-booking' ), 'number', 'e.g. 12' ),
-			'_g2ab_event_booking_type_slug' => array( __( 'Booking type slug', 'g2a-booking' ), 'text', 'e.g. ccw-class' ),
-			'_g2ab_event_end'       => array( __( 'End time', 'g2a-booking' ), 'text', 'e.g. 2:00 PM' ),
-			'_g2ab_event_location'  => array( __( 'Location', 'g2a-booking' ), 'text', '6030 E Main St, Mesa, AZ' ),
-			'_g2ab_event_price'     => array( __( 'Price', 'g2a-booking' ), 'text', 'e.g. $149.99 or Free' ),
-			'_g2ab_event_cta_label' => array( __( 'Button label', 'g2a-booking' ), 'text', 'e.g. Reserve a Spot' ),
-			'_g2ab_event_cta_url'   => array( __( 'Button link (URL)', 'g2a-booking' ), 'url', 'https://…' ),
-		);
+	public static function get_event( $id_or_slug ) {
+		global $wpdb;
+		$table = self::table();
+		if ( is_numeric( $id_or_slug ) ) {
+			return $wpdb->get_row( $wpdb->prepare( "SELECT * FROM {$table} WHERE id = %d", (int) $id_or_slug ) );
+		}
+		return $wpdb->get_row( $wpdb->prepare( "SELECT * FROM {$table} WHERE slug = %s", sanitize_title( $id_or_slug ) ) );
 	}
 
-	public function render_meta_box( $post ) {
-		wp_nonce_field( 'g2ab_event_meta', 'g2ab_event_meta_nonce' );
-		echo '<style>.g2ab-evm{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:6px;}'
-			. '.g2ab-evm label{display:block;font-weight:600;margin-bottom:4px;}'
-			. '.g2ab-evm input{width:100%;}.g2ab-evm .wide{grid-column:1 / -1;}</style>';
-		echo '<div class="g2ab-evm">';
-		foreach ( $this->fields() as $key => $field ) {
-			$value = get_post_meta( $post->ID, $key, true );
-			$wide  = in_array( $key, array( '_g2ab_event_location', '_g2ab_event_cta_url' ), true ) ? ' wide' : '';
-			printf(
-				'<div class="%s"><label for="%s">%s</label><input type="%s" id="%s" name="%s" value="%s" placeholder="%s" /></div>',
-				esc_attr( trim( $wide ) ),
-				esc_attr( $key ),
-				esc_html( $field[0] ),
-				esc_attr( $field[1] ),
-				esc_attr( $key ),
-				esc_attr( $key ),
-				esc_attr( $value ),
-				esc_attr( $field[2] )
-			);
-		}
-		$featured = get_post_meta( $post->ID, '_g2ab_event_featured', true );
-		printf(
-			'<div class="wide"><label><input type="checkbox" name="_g2ab_event_featured" value="1" %s /> %s</label></div>',
-			checked( $featured, '1', false ),
-			esc_html__( 'Feature this event (highlighted in banner views)', 'g2a-booking' )
-		);
-		echo '</div>';
-	}
+	/**
+	 * Occurrences for an event.
+	 *
+	 * @param int   $event_id
+	 * @param array $args upcoming_only, include_cancelled, limit, with_seats.
+	 * @return array of occurrence rows, each augmented with ->seats_total,
+	 *               ->seats_booked, ->seats_left, ->price_effective when
+	 *               with_seats is true (default).
+	 */
+	public static function get_occurrences( $event_id, $args = array() ) {
+		global $wpdb;
+		$args = wp_parse_args( $args, array(
+			'upcoming_only'      => true,
+			'include_cancelled'  => false,
+			'limit'              => 50,
+			'with_seats'         => true,
+		) );
 
-	public function save_meta( $post_id, $post ) {
-		if ( ! isset( $_POST['g2ab_event_meta_nonce'] ) || ! wp_verify_nonce( sanitize_text_field( wp_unslash( $_POST['g2ab_event_meta_nonce'] ) ), 'g2ab_event_meta' ) ) {
-			return;
+		$occ   = self::occ_table();
+		$where = array( 'event_id = %d' );
+		$prep  = array( (int) $event_id );
+
+		if ( ! $args['include_cancelled'] ) {
+			$where[] = "status <> 'cancelled'";
 		}
-		if ( defined( 'DOING_AUTOSAVE' ) && DOING_AUTOSAVE ) {
-			return;
-		}
-		if ( ! current_user_can( 'edit_post', $post_id ) ) {
-			return;
+		if ( $args['upcoming_only'] ) {
+			$where[] = 'end_at >= %s';
+			$prep[]  = current_time( 'mysql' );
 		}
 
-		foreach ( $this->fields() as $key => $field ) {
-			$raw = isset( $_POST[ $key ] ) ? wp_unslash( $_POST[ $key ] ) : '';
-			if ( 'url' === $field[1] ) {
-				$clean = esc_url_raw( $raw );
-			} elseif ( 'number' === $field[1] ) {
-				$clean = (string) max( 0, absint( $raw ) );
-			} else {
-				$clean = sanitize_text_field( $raw );
-			}
-			if ( '' === $clean ) {
-				delete_post_meta( $post_id, $key );
-			} else {
-				update_post_meta( $post_id, $key, $clean );
+		$sql    = "SELECT * FROM {$occ} WHERE " . implode( ' AND ', $where ) . ' ORDER BY start_at ASC LIMIT %d';
+		$prep[] = max( 1, (int) $args['limit'] );
+		$rows   = $wpdb->get_results( $wpdb->prepare( $sql, $prep ) ); // phpcs:ignore
+
+		if ( ! $rows ) {
+			return array();
+		}
+
+		$event = $args['with_seats'] ? self::get_event( $event_id ) : null;
+		foreach ( $rows as $row ) {
+			if ( $args['with_seats'] ) {
+				self::decorate_occurrence( $row, $event );
 			}
 		}
-		update_post_meta( $post_id, '_g2ab_event_featured', empty( $_POST['_g2ab_event_featured'] ) ? '' : '1' );
+		return $rows;
 	}
 
-	public function admin_columns( $columns ) {
+	/**
+	 * Single occurrence (decorated with seat counts) by id.
+	 */
+	public static function get_occurrence( $occurrence_id, $decorate = true ) {
+		global $wpdb;
+		$occ = self::occ_table();
+		$row = $wpdb->get_row( $wpdb->prepare( "SELECT * FROM {$occ} WHERE id = %d", (int) $occurrence_id ) );
+		if ( $row && $decorate ) {
+			self::decorate_occurrence( $row, self::get_event( $row->event_id ) );
+		}
+		return $row;
+	}
+
+	/**
+	 * Next upcoming, bookable occurrence for an event (or null).
+	 */
+	public static function next_occurrence( $event_id ) {
+		$list = self::get_occurrences( $event_id, array( 'upcoming_only' => true, 'limit' => 1 ) );
+		return $list ? $list[0] : null;
+	}
+
+	/**
+	 * Attach seat math + effective price to an occurrence row in place.
+	 */
+	public static function decorate_occurrence( $occurrence, $event = null ) {
+		if ( ! $event ) {
+			$event = self::get_event( $occurrence->event_id );
+		}
+		$total = (int) $occurrence->capacity;
+		if ( $total <= 0 && $event ) {
+			$total = (int) $event->capacity;
+		}
+		$booked = self::booked_seats( (int) $occurrence->id );
+
+		$occurrence->seats_total  = $total;
+		$occurrence->seats_booked = $booked;
+		$occurrence->seats_left   = max( 0, $total - $booked );
+
+		$price = ( null !== $occurrence->price ) ? (float) $occurrence->price : ( $event ? (float) $event->price : 0.0 );
+		if ( $event && (int) $event->is_free === 1 ) {
+			$price = 0.0;
+		}
+		$occurrence->price_effective = $price;
+		return $occurrence;
+	}
+
+	/**
+	 * Seats already reserved for an occurrence (sum of party sizes on
+	 * non-cancelled bookings).
+	 */
+	public static function booked_seats( $occurrence_id ) {
+		global $wpdb;
+		$bookings = $wpdb->prefix . 'g2ab_bookings';
+		$in       = "'" . implode( "','", array_map( 'esc_sql', self::ACTIVE_STATUSES ) ) . "'";
+		return (int) $wpdb->get_var( $wpdb->prepare(
+			"SELECT COALESCE(SUM(party_size),0) FROM {$bookings}
+			  WHERE event_occurrence_id = %d AND status IN ({$in})",
+			(int) $occurrence_id
+		) );
+	}
+
+	/**
+	 * Effective price for an occurrence for a given viewer.
+	 *
+	 * Member pricing precedence (when the viewer is an active member):
+	 *   1. a fixed member_price set on the event (incl. 0 = free for members)
+	 *   2. otherwise a member_discount percentage applied to the base price
+	 *   3. otherwise the base price
+	 */
+	public static function price_for( $event, $occurrence, $is_member = false ) {
+		if ( (int) $event->is_free === 1 ) {
+			return 0.0;
+		}
+		$base = ( $occurrence && null !== $occurrence->price ) ? (float) $occurrence->price : (float) $event->price;
+		$base = max( 0.0, $base );
+
+		if ( $is_member ) {
+			if ( property_exists( $event, 'member_price' ) && null !== $event->member_price ) {
+				return max( 0.0, (float) $event->member_price );
+			}
+			$discount = property_exists( $event, 'member_discount' ) ? (float) $event->member_discount : 0.0;
+			if ( $discount > 0 ) {
+				$discount = min( 100, $discount );
+				return round( $base * ( 1 - $discount / 100 ), 2 );
+			}
+		}
+		return $base;
+	}
+
+	/**
+	 * Format a naive, site-local datetime string for display WITHOUT shifting
+	 * timezones. Occurrence/booking datetimes are stored as site-local strings
+	 * (the same convention the booking engine uses), so feeding them through
+	 * strtotime()+wp_date() would wrongly treat them as UTC and shift them.
+	 */
+	public static function format_local( $sql, $format = 'D, M j · g:i A' ) {
+		$sql = (string) $sql;
+		$tz  = function_exists( 'wp_timezone' ) ? wp_timezone() : null;
+		$dt  = $tz
+			? date_create_immutable_from_format( 'Y-m-d H:i:s', $sql, $tz )
+			: date_create_immutable( $sql );
+		if ( ! $dt ) {
+			// Tolerate a missing-seconds value.
+			$dt = $tz ? date_create_immutable_from_format( 'Y-m-d H:i', substr( $sql, 0, 16 ), $tz ) : false;
+		}
+		if ( ! $dt ) {
+			return $sql;
+		}
+		return function_exists( 'wp_date' ) ? wp_date( $format, $dt->getTimestamp(), $tz ) : $dt->format( $format );
+	}
+
+	/**
+	 * True Unix timestamp for a naive site-local datetime string. Use this for
+	 * countdowns / comparisons so the epoch reflects the site timezone rather
+	 * than being mis-read as UTC.
+	 */
+	public static function timestamp( $sql ) {
+		$tz = function_exists( 'wp_timezone' ) ? wp_timezone() : null;
+		$dt = $tz
+			? date_create_immutable_from_format( 'Y-m-d H:i:s', (string) $sql, $tz )
+			: date_create_immutable( (string) $sql );
+		return $dt ? $dt->getTimestamp() : (int) strtotime( (string) $sql );
+	}
+
+	/* ────────────────────────────────────────────────────────────────
+	 * Writes
+	 * ──────────────────────────────────────────────────────────────── */
+
+	public static function create_event( $data ) {
+		global $wpdb;
+		$now   = current_time( 'mysql' );
+		$clean = self::sanitize_event( $data );
+		$clean['slug']       = self::unique_slug( $clean['slug'] ?: $clean['title'] );
+		$clean['created_at'] = $now;
+		$clean['updated_at'] = $now;
+
+		$ok = $wpdb->insert( self::table(), $clean );
+		return $ok ? (int) $wpdb->insert_id : new WP_Error( 'g2ab_event_insert_failed', __( 'Could not create event.', 'g2a-booking' ) );
+	}
+
+	public static function update_event( $id, $data ) {
+		global $wpdb;
+		$id    = (int) $id;
+		$clean = self::sanitize_event( $data );
+		// Keep an existing slug stable unless a new non-empty one is supplied.
+		if ( empty( $data['slug'] ) ) {
+			unset( $clean['slug'] );
+		} else {
+			$clean['slug'] = self::unique_slug( $clean['slug'], $id );
+		}
+		$clean['updated_at'] = current_time( 'mysql' );
+		return false !== $wpdb->update( self::table(), $clean, array( 'id' => $id ) );
+	}
+
+	public static function delete_event( $id ) {
+		global $wpdb;
+		$id = (int) $id;
+		$wpdb->delete( self::occ_table(), array( 'event_id' => $id ) );
+		return false !== $wpdb->delete( self::table(), array( 'id' => $id ) );
+	}
+
+	public static function add_occurrence( $event_id, $data ) {
+		global $wpdb;
+		$event_id = (int) $event_id;
+		$start    = self::normalize_datetime( $data['start_at'] ?? '' );
+		if ( ! $start ) {
+			return new WP_Error( 'g2ab_occ_bad_start', __( 'Invalid occurrence start time.', 'g2a-booking' ) );
+		}
+		$event    = self::get_event( $event_id );
+		$duration = $event ? (int) $event->duration_min : 120;
+		$end      = self::normalize_datetime( $data['end_at'] ?? '' );
+		if ( ! $end ) {
+			$end = gmdate( 'Y-m-d H:i:s', strtotime( $start . ' +' . max( 15, $duration ) . ' minutes' ) );
+		}
+		$now = current_time( 'mysql' );
+		$ok  = $wpdb->insert( self::occ_table(), array(
+			'event_id'   => $event_id,
+			'start_at'   => $start,
+			'end_at'     => $end,
+			'capacity'   => max( 0, (int) ( $data['capacity'] ?? 0 ) ),
+			'price'      => ( isset( $data['price'] ) && '' !== $data['price'] && null !== $data['price'] ) ? round( (float) $data['price'], 2 ) : null,
+			'status'     => sanitize_key( $data['status'] ?? 'scheduled' ) ?: 'scheduled',
+			'note'       => isset( $data['note'] ) ? sanitize_text_field( $data['note'] ) : null,
+			'created_at' => $now,
+			'updated_at' => $now,
+		) );
+		return $ok ? (int) $wpdb->insert_id : new WP_Error( 'g2ab_occ_insert_failed', __( 'Could not add occurrence.', 'g2a-booking' ) );
+	}
+
+	public static function delete_occurrence( $id ) {
+		global $wpdb;
+		return false !== $wpdb->delete( self::occ_table(), array( 'id' => (int) $id ) );
+	}
+
+	/* ────────────────────────────────────────────────────────────────
+	 * Internal booking type — gives event bookings a valid (NOT NULL)
+	 * booking_type_id while keeping the real linkage on event_occurrence_id.
+	 * ──────────────────────────────────────────────────────────────── */
+
+	public static function get_or_create_event_booking_type() {
+		global $wpdb;
+		$bt   = $wpdb->prefix . 'g2ab_booking_types';
+		$row  = $wpdb->get_row( $wpdb->prepare( "SELECT * FROM {$bt} WHERE slug = %s", 'event-seat' ) );
+		if ( $row ) {
+			return $row;
+		}
+		$now = current_time( 'mysql' );
+		$wpdb->insert( $bt, array(
+			'name'            => 'Event Seat',
+			'slug'            => 'event-seat',
+			'category'        => 'event',
+			'duration_min'    => 120,
+			'base_price'      => 0.00,
+			'payment_modes'   => 'full,free,in_store',
+			'requires_waiver' => 0,
+			'members_only'    => 0,
+			'capacity_mode'   => 'party_size',
+			'is_active'       => 1,
+			'created_at'      => $now,
+			'updated_at'      => $now,
+		) );
+		return $wpdb->get_row( $wpdb->prepare( "SELECT * FROM {$bt} WHERE id = %d", (int) $wpdb->insert_id ) );
+	}
+
+	/* ────────────────────────────────────────────────────────────────
+	 * Helpers
+	 * ──────────────────────────────────────────────────────────────── */
+
+	public static function categories() {
+		return apply_filters( 'g2ab_event_categories', array(
+			'event'       => __( 'General Event', 'g2a-booking' ),
+			'ladies'      => __( 'Ladies Night', 'g2a-booking' ),
+			'ccw-class'   => __( 'CCW / Class', 'g2a-booking' ),
+			'competition' => __( 'Competition', 'g2a-booking' ),
+			'private'     => __( 'Private Event', 'g2a-booking' ),
+		) );
+	}
+
+	public static function category_label( $key ) {
+		$cats = self::categories();
+		return $cats[ $key ] ?? ucwords( str_replace( '-', ' ', (string) $key ) );
+	}
+
+	private static function sanitize_event( $data ) {
 		$out = array();
-		foreach ( $columns as $key => $label ) {
-			$out[ $key ] = $label;
-			if ( 'title' === $key ) {
-				$out['g2ab_event_date'] = __( 'Event Date', 'g2a-booking' );
-				$out['g2ab_event_when'] = __( 'Time', 'g2a-booking' );
-			}
+		if ( isset( $data['title'] ) )         $out['title']           = sanitize_text_field( $data['title'] );
+		if ( isset( $data['slug'] ) )          $out['slug']            = sanitize_title( $data['slug'] );
+		if ( isset( $data['category'] ) )      $out['category']        = sanitize_key( $data['category'] ) ?: 'event';
+		if ( isset( $data['summary'] ) )       $out['summary']         = sanitize_text_field( $data['summary'] );
+		if ( isset( $data['description'] ) )   $out['description']      = wp_kses_post( $data['description'] );
+		if ( isset( $data['price'] ) )         $out['price']           = round( (float) $data['price'], 2 );
+		if ( array_key_exists( 'member_price', $data ) ) {
+			$out['member_price'] = ( '' === $data['member_price'] || null === $data['member_price'] ) ? null : round( (float) $data['member_price'], 2 );
 		}
+		if ( isset( $data['member_discount'] ) ) {
+			$out['member_discount'] = max( 0, min( 100, round( (float) $data['member_discount'], 2 ) ) );
+		}
+		if ( isset( $data['is_free'] ) )       $out['is_free']         = (int) ! empty( $data['is_free'] );
+		if ( isset( $data['capacity'] ) )      $out['capacity']        = max( 0, (int) $data['capacity'] );
+		if ( isset( $data['duration_min'] ) )  $out['duration_min']    = max( 15, (int) $data['duration_min'] );
+		if ( isset( $data['requires_waiver'] ) ) $out['requires_waiver'] = (int) ! empty( $data['requires_waiver'] );
+		if ( isset( $data['members_only'] ) )  $out['members_only']    = (int) ! empty( $data['members_only'] );
+		if ( array_key_exists( 'form_id', $data ) ) $out['form_id']    = $data['form_id'] ? (int) $data['form_id'] : null;
+		if ( isset( $data['image_url'] ) )     $out['image_url']       = esc_url_raw( $data['image_url'] );
+		if ( isset( $data['location'] ) )      $out['location']        = sanitize_text_field( $data['location'] );
+		if ( isset( $data['color'] ) )         $out['color']           = self::sanitize_hex( $data['color'] );
+		if ( isset( $data['status'] ) )        $out['status']          = sanitize_key( $data['status'] ) ?: 'publish';
+		if ( isset( $data['sort_order'] ) )    $out['sort_order']      = (int) $data['sort_order'];
 		return $out;
 	}
 
-	public function admin_column_value( $column, $post_id ) {
-		if ( 'g2ab_event_date' === $column ) {
-			$date = get_post_meta( $post_id, '_g2ab_event_date', true );
-			echo $date ? esc_html( date_i18n( 'M j, Y', strtotime( $date ) ) ) : '—';
-		}
-		if ( 'g2ab_event_when' === $column ) {
-			$time = get_post_meta( $post_id, '_g2ab_event_time', true );
-			echo $time ? esc_html( $time ) : '—';
-		}
+	private static function sanitize_hex( $value ) {
+		$value = trim( (string) $value );
+		return preg_match( '/^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/', $value ) ? $value : '';
 	}
 
-	/* ------------------------------------------------------------------ */
-	/* Query helper                                                       */
-	/* ------------------------------------------------------------------ */
-
-	/**
-	 * Fetch upcoming (and today's) events ordered by event date.
-	 *
-	 * @param int  $limit       Max events.
-	 * @param bool $include_past Include events whose date has passed.
-	 * @return WP_Post[]
-	 */
-	private function get_events( $limit = 12, $include_past = false ) {
-		$meta_query = array(
-			'date_clause' => array(
-				'key'  => '_g2ab_event_date',
-				'type' => 'DATE',
-			),
-		);
-		if ( ! $include_past ) {
-			$meta_query['date_clause']['compare'] = '>=';
-			$meta_query['date_clause']['value']   = current_time( 'Y-m-d' );
+	private static function normalize_datetime( $str ) {
+		$str = trim( (string) $str );
+		if ( '' === $str ) {
+			return '';
 		}
-
-		return get_posts(
-			array(
-				'post_type'      => self::CPT,
-				'post_status'    => 'publish',
-				'posts_per_page' => max( 1, (int) $limit ),
-				'meta_query'     => $meta_query, // phpcs:ignore WordPress.DB.SlowDBQuery
-				'orderby'        => array( 'date_clause' => 'ASC' ),
-			)
-		);
+		$str = str_replace( 'T', ' ', $str );
+		if ( preg_match( '/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}$/', $str ) ) {
+			$str .= ':00';
+		}
+		if ( ! preg_match( '/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/', $str ) ) {
+			return '';
+		}
+		return $str;
 	}
 
-	/**
-	 * Public: upcoming bookable events of a given type, normalized for the
-	 * booking calendar. Returns only events that have a parseable future
-	 * date, already ordered ascending. An empty $type returns every type.
-	 *
-	 * Used by the REST event-availability endpoint that powers the
-	 * event-driven booking calendar (e.g. Ladies Tuesday), so the calendar
-	 * can restrict selectable dates/times to published events only.
-	 *
-	 * @param string $type  _g2ab_event_type slug filter (empty = all types).
-	 * @param int    $limit Max events to scan.
-	 * @return array[] List of event_data() arrays.
-	 */
-	public function get_bookable_events_by_type( $type = '', $limit = 100 ) {
-		$type = sanitize_key( (string) $type );
-		$out  = array();
-		foreach ( $this->get_events( $limit, false ) as $post ) {
-			$event = $this->event_data( $post );
-			if ( empty( $event['date'] ) || empty( $event['ts'] ) ) {
-				continue;
+	private static function unique_slug( $base, $ignore_id = 0 ) {
+		global $wpdb;
+		$base  = sanitize_title( $base );
+		if ( '' === $base ) {
+			$base = 'event';
+		}
+		$table = self::table();
+		$slug  = $base;
+		$i     = 2;
+		while ( true ) {
+			$exists = $wpdb->get_var( $wpdb->prepare(
+				"SELECT id FROM {$table} WHERE slug = %s AND id <> %d LIMIT 1",
+				$slug, (int) $ignore_id
+			) );
+			if ( ! $exists ) {
+				return $slug;
 			}
-			if ( '' !== $type && sanitize_key( (string) $event['type'] ) !== $type ) {
-				continue;
-			}
-			$out[] = $event;
+			$slug = $base . '-' . $i;
+			$i++;
 		}
-		return $out;
-	}
-
-	/**
-	 * Normalize one event post into a flat data array for rendering.
-	 */
-	private function event_data( $post ) {
-		$date = get_post_meta( $post->ID, '_g2ab_event_date', true );
-		$ts   = $date ? strtotime( $date ) : 0;
-		return array(
-			'title'     => get_the_title( $post ),
-			'desc'      => has_excerpt( $post ) ? get_the_excerpt( $post ) : wp_trim_words( wp_strip_all_tags( $post->post_content ), 26 ),
-			'image'     => get_the_post_thumbnail_url( $post, 'large' ),
-			'date'      => $date,
-			'ts'        => $ts,
-			'day'       => $ts ? date_i18n( 'j', $ts ) : '',
-			'month'     => $ts ? date_i18n( 'M', $ts ) : '',
-			'weekday'   => $ts ? date_i18n( 'D', $ts ) : '',
-			'datelabel' => $ts ? date_i18n( 'l, F j, Y', $ts ) : '',
-			'time'      => get_post_meta( $post->ID, '_g2ab_event_time', true ),
-			'type'      => get_post_meta( $post->ID, '_g2ab_event_type', true ),
-			'instructor'=> get_post_meta( $post->ID, '_g2ab_event_instructor', true ),
-			'seats'     => absint( get_post_meta( $post->ID, '_g2ab_event_seats', true ) ),
-			'booking_type_slug' => sanitize_title( get_post_meta( $post->ID, '_g2ab_event_booking_type_slug', true ) ),
-			'end'       => get_post_meta( $post->ID, '_g2ab_event_end', true ),
-			'location'  => get_post_meta( $post->ID, '_g2ab_event_location', true ),
-			'price'     => get_post_meta( $post->ID, '_g2ab_event_price', true ),
-			'cta_label' => get_post_meta( $post->ID, '_g2ab_event_cta_label', true ),
-			'cta_url'   => get_post_meta( $post->ID, '_g2ab_event_cta_url', true ),
-			'featured'  => '1' === get_post_meta( $post->ID, '_g2ab_event_featured', true ),
-		);
-	}
-
-	private function time_range( $e ) {
-		$out = $e['time'];
-		if ( $e['time'] && $e['end'] ) {
-			$out = $e['time'] . ' – ' . $e['end'];
-		}
-		return $out;
-	}
-
-	private function print_basic_event_ui_css() {
-		static $printed = false;
-		if ( $printed ) {
-			return;
-		}
-		$printed = true;
-		?>
-		<style>
-		/* Brand-aligned, light/dark-aware tokens. The host theme stamps
-		   <html data-theme="light|dark"> so these widgets re-skin with the
-		   rest of the site instead of staying permanently dark. */
-		.g2ab-events-shortcode,.g2ab-event-countdown{--g2cd-ink:#F4F4F6;--g2cd-dim:#CBCAD2;--g2cd-card:#1B1C26;--g2cd-card2:#23242F;--g2cd-line:rgba(255,255,255,.10);--g2cd-brass:#DCB45F;--g2cd-ember:#E8802F;--g2cd-ember2:#C25C12;--g2cd-shadow:rgba(0,0,0,.38)}
-		html[data-theme="light"] .g2ab-events-shortcode,html[data-theme="light"] .g2ab-event-countdown{--g2cd-ink:#1E1B16;--g2cd-dim:#4B4639;--g2cd-card:#FFFFFF;--g2cd-card2:#F6F1E7;--g2cd-line:rgba(26,25,30,.12);--g2cd-brass:#A8862F;--g2cd-ember:#D9711F;--g2cd-ember2:#B85A12;--g2cd-shadow:rgba(60,48,24,.16)}
-
-		/* Upcoming-events cards */
-		.g2ab-events-shortcode{display:grid;gap:16px;max-width:980px;grid-template-columns:repeat(auto-fill,minmax(280px,1fr))}
-		.g2ab-events-shortcode-item{position:relative;background:linear-gradient(160deg,var(--g2cd-card2),var(--g2cd-card));border:1px solid var(--g2cd-line);padding:22px 22px 24px 26px;border-radius:14px;box-shadow:0 6px 22px var(--g2cd-shadow);overflow:hidden;transition:transform .18s ease,box-shadow .18s ease,border-color .18s ease}
-		.g2ab-events-shortcode-item::before{content:"";position:absolute;left:0;top:0;bottom:0;width:4px;background:linear-gradient(180deg,var(--g2cd-brass),var(--g2cd-ember))}
-		.g2ab-events-shortcode-item:hover{transform:translateY(-3px);box-shadow:0 14px 32px var(--g2cd-shadow);border-color:var(--g2cd-brass)}
-		.g2ab-events-shortcode-item h3{margin:0 0 14px;color:var(--g2cd-ink);font-family:"Bebas Neue","Oswald","Barlow Condensed",sans-serif;letter-spacing:.02em;font-size:30px;line-height:1.02}
-		.g2ab-events-shortcode-item p{margin:6px 0;color:var(--g2cd-dim);font-size:15px;line-height:1.5}
-		.g2ab-events-shortcode-item p strong{color:var(--g2cd-ink);font-weight:600}
-		.g2ab-events-shortcode-item a{display:inline-flex;align-items:center;gap:8px;margin-top:14px;background:linear-gradient(135deg,var(--g2cd-ember),var(--g2cd-ember2));color:#fff!important;text-decoration:none;padding:11px 20px;border-radius:8px;font-family:"Barlow Condensed","Oswald",sans-serif;font-weight:600;letter-spacing:.1em;text-transform:uppercase;box-shadow:0 4px 12px var(--g2cd-shadow);transition:transform .15s ease,box-shadow .15s ease}
-		.g2ab-events-shortcode-item a:hover{transform:translateY(-2px);box-shadow:0 8px 20px var(--g2cd-shadow);color:#fff!important}
-
-		/* Countdown panel */
-		.g2ab-event-countdown{position:relative;background:linear-gradient(160deg,var(--g2cd-card2),var(--g2cd-card));border:1px solid var(--g2cd-line);padding:28px 28px 30px;border-radius:16px;max-width:980px;box-shadow:0 10px 34px var(--g2cd-shadow);overflow:hidden}
-		.g2ab-event-countdown::after{content:"";position:absolute;right:-60px;top:-60px;width:220px;height:220px;border-radius:50%;background:radial-gradient(circle,rgba(220,180,95,.18),transparent 70%);pointer-events:none}
-		.g2ab-event-countdown h3{margin:0 0 8px;color:var(--g2cd-ink);font-family:"Bebas Neue","Oswald","Barlow Condensed",sans-serif;font-size:40px;line-height:1;letter-spacing:.02em}
-		.g2ab-event-countdown p{margin:6px 0;color:var(--g2cd-dim);font-size:15px}
-		.g2ab-event-countdown p strong{color:var(--g2cd-brass)}
-		.g2ab-event-countdown-timer{display:flex;gap:12px;align-items:flex-start;margin:18px 0 22px;flex-wrap:wrap}
-		.g2ab-cd-unit{display:flex;flex-direction:column;align-items:center;gap:7px}
-		.g2ab-cd-num{display:grid;place-items:center;min-width:76px;padding:14px 10px;background:linear-gradient(180deg,#12131A,#1B1C26);border:1px solid rgba(220,180,95,.42);border-radius:12px;color:#E3C06A;font-family:"Rajdhani","Oswald",monospace;font-weight:700;font-size:38px;line-height:1;font-variant-numeric:tabular-nums;box-shadow:inset 0 1px 0 rgba(255,255,255,.06),0 6px 16px var(--g2cd-shadow)}
-		.g2ab-cd-lbl{font-family:"Barlow Condensed","Oswald",sans-serif;font-size:11px;font-weight:600;letter-spacing:.18em;text-transform:uppercase;color:var(--g2cd-dim)}
-		.g2ab-cd-sep{align-self:flex-start;margin-top:16px;font-family:"Rajdhani",sans-serif;font-weight:700;font-size:34px;color:var(--g2cd-brass);opacity:.55}
-		.g2ab-event-countdown a{display:inline-flex;align-items:center;gap:8px;background:linear-gradient(135deg,var(--g2cd-ember),var(--g2cd-ember2));color:#fff!important;text-decoration:none;padding:12px 22px;border-radius:8px;font-family:"Barlow Condensed","Oswald",sans-serif;font-weight:600;letter-spacing:.1em;text-transform:uppercase;box-shadow:0 4px 14px var(--g2cd-shadow);transition:transform .15s ease,box-shadow .15s ease}
-		.g2ab-event-countdown a:hover{transform:translateY(-2px);box-shadow:0 9px 22px var(--g2cd-shadow);color:#fff!important}
-		@media (max-width:768px){
-			.g2ab-events-shortcode-item h3{font-size:26px}
-			.g2ab-events-shortcode-item p{font-size:14.5px}
-			.g2ab-event-countdown h3{font-size:32px}
-			.g2ab-cd-num{min-width:58px;font-size:30px;padding:12px 6px}
-			.g2ab-cd-sep{display:none}
-		}
-		</style>
-		<?php
-	}
-
-	/**
-	 * Empty-state message for the countdown / list shortcodes.
-	 *
-	 * Public-facing visitors see a short "stay tuned" line so the page
-	 * never reads as broken when the events queue is empty for a given
-	 * type. Logged-in admins additionally see a small bordered admin
-	 * note + direct link into the Events CPT, so staff who hit the
-	 * page after deploy know exactly where to add the first event.
-	 */
-	private function empty_state_message( $type = '', $title = '' ) {
-		$public  = $title
-			? sprintf( esc_html__( '%s — schedule is being finalised. Check back shortly or call the range.', 'g2a-booking' ), esc_html( $title ) )
-			: esc_html__( 'No upcoming events scheduled — check back shortly or call the range.', 'g2a-booking' );
-		$out = '<div class="g2ab-events-shortcode-empty">' . $public . '</div>';
-
-		if ( current_user_can( 'manage_options' ) ) {
-			$new_event_url = esc_url( admin_url( 'post-new.php?post_type=' . self::CPT ) );
-			$type_note     = $type
-				? sprintf( esc_html__( 'No published event found with type "%s".', 'g2a-booking' ), esc_html( $type ) )
-				: esc_html__( 'No published events found.', 'g2a-booking' );
-			$out .= '<div class="g2ab-events-shortcode-admin-note" style="margin-top:10px;padding:12px 14px;border:1px dashed #c9a84c;background:rgba(201,168,76,.08);border-radius:6px;color:#c9a84c;font-size:13px;font-family:ui-monospace,Menlo,Consolas,monospace;">';
-			$out .= '<strong>Admin note (only you see this):</strong> ' . $type_note;
-			$out .= ' <a href="' . $new_event_url . '" style="color:#c9a84c;font-weight:600;">' . esc_html__( 'Add an event →', 'g2a-booking' ) . '</a>';
-			if ( $type ) {
-				$out .= '<br>Set <code>_g2ab_event_type</code> = <code>' . esc_html( $type ) . '</code> and publish a date in the future.';
-			}
-			$out .= '</div>';
-		}
-		return $out;
-	}
-
-	private function next_event_by_type( $type = '' ) {
-		$events = $this->get_events( 50, false );
-		foreach ( $events as $post ) {
-			$event = $this->event_data( $post );
-			if ( $type && sanitize_key( (string) $event['type'] ) !== sanitize_key( (string) $type ) ) {
-				continue;
-			}
-			return $event;
-		}
-		return null;
-	}
-
-	public function render_events_shortcode( $atts = array() ) {
-		$atts = shortcode_atts(
-			array(
-				'type'  => '',
-				'limit' => 10,
-			),
-			$atts,
-			'g2a_events'
-		);
-		$type  = sanitize_key( (string) $atts['type'] );
-		$limit = max( 1, min( 50, (int) $atts['limit'] ) );
-		$posts = $this->get_events( $limit, false );
-		$rows  = array();
-
-		foreach ( $posts as $post ) {
-			$event = $this->event_data( $post );
-			$row_type = sanitize_key( (string) $event['type'] );
-			if ( $type && $row_type !== $type ) {
-				continue;
-			}
-			$rows[] = $event;
-		}
-
-		if ( empty( $rows ) ) {
-			return $this->empty_state_message( $type, '' );
-		}
-
-		ob_start();
-		$this->print_basic_event_ui_css();
-		echo '<div class="g2ab-events-shortcode">';
-		foreach ( $rows as $e ) {
-			echo '<article class="g2ab-events-shortcode-item">';
-			echo '<h3>' . esc_html( $e['title'] ) . '</h3>';
-			echo '<p><strong>' . esc_html__( 'Date', 'g2a-booking' ) . ':</strong> ' . esc_html( $e['datelabel'] ) . '</p>';
-			echo '<p><strong>' . esc_html__( 'Time', 'g2a-booking' ) . ':</strong> ' . esc_html( $this->time_range( $e ) ) . '</p>';
-			if ( ! empty( $e['instructor'] ) ) {
-				echo '<p><strong>' . esc_html__( 'Instructor', 'g2a-booking' ) . ':</strong> ' . esc_html( $e['instructor'] ) . '</p>';
-			}
-			if ( ! empty( $e['seats'] ) ) {
-				echo '<p><strong>' . esc_html__( 'Seats', 'g2a-booking' ) . ':</strong> ' . esc_html( (string) $e['seats'] ) . '</p>';
-			}
-			if ( ! empty( $e['price'] ) ) {
-				echo '<p><strong>' . esc_html__( 'Price', 'g2a-booking' ) . ':</strong> ' . esc_html( $e['price'] ) . '</p>';
-			}
-			if ( ! empty( $e['cta_url'] ) ) {
-				$label = ! empty( $e['cta_label'] ) ? $e['cta_label'] : __( 'Book Now', 'g2a-booking' );
-				echo '<p><a href="' . esc_url( $e['cta_url'] ) . '">' . esc_html( $label ) . '</a></p>';
-			}
-			echo '</article>';
-		}
-		echo '</div>';
-		return (string) ob_get_clean();
-	}
-
-	public function render_event_countdown( $atts = array() ) {
-		$atts = shortcode_atts(
-			array(
-				'type'         => '',
-				'title'        => __( 'Next Event Starts In', 'g2a-booking' ),
-				'button_label' => __( 'Book This Event', 'g2a-booking' ),
-			),
-			$atts,
-			'g2a_event_countdown'
-		);
-
-		$event = $this->next_event_by_type( (string) $atts['type'] );
-		if ( ! $event || empty( $event['date'] ) ) {
-			return $this->empty_state_message( (string) $atts['type'], (string) $atts['title'] );
-		}
-
-		$time     = ! empty( $event['time'] ) ? $event['time'] : '09:00 AM';
-		$event_ts = strtotime( trim( $event['date'] . ' ' . $time ) );
-		if ( ! $event_ts ) {
-			return '<div class="g2ab-events-shortcode-empty">' . esc_html__( 'Event date/time is not configured.', 'g2a-booking' ) . '</div>';
-		}
-
-		$booking_slug = ! empty( $event['booking_type_slug'] ) ? $event['booking_type_slug'] : 'ccw-class';
-		$book_url     = esc_url( add_query_arg( 'type', $booking_slug, home_url( '/book-a-lane/' ) ) );
-		$countdown_id = 'g2ab-countdown-' . wp_generate_password( 8, false, false );
-
-		ob_start();
-		$this->print_basic_event_ui_css();
-		?>
-		<div class="g2ab-event-countdown" id="<?php echo esc_attr( $countdown_id ); ?>" data-event-ts="<?php echo esc_attr( (string) $event_ts ); ?>">
-			<h3><?php echo esc_html( $atts['title'] ); ?></h3>
-			<p><strong><?php echo esc_html( $event['title'] ); ?></strong> - <?php echo esc_html( $event['datelabel'] . ' ' . $time ); ?></p>
-			<div class="g2ab-event-countdown-timer" role="timer">
-				<div class="g2ab-cd-unit"><span class="g2ab-cd-num" data-dd>00</span><span class="g2ab-cd-lbl"><?php esc_html_e( 'Days', 'g2a-booking' ); ?></span></div>
-				<div class="g2ab-cd-sep" aria-hidden="true">:</div>
-				<div class="g2ab-cd-unit"><span class="g2ab-cd-num" data-hh>00</span><span class="g2ab-cd-lbl"><?php esc_html_e( 'Hrs', 'g2a-booking' ); ?></span></div>
-				<div class="g2ab-cd-sep" aria-hidden="true">:</div>
-				<div class="g2ab-cd-unit"><span class="g2ab-cd-num" data-mm>00</span><span class="g2ab-cd-lbl"><?php esc_html_e( 'Min', 'g2a-booking' ); ?></span></div>
-				<div class="g2ab-cd-sep" aria-hidden="true">:</div>
-				<div class="g2ab-cd-unit"><span class="g2ab-cd-num" data-ss>00</span><span class="g2ab-cd-lbl"><?php esc_html_e( 'Sec', 'g2a-booking' ); ?></span></div>
-			</div>
-			<p><a href="<?php echo $book_url; ?>"><?php echo esc_html( $atts['button_label'] ); ?></a></p>
-		</div>
-		<script>
-		(function(){
-			var el = document.getElementById(<?php echo wp_json_encode( $countdown_id ); ?>);
-			if (!el) return;
-			var target = parseInt(el.getAttribute('data-event-ts') || '0', 10) * 1000;
-			var dd = el.querySelector('[data-dd]'), hh = el.querySelector('[data-hh]'),
-				mm = el.querySelector('[data-mm]'), ss = el.querySelector('[data-ss]');
-			function pad(n){ return n < 10 ? '0' + n : '' + n; }
-			function tick(){
-				var now = Date.now();
-				var diff = Math.max(0, target - now);
-				var sec = Math.floor(diff / 1000);
-				var d = Math.floor(sec / 86400); sec %= 86400;
-				var h = Math.floor(sec / 3600); sec %= 3600;
-				var m = Math.floor(sec / 60); sec %= 60;
-				dd.textContent = pad(d); hh.textContent = pad(h); mm.textContent = pad(m); ss.textContent = pad(sec);
-			}
-			tick(); setInterval(tick, 1000);
-		})();
-		</script>
-		<?php
-		return (string) ob_get_clean();
-	}
-
-	/* ------------------------------------------------------------------ */
-	/* Shortcode: LIST view                                               */
-	/* ------------------------------------------------------------------ */
-
-	public function render_list( $atts ) {
-		$atts   = shortcode_atts( array( 'limit' => 10, 'title' => '' ), $atts, 'g2a_events_list' );
-		$events = $this->get_events( (int) $atts['limit'] );
-
-		ob_start();
-		echo '<div class="g2a-ev g2a-ev-list">';
-		$this->print_css();
-		if ( $atts['title'] ) {
-			echo '<h2 class="g2a-ev-heading">' . esc_html( $atts['title'] ) . '</h2>';
-		}
-		if ( ! $events ) {
-			$this->empty_state();
-		} else {
-			foreach ( $events as $post ) {
-				$e   = $this->event_data( $post );
-				$cta = $e['cta_url'] ? $e['cta_url'] : '';
-				echo '<article class="g2a-ev-row' . ( $e['featured'] ? ' is-featured' : '' ) . ( $e['image'] ? ' has-image' : '' ) . '">';
-				echo '<div class="g2a-ev-datebox"><span class="g2a-ev-d">' . esc_html( $e['day'] ) . '</span>'
-					. '<span class="g2a-ev-m">' . esc_html( $e['month'] ) . '</span>'
-					. ( $e['weekday'] ? '<span class="g2a-ev-w">' . esc_html( $e['weekday'] ) . '</span>' : '' )
-					. '</div>';
-				if ( $e['image'] ) {
-					echo '<div class="g2a-ev-rowimg" style="background-image:url(\'' . esc_url( $e['image'] ) . '\')" role="img" aria-label="' . esc_attr( $e['title'] ) . '"></div>';
-				}
-				echo '<div class="g2a-ev-rowbody">';
-				if ( $e['featured'] ) {
-					echo '<span class="g2a-ev-flag">' . esc_html__( 'Featured', 'g2a-booking' ) . '</span>';
-				}
-				echo '<h3 class="g2a-ev-rowtitle">' . esc_html( $e['title'] ) . '</h3>';
-				echo '<div class="g2a-ev-meta">';
-				if ( $this->time_range( $e ) ) {
-					echo '<span>◷ ' . esc_html( $this->time_range( $e ) ) . '</span>';
-				}
-				if ( $e['location'] ) {
-					echo '<span>⚑ ' . esc_html( $e['location'] ) . '</span>';
-				}
-				if ( $e['price'] ) {
-					echo '<span class="g2a-ev-price">' . esc_html( $e['price'] ) . '</span>';
-				}
-				echo '</div>';
-				if ( $e['desc'] ) {
-					echo '<p class="g2a-ev-desc">' . esc_html( $e['desc'] ) . '</p>';
-				}
-				echo '</div>';
-				if ( $cta ) {
-					echo '<a class="g2a-ev-cta" href="' . esc_url( $cta ) . '">'
-						. esc_html( $e['cta_label'] ? $e['cta_label'] : __( 'Details', 'g2a-booking' ) ) . '</a>';
-				}
-				echo '</article>';
-			}
-		}
-		echo '</div>';
-		return ob_get_clean();
-	}
-
-	/* ------------------------------------------------------------------ */
-	/* Shortcode: CAROUSEL view                                           */
-	/* ------------------------------------------------------------------ */
-
-	public function render_carousel( $atts ) {
-		$atts   = shortcode_atts( array( 'limit' => 12, 'title' => '' ), $atts, 'g2a_events_carousel' );
-		$events = $this->get_events( (int) $atts['limit'] );
-
-		ob_start();
-		echo '<div class="g2a-ev g2a-ev-carousel">';
-		$this->print_css();
-		echo '<div class="g2a-ev-carhd">';
-		if ( $atts['title'] ) {
-			echo '<h2 class="g2a-ev-heading">' . esc_html( $atts['title'] ) . '</h2>';
-		}
-		if ( $events ) {
-			echo '<div class="g2a-ev-carnav"><button type="button" class="g2a-ev-arrow" data-ev-prev aria-label="Previous">‹</button>'
-				. '<button type="button" class="g2a-ev-arrow" data-ev-next aria-label="Next">›</button></div>';
-		}
-		echo '</div>';
-
-		if ( ! $events ) {
-			$this->empty_state();
-		} else {
-			echo '<div class="g2a-ev-track" data-ev-track>';
-			foreach ( $events as $post ) {
-				$e   = $this->event_data( $post );
-				$cta = $e['cta_url'] ? $e['cta_url'] : '';
-				echo '<article class="g2a-ev-card' . ( $e['featured'] ? ' is-featured' : '' ) . '">';
-				echo '<div class="g2a-ev-cardimg"' . ( $e['image'] ? ' style="background-image:url(\'' . esc_url( $e['image'] ) . '\')"' : '' ) . '>';
-				echo '<span class="g2a-ev-cardchip">' . esc_html( $e['month'] . ' ' . $e['day'] ) . '</span>';
-				if ( $e['featured'] ) {
-					echo '<span class="g2a-ev-flag g2a-ev-flag--abs">' . esc_html__( 'Featured', 'g2a-booking' ) . '</span>';
-				}
-				echo '</div>';
-				echo '<div class="g2a-ev-cardbody">';
-				echo '<h3 class="g2a-ev-rowtitle">' . esc_html( $e['title'] ) . '</h3>';
-				echo '<div class="g2a-ev-meta">';
-				if ( $e['datelabel'] ) {
-					echo '<span>' . esc_html( $e['datelabel'] ) . '</span>';
-				}
-				if ( $this->time_range( $e ) ) {
-					echo '<span>◷ ' . esc_html( $this->time_range( $e ) ) . '</span>';
-				}
-				if ( $e['price'] ) {
-					echo '<span class="g2a-ev-price">' . esc_html( $e['price'] ) . '</span>';
-				}
-				echo '</div>';
-				if ( $e['desc'] ) {
-					echo '<p class="g2a-ev-desc">' . esc_html( $e['desc'] ) . '</p>';
-				}
-				if ( $cta ) {
-					echo '<a class="g2a-ev-cta" href="' . esc_url( $cta ) . '">'
-						. esc_html( $e['cta_label'] ? $e['cta_label'] : __( 'Reserve', 'g2a-booking' ) ) . '</a>';
-				}
-				echo '</div>';
-				echo '</article>';
-			}
-			echo '</div>';
-		}
-		echo '</div>';
-		$this->print_carousel_js();
-		return ob_get_clean();
-	}
-
-	/* ------------------------------------------------------------------ */
-	/* Shortcode: CALENDAR view                                           */
-	/* ------------------------------------------------------------------ */
-
-	public function render_calendar( $atts ) {
-		$atts = shortcode_atts( array( 'title' => '' ), $atts, 'g2a_events_calendar' );
-
-		// Which month to show — ?g2a_evm=YYYY-MM, default current month.
-		$req   = isset( $_GET['g2a_evm'] ) ? sanitize_text_field( wp_unslash( $_GET['g2a_evm'] ) ) : '';
-		$month = preg_match( '/^\d{4}-\d{2}$/', $req ) ? $req : current_time( 'Y-m' );
-		$first = strtotime( $month . '-01' );
-		$days  = (int) date( 't', $first );
-		$start = (int) date( 'w', $first );
-
-		// All events (incl. past) grouped by Y-m-d for the visible month.
-		$by_day = array();
-		foreach ( $this->get_events( 200, true ) as $post ) {
-			$e = $this->event_data( $post );
-			if ( $e['date'] && 0 === strpos( $e['date'], $month ) ) {
-				$by_day[ $e['date'] ][] = $e;
-			}
-		}
-
-		$prev = date( 'Y-m', strtotime( '-1 month', $first ) );
-		$next = date( 'Y-m', strtotime( '+1 month', $first ) );
-
-		ob_start();
-		echo '<div class="g2a-ev g2a-ev-cal">';
-		$this->print_css();
-		echo '<div class="g2a-ev-calhd">';
-		echo '<a class="g2a-ev-arrow" href="' . esc_url( add_query_arg( 'g2a_evm', $prev ) ) . '">‹</a>';
-		echo '<span class="g2a-ev-calmonth">' . esc_html( date_i18n( 'F Y', $first ) ) . '</span>';
-		echo '<a class="g2a-ev-arrow" href="' . esc_url( add_query_arg( 'g2a_evm', $next ) ) . '">›</a>';
-		echo '</div>';
-		echo '<div class="g2a-ev-calgrid">';
-		foreach ( array( 'Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat' ) as $dow ) {
-			echo '<div class="g2a-ev-dow">' . esc_html( $dow ) . '</div>';
-		}
-		for ( $i = 0; $i < $start; $i++ ) {
-			echo '<div class="g2a-ev-cell is-empty"></div>';
-		}
-		$today = current_time( 'Y-m-d' );
-		for ( $d = 1; $d <= $days; $d++ ) {
-			$ymd  = sprintf( '%s-%02d', $month, $d );
-			$list = isset( $by_day[ $ymd ] ) ? $by_day[ $ymd ] : array();
-			$cls  = 'g2a-ev-cell' . ( $list ? ' has-events' : '' ) . ( $ymd === $today ? ' is-today' : '' );
-			echo '<div class="' . esc_attr( $cls ) . '">';
-			echo '<span class="g2a-ev-celln">' . esc_html( $d ) . '</span>';
-			foreach ( $list as $e ) {
-				$cta = $e['cta_url'] ? $e['cta_url'] : '#';
-				echo '<a class="g2a-ev-chip' . ( $e['featured'] ? ' is-featured' : '' ) . '" href="' . esc_url( $cta ) . '" title="' . esc_attr( $e['title'] . ( $e['time'] ? ' · ' . $e['time'] : '' ) ) . '">'
-					. ( $e['time'] ? '<b>' . esc_html( $e['time'] ) . '</b> ' : '' )
-					. '<span class="g2a-ev-chiptitle">' . esc_html( $e['title'] ) . '</span></a>';
-			}
-			echo '</div>';
-		}
-		echo '</div></div>';
-		return ob_get_clean();
-	}
-
-	/* ------------------------------------------------------------------ */
-	/* Shared output helpers                                              */
-	/* ------------------------------------------------------------------ */
-
-	private function empty_state() {
-		echo '<div class="g2a-ev-empty"><p>'
-			. esc_html__( 'No upcoming events are scheduled right now — check back soon.', 'g2a-booking' )
-			. '</p></div>';
-	}
-
-	private function print_carousel_js() {
-		static $done = false;
-		if ( $done ) {
-			return;
-		}
-		$done = true;
-		?>
-		<script>
-		(function(){
-			document.querySelectorAll('.g2a-ev-carousel').forEach(function(wrap){
-				var track=wrap.querySelector('[data-ev-track]');
-				if(!track)return;
-				var step=function(){var c=track.querySelector('.g2a-ev-card');return c?c.offsetWidth+18:320;};
-				var prev=wrap.querySelector('[data-ev-prev]'),next=wrap.querySelector('[data-ev-next]');
-				if(prev)prev.addEventListener('click',function(){track.scrollBy({left:-step(),behavior:'smooth'});});
-				if(next)next.addEventListener('click',function(){track.scrollBy({left:step(),behavior:'smooth'});});
-			});
-		})();
-		</script>
-		<?php
-	}
-
-	private function print_css() {
-		static $done = false;
-		if ( $done ) {
-			return;
-		}
-		$done = true;
-		?>
-		<style>
-		/* Theme tokens — dark defaults, overridden for light sites below.
-		   All views (list / calendar / carousel) read ONLY these vars, so a
-		   single override block re-skins everything. */
-		.g2a-ev{--ev-card:#26252C;--ev-card2:#201F26;--ev-line:rgba(255,255,255,.1);--ev-brass:#C9A84C;
-			--ev-brass2:#E3C06A;--ev-ember:#E8802F;--ev-ember2:#C25C12;--ev-white:#F4F4F6;--ev-fog:#CBCAD2;
-			--ev-silver:#8E8D96;--ev-chip-ink:#fff;--ev-shadow:rgba(0,0,0,.35);
-			font-family:var(--font-body,"DM Sans",-apple-system,Segoe UI,sans-serif);max-width:1280px;margin:0 auto;}
-		html[data-theme="light"] .g2a-ev{--ev-card:#FFFFFF;--ev-card2:#F6F1E7;--ev-line:rgba(26,25,30,.14);
-			--ev-brass:#A8862F;--ev-brass2:#8F7120;--ev-ember:#D9711F;--ev-ember2:#B85A12;--ev-white:#1E1B16;
-			--ev-fog:#4B4639;--ev-silver:#7A7468;--ev-chip-ink:#fff;--ev-shadow:rgba(60,48,24,.16);}
-		.g2a-ev *{box-sizing:border-box;}
-		.g2a-ev-heading{font-family:var(--font-display,"Bebas Neue",sans-serif);color:var(--ev-white);
-			font-size:clamp(28px,4vw,44px);letter-spacing:.02em;margin:0 0 20px;line-height:1;}
-		.g2a-ev-empty{background:var(--ev-card);border:1px solid var(--ev-line);border-radius:10px;
-			padding:38px;text-align:center;color:var(--ev-silver);}
-		.g2a-ev-flag{display:inline-block;background:linear-gradient(135deg,var(--ev-brass),var(--ev-ember));color:#1A191E;
-			font-family:var(--font-mono,monospace);font-size:9px;font-weight:700;letter-spacing:.16em;text-transform:uppercase;
-			padding:3px 9px;border-radius:999px;margin-bottom:8px;}
-		html[data-theme="light"] .g2a-ev-flag{color:#fff;}
-		.g2a-ev-flag--abs{position:absolute;top:12px;left:12px;margin:0;}
-		.g2a-ev-rowtitle{font-family:var(--font-display,"Bebas Neue",sans-serif);color:var(--ev-white);
-			font-size:25px;letter-spacing:.02em;line-height:1.05;margin:0 0 8px;}
-		.g2a-ev-meta{display:flex;flex-wrap:wrap;gap:8px 16px;font-family:var(--font-mono,monospace);
-			font-size:11px;letter-spacing:.06em;color:var(--ev-silver);text-transform:uppercase;margin-bottom:8px;}
-		.g2a-ev-price{color:var(--ev-brass2)!important;font-weight:700;}
-		.g2a-ev-desc{color:var(--ev-fog);font-size:14.5px;line-height:1.65;margin:0;}
-		.g2a-ev-cta{display:inline-block;background:linear-gradient(135deg,var(--ev-ember),var(--ev-ember2));color:#fff;
-			text-decoration:none;font-family:var(--font-condensed,"Barlow Condensed",sans-serif);font-weight:600;font-size:13px;
-			letter-spacing:.1em;text-transform:uppercase;padding:11px 20px;border-radius:6px;white-space:nowrap;
-			box-shadow:0 3px 10px var(--ev-shadow);transition:transform .15s ease,box-shadow .15s ease;}
-		.g2a-ev-cta:hover{color:#fff;transform:translateY(-2px);box-shadow:0 8px 18px var(--ev-shadow);}
-
-		/* LIST (banner cards) */
-		.g2a-ev-row{display:flex;gap:18px;align-items:center;background:var(--ev-card);
-			border:1px solid var(--ev-line);border-radius:10px;padding:18px 20px;margin-bottom:14px;
-			box-shadow:0 4px 14px var(--ev-shadow);transition:transform .15s ease,box-shadow .15s ease,border-color .15s ease;}
-		.g2a-ev-row:hover{transform:translateY(-2px);box-shadow:0 10px 26px var(--ev-shadow);}
-		.g2a-ev-row.is-featured{border-color:var(--ev-brass);box-shadow:0 4px 16px var(--ev-shadow),0 0 0 1px var(--ev-brass) inset;}
-		.g2a-ev-datebox{flex:0 0 70px;text-align:center;border:1px solid var(--ev-line);border-radius:8px;
-			padding:10px 6px;background:var(--ev-card2);}
-		.g2a-ev-d{display:block;font-family:var(--font-display,"Bebas Neue",sans-serif);font-size:30px;
-			color:var(--ev-brass2);line-height:1;}
-		.g2a-ev-m{display:block;font-family:var(--font-mono,monospace);font-size:10px;letter-spacing:.14em;
-			text-transform:uppercase;color:var(--ev-silver);margin-top:3px;}
-		.g2a-ev-w{display:block;font-family:var(--font-mono,monospace);font-size:9px;letter-spacing:.12em;
-			text-transform:uppercase;color:var(--ev-silver);margin-top:2px;opacity:.8;}
-		.g2a-ev-rowimg{flex:0 0 116px;height:86px;border-radius:8px;border:1px solid var(--ev-line);
-			background:var(--ev-card2) center/cover no-repeat;}
-		.g2a-ev-rowbody{flex:1;min-width:0;}
-		.g2a-ev-row .g2a-ev-cta{flex:0 0 auto;}
-		@media(max-width:640px){
-			.g2a-ev-row{flex-wrap:wrap;}
-			.g2a-ev-rowimg{flex:1 1 100%;height:140px;order:-1;}
-			.g2a-ev-row .g2a-ev-cta{width:100%;text-align:center;}
-		}
-
-		/* CAROUSEL */
-		.g2a-ev-carhd{display:flex;justify-content:space-between;align-items:center;gap:16px;margin-bottom:18px;}
-		.g2a-ev-carnav{display:flex;gap:8px;}
-		.g2a-ev-arrow{width:40px;height:40px;display:inline-grid;place-items:center;background:var(--ev-card);
-			border:1px solid var(--ev-line);color:var(--ev-white);font-size:20px;cursor:pointer;text-decoration:none;
-			border-radius:999px;transition:border-color .15s ease,color .15s ease;}
-		.g2a-ev-arrow:hover{border-color:var(--ev-brass);color:var(--ev-brass2);}
-		.g2a-ev-track{display:flex;gap:18px;overflow-x:auto;scroll-snap-type:x mandatory;
-			padding-bottom:8px;-webkit-overflow-scrolling:touch;scrollbar-width:thin;}
-		.g2a-ev-card{flex:0 0 320px;scroll-snap-align:start;background:var(--ev-card);
-			border:1px solid var(--ev-line);border-radius:10px;overflow:hidden;display:flex;flex-direction:column;
-			box-shadow:0 4px 14px var(--ev-shadow);transition:transform .15s ease,box-shadow .15s ease;}
-		.g2a-ev-card:hover{transform:translateY(-3px);box-shadow:0 12px 28px var(--ev-shadow);}
-		.g2a-ev-card.is-featured{border-color:var(--ev-brass);}
-		.g2a-ev-cardimg{position:relative;height:150px;background:var(--ev-card2) center/cover no-repeat;}
-		.g2a-ev-cardchip{position:absolute;bottom:12px;right:12px;background:rgba(26,25,30,.9);
-			color:#E3C06A;font-family:var(--font-mono,monospace);font-size:11px;letter-spacing:.1em;
-			text-transform:uppercase;padding:5px 10px;border-radius:999px;}
-		.g2a-ev-cardbody{padding:18px;display:flex;flex-direction:column;gap:0;flex:1;}
-		.g2a-ev-cardbody .g2a-ev-cta{margin-top:auto;align-self:flex-start;}
-		@media(max-width:480px){.g2a-ev-card{flex-basis:80vw;}}
-
-		/* CALENDAR (month grid) */
-		.g2a-ev-calhd{display:flex;align-items:center;justify-content:center;gap:18px;margin-bottom:14px;}
-		.g2a-ev-calmonth{font-family:var(--font-display,"Bebas Neue",sans-serif);color:var(--ev-white);
-			font-size:clamp(24px,3vw,30px);letter-spacing:.03em;min-width:200px;text-align:center;}
-		.g2a-ev-calgrid{display:grid;grid-template-columns:repeat(7,1fr);gap:6px;}
-		.g2a-ev-dow{font-family:var(--font-mono,monospace);font-size:10px;letter-spacing:.14em;
-			text-transform:uppercase;color:var(--ev-silver);text-align:center;padding:6px 0;}
-		.g2a-ev-cell{min-height:96px;background:var(--ev-card);border:1px solid var(--ev-line);
-			border-radius:8px;padding:6px;transition:border-color .15s ease;}
-		.g2a-ev-cell.is-empty{background:transparent;border-color:transparent;}
-		.g2a-ev-cell.is-today{border-color:var(--ev-brass);box-shadow:0 0 0 1px var(--ev-brass) inset;}
-		.g2a-ev-cell.has-events{background:var(--ev-card2);}
-		.g2a-ev-celln{display:block;font-family:var(--font-mono,monospace);font-size:11px;font-weight:700;
-			color:var(--ev-silver);margin-bottom:4px;}
-		.g2a-ev-cell.is-today .g2a-ev-celln{color:var(--ev-brass2);}
-		.g2a-ev-chip{display:flex;align-items:center;gap:6px;background:linear-gradient(135deg,var(--ev-ember),var(--ev-ember2));
-			color:var(--ev-chip-ink);text-decoration:none;font-size:11px;line-height:1.3;padding:4px 8px;border-radius:6px;
-			margin-bottom:4px;overflow:hidden;box-shadow:0 1px 3px var(--ev-shadow);
-			transition:transform .14s ease,box-shadow .14s ease;}
-		.g2a-ev-chip:hover{color:var(--ev-chip-ink);transform:translateY(-1px);box-shadow:0 5px 12px var(--ev-shadow);}
-		.g2a-ev-chiptitle{flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
-		.g2a-ev-chip.is-featured,.g2a-ev-chip.is-featured:hover{background:linear-gradient(135deg,var(--ev-brass),var(--ev-ember));color:#1A191E;}
-		html[data-theme="light"] .g2a-ev-chip.is-featured,html[data-theme="light"] .g2a-ev-chip.is-featured:hover{color:#fff;}
-		.g2a-ev-chip.is-featured b{background:rgba(255,255,255,.3);}
-		html[data-theme="light"] .g2a-ev-chip.is-featured b{background:rgba(0,0,0,.22);}
-		.g2a-ev-chip b{flex:0 0 auto;font-weight:700;font-size:9.5px;letter-spacing:.04em;
-			background:rgba(0,0,0,.22);padding:1px 6px;border-radius:4px;white-space:nowrap;}
-		@media(max-width:600px){
-			.g2a-ev-cell{min-height:64px;}
-			.g2a-ev-chip{font-size:0;padding:5px;justify-content:center;}
-			.g2a-ev-chip b{font-size:0;padding:0;background:transparent;}
-			.g2a-ev-chip::after{content:"●";font-size:11px;}
-		}
-		</style>
-		<?php
 	}
 }

@@ -13,14 +13,18 @@ use WP_REST_Request;
 final class InventoryImportController {
 
 	public static function adapters( WP_REST_Request $req ) {
+		// AdapterRegistry::all() is keyed by slug; array_values() guarantees a
+		// JSON array (not an object) so the admin SPA can .map() over it.
 		return array(
-			'adapters' => array_map(
-				static fn( $a ) => array(
-					'slug'      => $a->slug(),
-					'label'     => $a->label(),
-					'signature' => $a->header_signature(),
-				),
-				AdapterRegistry::all()
+			'adapters' => array_values(
+				array_map(
+					static fn( $a ) => array(
+						'slug'      => $a->slug(),
+						'label'     => $a->label(),
+						'signature' => $a->header_signature(),
+					),
+					AdapterRegistry::all()
+				)
 			),
 		);
 	}
@@ -138,8 +142,15 @@ final class InventoryImportController {
 			file_put_contents( $tmp, $bin );
 			return $tmp;
 		}
-		if ( ! empty( $payload['csv_path'] ) && is_readable( (string) $payload['csv_path'] ) ) {
-			return (string) $payload['csv_path'];
+		if ( ! empty( $payload['csv_path'] ) ) {
+			// Only allow server paths inside the uploads directory — anything
+			// else (wp-config.php, /etc/passwd, …) is rejected.
+			$real = realpath( (string) $payload['csv_path'] );
+			$base = realpath( (string) ( wp_upload_dir()['basedir'] ?? '' ) );
+			if ( $real === false || $base === false || ! str_starts_with( $real, trailingslashit( $base ) ) || ! is_readable( $real ) ) {
+				return null;
+			}
+			return $real;
 		}
 		$files = $req->get_file_params();
 		if ( ! empty( $files['csv']['tmp_name'] ) ) {

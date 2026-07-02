@@ -2,6 +2,41 @@
 
 All notable changes are tracked here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## 1.9.9.4 — Sign-out
+
+### Fixed
+- **Members couldn't sign out.** The theme filters `logout_url` to `/login/?action=logout&redirect_to=…&_wpnonce=…`, but `Auth` only handled login / lostpassword / reset — so the logout link landed on the login page with the member still signed in. `Auth::maybe_logout()` now handles it: verifies the standard `log-out` nonce, calls `wp_logout()`, and redirects to `redirect_to` (default home) through the `logout_redirect` filter. A stale-nonce link falls through to a one-tap confirm view (`render_logout_confirm()`) with a fresh logout URL. `retrievepassword` is also accepted as a legacy alias of `lostpassword`.
+
+### Changed
+- The account template's "no active membership" state now includes a **Sign Out** link, so a signed-in visitor without a membership isn't stranded.
+
+## 1.9.9.3 — Live-site hardening
+
+### Fixed
+- **Forgot-password still looked dead on the live site** because a page cache / CDN served the cached *login* HTML for `/login/?action=lostpassword` and `/login/?action=rp`. `Auth::prevent_login_cache()` now sends `nocache_headers()` and defines `DONOTCACHEPAGE` / `DONOTCACHEOBJECT` etc. on the login surface (detected by auth action, login/account page id, or the login/account shortcode), so caching plugins and CDNs keep it dynamic. Clear the site cache once after updating.
+- **"Set up member logins" admin notice would not clear** when a flagged membership had no email (the repair tool can't create a login without one), leaving a permanent banner. `count_missing_logins()` is now email-aware (joins the people table and only counts memberships that have a real email and no linked user), and `ensure_user_for_membership()` falls back to any linked person's email when the primary row has none — common in imported data — so imported members are reachable and the notice clears once the actionable work is done.
+
+### Changed
+- **Settings screen now has a single Save button.** Removed the duplicate header "Save changes" button; the sticky footer save bar remains.
+
+## 1.9.9.2 — Member login & password recovery
+
+### Fixed
+- **Forgot-password / reset-password did nothing.** The Guns 2 Ammo theme filters `login_url` / `lostpassword_url` to the branded `/login/` page, and WP's reset emails carry `wp-login.php?action=rp` links — but `[memberistic_login]` only rendered the *login* form, so `/login/?action=lostpassword` and `/login/?action=rp` dead-ended. A new `Frontend\Auth` handler turns `/login/` into a full, theme-independent auth surface: it processes login (via `wp_signon`), lost-password (via `retrieve_password`) and reset-password (via `check_password_reset_key` + `reset_password`) on `template_redirect`, with PRG redirects and inline notices. Works even when wp-login.php is blocked/redirected.
+- **Password links bypassed the branded page.** WP builds reset and "set your password" links with `network_site_url('wp-login.php?action=rp…')`, side-stepping the theme filter. `Auth` now filters `retrieve_password_message` and `wp_new_user_notification_email` to rewrite those URLs to `/login/?action=rp`, so every link lands on the working handler.
+- **Staff-added and imported members had no WP account.** Only the Stripe checkout and corporate paths created users; admin "Add Member" and CSV import left a membership with no `primary_user_id`, so those members couldn't sign in or set a password. New `Account_Provisioner` creates (or links) a WP user for a membership's primary person and emails a set-password link — wired to run on `memberistic_membership_activated`, on staff member creation (REST `create_item`), and as a one-click bulk **"Set up member logins"** repair tool surfaced via an admin notice. Idempotent; the set-password email is sent at most once per member.
+
+## 1.46.1 — Booking integration correctness
+
+### Fixed
+- **Member booking discounts now apply.** `booking_discount()` / `discount_percent_for_booking_type()` read `booking_discounts` from `$membership['settings']`, but the `memberistic_memberships` table has no `settings` column (only `memberistic_plans` does), so the rules were always empty and members only ever got the booking type's base `member_discount`. Both now resolve the plan via `Plans_Repository::get($membership['plan_id'])` and read the rules from the plan settings.
+- **Timezone-correct expiry check.** `membership_is_bookable()` appended `' 23:59:59'` to `renewal_date`, but that column is a `DATETIME` (`Y-m-d H:i:s`), producing a "double time specification" that made every active member read as **not bookable** (breaking member booking, pricing and member content access). It now takes the date part only and builds the end-of-day in `wp_timezone()`, treating `''`/`0000-00-00[ 00:00:00]` as non-expiring.
+- **Booking-form pages are never content-restricted.** `Content_Restrictions` now exempts any page containing `[g2a_lane_booking]` / `[g2a_booking_form]` (filterable via `memberistic_restriction_exempt_post`) across all four gates, so a mis-set required-plan can't hide the lane-booking UI from guests.
+- **Member state cleared on expiry.** A new `clear_roles_for_membership()` on `memberistic_membership_expired` strips the member + plan roles and the `memberistic_active_plan_id`/`_name` meta, guarded so a user who still holds another active membership keeps their roles (the survivor check excludes the just-expired row).
+- **Consistent member resolution for content gating.** `current_user_has_any_plan()` now resolves through the booking integration's `get_active_membership_for_user()` (honors email-linked memberships + rechecks renewal) instead of a status-only `primary_user_id` lookup.
+- **Correct membership level id in booking metadata.** `g2ab_booking_pricing` now carries the plan id (was the membership row id) so the booking engine's role/label assignment looks up the right plan.
+- **Stripe checkout currency allowlist.** `create_checkout_session()` validates the configured currency against a known list and falls back to `usd`, so a corrupted setting can't make Stripe reject the session.
+
 ## 1.45.0 — Integrations toggle fix + POS Bridge + SMS module + waiver module
 
 ### Fixed

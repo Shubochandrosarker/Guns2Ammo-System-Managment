@@ -36,7 +36,10 @@ function g2a_redirects_handle() {
 	// also fixes that for AI crawlers and shared/bookmarked links.
 	$host = isset( $_SERVER['HTTP_HOST'] ) ? strtolower( (string) wp_unslash( $_SERVER['HTTP_HOST'] ) ) : '';
 	if ( $host && 0 === strpos( $host, 'www.' ) ) {
-		$canonical_host = substr( $host, 4 );
+		// Never reflect the request's Host header into the redirect target —
+		// a forged Host header would 301 visitors (and poison any full-page
+		// cache) to an attacker-chosen domain. Anchor on the configured host.
+		$canonical_host = (string) wp_parse_url( home_url(), PHP_URL_HOST );
 		$scheme = is_ssl() ? 'https' : 'http';
 		$uri    = isset( $_SERVER['REQUEST_URI'] ) ? (string) wp_unslash( $_SERVER['REQUEST_URI'] ) : '/';
 		$target = $scheme . '://' . $canonical_host . $uri;

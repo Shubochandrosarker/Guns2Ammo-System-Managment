@@ -28,6 +28,7 @@ $lane_url    = home_url( '/book-a-lane/' );
 		<h3><?php esc_html_e( 'No active membership found', 'memberistic' ); ?></h3>
 		<p><?php esc_html_e( 'No membership is linked to this account yet. If you joined online, sign in with the same email you used at checkout.', 'memberistic' ); ?></p>
 		<a class="memberistic-acct-cta memberistic-acct-cta--primary" href="<?php echo esc_url( $plans_url ); ?>"><?php esc_html_e( 'View Membership Plans', 'memberistic' ); ?></a>
+		<a class="memberistic-acct-cta memberistic-acct-signout" href="<?php echo esc_url( wp_logout_url( home_url( '/' ) ) ); ?>"><?php esc_html_e( 'Sign Out', 'memberistic' ); ?></a>
 	</div>
 <?php else :
 	$user        = wp_get_current_user();

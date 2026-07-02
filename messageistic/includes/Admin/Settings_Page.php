@@ -187,6 +187,12 @@ final class Settings_Page {
                 is_array( $out['jasmin'] ?? null ) ? $out['jasmin'] : [],
                 [ 'password', 'webhook_secret' ]
             );
+            // Fail closed once a secret exists: unsigned inbound MO/DLR posts
+            // can spoof senders and forge opt-ins, so signature validation is
+            // not optional when it is actually possible.
+            if ( '' !== (string) ( $out['jasmin']['webhook_secret'] ?? '' ) ) {
+                $out['jasmin']['validate_signature'] = true;
+            }
         }
 
         if ( isset( $input['smsgate'] ) && is_array( $input['smsgate'] ) ) {
@@ -209,6 +215,11 @@ final class Settings_Page {
                 is_array( $out['smsgate'] ?? null ) ? $out['smsgate'] : [],
                 [ 'password', 'webhook_secret', 'signing_key' ]
             );
+            // Fail closed once a secret/signing key exists (see Jasmin above).
+            if ( '' !== (string) ( $out['smsgate']['webhook_secret'] ?? '' )
+                || '' !== (string) ( $out['smsgate']['signing_key'] ?? '' ) ) {
+                $out['smsgate']['validate_signature'] = true;
+            }
         }
 
         if ( isset( $input['testing'] ) && is_array( $input['testing'] ) ) {

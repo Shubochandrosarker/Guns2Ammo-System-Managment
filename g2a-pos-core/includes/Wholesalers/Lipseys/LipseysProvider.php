@@ -177,11 +177,40 @@ final class LipseysProvider extends AbstractWholesalerProvider {
 			);
 		}
 
-		$items = $snapshot['data'] ?? $snapshot['Items'] ?? $snapshot['items'] ?? array();
+		if ( (int) ( $snapshot['_status'] ?? 200 ) !== 200 ) {
+			return array(
+				'ok'    => false,
+				'error' => 'pricing_feed_http_' . (int) ( $snapshot['_status'] ?? 0 ),
+			);
+		}
+		// Lipsey's returns HTTP 200 with an API-level failure envelope
+		// (e.g. {"success":false,"authorized":false,"errors":[...]}). Treat that
+		// as a hard failure — never "successfully synced 0 rows", which would
+		// wrongly mark the wholesaler as synced. Mirrors importCatalogApi().
+		$authorized = $snapshot['authorized'] ?? $snapshot['Authorized'] ?? true;
+		$success    = $snapshot['success'] ?? $snapshot['Success'] ?? true;
+		if ( false === $authorized || false === $success ) {
+			$errs = $snapshot['errors'] ?? $snapshot['Errors'] ?? array();
+			return array(
+				'ok'     => false,
+				'error'  => 'lipseys_api_rejected',
+				'detail' => is_array( $errs ) ? implode( '; ', array_map( 'strval', $errs ) ) : (string) $errs,
+			);
+		}
+
+		$items = $snapshot['data'] ?? $snapshot['Items'] ?? $snapshot['items'] ?? null;
 		if ( ! is_array( $items ) ) {
 			return array(
 				'ok'    => false,
 				'error' => 'unexpected_response_shape',
+			);
+		}
+		if ( array() === $items ) {
+			// An empty feed from an authorized account is suspicious — report it
+			// rather than silently marking a successful zero-row sync.
+			return array(
+				'ok'    => false,
+				'error' => 'empty_pricing_feed',
 			);
 		}
 

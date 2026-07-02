@@ -57,7 +57,7 @@ final class G2AB_Migration_Adapter_Amelia extends G2AB_Migration_Adapter_Base {
 		);
 		if ( $orphans > 0 ) {
 			$warnings[] = sprintf(
-				_n( '%d orphaned booking found (no parent appointment) - it will import into the review queue with a fallback time.', '%d orphaned bookings found (no parent appointment) - they will import into the review queue with fallback times.', $orphans, 'g2a-booking' ),
+				_n( '%d orphaned booking found (no parent appointment) - it will be skipped.', '%d orphaned bookings found (no parent appointment) - they will be skipped.', $orphans, 'g2a-booking' ),
 				$orphans
 			);
 		}
@@ -194,7 +194,7 @@ final class G2AB_Migration_Adapter_Amelia extends G2AB_Migration_Adapter_Base {
 				u.email            AS customer_email,
 				u.phone            AS customer_phone
 			FROM {$p}amelia_customer_bookings cb
-			LEFT JOIN {$p}amelia_appointments a ON a.id = cb.appointmentId
+			INNER JOIN {$p}amelia_appointments a ON a.id = cb.appointmentId
 			LEFT JOIN  {$p}amelia_users u        ON u.id = cb.customerId
 			ORDER BY cb.id ASC
 			LIMIT %d OFFSET %d",
@@ -207,20 +207,15 @@ final class G2AB_Migration_Adapter_Amelia extends G2AB_Migration_Adapter_Base {
 			$name = trim( ( $r['customer_first'] ?? '' ) . ' ' . ( $r['customer_last'] ?? '' ) );
 			if ( $name === '' ) $name = $r['customer_email'] ?: __( 'Anonymous', 'g2a-booking' );
 
-			$created = $this->normalize_datetime( $r['booking_created'] );
-			$start   = $this->normalize_datetime( $r['start_at'] );
-			$end     = $this->normalize_datetime( $r['end_at'] );
-			$needs_review = false;
-			$review_notes = array();
-			if ( ! $start ) {
-				$start = $created ?: gmdate( 'Y-m-d H:i:s' );
-				$needs_review = true;
-				$review_notes[] = 'Missing Amelia appointment start; fallback start applied during migration.';
-			}
-			if ( ! $end ) {
-				$end = gmdate( 'Y-m-d H:i:s', strtotime( $start ) + HOUR_IN_SECONDS );
-				$needs_review = true;
-				$review_notes[] = 'Missing Amelia appointment end; fallback 60-minute duration applied during migration.';
+			$start = $this->normalize_datetime( $r['start_at'] );
+			$end   = $this->normalize_datetime( $r['end_at'] );
+			if ( ! $start || ! $end ) {
+				yield array(
+					'external_id' => (int) $r['booking_id'],
+					'start_at'    => null,
+					'end_at'      => null,
+				);
+				continue;
 			}
 
 			$duration_min = max( 15, (int) round( ( strtotime( $end ) - strtotime( $start ) ) / 60 ) );
@@ -251,14 +246,9 @@ final class G2AB_Migration_Adapter_Amelia extends G2AB_Migration_Adapter_Base {
 				'paid_amount'              => round( $paid_amount, 2 ),
 				'currency'                 => $this->detect_currency(),
 				'form_data'                => $form_data,
-				'notes'                    => trim( implode( "\n", array_filter( array_merge( array( $r['internal_notes'] ?: '' ), $review_notes ) ) ) ) ?: null,
-				'created_at'               => $created,
+				'notes'                    => $r['internal_notes'] ?: null,
+				'created_at'               => $this->normalize_datetime( $r['booking_created'] ),
 				'payments'                 => $payments,
-				'metadata'                 => array(
-					'amelia_appointment_id' => $r['appointment_id'] ? (int) $r['appointment_id'] : null,
-					'needs_review'          => $needs_review,
-					'review_reason'         => $review_notes,
-				),
 			);
 		}
 	}

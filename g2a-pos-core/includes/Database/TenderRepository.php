@@ -49,6 +49,23 @@ final class TenderRepository extends Repository {
 		return $row ?: null;
 	}
 
+	/** Most recent card tender line recorded against an external reference (Stripe payment intent id). */
+	public function find_by_external_ref( string $external_ref ): ?array {
+		global $wpdb;
+		if ( $external_ref === '' ) {
+			return null;
+		}
+		$row = $wpdb->get_row(
+			$wpdb->prepare(
+				"SELECT * FROM {$this->table('g2a_pos_tender_lines')}
+	         WHERE external_ref = %s AND tender_method = 'card' ORDER BY id DESC LIMIT 1",
+				$external_ref
+			),
+			ARRAY_A
+		);
+		return $row ?: null;
+	}
+
 	public function list_for_order( int $order_id ): array {
 		global $wpdb;
 		return $wpdb->get_results(
@@ -103,21 +120,36 @@ final class TenderRepository extends Repository {
 				'remaining' => $remaining,
 			);
 		}
-		$new_refunded = $already + $amount;
-		$new_status   = $new_refunded >= $captured - 0.0001 ? 'refunded' : 'partially_refunded';
-		$wpdb->update(
-			$this->table( 'g2a_pos_tender_lines' ),
-			array(
-				'refunded_amount' => $new_refunded,
-				'status'          => $new_status,
-				'updated_at'      => $this->now(),
-			),
-			array( 'id' => $id )
+		// Atomic-conditional update: the WHERE clause re-checks the running
+		// refunded_amount against the captured amount so two concurrent refunds
+		// cannot both pass the pre-check above (double-spend).
+		$affected = $wpdb->query(
+			$wpdb->prepare(
+				"UPDATE {$this->table('g2a_pos_tender_lines')}
+	         SET status = IF(refunded_amount + %f >= amount - 0.0001, 'refunded', 'partially_refunded'),
+	             refunded_amount = refunded_amount + %f,
+	             updated_at = %s
+	         WHERE id = %d AND status != 'voided' AND (refunded_amount + %f) <= amount + 0.0001",
+				$amount,
+				$amount,
+				$this->now(),
+				$id,
+				$amount
+			)
 		);
+		if ( ! $affected ) {
+			$fresh = $this->find( $id );
+			return array(
+				'ok'        => false,
+				'error'     => 'amount_out_of_range',
+				'remaining' => $fresh ? max( 0.0, (float) $fresh['amount'] - (float) $fresh['refunded_amount'] ) : 0.0,
+			);
+		}
+		$fresh = $this->find( $id );
 		return array(
 			'ok'              => true,
-			'refunded_amount' => $new_refunded,
-			'status'          => $new_status,
+			'refunded_amount' => (float) ( $fresh['refunded_amount'] ?? $already + $amount ),
+			'status'          => (string) ( $fresh['status'] ?? 'partially_refunded' ),
 		);
 	}
 

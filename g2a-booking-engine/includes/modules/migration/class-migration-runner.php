@@ -339,18 +339,8 @@ final class G2AB_Migration_Runner {
 		$existing = $this->find_by_external_ref( 'bookings', $ext_ref );
 		if ( $existing ) return 'skipped';
 
-		// Last-resort fallback. Adapters should provide review metadata when
-		// source dates are incomplete, but do not drop rows silently here.
-		if ( empty( $b['start_at'] ) ) {
-			$b['start_at'] = current_time( 'mysql' );
-			$b['metadata']['needs_review'] = true;
-			$b['metadata']['review_reason'][] = 'Missing start time; migration runner fallback applied.';
-		}
-		if ( empty( $b['end_at'] ) ) {
-			$b['end_at'] = gmdate( 'Y-m-d H:i:s', strtotime( $b['start_at'] ) + HOUR_IN_SECONDS );
-			$b['metadata']['needs_review'] = true;
-			$b['metadata']['review_reason'][] = 'Missing end time; migration runner fallback applied.';
-		}
+		// Validate minimum fields.
+		if ( empty( $b['start_at'] ) || empty( $b['end_at'] ) ) return 'missing start/end';
 
 		// Resolve resource + booking_type from remap tables (NULL if unmapped).
 		$resource_id     = $this->resolve_remap( $this->resource_map, $b['external_resource_id']     ?? null );
@@ -415,7 +405,7 @@ final class G2AB_Migration_Runner {
 					'gateway_response'=> null,
 					'metadata'        => wp_json_encode( $this->migration_metadata( $pmt['metadata'] ?? array(), $run_id, $adapter->id() ) ),
 					'processed_at'    => $pmt['processed_at'] ?? null,
-					'created_at'      => $pmt['processed_at'] ?? ( $b['created_at'] ?: $now ),
+					'created_at'      => $now,
 					'external_ref'    => $pmt_ref,
 				) );
 			}

@@ -24,12 +24,14 @@ defined( 'ABSPATH' ) || exit;
  * - POST /ai/brain/refresh-site re-ingests, preferring live site content
  *   from home_url('/llms-full.txt') (the theme publishes it), chunked by
  *   section; the curated pack is always (re)ingested as the baseline.
- * - Weekly cron (g2a_pos_brain_site_refresh) runs the same refresh.
+ * - A full-site crawl (every published page/post/product) runs on each
+ *   refresh so the brain reflects the real website.
+ * - Nightly cron (g2a_pos_brain_site_refresh) runs the same refresh.
  */
 final class WebsiteKnowledgeSeeder {
 
 	public const CRON_HOOK    = 'g2a_pos_brain_site_refresh';
-	public const SEED_VERSION = '2026-06-12.1';
+	public const SEED_VERSION = '2026-06-29.1';
 
 	private const OPTION_SEEDED = 'g2a_pos_brain_seeded_version';
 	private const TAG_DEFAULT   = 'g2a-website-default';
@@ -72,6 +74,7 @@ final class WebsiteKnowledgeSeeder {
 			'ok'               => true,
 			'default_sections' => 0,
 			'live_sections'    => 0,
+			'crawled_pages'    => 0,
 			'chunks'           => 0,
 			'live_source'      => null,
 		);
@@ -125,6 +128,11 @@ final class WebsiteKnowledgeSeeder {
 			}
 			$result['live_source'] = $url;
 		}
+
+		// Full-site crawl: index every published page/post/product so the brain
+		// reflects the actual website, not only the curated pack and the theme's
+		// /llms-full.txt. Tagged live, so it refreshes (replaces) on each run.
+		self::crawl_published_content( $result );
 
 		update_option( self::OPTION_SEEDED, self::SEED_VERSION, false );
 		update_option(
@@ -288,6 +296,74 @@ final class WebsiteKnowledgeSeeder {
 		}
 
 		return $parts ? implode( "\n\n", $parts ) : '';
+	}
+
+	/**
+	 * Crawl the whole site: index every published page, post and WooCommerce
+	 * product so the agent answers from real website content. Tagged TAG_LIVE
+	 * (purged at the start of refresh) so each run replaces the prior crawl.
+	 * Capped so a single cron run stays bounded.
+	 *
+	 * @param array<string,mixed> $result Mutated in place with counts.
+	 */
+	private static function crawl_published_content( array &$result ): void {
+		if ( ! class_exists( '\WP_Query' ) || ! function_exists( 'get_permalink' ) ) {
+			return;
+		}
+		$types = array();
+		foreach ( array( 'page', 'post', 'product' ) as $pt ) {
+			if ( ! function_exists( 'post_type_exists' ) || post_type_exists( $pt ) ) {
+				$types[] = $pt;
+			}
+		}
+		if ( ! $types ) {
+			return;
+		}
+
+		$query = new \WP_Query(
+			array(
+				'post_type'              => $types,
+				'post_status'            => 'publish',
+				'posts_per_page'         => 500,
+				'orderby'                => 'modified',
+				'order'                  => 'DESC',
+				'no_found_rows'          => true,
+				'ignore_sticky_posts'    => true,
+				'suppress_filters'       => true,
+				'update_post_meta_cache' => false,
+				'update_post_term_cache' => false,
+			)
+		);
+
+		foreach ( $query->posts as $post ) {
+			$title   = trim( (string) get_the_title( $post ) );
+			$raw     = (string) ( $post->post_content ?? '' );
+			$content = trim( wp_strip_all_tags( strip_shortcodes( $raw ) ) );
+			$excerpt = trim( wp_strip_all_tags( (string) ( $post->post_excerpt ?? '' ) ) );
+			$text    = trim( $title . "\n\n" . $excerpt . "\n\n" . $content );
+			if ( ( function_exists( 'mb_strlen' ) ? mb_strlen( $text ) : strlen( $text ) ) < 40 ) {
+				continue; // Skip near-empty pages (e.g. page-builder layouts with no server-rendered copy).
+			}
+			$url = (string) get_permalink( $post );
+			$r   = BrainService::ingest_text(
+				'Page: ' . ( $title !== '' ? $title : $url ),
+				$text,
+				array(
+					'source_type' => 'url',
+					'source_uri'  => $url,
+					'tags'        => self::TAG_LIVE,
+					'scope'       => 'public',
+				)
+			);
+			if ( ! empty( $r['ok'] ) ) {
+				++$result['crawled_pages'];
+				$result['chunks'] += (int) ( $r['chunks'] ?? 0 );
+			}
+		}
+
+		if ( function_exists( 'wp_reset_postdata' ) ) {
+			wp_reset_postdata();
+		}
 	}
 
 	// ------------------------------------------------------------------ helpers

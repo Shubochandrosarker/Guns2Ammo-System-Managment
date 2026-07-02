@@ -26,7 +26,7 @@ class G2AB_Verifyistic_Settings {
 		$require      = (int) get_option( G2AB_Module_Verifyistic::OPT_REQUIRE_VERIFICATION, 0 );
 		$auto_waiver  = (int) get_option( G2AB_Module_Verifyistic::OPT_AUTO_WAIVER, 1 );
 		$autofill     = (int) get_option( G2AB_Module_Verifyistic::OPT_AUTOFILL_NAME, 1 );
-		$max_age      = (int) get_option( G2AB_Module_Verifyistic::OPT_MAX_AGE, 60 );
+		$max_age      = (int) get_option( G2AB_Module_Verifyistic::OPT_MAX_AGE, 525600 );
 
 		// Counters from the Verifyistic logs table — only if it exists.
 		$today_count = 0;
@@ -139,7 +139,7 @@ class G2AB_Verifyistic_Settings {
 				<div class="g2ab-vfy__row">
 					<label>Maximum verification age (minutes)</label>
 					<input type="number" name="max_age" min="1" max="525600" value="<?php echo esc_attr( $max_age ); ?>" />
-					<small>How recent the verification must be to be considered valid for a booking. Set higher than your Verifyistic cookie expiry (e.g. 30 days × 1440 = 43200) if you want long-lived linking. Default: 60 minutes.</small>
+					<small>How recent the verification must be to count for a booking. The default <strong>525600</strong> (≈1 year) effectively disables this window so the Verifyistic cookie's own expiry is what matters — recommended, and it prevents validly-verified returning customers from being blocked. Only lower it (e.g. 1440 = 24h) if you specifically want to force re-verification sooner than the Verifyistic cookie lasts.</small>
 				</div>
 			</div>
 
@@ -181,7 +181,7 @@ class G2AB_Verifyistic_Settings {
 		update_option( G2AB_Module_Verifyistic::OPT_AUTO_WAIVER, isset( $_POST['auto_waiver'] ) ? 1 : 0 );
 		update_option( G2AB_Module_Verifyistic::OPT_AUTOFILL_NAME, isset( $_POST['autofill'] ) ? 1 : 0 );
 
-		$max_age = isset( $_POST['max_age'] ) ? max( 1, min( 525600, (int) $_POST['max_age'] ) ) : 60;
+		$max_age = isset( $_POST['max_age'] ) ? max( 1, min( 525600, (int) $_POST['max_age'] ) ) : 525600;
 		update_option( G2AB_Module_Verifyistic::OPT_MAX_AGE, $max_age );
 
 		wp_safe_redirect( add_query_arg( array( 'page' => 'g2ab-settings', 'tab' => 'verifyistic', 'saved' => 1 ), admin_url( 'admin.php' ) ) );

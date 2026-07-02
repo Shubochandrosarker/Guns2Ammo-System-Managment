@@ -39,9 +39,28 @@ class G2AB_Woo_Sync {
 		$booking = $wpdb->get_row( $wpdb->prepare( "SELECT * FROM {$bk} WHERE id = %d", $booking_id ) ); // phpcs:ignore
 		if ( ! $booking || in_array( $booking->status, array( 'paid', 'completed' ), true ) ) return;
 
+		// Only proceed when WooCommerce itself considers the order paid.
+		if ( ! $order->is_paid() ) return;
+
+		// Amount cross-check — mirror the native gateways: refuse to mark paid
+		// when the order total doesn't match the booking total or deposit.
+		$amount = (float) $order->get_total();
+		if ( function_exists( 'g2ab_validate_payment_amount' ) && ! g2ab_validate_payment_amount( $booking, $amount ) ) {
+			$wpdb->insert( $wpdb->prefix . 'g2ab_logs', array(
+				'booking_id' => (int) $booking_id,
+				'event_type' => 'payment_amount_mismatch',
+				'severity'   => 'warning',
+				'message'    => sprintf( 'WooCommerce amount mismatch: paid=%s expected=%s', number_format( $amount, 2 ), number_format( (float) $booking->total_amount, 2 ) ),
+				'context'    => wp_json_encode( array( 'wc_order_id' => $order_id ) ),
+				'created_at' => current_time( 'mysql' ),
+			) );
+			$order->add_order_note( sprintf( 'G2A booking #%d NOT marked paid: order total %s does not match booking expected total %s — needs review.', $booking_id, number_format( $amount, 2 ), number_format( (float) $booking->total_amount, 2 ) ) );
+			return;
+		}
+
 		$wpdb->update(
 			$bk,
-			array( 'status' => 'paid', 'amount' => (float) $order->get_total(), 'updated_at' => current_time( 'mysql' ) ),
+			array( 'status' => 'paid', 'paid_amount' => $amount, 'updated_at' => current_time( 'mysql' ) ),
 			array( 'id' => $booking_id ),
 			array( '%s', '%f', '%s' ), array( '%d' )
 		);
@@ -53,7 +72,7 @@ class G2AB_Woo_Sync {
 				'booking_id'   => $booking_id,
 				'gateway'      => 'woocommerce',
 				'transaction_id' => 'wc_' . $order_id,
-				'amount'       => (float) $order->get_total(),
+				'amount'       => $amount,
 				'currency'     => $order->get_currency(),
 				'status'       => 'paid',
 				'created_at'   => current_time( 'mysql' ),

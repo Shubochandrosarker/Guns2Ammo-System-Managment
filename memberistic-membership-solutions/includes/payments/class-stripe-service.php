@@ -173,6 +173,24 @@ final class Stripe_Service {
 			wp_die( esc_html__( 'Stripe checkout is not enabled yet.', 'memberistic' ) );
 		}
 
+		// Throttle the public checkout endpoint per IP. The signup nonce is
+		// rendered on a public page (identical for all logged-out visitors),
+		// so without this a script could seed pending memberships and fire
+		// 'membership_created' mail to arbitrary addresses. 8 attempts / 10 min.
+		$mem_ip  = isset( $_SERVER['HTTP_CF_CONNECTING_IP'] ) && filter_var( wp_unslash( $_SERVER['HTTP_CF_CONNECTING_IP'] ), FILTER_VALIDATE_IP )
+			? sanitize_text_field( wp_unslash( $_SERVER['HTTP_CF_CONNECTING_IP'] ) )
+			: ( isset( $_SERVER['REMOTE_ADDR'] ) ? sanitize_text_field( wp_unslash( $_SERVER['REMOTE_ADDR'] ) ) : '0.0.0.0' );
+		$mem_rl_key = 'memberistic_checkout_rl_' . md5( $mem_ip );
+		$mem_hits   = (int) get_transient( $mem_rl_key );
+		if ( $mem_hits >= (int) apply_filters( 'memberistic_checkout_rate_limit', 8 ) ) {
+			wp_die(
+				esc_html__( 'Too many checkout attempts. Please wait a few minutes and try again.', 'memberistic' ),
+				esc_html__( 'Slow down', 'memberistic' ),
+				array( 'response' => 429 )
+			);
+		}
+		set_transient( $mem_rl_key, $mem_hits + 1, 10 * MINUTE_IN_SECONDS );
+
 		$plan_id       = isset( $_POST['plan_id'] ) ? absint( $_POST['plan_id'] ) : 0;
 		$billing_cycle = isset( $_POST['billing_cycle'] ) ? sanitize_key( wp_unslash( $_POST['billing_cycle'] ) ) : 'monthly';
 		$full_name     = isset( $_POST['full_name'] ) ? sanitize_text_field( wp_unslash( $_POST['full_name'] ) ) : '';
@@ -396,13 +414,20 @@ final class Stripe_Service {
 		$success_url = memberistic_get_page_url( 'thank_you_page_id', 'memberistic-thank-you', home_url( '/' ) );
 		$cancel_url  = memberistic_get_page_url( 'failed_payment_page_id', 'memberistic-payment-failed', home_url( '/' ) );
 
+		// Guard against a corrupted/unsupported admin currency setting that would
+		// make Stripe reject the whole checkout session.
+		$currency = strtolower( (string) memberistic_get_setting( 'currency', 'USD' ) );
+		if ( ! in_array( $currency, array( 'usd', 'eur', 'gbp', 'cad', 'aud' ), true ) ) {
+			$currency = 'usd';
+		}
+
 		$payload = array(
 			'mode'                                      => 'subscription',
 			'customer_email'                            => $email,
 			'success_url'                               => add_query_arg( array( 'memberistic_checkout' => 'success', 'membership_id' => $membership_id ), $success_url ),
 			'cancel_url'                                => add_query_arg( array( 'memberistic_checkout' => 'cancelled', 'membership_id' => $membership_id ), $cancel_url ),
 			'line_items[0][quantity]'                   => 1,
-			'line_items[0][price_data][currency]'       => strtolower( memberistic_get_setting( 'currency', 'USD' ) ),
+			'line_items[0][price_data][currency]'       => $currency,
 			'line_items[0][price_data][unit_amount]'    => (int) round( $amount * 100 ),
 			'line_items[0][price_data][recurring][interval]' => $interval,
 			'line_items[0][price_data][product_data][name]'  => $plan['name'] . ' Membership',

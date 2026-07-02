@@ -1,22 +1,37 @@
 <?php
 /**
- * [g2a_upcoming_events] — list of upcoming bookable events/classes.
+ * [g2a_upcoming_events] — clean, premium event listing (Amelia-style).
  *
- * Self-registers shortcode + tactical styles. Pure SVG/CSS, no JS deps.
- * Reads from booking_types where category='class' AND active, joins with
- * existing bookings to compute spots remaining.
+ * Two layouts:
+ *   layout="list"  a tidy vertical list — date badge · name + status · price · button
+ *                  (one row per upcoming date), with an optional search box.
+ *   layout="card"  premium event cards (one per event, showing the next date).
+ *
+ * Scope it to a page:
+ *   category="ccw-class"   only CCW classes
+ *   category="ladies"      only Ladies night events
+ *   event="az-ccw-classroom"  a single event's upcoming dates
+ *   (no scope)             every upcoming event
+ *
+ * Self-registers; assets emitted in wp_footer so the_content can't mangle them.
  *
  * @package G2AB
+ * @since   1.0.0 (rebuilt 1.9.9)
  */
-if ( ! defined( 'ABSPATH' ) ) exit;
+
+if ( ! defined( 'ABSPATH' ) ) {
+	exit;
+}
 
 final class G2AB_Frontend_Shortcode_Events {
 
 	private static $instance = null;
-	private $printed = false;
+	private static $css_done = false;
 
 	public static function instance() {
-		if ( null === self::$instance ) self::$instance = new self();
+		if ( null === self::$instance ) {
+			self::$instance = new self();
+		}
 		return self::$instance;
 	}
 
@@ -25,191 +40,347 @@ final class G2AB_Frontend_Shortcode_Events {
 	}
 
 	public function render( $atts = array() ) {
+		if ( ! class_exists( 'G2AB_Events' ) ) {
+			return '';
+		}
 		$atts = shortcode_atts( array(
-			'limit'             => 6,
-			'type'              => '',          // booking type slug
-			'category'          => '',          // 'class', 'lane', 'membership'
-			'layout'            => 'grid',      // 'grid' or 'list'
-			'show_book_button'  => 'yes',
-			'days_ahead'        => 60,
-			'members_only'      => '',          // 'yes' / 'no' / ''
-			'theme'             => 'dark',
+			'layout'           => 'list',     // 'list' | 'card'
+			'category'         => '',
+			'event'            => '',          // single event id or slug
+			'limit'            => 12,
+			'theme'            => 'dark',      // 'dark' | 'light'
+			'members_only'     => '',
+			'show_book_button' => 'yes',
+			'heading'          => '',
+			'search'           => '',          // 'yes' to show a search box (list only)
 		), $atts, 'g2a_upcoming_events' );
 
-		global $wpdb;
-		$btt = $wpdb->prefix . 'g2ab_booking_types';
-		$bt  = $wpdb->prefix . 'g2ab_bookings';
-		$rt  = $wpdb->prefix . 'g2ab_resources';
-
-		$where = " WHERE t.is_active = 1 ";
-		$args  = array();
-
-		if ( $atts['type'] ) {
-			$where .= " AND t.slug = %s ";
-			$args[] = sanitize_title( $atts['type'] );
-		} elseif ( $atts['category'] ) {
-			$where .= " AND t.category = %s ";
-			$args[] = sanitize_key( $atts['category'] );
+		// Resolve the candidate events.
+		if ( '' !== $atts['event'] ) {
+			$ev = G2AB_Events::get_event( is_numeric( $atts['event'] ) ? (int) $atts['event'] : sanitize_title( $atts['event'] ) );
+			$events = ( $ev && 'publish' === $ev->status ) ? array( $ev ) : array();
 		} else {
-			// Default: classes (the typical "events" use case).
-			$where .= " AND t.category IN ('class','membership') ";
-		}
-
-		if ( 'yes' === $atts['members_only'] ) $where .= " AND t.members_only = 1 ";
-		if ( 'no'  === $atts['members_only'] ) $where .= " AND t.members_only = 0 ";
-
-		$sql = "SELECT t.* FROM {$btt} t {$where} ORDER BY t.id ASC LIMIT %d";
-		$args[] = max( 1, (int) $atts['limit'] );
-		$types  = $wpdb->get_results( $wpdb->prepare( $sql, $args ) );
-
-		if ( empty( $types ) ) {
-			return $this->render_empty( __( 'No upcoming events.', 'g2a-booking' ) );
-		}
-
-		// For each type, compute next available slot + seat counts.
-		$now = current_time( 'mysql' );
-		$end = wp_date( 'Y-m-d 23:59:59', strtotime( '+' . max( 1, (int) $atts['days_ahead'] ) . ' days' ) );
-
-		$events = array();
-		foreach ( $types as $t ) {
-			$settings = json_decode( (string) ( $t->settings ?? '' ), true );
-			$settings = is_array( $settings ) ? $settings : array();
-			// Count active bookings for this type in window (gives a "spots taken" feel).
-			$booked = (int) $wpdb->get_var( $wpdb->prepare(
-				"SELECT COUNT(*) FROM {$bt} WHERE booking_type_id = %d AND start_at BETWEEN %s AND %s AND status IN ('pending','reserved','confirmed','paid')",
-				$t->id, $now, $end
+			$events = G2AB_Events::get_events( array(
+				'status'   => 'publish',
+				'category' => $atts['category'] ? sanitize_key( $atts['category'] ) : '',
+				'limit'    => 200,
 			) );
-
-			// Pick first instructor or classroom resource by default (assumes one resource per class type).
-			// No placeholders here — {$rt} is an internal table name — so prepare() is not used.
-			$resource_id = (int) $wpdb->get_var(
-				"SELECT id FROM {$rt} WHERE is_active = 1 AND type IN ('classroom','instructor') ORDER BY sort_order ASC LIMIT 1"
-			);
-
-			$capacity   = ! empty( $settings['event_total_seats'] )
-				? max( 1, (int) $settings['event_total_seats'] )
-				: ( $resource_id ? (int) $wpdb->get_var( $wpdb->prepare( "SELECT capacity FROM {$rt} WHERE id = %d", $resource_id ) ) : 1 );
-			$spots_left = max( 0, $capacity - $booked );
-			$pct_full   = $capacity > 0 ? min( 100, (int) round( ( $booked / $capacity ) * 100 ) ) : 0;
-
-			$events[] = array(
-				'type'        => $t,
-				'capacity'    => $capacity,
-				'booked'      => $booked,
-				'spots_left'  => $spots_left,
-				'pct_full'    => $pct_full,
-				'resource_id' => $resource_id,
-				'instructor'  => sanitize_text_field( (string) ( $settings['event_instructor'] ?? '' ) ),
-				'time_start'  => sanitize_text_field( (string) ( $settings['event_start_time'] ?? '' ) ),
-				'time_end'    => sanitize_text_field( (string) ( $settings['event_end_time'] ?? '' ) ),
-			);
 		}
 
+		$layout = ( 'card' === $atts['layout'] ) ? 'card' : 'list';
+		$theme  = ( 'light' === $atts['theme'] ) ? 'light' : 'dark';
+		$limit  = max( 1, (int) $atts['limit'] );
+
+		if ( 'card' === $layout ) {
+			$rows = $this->collect_cards( $events, $atts, $limit );
+		} else {
+			$rows = $this->collect_occurrences( $events, $atts, $limit );
+		}
+
+		if ( empty( $rows ) ) {
+			$this->enqueue_css();
+			return '<div class="g2ab-evt g2ab-evt--' . esc_attr( $theme ) . ' g2ab-evt--empty"><p>' . esc_html__( 'No upcoming events right now — check back soon.', 'g2a-booking' ) . '</p></div>';
+		}
+
+		$this->enqueue_css();
 		ob_start();
-		$this->print_styles();
-		?>
-		<div class="g2ab-evt g2ab-evt--<?php echo esc_attr( $atts['layout'] ); ?> g2ab-evt--theme-<?php echo esc_attr( $atts['theme'] ); ?>">
-			<?php foreach ( $events as $e ) : $t = $e['type']; ?>
-				<article class="g2ab-evt__card g2ab-evt__card--<?php echo esc_attr( $t->category ); ?>">
-					<div class="g2ab-evt__camo"></div>
-					<header class="g2ab-evt__head">
-						<div class="g2ab-evt__tag"><?php echo esc_html( strtoupper( $t->category ) ); ?></div>
-						<?php if ( (int) $t->members_only ) : ?>
-							<div class="g2ab-evt__members">★ MEMBERS ONLY</div>
-						<?php endif; ?>
-					</header>
-					<h3 class="g2ab-evt__name"><?php echo esc_html( $t->name ); ?></h3>
-					<div class="g2ab-evt__meta">
-						<span class="g2ab-evt__meta-item"><span class="g2ab-evt__meta-icon">⏱</span> <?php echo (int) $t->duration_min; ?> min</span>
-						<?php if ( ! empty( $e['time_start'] ) && ! empty( $e['time_end'] ) ) : ?>
-							<span class="g2ab-evt__meta-item"><span class="g2ab-evt__meta-icon">🕘</span> <?php echo esc_html( $e['time_start'] . ' - ' . $e['time_end'] ); ?></span>
-						<?php endif; ?>
-						<?php if ( ! empty( $e['instructor'] ) ) : ?>
-							<span class="g2ab-evt__meta-item"><span class="g2ab-evt__meta-icon">🎯</span> <?php echo esc_html( $e['instructor'] ); ?></span>
-						<?php endif; ?>
-						<?php if ( (int) $t->requires_waiver ) : ?>
-							<span class="g2ab-evt__meta-item"><span class="g2ab-evt__meta-icon">⚠</span> WAIVER</span>
-						<?php endif; ?>
-					</div>
-					<div class="g2ab-evt__price">
-						<span class="g2ab-evt__price-amt">$<?php echo esc_html( number_format( (float) $t->base_price, 2 ) ); ?></span>
-						<?php if ( (float) $t->member_discount > 0 ) : ?>
-							<span class="g2ab-evt__price-disc">MEMBERS -<?php echo esc_html( number_format( (float) $t->member_discount, 0 ) ); ?>%</span>
-						<?php endif; ?>
-					</div>
-					<div class="g2ab-evt__seats">
-						<div class="g2ab-evt__seats-row">
-							<span class="g2ab-evt__seats-label"><?php echo (int) $e['booked']; ?> of <?php echo (int) $e['capacity']; ?> LOCKED</span>
-							<span class="g2ab-evt__seats-left"><?php echo (int) $e['spots_left']; ?> SPOTS</span>
-						</div>
-						<div class="g2ab-evt__seats-bar">
-							<div class="g2ab-evt__seats-fill" style="width:<?php echo (int) $e['pct_full']; ?>%;"></div>
-						</div>
-					</div>
-					<?php if ( 'yes' === $atts['show_book_button'] ) : ?>
-						<a class="g2ab-evt__cta" href="<?php echo esc_url( $this->book_url( $t ) ); ?>">
-							<span><?php esc_html_e( 'RECRUIT NOW', 'g2a-booking' ); ?></span>
-							<span class="g2ab-evt__cta-arrow">→</span>
-						</a>
-					<?php endif; ?>
-				</article>
-			<?php endforeach; ?>
-		</div>
-		<?php
+		if ( 'card' === $layout ) {
+			$this->render_cards( $rows, $atts, $theme );
+		} else {
+			$this->render_list( $rows, $atts, $theme );
+		}
 		return ob_get_clean();
 	}
 
-	private function book_url( $type ) {
-		// Default to /book-now/?type={slug}, fallback to homepage with hash.
-		$book_page = get_option( 'g2ab_booking_page_url', '' );
-		if ( $book_page ) {
-			return add_query_arg( 'type', $type->slug, $book_page );
+	/* ───────────────────────── data ───────────────────────── */
+
+	/** One row per upcoming occurrence, across all matching events, soonest first. */
+	private function collect_occurrences( $events, $atts, $limit ) {
+		$is_member = $this->viewer_is_member();
+		$rows = array();
+		foreach ( $events as $ev ) {
+			if ( ! $this->passes_members_filter( $ev, $atts ) ) {
+				continue;
+			}
+			$occs = G2AB_Events::get_occurrences( $ev->id, array( 'upcoming_only' => true, 'limit' => 60 ) );
+			foreach ( $occs as $o ) {
+				$price = G2AB_Events::price_for( $ev, $o, $is_member );
+				$free  = ( (int) $ev->is_free === 1 || (float) $price <= 0 );
+				$rows[] = array(
+					'ev'      => $ev,
+					'ts'      => G2AB_Events::timestamp( $o->start_at ),
+					'start'   => $o->start_at,
+					'left'    => (int) $o->seats_left,
+					'total'   => (int) $o->seats_total,
+					'soldout' => (int) $o->seats_left <= 0,
+					'free'    => $free,
+					'price'   => $free ? 0.0 : (float) $price,
+				);
+			}
 		}
-		return home_url( '/?g2ab_book=' . $type->slug );
+		usort( $rows, static function ( $a, $b ) { return $a['ts'] <=> $b['ts']; } );
+		return array_slice( $rows, 0, $limit );
 	}
 
-	private function render_empty( $msg ) {
-		$this->print_styles();
-		return '<div class="g2ab-evt g2ab-evt--empty"><p>' . esc_html( $msg ) . '</p></div>';
+	/** One card per event (its next upcoming occurrence). */
+	private function collect_cards( $events, $atts, $limit ) {
+		$is_member = $this->viewer_is_member();
+		$rows = array();
+		foreach ( $events as $ev ) {
+			if ( ! $this->passes_members_filter( $ev, $atts ) ) {
+				continue;
+			}
+			$next = G2AB_Events::next_occurrence( $ev->id );
+			if ( ! $next ) {
+				continue;
+			}
+			$price = G2AB_Events::price_for( $ev, $next, $is_member );
+			$free  = ( (int) $ev->is_free === 1 || (float) $price <= 0 );
+			$rows[] = array(
+				'ev'      => $ev,
+				'ts'      => G2AB_Events::timestamp( $next->start_at ),
+				'start'   => $next->start_at,
+				'left'    => (int) $next->seats_left,
+				'total'   => (int) $next->seats_total,
+				'soldout' => (int) $next->seats_left <= 0,
+				'free'    => $free,
+				'price'   => $free ? 0.0 : (float) $price,
+				'dates'   => count( G2AB_Events::get_occurrences( $ev->id, array( 'upcoming_only' => true, 'with_seats' => false, 'limit' => 60 ) ) ),
+			);
+			if ( count( $rows ) >= $limit ) {
+				break;
+			}
+		}
+		usort( $rows, static function ( $a, $b ) { return $a['ts'] <=> $b['ts']; } );
+		return $rows;
 	}
 
-	private function print_styles() {
-		if ( $this->printed ) return;
-		$this->printed = true;
+	private function viewer_is_member() {
+		$uid = get_current_user_id();
+		$base = $uid ? ( function_exists( 'memberistic_user_has_active_membership' ) ? (bool) memberistic_user_has_active_membership( $uid ) : current_user_can( 'manage_g2ab_bookings' ) ) : false;
+		return (bool) apply_filters( 'g2ab_user_is_member', $base, $uid, (object) array( 'members_only' => 1 ), '' );
+	}
+
+	private function passes_members_filter( $ev, $atts ) {
+		if ( 'yes' === $atts['members_only'] && (int) $ev->members_only !== 1 ) {
+			return false;
+		}
+		if ( 'no' === $atts['members_only'] && (int) $ev->members_only === 1 ) {
+			return false;
+		}
+		return true;
+	}
+
+	private function book_url( $event ) {
+		return home_url( '/event/' . $event->slug . '/' );
+	}
+
+	/* ───────────────────────── list layout ───────────────────────── */
+
+	private function render_list( $rows, $atts, $theme ) {
+		$show_search = ( 'yes' === $atts['search'] || count( $rows ) >= 6 );
+		?>
+		<div class="g2ab-evl g2ab-evl--<?php echo esc_attr( $theme ); ?>" data-g2ab-evl>
+			<div class="g2ab-evl__head">
+				<div class="g2ab-evl__count"><strong><?php echo (int) count( $rows ); ?></strong> <?php echo esc_html( _n( 'event available', 'events available', count( $rows ), 'g2a-booking' ) ); ?></div>
+				<?php if ( $atts['heading'] ) : ?><h2 class="g2ab-evl__heading"><?php echo esc_html( $atts['heading'] ); ?></h2><?php endif; ?>
+				<?php if ( $show_search ) : ?>
+					<div class="g2ab-evl__search"><span class="g2ab-evl__search-i">⌕</span><input type="search" data-evl-search placeholder="<?php esc_attr_e( 'Search events…', 'g2a-booking' ); ?>" /></div>
+				<?php endif; ?>
+			</div>
+			<div class="g2ab-evl__rows">
+				<?php foreach ( $rows as $r ) : $ev = $r['ev']; $accent = $ev->color ?: '#D2691E'; ?>
+					<a class="g2ab-evl__row<?php echo $r['soldout'] ? ' is-out' : ''; ?>" href="<?php echo esc_url( $this->book_url( $ev ) ); ?>" style="--accent:<?php echo esc_attr( $accent ); ?>;" data-evl-name="<?php echo esc_attr( strtolower( $ev->title . ' ' . G2AB_Events::category_label( $ev->category ) ) ); ?>">
+						<div class="g2ab-evl__date">
+							<span class="g2ab-evl__d"><?php echo esc_html( G2AB_Events::format_local( $r['start'], 'd' ) ); ?></span>
+							<span class="g2ab-evl__mo"><?php echo esc_html( strtoupper( G2AB_Events::format_local( $r['start'], 'M' ) ) ); ?></span>
+							<span class="g2ab-evl__ti"><?php echo esc_html( G2AB_Events::format_local( $r['start'], 'g:i A' ) ); ?></span>
+						</div>
+						<div class="g2ab-evl__main">
+							<span class="g2ab-evl__tag"><?php echo esc_html( strtoupper( G2AB_Events::category_label( $ev->category ) ) ); ?></span>
+							<span class="g2ab-evl__name"><?php echo esc_html( $ev->title ); ?></span>
+							<span class="g2ab-evl__sub">
+								<?php if ( $r['soldout'] ) : ?>
+									<span class="g2ab-evl__status is-out"><?php esc_html_e( 'Sold out', 'g2a-booking' ); ?></span>
+								<?php else : ?>
+									<span class="g2ab-evl__status is-open"><?php esc_html_e( 'Open', 'g2a-booking' ); ?></span>
+									<span class="g2ab-evl__slots"><?php echo (int) $r['left']; ?> <?php esc_html_e( 'seats left', 'g2a-booking' ); ?></span>
+								<?php endif; ?>
+								<?php if ( $ev->location ) : ?><span class="g2ab-evl__loc">· <?php echo esc_html( $ev->location ); ?></span><?php endif; ?>
+								<?php if ( (int) $ev->requires_waiver ) : ?><span class="g2ab-evl__loc">· <?php esc_html_e( 'waiver', 'g2a-booking' ); ?></span><?php endif; ?>
+							</span>
+						</div>
+						<div class="g2ab-evl__right">
+							<span class="g2ab-evl__price"><?php echo $r['free'] ? esc_html__( 'FREE', 'g2a-booking' ) : '$' . esc_html( number_format( $r['price'], 2 ) ); ?></span>
+							<?php if ( 'yes' === $atts['show_book_button'] ) : ?>
+								<span class="g2ab-evl__btn"><?php echo $r['soldout'] ? esc_html__( 'Details', 'g2a-booking' ) : esc_html__( 'Reserve', 'g2a-booking' ); ?> →</span>
+							<?php endif; ?>
+						</div>
+					</a>
+				<?php endforeach; ?>
+				<div class="g2ab-evl__noresults" data-evl-none hidden><?php esc_html_e( 'No events match your search.', 'g2a-booking' ); ?></div>
+			</div>
+		</div>
+		<?php
+		$this->enqueue_search_js();
+	}
+
+	/* ───────────────────────── card layout ───────────────────────── */
+
+	private function render_cards( $rows, $atts, $theme ) {
+		?>
+		<div class="g2ab-evc g2ab-evc--<?php echo esc_attr( $theme ); ?>">
+			<?php if ( $atts['heading'] ) : ?><h2 class="g2ab-evc__heading"><?php echo esc_html( $atts['heading'] ); ?></h2><?php endif; ?>
+			<div class="g2ab-evc__grid">
+				<?php foreach ( $rows as $r ) : $ev = $r['ev']; $accent = $ev->color ?: '#D2691E'; $pct = $r['total'] > 0 ? min( 100, (int) round( ( ( $r['total'] - $r['left'] ) / $r['total'] ) * 100 ) ) : 0; ?>
+					<article class="g2ab-evc__card<?php echo $r['soldout'] ? ' is-out' : ''; ?>" style="--accent:<?php echo esc_attr( $accent ); ?>;">
+						<div class="g2ab-evc__top">
+							<span class="g2ab-evc__tag"><?php echo esc_html( strtoupper( G2AB_Events::category_label( $ev->category ) ) ); ?></span>
+							<?php if ( (int) $ev->members_only ) : ?><span class="g2ab-evc__members">★ <?php esc_html_e( 'MEMBERS', 'g2a-booking' ); ?></span><?php endif; ?>
+						</div>
+						<h3 class="g2ab-evc__name"><?php echo esc_html( $ev->title ); ?></h3>
+						<?php if ( $ev->summary ) : ?><p class="g2ab-evc__sum"><?php echo esc_html( $ev->summary ); ?></p><?php endif; ?>
+						<div class="g2ab-evc__when">
+							<span class="g2ab-evc__when-d"><?php echo esc_html( G2AB_Events::format_local( $r['start'], 'D, M j' ) ); ?></span>
+							<span class="g2ab-evc__when-t"><?php echo esc_html( G2AB_Events::format_local( $r['start'], 'g:i A' ) ); ?></span>
+							<?php if ( (int) $r['dates'] > 1 ) : ?><span class="g2ab-evc__more">+<?php echo (int) $r['dates'] - 1; ?> <?php esc_html_e( 'more dates', 'g2a-booking' ); ?></span><?php endif; ?>
+						</div>
+						<div class="g2ab-evc__meta">
+							<span>⏱ <?php echo (int) $ev->duration_min; ?> <?php esc_html_e( 'min', 'g2a-booking' ); ?></span>
+							<?php if ( $ev->location ) : ?><span>⌖ <?php echo esc_html( $ev->location ); ?></span><?php endif; ?>
+							<?php if ( (int) $ev->requires_waiver ) : ?><span>⚠ <?php esc_html_e( 'Waiver', 'g2a-booking' ); ?></span><?php endif; ?>
+						</div>
+						<div class="g2ab-evc__seats">
+							<div class="g2ab-evc__seats-row">
+								<span><?php echo $r['soldout'] ? esc_html__( 'Sold out', 'g2a-booking' ) : ( (int) $r['left'] . ' ' . esc_html__( 'of', 'g2a-booking' ) . ' ' . (int) $r['total'] . ' ' . esc_html__( 'open', 'g2a-booking' ) ); ?></span>
+								<span class="g2ab-evc__price"><?php echo $r['free'] ? esc_html__( 'FREE', 'g2a-booking' ) : '$' . esc_html( number_format( $r['price'], 2 ) ); ?></span>
+							</div>
+							<div class="g2ab-evc__bar"><div class="g2ab-evc__fill" style="width:<?php echo (int) $pct; ?>%;"></div></div>
+						</div>
+						<?php if ( 'yes' === $atts['show_book_button'] ) : ?>
+							<a class="g2ab-evc__cta" href="<?php echo esc_url( $this->book_url( $ev ) ); ?>"><?php echo $r['soldout'] ? esc_html__( 'View details', 'g2a-booking' ) : esc_html__( 'Reserve a seat', 'g2a-booking' ); ?> <span class="g2ab-evc__arrow">→</span></a>
+						<?php endif; ?>
+					</article>
+				<?php endforeach; ?>
+			</div>
+		</div>
+		<?php
+	}
+
+	/* ───────────────────────── assets ───────────────────────── */
+
+	private function enqueue_css() {
+		if ( self::$css_done ) {
+			return;
+		}
+		self::$css_done = true;
+		$hook = is_admin() ? 'admin_footer' : 'wp_footer';
+		add_action( $hook, array( __CLASS__, 'print_css' ) );
+		if ( did_action( $hook ) ) {
+			self::print_css();
+		}
+	}
+
+	private function enqueue_search_js() {
+		static $done = false;
+		if ( $done ) {
+			return;
+		}
+		$done = true;
+		$hook = is_admin() ? 'admin_footer' : 'wp_footer';
+		add_action( $hook, array( __CLASS__, 'print_search_js' ) );
+		if ( did_action( $hook ) ) {
+			self::print_search_js();
+		}
+	}
+
+	public static function print_search_js() {
+		?>
+		<script>
+		(function(){
+			document.querySelectorAll('[data-g2ab-evl]').forEach(function(root){
+				if (root.dataset.evlBooted) return; root.dataset.evlBooted='1';
+				var s = root.querySelector('[data-evl-search]'); if (!s) return;
+				var rows = Array.prototype.slice.call(root.querySelectorAll('.g2ab-evl__row'));
+				var none = root.querySelector('[data-evl-none]');
+				s.addEventListener('input', function(){
+					var q = s.value.trim().toLowerCase(), shown = 0;
+					rows.forEach(function(r){ var hit = !q || (r.getAttribute('data-evl-name')||'').indexOf(q) !== -1; r.style.display = hit ? '' : 'none'; if (hit) shown++; });
+					if (none) none.hidden = shown !== 0;
+				});
+			});
+		})();
+		</script>
+		<?php
+	}
+
+	public static function print_css() {
 		?>
 		<style id="g2ab-evt-styles">
-		.g2ab-evt{font-family:'Inter',system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;display:grid;gap:18px;margin:24px 0;}
-		.g2ab-evt--grid{grid-template-columns:repeat(auto-fill,minmax(280px,1fr));}
-		.g2ab-evt--list{grid-template-columns:1fr;max-width:780px;}
-		.g2ab-evt--list .g2ab-evt__card{display:grid;grid-template-columns:auto 1fr auto;gap:20px;align-items:center;padding:20px 24px;}
-		.g2ab-evt--list .g2ab-evt__card>*{position:relative;}
-		.g2ab-evt--list .g2ab-evt__name{margin:0;}
-		.g2ab-evt--list .g2ab-evt__seats{min-width:160px;}
-		.g2ab-evt__card{position:relative;background:#0F1115;color:#E8E8E8;border:1px solid #2A323D;border-top:4px solid #D2691E;padding:24px 22px;overflow:hidden;transition:transform .15s ease,box-shadow .15s ease;}
-		.g2ab-evt__card--lane{border-top-color:#D2691E;}
-		.g2ab-evt__card--class{border-top-color:#4A5D3A;}
-		.g2ab-evt__card--membership{border-top-color:#F9A825;}
-		.g2ab-evt__card:hover{transform:translateY(-3px);box-shadow:0 12px 28px rgba(0,0,0,.5);}
-		.g2ab-evt__camo{position:absolute;inset:0;pointer-events:none;opacity:.06;background-image:repeating-linear-gradient(45deg,transparent 0,transparent 8px,#4A5D3A 8px,#4A5D3A 12px),repeating-linear-gradient(-45deg,transparent 0,transparent 12px,#D2691E 12px,#D2691E 14px);}
-		.g2ab-evt__head{position:relative;display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;}
-		.g2ab-evt__tag{display:inline-block;background:#D2691E;color:#fff;padding:3px 10px;font-size:9px;letter-spacing:.12em;font-weight:700;border-radius:2px;font-family:'Rajdhani','Oswald',Impact,sans-serif;}
-		.g2ab-evt__members{font-size:9px;letter-spacing:.1em;color:#F9A825;font-weight:700;}
-		.g2ab-evt__name{position:relative;margin:0 0 10px;font-size:20px;line-height:1.2;font-weight:700;color:#fff;font-family:'Rajdhani','Oswald',Impact,sans-serif;letter-spacing:.04em;text-transform:uppercase;}
-		.g2ab-evt__meta{position:relative;display:flex;gap:14px;flex-wrap:wrap;font-size:11px;color:#8A95A5;letter-spacing:.06em;margin-bottom:14px;}
-		.g2ab-evt__meta-item{display:inline-flex;align-items:center;gap:4px;}
-		.g2ab-evt__meta-icon{color:#D2691E;}
-		.g2ab-evt__price{position:relative;display:flex;align-items:baseline;gap:10px;margin-bottom:14px;}
-		.g2ab-evt__price-amt{font-family:'Rajdhani','Oswald',Impact,sans-serif;font-size:32px;font-weight:700;color:#D2691E;line-height:1;}
-		.g2ab-evt__price-disc{font-size:10px;letter-spacing:.08em;color:#F9A825;font-weight:700;background:rgba(249,168,37,.12);padding:3px 7px;}
-		.g2ab-evt__seats{position:relative;margin-bottom:16px;}
-		.g2ab-evt__seats-row{display:flex;justify-content:space-between;font-size:10px;letter-spacing:.08em;color:#8A95A5;font-weight:700;margin-bottom:6px;}
-		.g2ab-evt__seats-left{color:#4CAF50;}
-		.g2ab-evt__seats-bar{height:6px;background:#1A1F26;overflow:hidden;border-radius:1px;}
-		.g2ab-evt__seats-fill{height:100%;background:linear-gradient(90deg,#4A5D3A 0,#D2691E 70%,#C62828 100%);transition:width .4s ease;}
-		.g2ab-evt__cta{position:relative;display:flex;justify-content:space-between;align-items:center;background:#D2691E;color:#fff !important;padding:14px 18px;text-decoration:none;font-family:'Rajdhani','Oswald',Impact,sans-serif;font-size:14px;letter-spacing:.12em;font-weight:700;text-transform:uppercase;border-radius:2px;transition:all .15s ease;}
-		.g2ab-evt__cta:hover{background:#0F1115;color:#D2691E !important;box-shadow:0 0 0 2px #D2691E inset;}
-		.g2ab-evt__cta-arrow{font-size:18px;}
-		.g2ab-evt--empty{padding:30px;background:#1A1F26;color:#8A95A5;text-align:center;border-left:3px solid #D2691E;}
+		.g2ab-evl,.g2ab-evc{--bg:#0F1115;--surface:#15191F;--surface2:#1C232C;--border:#2A323D;--text:#EDEFF2;--muted:#9AA4B2;--orange:#D2691E;--green:#36C26B;--red:#E5484D;font-family:'Inter',system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;margin:26px 0;}
+		.g2ab-evl--light,.g2ab-evc--light{--bg:#FFFFFF;--surface:#FFFFFF;--surface2:#F4F6FA;--border:#E5E9F0;--text:#1C2533;--muted:#6B7686;}
+		.g2ab-evl *,.g2ab-evc *{box-sizing:border-box;}
+		/* ── list ── */
+		.g2ab-evl__head{display:flex;flex-wrap:wrap;align-items:center;gap:12px 18px;margin-bottom:16px;}
+		/* Header sits on the page (not a card) — inherit the page's text colour so
+		   it stays readable on light OR dark pages regardless of the list theme. */
+		.g2ab-evl__count{font-size:14px;color:inherit;opacity:.7;}
+		.g2ab-evl__count strong{color:var(--orange);opacity:1;font-family:'Inter','Segoe UI',system-ui,-apple-system,sans-serif;font-size:18px;}
+		.g2ab-evl__heading{margin:0;font-family:'Inter','Segoe UI',system-ui,-apple-system,sans-serif;font-size:20px;letter-spacing:.03em;text-transform:uppercase;color:inherit;}
+		.g2ab-evl__search{position:relative;margin-left:auto;}
+		.g2ab-evl__search-i{position:absolute;left:12px;top:50%;transform:translateY(-50%);color:var(--muted);font-size:16px;}
+		.g2ab-evl__search input{background:var(--surface);border:1px solid var(--border);border-radius:10px;color:var(--text);padding:10px 14px 10px 34px;font-size:14px;min-width:240px;}
+		.g2ab-evl__search input:focus{outline:none;border-color:var(--orange);}
+		.g2ab-evl__rows{display:flex;flex-direction:column;gap:10px;}
+		.g2ab-evl__row{display:grid;grid-template-columns:84px 1fr auto;gap:18px;align-items:center;background:var(--surface);border:1px solid var(--border);border-left:4px solid var(--accent,#D2691E);border-radius:12px;padding:16px 20px;text-decoration:none;transition:transform .14s ease,box-shadow .14s ease,border-color .14s ease;animation:g2ab-evl-in .35s ease both;}
+		.g2ab-evl__row:hover{transform:translateX(3px);box-shadow:0 10px 26px rgba(0,0,0,.22);}
+		.g2ab-evl__row.is-out{opacity:.62;}
+		@keyframes g2ab-evl-in{from{opacity:0;transform:translateY(8px);}to{opacity:1;transform:translateY(0);}}
+		.g2ab-evl__date{text-align:center;border-right:1px solid var(--border);padding-right:14px;}
+		.g2ab-evl__d{display:block;font-family:'Inter','Segoe UI',system-ui,-apple-system,sans-serif;font-size:30px;font-weight:700;color:var(--text);line-height:.95;}
+		.g2ab-evl__mo{display:block;font-size:11px;font-weight:700;letter-spacing:.12em;color:var(--accent,#D2691E);}
+		.g2ab-evl__ti{display:block;font-size:11px;color:var(--muted);margin-top:3px;}
+		.g2ab-evl__main{min-width:0;}
+		.g2ab-evl__tag{display:inline-block;font-size:9px;font-weight:700;letter-spacing:.12em;color:var(--accent,#D2691E);margin-bottom:3px;}
+		.g2ab-evl__name{display:block;font-family:'Inter','Segoe UI',system-ui,-apple-system,sans-serif;font-size:20px;font-weight:700;color:var(--text);letter-spacing:.01em;text-transform:uppercase;line-height:1.1;}
+		.g2ab-evl__sub{display:flex;flex-wrap:wrap;align-items:center;gap:7px;font-size:13px;color:var(--muted);margin-top:4px;}
+		.g2ab-evl__status{font-weight:700;}
+		.g2ab-evl__status.is-open{color:var(--green);}
+		.g2ab-evl__status.is-out{color:var(--red);}
+		.g2ab-evl__slots{color:var(--muted);}
+		.g2ab-evl__right{display:flex;flex-direction:column;align-items:flex-end;gap:8px;}
+		.g2ab-evl__price{font-family:'Inter','Segoe UI',system-ui,-apple-system,sans-serif;font-size:24px;font-weight:700;color:var(--accent,#D2691E);line-height:1;}
+		.g2ab-evl__btn{display:inline-block;background:var(--accent,#D2691E);color:#fff;font-size:12px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;padding:8px 16px;border-radius:8px;white-space:nowrap;transition:filter .14s ease;}
+		.g2ab-evl__row:hover .g2ab-evl__btn{filter:brightness(1.1);}
+		.g2ab-evl__noresults{color:var(--muted);text-align:center;padding:24px;}
+		@media (max-width:620px){.g2ab-evl__row{grid-template-columns:64px 1fr;}.g2ab-evl__right{grid-column:1/-1;flex-direction:row;justify-content:space-between;align-items:center;border-top:1px solid var(--border);padding-top:10px;}.g2ab-evl__search input{min-width:0;width:100%;}.g2ab-evl__search{width:100%;margin-left:0;}}
+		/* ── cards ── */
+		.g2ab-evc__heading{font-family:'Inter','Segoe UI',system-ui,-apple-system,sans-serif;font-size:22px;letter-spacing:.03em;text-transform:uppercase;color:inherit;margin:0 0 16px;}
+		.g2ab-evc__grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:18px;}
+		.g2ab-evc__card{display:flex;flex-direction:column;gap:9px;background:var(--surface);border:1px solid var(--border);border-top:4px solid var(--accent,#D2691E);border-radius:14px;padding:20px;transition:transform .14s ease,box-shadow .14s ease;animation:g2ab-evl-in .35s ease both;}
+		.g2ab-evc__card:hover{transform:translateY(-4px);box-shadow:0 16px 36px rgba(0,0,0,.22);}
+		.g2ab-evc__card.is-out{opacity:.66;}
+		.g2ab-evc__top{display:flex;justify-content:space-between;align-items:center;}
+		.g2ab-evc__tag{display:inline-block;background:var(--accent,#D2691E);color:#fff;font-size:9px;font-weight:700;letter-spacing:.1em;padding:4px 9px;border-radius:3px;}
+		.g2ab-evc__members{font-size:9px;letter-spacing:.08em;color:#F2B33D;font-weight:700;}
+		.g2ab-evc__name{margin:2px 0 0;font-family:'Inter','Segoe UI',system-ui,-apple-system,sans-serif;font-size:21px;font-weight:700;color:var(--text);text-transform:uppercase;letter-spacing:.01em;line-height:1.12;}
+		.g2ab-evc__sum{margin:0;color:var(--muted);font-size:13px;line-height:1.45;}
+		.g2ab-evc__when{display:flex;flex-wrap:wrap;align-items:baseline;gap:10px;padding:8px 0;border-top:1px solid var(--border);border-bottom:1px solid var(--border);}
+		.g2ab-evc__when-d{font-family:'Inter','Segoe UI',system-ui,-apple-system,sans-serif;font-size:17px;font-weight:700;color:var(--text);}
+		.g2ab-evc__when-t{font-size:13px;color:var(--muted);}
+		.g2ab-evc__more{margin-left:auto;font-size:11px;color:var(--accent,#D2691E);font-weight:700;}
+		.g2ab-evc__meta{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:12px;color:var(--muted);}
+		.g2ab-evc__seats{margin-top:2px;}
+		.g2ab-evc__seats-row{display:flex;justify-content:space-between;align-items:baseline;font-size:12px;color:var(--muted);font-weight:600;margin-bottom:6px;}
+		.g2ab-evc__price{font-family:'Inter','Segoe UI',system-ui,-apple-system,sans-serif;font-size:22px;font-weight:700;color:var(--accent,#D2691E);}
+		.g2ab-evc__bar{height:6px;background:var(--surface2);border-radius:999px;overflow:hidden;}
+		.g2ab-evc__fill{height:100%;background:linear-gradient(90deg,var(--green),var(--accent,#D2691E));transition:width .6s ease;}
+		.g2ab-evc__cta{display:flex;justify-content:center;align-items:center;gap:10px;margin-top:auto;background:var(--accent,#D2691E);color:#fff !important;text-decoration:none;font-family:'Inter','Segoe UI',system-ui,-apple-system,sans-serif;font-size:14px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;padding:13px;border-radius:9px;border:2px solid var(--accent,#D2691E);transition:all .15s ease;}
+		.g2ab-evc__cta:hover{background:transparent;color:var(--accent,#D2691E) !important;}
+		.g2ab-evc__arrow{transition:transform .15s ease;}
+		.g2ab-evc__cta:hover .g2ab-evc__arrow{transform:translateX(4px);}
+		.g2ab-evl--empty,.g2ab-evc--empty,.g2ab-evt--empty{padding:30px;background:var(--surface,#15191F);border:1px dashed var(--border,#2A323D);border-radius:12px;color:var(--muted,#9AA4B2);text-align:center;}
+		.g2ab-evt--light.g2ab-evt--empty{--surface:#fff;--border:#E5E9F0;--muted:#6B7686;}
 		</style>
 		<?php
 	}

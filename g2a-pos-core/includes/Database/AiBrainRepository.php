@@ -181,21 +181,78 @@ final class AiBrainRepository extends Repository {
 		return array_slice( $scored, 0, max( 1, min( 50, $limit ) ) );
 	}
 
-	/** Plain-text BM25-ish substring retrieval — fallback when no embedding model is loaded. */
+	/**
+	 * Keyword retrieval — the fallback used whenever no embedding endpoint is
+	 * configured. Tokenizes the query and ranks chunks by how many distinct
+	 * terms they contain, so a natural-language question ("what are your range
+	 * hours?") matches relevant chunks instead of requiring the whole phrase to
+	 * appear verbatim.
+	 */
 	public function search_text( string $query, int $limit = 5 ): array {
 		global $wpdb;
-		$like = '%' . $wpdb->esc_like( $query ) . '%';
-		return $wpdb->get_results(
-			$wpdb->prepare(
-				"SELECT c.id, c.document_id, c.text_content,
-                    d.source_type, d.source_label, d.source_uri
-             FROM {$this->table('g2a_ai_brain_chunks')} c
-             JOIN {$this->table('g2a_ai_brain_documents')} d ON d.id = c.document_id
-             WHERE c.text_content LIKE %s ORDER BY c.id DESC LIMIT %d",
-				$like,
-				max( 1, min( 50, $limit ) )
-			),
-			ARRAY_A
-		) ?: array();
+		$limit  = max( 1, min( 50, $limit ) );
+		$chunks = $this->table( 'g2a_ai_brain_chunks' );
+		$docs   = $this->table( 'g2a_ai_brain_documents' );
+		$tokens = self::tokenize( $query );
+
+		if ( ! $tokens ) {
+			$like = '%' . $wpdb->esc_like( trim( $query ) ) . '%';
+			return $wpdb->get_results(
+				$wpdb->prepare(
+					"SELECT c.id, c.document_id, c.text_content, d.source_type, d.source_label, d.source_uri
+                     FROM {$chunks} c JOIN {$docs} d ON d.id = c.document_id
+                     WHERE c.text_content LIKE %s ORDER BY c.id DESC LIMIT %d",
+					$like,
+					$limit
+				),
+				ARRAY_A
+			) ?: array();
+		}
+
+		// Rank by number of distinct query terms present in each chunk.
+		$score_parts = array();
+		$where_parts = array();
+		$score_args  = array();
+		$where_args  = array();
+		foreach ( $tokens as $t ) {
+			$like          = '%' . $wpdb->esc_like( $t ) . '%';
+			$score_parts[] = '(CASE WHEN c.text_content LIKE %s THEN 1 ELSE 0 END)';
+			$score_args[]  = $like;
+			$where_parts[] = 'c.text_content LIKE %s';
+			$where_args[]  = $like;
+		}
+		$score = implode( ' + ', $score_parts );
+		$where = implode( ' OR ', $where_parts );
+		$sql   = "SELECT c.id, c.document_id, c.text_content, d.source_type, d.source_label, d.source_uri,
+                         ({$score}) AS match_score
+                  FROM {$chunks} c JOIN {$docs} d ON d.id = c.document_id
+                  WHERE {$where}
+                  ORDER BY match_score DESC, c.id DESC
+                  LIMIT %d";
+		$args  = array_merge( $score_args, $where_args, array( $limit ) );
+		return $wpdb->get_results( $wpdb->prepare( $sql, $args ), ARRAY_A ) ?: array();
+	}
+
+	/**
+	 * Split a query into lowercase keyword tokens (drops short words and common
+	 * stopwords), capped so the generated SQL stays small.
+	 *
+	 * @return array<int,string>
+	 */
+	private static function tokenize( string $query ): array {
+		$stop  = array(
+			'the','and','for','are','you','your','our','with','what','when','where','which','who','how',
+			'does','did','can','could','will','would','from','that','this','have','has','had','was','were',
+			'about','into','out','get','got','any','all','please','tell','show','give','need','want','there',
+			'here','they','them','its','his','her','but','not','than','then','too','use','using','able',
+		);
+		$words = preg_split( '/[^a-z0-9]+/', strtolower( $query ) ) ?: array();
+		$out   = array();
+		foreach ( $words as $w ) {
+			if ( strlen( $w ) >= 3 && ! in_array( $w, $stop, true ) ) {
+				$out[ $w ] = true;
+			}
+		}
+		return array_slice( array_keys( $out ), 0, 8 );
 	}
 }

@@ -36,6 +36,7 @@ final class Plugin {
 			'includes/class-capabilities.php',
 			'includes/class-roles.php',
 			'includes/class-content-restrictions.php',
+			'includes/class-account-provisioner.php',
 			'includes/class-scheduler.php',
 			'includes/class-router.php',
 			'includes/class-installer.php',
@@ -67,6 +68,7 @@ final class Plugin {
 			'includes/admin/class-plans-page.php',
 			'includes/admin/class-settings-page.php',
 			'includes/admin/class-import-page.php',
+			'includes/frontend/class-auth.php',
 			'includes/frontend/class-shortcodes.php',
 			'includes/frontend/class-staff-dashboard.php',
 			'includes/rest/class-rest-controller.php',
@@ -122,6 +124,8 @@ final class Plugin {
 		add_action( 'admin_enqueue_scripts', array( $this, 'enqueue_admin_assets' ) );
 		add_action( 'wp_enqueue_scripts', array( $this, 'enqueue_frontend_assets' ) );
 		add_action( 'init', array( Frontend\Shortcodes::class, 'register' ) );
+		Frontend\Auth::register();
+		Account_Provisioner::register();
 		add_action( 'init', array( Frontend\Staff_Dashboard::class, 'register' ) );
 		add_action( 'init', array( Frontend\Staff_Dashboard::class, 'handle_actions' ) );
 		add_action( 'init', array( Content_Restrictions::class, 'register' ) );

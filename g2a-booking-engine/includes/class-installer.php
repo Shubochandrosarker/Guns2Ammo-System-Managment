@@ -24,6 +24,8 @@ final class G2AB_Installer {
 		'migration_runs'     => 17,
 		'booking_activity'   => 8,
 		'checkins'           => 8,
+		'events'             => 23,
+		'event_occurrences'  => 10,
 	);
 
 	private $last_result = array();
@@ -157,129 +159,38 @@ final class G2AB_Installer {
 		$this->migrate_to_1_3_0( $current );
 		$this->migrate_to_1_4_0( $current );
 		$this->migrate_to_1_5_0( $current );
-		$this->migrate_to_1_6_0( $current );
-		$this->migrate_to_1_6_1( $current );
+		$this->migrate_to_1_5_1( $current );
 		do_action( 'g2ab_run_migrations', $current, G2AB_DB_VERSION );
 	}
 
 	/**
-	 * v1.6.1 — partial-unique on (resource_id, start_at) for active bookings.
+	 * v1.5.1 — per-event member discount.
 	 *
-	 * Adds a generated VIRTUAL column `slot_key` that is non-NULL only when
-	 * status is active ('pending','reserved','confirmed','paid','checked_in').
-	 * A UNIQUE KEY on that column treats NULLs as distinct (MySQL behavior),
-	 * so cancelled/expired/no_show rows never collide, but two simultaneous
-	 * active bookings at the same (resource, start_at) now fail at the
-	 * database layer — belt-and-suspenders against the FOR UPDATE lock
-	 * degrading on non-InnoDB engines.
-	 *
-	 * Capacity > 1 resources (CCW class blocks) are modeled as a single
-	 * row with party_size = N at the same slot, so this rule does NOT
-	 * conflict with multi-seat resources.
-	 *
-	 * SELF-HEALING: keyed on column existence, NOT the version option.
-	 * Earlier installs may have had `g2ab_db_version` bumped past 1.6.1
-	 * by an unrelated dev/staging deploy, which would otherwise skip
-	 * this migration entirely.
-	 *
-	 * Skipped silently if the MySQL version is too old for generated
-	 * columns (< 5.7) — the FOR UPDATE path stays as the only defense.
+	 * dbDelta adds the `member_discount` column on g2ab_events. Existing
+	 * events default to 0% (no member discount) until staff set one.
 	 */
-	private function migrate_to_1_6_1( $current ) {
-		global $wpdb;
-		$bookings = $wpdb->prefix . 'g2ab_bookings';
-
-		// Column-existence is the source of truth, not the version option.
-		$cols = (array) $wpdb->get_col( "SHOW COLUMNS FROM {$bookings}" );
-		if ( in_array( 'slot_key', $cols, true ) ) {
+	private function migrate_to_1_5_1( $current ) {
+		if ( version_compare( $current, '1.5.1', '>=' ) ) {
 			return;
 		}
-
-		// Require MySQL 5.7+ for generated columns.
-		$version = (string) $wpdb->get_var( 'SELECT VERSION()' );
-		if ( '' === $version || version_compare( preg_replace( '/[^0-9.].*$/', '', $version ), '5.7.0', '<' ) ) {
-			return;
-		}
-
-		// Defensive collapse: keep the most recently created active row per slot
-		// before we add the unique constraint, otherwise the ALTER fails.
-		$wpdb->query( "DELETE b1 FROM {$bookings} b1
-			INNER JOIN {$bookings} b2
-			ON b1.resource_id = b2.resource_id
-			AND b1.start_at = b2.start_at
-			AND b1.id < b2.id
-			WHERE b1.status IN ('pending','reserved','confirmed','paid','checked_in')
-			AND b2.status IN ('pending','reserved','confirmed','paid','checked_in')" );
-
-		$wpdb->query( "ALTER TABLE {$bookings}
-			ADD COLUMN slot_key VARCHAR(80) GENERATED ALWAYS AS (
-				CASE WHEN status IN ('pending','reserved','confirmed','paid','checked_in')
-					THEN CONCAT(resource_id, '|', DATE_FORMAT(start_at, '%Y-%m-%d %H:%i:%s'))
-				ELSE NULL END
-			) VIRTUAL,
-			ADD UNIQUE KEY uniq_active_slot (slot_key)" );
+		// no-op (column added by dbDelta)
 	}
 
 	/**
-	 * v1.6.0 — compound index on g2ab_logs (event_type, booking_id)
-	 * + log-retention pruner.
+	 * v1.5.0 — events system.
 	 *
-	 * The reminder cron + activity-log views both filter logs by
-	 * (event_type='reminder_24h_sent' AND booking_id IN (…)) — a
-	 * compound index on those two columns turns it from a full
-	 * scan into a covering lookup. dbDelta will add the new key
-	 * on the next install_tables() pass.
-	 *
-	 * Also seeds a one-time prune of any logs older than 365 days
-	 * on upgrade so existing installs immediately benefit.
-	 */
-	private function migrate_to_1_6_0( $current ) {
-		if ( version_compare( $current, '1.6.0', '>=' ) ) {
-			return;
-		}
-		global $wpdb;
-		$logs = $wpdb->prefix . 'g2ab_logs';
-		// One-time historical prune.
-		$wpdb->query( $wpdb->prepare(
-			"DELETE FROM {$logs} WHERE created_at < %s",
-			gmdate( 'Y-m-d H:i:s', time() - 365 * DAY_IN_SECONDS )
-		) );
-	}
-
-	/**
-	 * v1.5.0 — payment-row de-duplication.
-	 *
-	 * Adds UNIQUE KEY (gateway, transaction_id) to g2ab_payments so two
-	 * concurrent webhook deliveries (Stripe/Fortis/Authnet/PayPal retries,
-	 * or simultaneous payment_intent + checkout.session events) can't
-	 * insert duplicate rows. dbDelta will have added the key on fresh
-	 * installs; on upgrades we first collapse any existing duplicates so
-	 * the index can be added. Strategy: keep the most recent row per
-	 * (gateway, transaction_id) and delete the rest.
-	 *
-	 * Rows where transaction_id IS NULL (pay-in-store, manual payments)
-	 * are exempt from the dedupe because they have no provider id; the
-	 * UNIQUE KEY treats multiple NULLs as distinct on MySQL.
+	 * dbDelta creates `g2ab_events` + `g2ab_event_occurrences` and adds the
+	 * `event_id` / `event_occurrence_id` columns to bookings. Nothing to
+	 * backfill — existing lane bookings simply leave those columns NULL. The
+	 * internal "event-seat" booking type that event bookings reference is
+	 * provisioned lazily by the events REST controller on first use, so no
+	 * seeding is required here.
 	 */
 	private function migrate_to_1_5_0( $current ) {
 		if ( version_compare( $current, '1.5.0', '>=' ) ) {
 			return;
 		}
-		global $wpdb;
-		$payments = $wpdb->prefix . 'g2ab_payments';
-
-		// Collapse duplicates: keep the row with the largest id (most
-		// recently inserted) per (gateway, transaction_id) and delete
-		// the rest. Excludes rows where transaction_id is NULL or empty
-		// (in-store payments don't have a provider transaction id).
-		$wpdb->query( "DELETE p1 FROM {$payments} p1
-			INNER JOIN {$payments} p2
-			ON p1.gateway = p2.gateway
-			AND p1.transaction_id = p2.transaction_id
-			AND p1.id < p2.id
-			WHERE p1.transaction_id IS NOT NULL
-			AND p1.transaction_id <> ''" );
-		// dbDelta will add the new UNIQUE KEY on the next install_tables() pass.
+		// no-op (tables + columns added by dbDelta)
 	}
 
 	/**
@@ -386,6 +297,8 @@ cancelled_by_user_id BIGINT UNSIGNED DEFAULT NULL,
 rescheduled_at DATETIME DEFAULT NULL,
 original_start_at DATETIME DEFAULT NULL,
 checked_in_at DATETIME DEFAULT NULL,
+event_id BIGINT UNSIGNED DEFAULT NULL,
+event_occurrence_id BIGINT UNSIGNED DEFAULT NULL,
 PRIMARY KEY  (id),
 UNIQUE KEY uuid (uuid),
 KEY idx_status (status),
@@ -395,8 +308,10 @@ KEY idx_email (customer_email),
 KEY idx_start (start_at),
 KEY idx_type (booking_type_id),
 KEY idx_gateway_intent (gateway_intent_id),
-KEY idx_extref (external_ref)
-) ENGINE=InnoDB {$collate};";
+KEY idx_extref (external_ref),
+KEY idx_event (event_id),
+KEY idx_event_occurrence (event_occurrence_id)
+) {$collate};";
 
 		$schemas['checkins'] = "CREATE TABLE {$prefix}g2ab_checkins (
 id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
@@ -410,7 +325,7 @@ created_at DATETIME NOT NULL,
 PRIMARY KEY  (id),
 UNIQUE KEY uniq_booking (booking_id),
 KEY idx_checked_in_at (checked_in_at)
-) ENGINE=InnoDB {$collate};";
+) {$collate};";
 
 		$schemas['booking_activity'] = "CREATE TABLE {$prefix}g2ab_booking_activity (
 id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
@@ -425,7 +340,7 @@ PRIMARY KEY  (id),
 KEY idx_booking (booking_id),
 KEY idx_action (action),
 KEY idx_created (created_at)
-) ENGINE=InnoDB {$collate};";
+) {$collate};";
 
 		$schemas['resources'] = "CREATE TABLE {$prefix}g2ab_resources (
 id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
@@ -444,7 +359,7 @@ PRIMARY KEY  (id),
 UNIQUE KEY slug (slug),
 KEY idx_type_active (type, is_active),
 KEY idx_extref (external_ref)
-) ENGINE=InnoDB {$collate};";
+) {$collate};";
 
 		$schemas['booking_types'] = "CREATE TABLE {$prefix}g2ab_booking_types (
 id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
@@ -471,7 +386,7 @@ PRIMARY KEY  (id),
 UNIQUE KEY slug (slug),
 KEY idx_category_active (category, is_active),
 KEY idx_extref (external_ref)
-) ENGINE=InnoDB {$collate};";
+) {$collate};";
 
 		$schemas['forms'] = "CREATE TABLE {$prefix}g2ab_forms (
 id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
@@ -485,7 +400,7 @@ created_at DATETIME NOT NULL,
 updated_at DATETIME NOT NULL,
 PRIMARY KEY  (id),
 UNIQUE KEY slug (slug)
-) ENGINE=InnoDB {$collate};";
+) {$collate};";
 
 		$schemas['form_fields'] = "CREATE TABLE {$prefix}g2ab_form_fields (
 id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
@@ -503,7 +418,7 @@ is_required TINYINT(1) NOT NULL DEFAULT 0,
 PRIMARY KEY  (id),
 UNIQUE KEY uniq_form_key (form_id, field_key),
 KEY idx_form (form_id, sort_order)
-) ENGINE=InnoDB {$collate};";
+) {$collate};";
 
 		$schemas['availability_rules'] = "CREATE TABLE {$prefix}g2ab_availability_rules (
 id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
@@ -522,13 +437,13 @@ created_at DATETIME NOT NULL,
 PRIMARY KEY  (id),
 KEY idx_lookup (resource_id, rule_type, is_active),
 KEY idx_date_range (start_date, end_date)
-) ENGINE=InnoDB {$collate};";
+) {$collate};";
 
 		$schemas['payments'] = "CREATE TABLE {$prefix}g2ab_payments (
 id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
 booking_id BIGINT UNSIGNED NOT NULL,
 gateway VARCHAR(50) NOT NULL DEFAULT 'pay_in_store',
-transaction_id VARCHAR(191) DEFAULT NULL,
+transaction_id VARCHAR(255) DEFAULT NULL,
 amount DECIMAL(10,2) NOT NULL DEFAULT 0.00,
 currency CHAR(3) NOT NULL DEFAULT 'USD',
 status VARCHAR(20) NOT NULL DEFAULT 'pending',
@@ -540,11 +455,11 @@ external_ref VARCHAR(64) DEFAULT NULL,
 processed_at DATETIME DEFAULT NULL,
 created_at DATETIME NOT NULL,
 PRIMARY KEY  (id),
-UNIQUE KEY uniq_gateway_tx (gateway, transaction_id),
 KEY idx_booking (booking_id),
+KEY idx_transaction (transaction_id),
 KEY idx_status (status),
 KEY idx_extref (external_ref)
-) ENGINE=InnoDB {$collate};";
+) {$collate};";
 
 		$schemas['logs'] = "CREATE TABLE {$prefix}g2ab_logs (
 id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
@@ -560,9 +475,8 @@ created_at DATETIME NOT NULL,
 PRIMARY KEY  (id),
 KEY idx_booking (booking_id),
 KEY idx_event (event_type),
-KEY idx_created (created_at),
-KEY idx_event_booking (event_type, booking_id)
-) ENGINE=InnoDB {$collate};";
+KEY idx_created (created_at)
+) {$collate};";
 
 		$schemas['migration_runs'] = "CREATE TABLE {$prefix}g2ab_migration_runs (
 id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
@@ -586,7 +500,54 @@ PRIMARY KEY  (id),
 KEY idx_status (status),
 KEY idx_adapter (adapter),
 KEY idx_started (started_at)
-) ENGINE=InnoDB {$collate};";
+) {$collate};";
+
+		$schemas['events'] = "CREATE TABLE {$prefix}g2ab_events (
+id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+title VARCHAR(190) NOT NULL,
+slug VARCHAR(190) NOT NULL,
+category VARCHAR(50) NOT NULL DEFAULT 'event',
+summary VARCHAR(255) DEFAULT NULL,
+description LONGTEXT,
+price DECIMAL(10,2) NOT NULL DEFAULT 0.00,
+member_price DECIMAL(10,2) DEFAULT NULL,
+member_discount DECIMAL(5,2) NOT NULL DEFAULT 0.00,
+is_free TINYINT(1) NOT NULL DEFAULT 0,
+capacity SMALLINT UNSIGNED NOT NULL DEFAULT 20,
+duration_min SMALLINT UNSIGNED NOT NULL DEFAULT 120,
+requires_waiver TINYINT(1) NOT NULL DEFAULT 1,
+members_only TINYINT(1) NOT NULL DEFAULT 0,
+form_id BIGINT UNSIGNED DEFAULT NULL,
+image_url VARCHAR(255) DEFAULT NULL,
+location VARCHAR(190) DEFAULT NULL,
+color VARCHAR(20) DEFAULT NULL,
+status VARCHAR(20) NOT NULL DEFAULT 'publish',
+sort_order INT NOT NULL DEFAULT 0,
+settings LONGTEXT,
+created_at DATETIME NOT NULL,
+updated_at DATETIME NOT NULL,
+PRIMARY KEY  (id),
+UNIQUE KEY slug (slug),
+KEY idx_status (status),
+KEY idx_category (category)
+) {$collate};";
+
+		$schemas['event_occurrences'] = "CREATE TABLE {$prefix}g2ab_event_occurrences (
+id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+event_id BIGINT UNSIGNED NOT NULL,
+start_at DATETIME NOT NULL,
+end_at DATETIME NOT NULL,
+capacity SMALLINT UNSIGNED NOT NULL DEFAULT 0,
+price DECIMAL(10,2) DEFAULT NULL,
+status VARCHAR(20) NOT NULL DEFAULT 'scheduled',
+note VARCHAR(255) DEFAULT NULL,
+created_at DATETIME NOT NULL,
+updated_at DATETIME NOT NULL,
+PRIMARY KEY  (id),
+KEY idx_event (event_id),
+KEY idx_start (start_at),
+KEY idx_status (status)
+) {$collate};";
 
 		return apply_filters( 'g2ab_install_schemas', $schemas );
 	}

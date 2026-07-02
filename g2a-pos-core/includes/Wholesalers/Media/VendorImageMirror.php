@@ -26,6 +26,13 @@ final class VendorImageMirror {
 			);
 		}
 
+		if ( ! self::urlIsSafe( $cdnUrl ) ) {
+			return array(
+				'ok'    => false,
+				'error' => 'unsafe_url',
+			);
+		}
+
 		$existing = self::findExistingAttachment( $cdnUrl );
 		if ( $existing ) {
 			return array(
@@ -118,6 +125,28 @@ final class VendorImageMirror {
 			)
 		);
 		return $id ? (int) $id : null;
+	}
+
+	/**
+	 * SSRF guard: only http(s) URLs whose host resolves to a public unicast
+	 * IP may be fetched. Private, loopback, link-local and reserved ranges
+	 * are rejected.
+	 */
+	private static function urlIsSafe( string $url ): bool {
+		$scheme = strtolower( (string) parse_url( $url, PHP_URL_SCHEME ) );
+		if ( ! in_array( $scheme, array( 'http', 'https' ), true ) ) {
+			return false;
+		}
+		$host = (string) parse_url( $url, PHP_URL_HOST );
+		if ( $host === '' ) {
+			return false;
+		}
+		$host = trim( $host, '[]' ); // IPv6 literal.
+		$ip   = filter_var( $host, FILTER_VALIDATE_IP ) ? $host : gethostbyname( $host );
+		if ( ! filter_var( $ip, FILTER_VALIDATE_IP ) ) {
+			return false; // Unresolvable host.
+		}
+		return filter_var( $ip, FILTER_VALIDATE_IP, FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE ) !== false;
 	}
 
 	private static function filenameFromUrl( string $url ): string {

@@ -89,10 +89,7 @@ final class G2AB_Frontdesk_View {
 		wp_enqueue_style( 'g2ab-frontdesk' );
 		wp_add_inline_style( 'g2ab-frontdesk', self::css() );
 
-		// Use the boolean `false` src (not ''), otherwise WordPress drops the
-		// wp_add_inline_script() payload and the front-desk terminal renders an
-		// empty, non-functional shell. Matches the wp_register_style() call above.
-		wp_register_script( 'g2ab-frontdesk', false, array(), G2AB_VERSION, true );
+		wp_register_script( 'g2ab-frontdesk', '', array(), G2AB_VERSION, true );
 		wp_enqueue_script( 'g2ab-frontdesk' );
 		wp_add_inline_script( 'g2ab-frontdesk', self::js() );
 	}
@@ -176,7 +173,11 @@ final class G2AB_Frontdesk_View {
 			function showMsg(text, type) {
 				msgEl.textContent = text;
 				msgEl.className = 'g2ab-fd__msg is-' + (type || 'success');
-				setTimeout(function () { msgEl.className = 'g2ab-fd__msg'; }, 4000);
+				// Auto-dismiss success toasts, but keep errors on screen so a failed
+				// roster load shows its reason instead of leaving a blank page.
+				if (type !== 'error') {
+					setTimeout(function () { msgEl.className = 'g2ab-fd__msg'; }, 4000);
+				}
 			}
 
 			function fmtMoney(n) { return '$' + Number(n || 0).toFixed(2); }
@@ -361,8 +362,8 @@ final class G2AB_Frontdesk_View {
 				searchEl.addEventListener('input', debounceLoad);
 
 				load();
-				// Auto-refresh today\'s roster every 60s when search box is empty.
-				setInterval(function () { if (mode === \'today\') load(); }, 60000);
+				// Auto-refresh today's roster every 60s when search box is empty.
+				setInterval(function () { if (mode === 'today') load(); }, 60000);
 			}
 
 			if (document.readyState === 'loading') {

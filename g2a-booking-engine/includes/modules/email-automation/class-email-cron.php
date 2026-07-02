@@ -29,52 +29,6 @@ class G2AB_Email_Cron {
 
 		// Clean up on module deactivate.
 		add_action( 'g2ab_module_deactivated_email_automation', array( $this, 'unschedule' ) );
-
-		// Lazy one-shot index check. The reminder subqueries in tick() filter on
-		// (event_type, booking_id); without a composite index every cron run
-		// becomes a full scan of g2ab_logs and degrades linearly as logs grow.
-		// Only run during admin or cron contexts so normal frontend page loads
-		// don't pay the get_option/ALTER cost.
-		if ( wp_doing_cron() || is_admin() ) {
-			$this->maybe_add_logs_index();
-		}
-	}
-
-	/**
-	 * Idempotent: adds the composite index on g2ab_logs(event_type, booking_id)
-	 * for existing installs whose schema predates it. Newly installed sites
-	 * already have the index via the dbDelta CREATE TABLE.
-	 *
-	 * Uses an option flag so we don't re-issue the ALTER on every cron tick.
-	 * The ALTER itself is wrapped in a try/catch — MySQL errors `Duplicate key`
-	 * if the index already exists, and we want to record the option in that
-	 * case too.
-	 */
-	private function maybe_add_logs_index() {
-		if ( get_option( 'g2ab_logs_idx_v1' ) ) {
-			return;
-		}
-		global $wpdb;
-		$logs = $wpdb->prefix . 'g2ab_logs';
-		try {
-			// Check first — avoids a noisy error log on the duplicate path.
-			$existing = $wpdb->get_results( $wpdb->prepare(
-				"SHOW INDEX FROM {$logs} WHERE Key_name = %s", // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
-				'idx_event_booking'
-			) );
-			if ( empty( $existing ) ) {
-				// Suppress wpdb errors for the duration of this single ALTER —
-				// we re-raise via the catch and don't want WP to noisy-log it.
-				$prev = $wpdb->suppress_errors( true );
-				$wpdb->query( "ALTER TABLE {$logs} ADD INDEX idx_event_booking (event_type, booking_id)" ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
-				$wpdb->suppress_errors( $prev );
-			}
-			update_option( 'g2ab_logs_idx_v1', current_time( 'mysql' ), false );
-		} catch ( \Throwable $e ) {
-			// Don't crash the cron tick — log + set the option so we don't loop.
-			error_log( '[G2AB] logs index add failed: ' . $e->getMessage() );
-			update_option( 'g2ab_logs_idx_v1', 'error:' . substr( $e->getMessage(), 0, 100 ), false );
-		}
 	}
 
 	public function unschedule() {
@@ -93,42 +47,42 @@ class G2AB_Email_Cron {
 		// Only care about confirmed/paid bookings — reservations not yet paid don't get reminders.
 		$active_statuses = "'reserved','confirmed','paid'";
 
-		// start_at rows are stored as site-local mysql datetimes (via
-		// current_time('mysql')), so the comparison windows MUST also be
-		// site-local. gmdate() renders UTC, so on a non-UTC site (Mesa AZ
-		// is UTC-7 year round) windows were off by the UTC offset and
-		// reminders mis-fired. Use current_time() arithmetic instead.
-		$now_ts = (int) current_time( 'timestamp' );
-
 		// 24h window: start_at between (now+23h) and (now+25h)
-		$start_24 = wp_date( 'Y-m-d H:i:s', $now_ts + ( 23 * HOUR_IN_SECONDS ) );
-		$end_24   = wp_date( 'Y-m-d H:i:s', $now_ts + ( 25 * HOUR_IN_SECONDS ) );
+		$now = current_time( 'mysql' );
+		$start_24 = gmdate( 'Y-m-d H:i:s', strtotime( $now ) + ( 23 * HOUR_IN_SECONDS ) );
+		$end_24   = gmdate( 'Y-m-d H:i:s', strtotime( $now ) + ( 25 * HOUR_IN_SECONDS ) );
 
 		$rows_24 = $wpdb->get_results( $wpdb->prepare(
-			"SELECT * FROM {$bk} WHERE start_at BETWEEN %s AND %s AND status IN ({$active_statuses}) AND id NOT IN ( SELECT booking_id FROM {$lg} WHERE booking_id IS NOT NULL AND event_type = %s ) ORDER BY start_at ASC LIMIT 50",
+			"SELECT * FROM {$bk} WHERE start_at BETWEEN %s AND %s AND status IN ({$active_statuses}) AND id NOT IN ( SELECT booking_id FROM {$lg} WHERE booking_id IS NOT NULL AND event_type = %s ) ORDER BY start_at ASC LIMIT 200",
 			$start_24, $end_24, self::LOG_24H
 		) ); // phpcs:ignore
 
 		if ( $rows_24 ) {
 			foreach ( $rows_24 as $b ) {
-				$this->engine->send_event( 'booking_reminder_24h', $b );
-				$this->log( $b->id, self::LOG_24H );
+				$res = $this->engine->send_event( 'booking_reminder_24h', $b );
+				// Only mark as sent when at least one recipient send succeeded,
+				// so a failed send is retried on the next tick.
+				if ( is_array( $res ) && in_array( true, $res, true ) ) {
+					$this->log( $b->id, self::LOG_24H );
+				}
 			}
 		}
 
 		// 2h window: start_at between (now+1h45m) and (now+2h15m)
-		$start_2 = wp_date( 'Y-m-d H:i:s', $now_ts + ( 105 * MINUTE_IN_SECONDS ) );
-		$end_2   = wp_date( 'Y-m-d H:i:s', $now_ts + ( 135 * MINUTE_IN_SECONDS ) );
+		$start_2 = gmdate( 'Y-m-d H:i:s', strtotime( $now ) + ( 105 * MINUTE_IN_SECONDS ) );
+		$end_2   = gmdate( 'Y-m-d H:i:s', strtotime( $now ) + ( 135 * MINUTE_IN_SECONDS ) );
 
 		$rows_2 = $wpdb->get_results( $wpdb->prepare(
-			"SELECT * FROM {$bk} WHERE start_at BETWEEN %s AND %s AND status IN ({$active_statuses}) AND id NOT IN ( SELECT booking_id FROM {$lg} WHERE booking_id IS NOT NULL AND event_type = %s ) ORDER BY start_at ASC LIMIT 50",
+			"SELECT * FROM {$bk} WHERE start_at BETWEEN %s AND %s AND status IN ({$active_statuses}) AND id NOT IN ( SELECT booking_id FROM {$lg} WHERE booking_id IS NOT NULL AND event_type = %s ) ORDER BY start_at ASC LIMIT 200",
 			$start_2, $end_2, self::LOG_2H
 		) ); // phpcs:ignore
 
 		if ( $rows_2 ) {
 			foreach ( $rows_2 as $b ) {
-				$this->engine->send_event( 'booking_reminder_2h', $b );
-				$this->log( $b->id, self::LOG_2H );
+				$res = $this->engine->send_event( 'booking_reminder_2h', $b );
+				if ( is_array( $res ) && in_array( true, $res, true ) ) {
+					$this->log( $b->id, self::LOG_2H );
+				}
 			}
 		}
 	}

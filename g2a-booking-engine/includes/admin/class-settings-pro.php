@@ -44,6 +44,22 @@ final class G2AB_Admin_Settings_Pro {
 		return array_merge( $tabs, $module_tabs, $tail );
 	}
 
+	/**
+	 * Options rendered as masked password fields. Stored values are never echoed
+	 * back into the page; submitting the field empty keeps the saved value.
+	 */
+	const SECRET_OPTIONS = array(
+		'g2ab_stripe_secret_key',
+		'g2ab_stripe_webhook_secret',
+		'g2ab_paypal_secret',
+		'g2ab_fortis_user_api_key',
+		'g2ab_fortis_hmac_secret',
+		'g2ab_fortis_webhook_secret',
+		'g2ab_authnet_transaction_key',
+		'g2ab_authnet_signature_key',
+		'g2ab_twilio_token',
+	);
+
 	const GATEWAYS = array(
 		'stripe'         => array( 'label' => 'Stripe',              'color' => '#635BFF', 'logo' => 'S' ),
 		'paypal'         => array( 'label' => 'PayPal',              'color' => '#003087', 'logo' => 'P' ),
@@ -252,6 +268,16 @@ final class G2AB_Admin_Settings_Pro {
 		return '';
 	}
 
+	/**
+	 * Echo value/placeholder attributes for a masked secret input. The stored
+	 * secret is never rendered — an empty submit keeps it (see handle_save()).
+	 */
+	private function secret_input_attrs( $option, $empty_placeholder = '' ) {
+		$has_saved = '' !== (string) get_option( $option, '' );
+		$ph = $has_saved ? __( 'saved — enter new value to replace', 'g2a-booking' ) : $empty_placeholder;
+		echo 'value=""' . ( $ph ? ' placeholder="' . esc_attr( $ph ) . '"' : '' );
+	}
+
 	private function gateway_is_configured( $key ) {
 		switch ( $key ) {
 			case 'stripe':       return get_option( 'g2ab_stripe_publishable_key' ) && get_option( 'g2ab_stripe_secret_key' );
@@ -264,45 +290,15 @@ final class G2AB_Admin_Settings_Pro {
 		return false;
 	}
 
-	/**
-	 * Render a per-gateway "Some keys are locked by wp-config.php
-	 * constants" notice listing every locked option key from the
-	 * passed list. Renders nothing if none are locked.
-	 */
-	private function render_constant_lock_notice( array $option_keys ) {
-		$map    = self::secret_option_constants();
-		$locked = array();
-		foreach ( $option_keys as $opt ) {
-			if ( self::option_is_constant_locked( $opt ) ) {
-				$locked[ $opt ] = $map[ $opt ];
-			}
-		}
-		if ( empty( $locked ) ) {
-			return;
-		}
-		?>
-		<div class="g2ab-set__notice g2ab-set__notice--warn" style="margin:8px 0 14px;padding:10px 14px;border-left:4px solid #c9a84c;background:rgba(201,168,76,.08);color:#5a4a14;font-size:13px;">
-			<strong><?php esc_html_e( 'Some credentials are locked by wp-config.php constants.', 'g2a-booking' ); ?></strong>
-			<?php esc_html_e( 'The constant value always wins on read; any value you save below for these fields will be ignored.', 'g2a-booking' ); ?>
-			<ul style="margin:6px 0 0 18px;">
-				<?php foreach ( $locked as $opt => $const ) : ?>
-					<li><code><?php echo esc_html( $opt ); ?></code> ← <code><?php echo esc_html( $const ); ?></code></li>
-				<?php endforeach; ?>
-			</ul>
-		</div>
-		<?php
-	}
-
 	private function render_gateway_stripe() {
 		?>
 		<div class="g2ab-set__gw-card-detail">
 			<div class="g2ab-set__gw-detail-head"><span class="g2ab-set__gw-logo g2ab-set__gw-logo--xl" style="background:#635BFF;">S</span><div><h2>Stripe</h2><p>Get your API keys at <a href="https://dashboard.stripe.com/apikeys" target="_blank" rel="noopener">dashboard.stripe.com/apikeys</a></p></div></div>
-			<?php $this->render_constant_lock_notice( array( 'g2ab_stripe_secret_key', 'g2ab_stripe_publishable_key', 'g2ab_stripe_webhook_secret' ) ); ?>
 			<div class="g2ab-set__field"><label class="g2ab-set__check"><input type="checkbox" name="g2ab_stripe_enabled" value="1" <?php checked( 1, (int) get_option( 'g2ab_stripe_enabled', 0 ) ); ?> /> <?php esc_html_e( 'Enable Stripe', 'g2a-booking' ); ?></label></div>
 			<div class="g2ab-set__field"><label class="g2ab-set__check"><input type="checkbox" name="g2ab_stripe_test_mode" value="1" <?php checked( 1, (int) get_option( 'g2ab_stripe_test_mode', 1 ) ); ?> /> <?php esc_html_e( 'Test mode (use pk_test_/sk_test_ keys)', 'g2a-booking' ); ?></label></div>
 			<div class="g2ab-set__field"><label><?php esc_html_e( 'Publishable Key', 'g2a-booking' ); ?></label><input type="text" name="g2ab_stripe_publishable_key" value="<?php echo esc_attr( get_option( 'g2ab_stripe_publishable_key', '' ) ); ?>" placeholder="pk_live_..." /></div>
-			<div class="g2ab-set__field"><label><?php esc_html_e( 'Secret Key', 'g2a-booking' ); ?></label><input type="password" name="g2ab_stripe_secret_key" value="<?php echo esc_attr( get_option( 'g2ab_stripe_secret_key', '' ) ); ?>" placeholder="sk_live_..." autocomplete="new-password" /></div>
-			<div class="g2ab-set__field"><label><?php esc_html_e( 'Webhook Signing Secret', 'g2a-booking' ); ?></label><input type="password" name="g2ab_stripe_webhook_secret" value="<?php echo esc_attr( get_option( 'g2ab_stripe_webhook_secret', '' ) ); ?>" placeholder="whsec_..." autocomplete="new-password" /><small><?php printf( esc_html__( 'Add a webhook in Stripe pointed at: %s', 'g2a-booking' ), '<code>' . esc_url( rest_url( G2AB_REST_NAMESPACE . '/webhooks/stripe' ) ) . '</code>' ); ?></small></div>
+			<div class="g2ab-set__field"><label><?php esc_html_e( 'Secret Key', 'g2a-booking' ); ?></label><input type="password" name="g2ab_stripe_secret_key" <?php $this->secret_input_attrs( 'g2ab_stripe_secret_key', 'sk_live_...' ); ?> autocomplete="new-password" /></div>
+			<div class="g2ab-set__field"><label><?php esc_html_e( 'Webhook Signing Secret', 'g2a-booking' ); ?></label><input type="password" name="g2ab_stripe_webhook_secret" <?php $this->secret_input_attrs( 'g2ab_stripe_webhook_secret', 'whsec_...' ); ?> autocomplete="new-password" /><small><?php printf( esc_html__( 'Add a webhook in Stripe pointed at: %s', 'g2a-booking' ), '<code>' . esc_url( rest_url( G2AB_REST_NAMESPACE . '/webhooks/stripe' ) ) . '</code>' ); ?></small></div>
 		</div>
 		<?php
 	}
@@ -311,11 +307,10 @@ final class G2AB_Admin_Settings_Pro {
 		?>
 		<div class="g2ab-set__gw-card-detail">
 			<div class="g2ab-set__gw-detail-head"><span class="g2ab-set__gw-logo g2ab-set__gw-logo--xl" style="background:#003087;">P</span><div><h2>PayPal</h2><p>Get your REST API credentials at <a href="https://developer.paypal.com/dashboard/applications/" target="_blank" rel="noopener">developer.paypal.com</a></p></div></div>
-			<?php $this->render_constant_lock_notice( array( 'g2ab_paypal_client_id', 'g2ab_paypal_secret', 'g2ab_paypal_webhook_id' ) ); ?>
 			<div class="g2ab-set__field"><label class="g2ab-set__check"><input type="checkbox" name="g2ab_paypal_enabled" value="1" <?php checked( 1, (int) get_option( 'g2ab_paypal_enabled', 0 ) ); ?> /> <?php esc_html_e( 'Enable PayPal', 'g2a-booking' ); ?></label></div>
 			<div class="g2ab-set__field"><label class="g2ab-set__check"><input type="checkbox" name="g2ab_paypal_test_mode" value="1" <?php checked( 1, (int) get_option( 'g2ab_paypal_test_mode', 1 ) ); ?> /> <?php esc_html_e( 'Sandbox mode', 'g2a-booking' ); ?></label></div>
 			<div class="g2ab-set__field"><label><?php esc_html_e( 'Client ID', 'g2a-booking' ); ?></label><input type="text" name="g2ab_paypal_client_id" value="<?php echo esc_attr( get_option( 'g2ab_paypal_client_id', '' ) ); ?>" /></div>
-			<div class="g2ab-set__field"><label><?php esc_html_e( 'Secret', 'g2a-booking' ); ?></label><input type="password" name="g2ab_paypal_secret" value="<?php echo esc_attr( get_option( 'g2ab_paypal_secret', '' ) ); ?>" autocomplete="new-password" /></div>
+			<div class="g2ab-set__field"><label><?php esc_html_e( 'Secret', 'g2a-booking' ); ?></label><input type="password" name="g2ab_paypal_secret" <?php $this->secret_input_attrs( 'g2ab_paypal_secret' ); ?> autocomplete="new-password" /></div>
 			<div class="g2ab-set__field"><label><?php esc_html_e( 'Webhook ID', 'g2a-booking' ); ?></label><input type="text" name="g2ab_paypal_webhook_id" value="<?php echo esc_attr( get_option( 'g2ab_paypal_webhook_id', '' ) ); ?>" /><small><?php printf( esc_html__( 'Webhook URL: %s', 'g2a-booking' ), '<code>' . esc_url( rest_url( G2AB_REST_NAMESPACE . '/webhooks/paypal' ) ) . '</code>' ); ?></small></div>
 		</div>
 		<?php
@@ -325,14 +320,13 @@ final class G2AB_Admin_Settings_Pro {
 		?>
 		<div class="g2ab-set__gw-card-detail">
 			<div class="g2ab-set__gw-detail-head"><span class="g2ab-set__gw-logo g2ab-set__gw-logo--xl" style="background:#0F4C75;">F</span><div><h2>Fortis Pay</h2><p>Get credentials at <a href="https://docs.fortispay.com/" target="_blank" rel="noopener">docs.fortispay.com</a> · 3-header auth (user-id, user-api-key, developer-id)</p></div></div>
-			<?php $this->render_constant_lock_notice( array( 'g2ab_fortis_user_id', 'g2ab_fortis_user_api_key', 'g2ab_fortis_developer_id', 'g2ab_fortis_hmac_secret', 'g2ab_fortis_webhook_secret' ) ); ?>
 			<div class="g2ab-set__field"><label class="g2ab-set__check"><input type="checkbox" name="g2ab_fortis_enabled" value="1" <?php checked( 1, (int) get_option( 'g2ab_fortis_enabled', 0 ) ); ?> /> <?php esc_html_e( 'Enable Fortis Pay', 'g2a-booking' ); ?></label></div>
 			<div class="g2ab-set__field"><label class="g2ab-set__check"><input type="checkbox" name="g2ab_fortis_test_mode" value="1" <?php checked( 1, (int) get_option( 'g2ab_fortis_test_mode', 1 ) ); ?> /> <?php esc_html_e( 'Sandbox mode', 'g2a-booking' ); ?></label></div>
 			<div class="g2ab-set__field"><label><?php esc_html_e( 'User ID', 'g2a-booking' ); ?></label><input type="text" name="g2ab_fortis_user_id" value="<?php echo esc_attr( get_option( 'g2ab_fortis_user_id', '' ) ); ?>" /><small><?php esc_html_e( 'Your merchant user ID from Fortis.', 'g2a-booking' ); ?></small></div>
-			<div class="g2ab-set__field"><label><?php esc_html_e( 'User API Key', 'g2a-booking' ); ?></label><input type="password" name="g2ab_fortis_user_api_key" value="<?php echo esc_attr( get_option( 'g2ab_fortis_user_api_key', '' ) ); ?>" autocomplete="new-password" /></div>
+			<div class="g2ab-set__field"><label><?php esc_html_e( 'User API Key', 'g2a-booking' ); ?></label><input type="password" name="g2ab_fortis_user_api_key" <?php $this->secret_input_attrs( 'g2ab_fortis_user_api_key' ); ?> autocomplete="new-password" /></div>
 			<div class="g2ab-set__field"><label><?php esc_html_e( 'Developer ID', 'g2a-booking' ); ?></label><input type="text" name="g2ab_fortis_developer_id" value="<?php echo esc_attr( get_option( 'g2ab_fortis_developer_id', '' ) ); ?>" /><small><?php esc_html_e( 'Plugin partner identifier — provided to your client when they sign up.', 'g2a-booking' ); ?></small></div>
-			<div class="g2ab-set__field"><label><?php esc_html_e( 'HMAC Secret', 'g2a-booking' ); ?></label><input type="password" name="g2ab_fortis_hmac_secret" value="<?php echo esc_attr( get_option( 'g2ab_fortis_hmac_secret', '' ) ); ?>" autocomplete="new-password" /><small><?php esc_html_e( 'Optional but recommended for production. Strengthens auth on /v2/transactions, /v2/payform, /v2/accountvault.', 'g2a-booking' ); ?></small></div>
-			<div class="g2ab-set__field"><label><?php esc_html_e( 'Webhook Secret', 'g2a-booking' ); ?></label><input type="password" name="g2ab_fortis_webhook_secret" value="<?php echo esc_attr( get_option( 'g2ab_fortis_webhook_secret', '' ) ); ?>" autocomplete="new-password" /><small><?php printf( esc_html__( 'Webhook URL: %s', 'g2a-booking' ), '<code>' . esc_url( rest_url( G2AB_REST_NAMESPACE . '/webhooks/fortis' ) ) . '</code>' ); ?></small></div>
+			<div class="g2ab-set__field"><label><?php esc_html_e( 'HMAC Secret', 'g2a-booking' ); ?></label><input type="password" name="g2ab_fortis_hmac_secret" <?php $this->secret_input_attrs( 'g2ab_fortis_hmac_secret' ); ?> autocomplete="new-password" /><small><?php esc_html_e( 'Optional but recommended for production. Strengthens auth on /v2/transactions, /v2/payform, /v2/accountvault.', 'g2a-booking' ); ?></small></div>
+			<div class="g2ab-set__field"><label><?php esc_html_e( 'Webhook Secret', 'g2a-booking' ); ?></label><input type="password" name="g2ab_fortis_webhook_secret" <?php $this->secret_input_attrs( 'g2ab_fortis_webhook_secret' ); ?> autocomplete="new-password" /><small><?php printf( esc_html__( 'Webhook URL: %s', 'g2a-booking' ), '<code>' . esc_url( rest_url( G2AB_REST_NAMESPACE . '/webhooks/fortis' ) ) . '</code>' ); ?></small></div>
 		</div>
 		<?php
 	}
@@ -341,12 +335,11 @@ final class G2AB_Admin_Settings_Pro {
 		?>
 		<div class="g2ab-set__gw-card-detail">
 			<div class="g2ab-set__gw-detail-head"><span class="g2ab-set__gw-logo g2ab-set__gw-logo--xl" style="background:#1F3864;">A</span><div><h2>Authorize.net</h2><p>Get credentials at <a href="https://account.authorize.net/" target="_blank" rel="noopener">account.authorize.net</a></p></div></div>
-			<?php $this->render_constant_lock_notice( array( 'g2ab_authnet_login_id', 'g2ab_authnet_transaction_key', 'g2ab_authnet_signature_key' ) ); ?>
 			<div class="g2ab-set__field"><label class="g2ab-set__check"><input type="checkbox" name="g2ab_authnet_enabled" value="1" <?php checked( 1, (int) get_option( 'g2ab_authnet_enabled', 0 ) ); ?> /> <?php esc_html_e( 'Enable Authorize.net', 'g2a-booking' ); ?></label></div>
 			<div class="g2ab-set__field"><label class="g2ab-set__check"><input type="checkbox" name="g2ab_authnet_test_mode" value="1" <?php checked( 1, (int) get_option( 'g2ab_authnet_test_mode', 1 ) ); ?> /> <?php esc_html_e( 'Sandbox mode', 'g2a-booking' ); ?></label></div>
 			<div class="g2ab-set__field"><label><?php esc_html_e( 'API Login ID', 'g2a-booking' ); ?></label><input type="text" name="g2ab_authnet_login_id" value="<?php echo esc_attr( get_option( 'g2ab_authnet_login_id', '' ) ); ?>" /></div>
-			<div class="g2ab-set__field"><label><?php esc_html_e( 'Transaction Key', 'g2a-booking' ); ?></label><input type="password" name="g2ab_authnet_transaction_key" value="<?php echo esc_attr( get_option( 'g2ab_authnet_transaction_key', '' ) ); ?>" autocomplete="new-password" /></div>
-			<div class="g2ab-set__field"><label><?php esc_html_e( 'Signature Key', 'g2a-booking' ); ?></label><input type="password" name="g2ab_authnet_signature_key" value="<?php echo esc_attr( get_option( 'g2ab_authnet_signature_key', '' ) ); ?>" autocomplete="new-password" /><small><?php esc_html_e( 'Required for webhook signature verification.', 'g2a-booking' ); ?></small></div>
+			<div class="g2ab-set__field"><label><?php esc_html_e( 'Transaction Key', 'g2a-booking' ); ?></label><input type="password" name="g2ab_authnet_transaction_key" <?php $this->secret_input_attrs( 'g2ab_authnet_transaction_key' ); ?> autocomplete="new-password" /></div>
+			<div class="g2ab-set__field"><label><?php esc_html_e( 'Signature Key', 'g2a-booking' ); ?></label><input type="password" name="g2ab_authnet_signature_key" <?php $this->secret_input_attrs( 'g2ab_authnet_signature_key' ); ?> autocomplete="new-password" /><small><?php esc_html_e( 'Required for webhook signature verification.', 'g2a-booking' ); ?></small></div>
 		</div>
 		<?php
 	}
@@ -417,57 +410,22 @@ final class G2AB_Admin_Settings_Pro {
 	/* ============================================================ */
 	private function render_notifications_tab() {
 		$this->open_form( 'notifications' );
-		$emails_disabled_const = defined( 'G2AB_EMAIL_DISABLED' ) && G2AB_EMAIL_DISABLED;
-		$override_const        = defined( 'G2AB_EMAIL_OVERRIDE_RECIPIENT' ) ? G2AB_EMAIL_OVERRIDE_RECIPIENT : '';
 		?>
 		<div class="g2ab-set__panel">
 			<h3><?php esc_html_e( 'EMAIL', 'g2a-booking' ); ?></h3>
 			<div class="g2ab-set__field"><label><?php esc_html_e( 'Admin Notification Email', 'g2a-booking' ); ?></label><input type="email" name="g2ab_admin_notification_email" value="<?php echo esc_attr( get_option( 'g2ab_admin_notification_email', get_option( 'admin_email' ) ) ); ?>" /></div>
-			<div class="g2ab-set__field"><label><?php esc_html_e( 'From Name', 'g2a-booking' ); ?></label><input type="text" name="g2ab_email_from_name" value="<?php echo esc_attr( get_option( 'g2ab_email_from_name', get_option( 'g2ab_business_name', get_bloginfo( 'name' ) ) ) ); ?>" /></div>
+			<div class="g2ab-set__field"><label><?php esc_html_e( 'From Name', 'g2a-booking' ); ?></label><input type="text" name="g2ab_email_from_name" value="<?php echo esc_attr( get_option( 'g2ab_email_from_name', get_option( 'g2ab_business_name', 'Guns 2 Ammo' ) ) ); ?>" /></div>
 			<div class="g2ab-set__field"><label><?php esc_html_e( 'From Email', 'g2a-booking' ); ?></label><input type="email" name="g2ab_email_from_address" value="<?php echo esc_attr( get_option( 'g2ab_email_from_address', '' ) ); ?>" /></div>
 			<div class="g2ab-set__field"><label class="g2ab-set__check"><input type="checkbox" name="g2ab_send_confirmation_email" value="1" <?php checked( 1, (int) get_option( 'g2ab_send_confirmation_email', 1 ) ); ?> /> <?php esc_html_e( 'Send booking confirmation email', 'g2a-booking' ); ?></label></div>
 			<div class="g2ab-set__field"><label class="g2ab-set__check"><input type="checkbox" name="g2ab_send_reminder_email" value="1" <?php checked( 1, (int) get_option( 'g2ab_send_reminder_email', 1 ) ); ?> /> <?php esc_html_e( 'Send reminder email', 'g2a-booking' ); ?></label></div>
 			<div class="g2ab-set__field"><label><?php esc_html_e( 'Reminder hours before start', 'g2a-booking' ); ?></label><input type="number" name="g2ab_reminder_hours_before" min="1" max="168" value="<?php echo esc_attr( get_option( 'g2ab_reminder_hours_before', 24 ) ); ?>" /></div>
 		</div>
 		<div class="g2ab-set__panel">
-			<h3><?php esc_html_e( 'EMAIL SAFETY (staging / dev)', 'g2a-booking' ); ?></h3>
-			<p class="g2ab-set__desc"><?php esc_html_e( 'Use these to suppress or reroute outbound email after restoring a production database to staging. Either option below is overridden by the matching wp-config.php constant if defined.', 'g2a-booking' ); ?></p>
-			<div class="g2ab-set__field">
-				<label class="g2ab-set__check">
-					<input type="checkbox" name="g2ab_emails_disabled" value="1" <?php checked( 1, (int) get_option( 'g2ab_emails_disabled', 0 ) ); ?> <?php disabled( $emails_disabled_const ); ?> />
-					<?php esc_html_e( 'Disable ALL outbound booking emails', 'g2a-booking' ); ?>
-				</label>
-				<?php if ( $emails_disabled_const ) : ?><p class="g2ab-set__desc" style="color:#b32d2e;"><?php esc_html_e( 'Locked: G2AB_EMAIL_DISABLED constant is set in wp-config.php.', 'g2a-booking' ); ?></p><?php endif; ?>
-			</div>
-			<div class="g2ab-set__field">
-				<label><?php esc_html_e( 'Reroute every outbound to this address (staging)', 'g2a-booking' ); ?></label>
-				<input type="email" name="g2ab_email_override_recipient" value="<?php echo esc_attr( $override_const ? $override_const : get_option( 'g2ab_email_override_recipient', '' ) ); ?>" placeholder="ops@example.com" <?php disabled( ! empty( $override_const ) ); ?> />
-				<?php if ( $override_const ) : ?><p class="g2ab-set__desc" style="color:#b32d2e;"><?php esc_html_e( 'Locked: G2AB_EMAIL_OVERRIDE_RECIPIENT constant is set in wp-config.php.', 'g2a-booking' ); ?></p>
-				<?php else : ?><p class="g2ab-set__desc"><?php esc_html_e( 'When set, every customer + admin email is rerouted to this address. The original recipient is preserved in the subject line as [REROUTED -> original@…].', 'g2a-booking' ); ?></p><?php endif; ?>
-			</div>
-		</div>
-		<div class="g2ab-set__panel">
-			<h3><?php esc_html_e( 'GUEST BOOKING USER ACCOUNTS', 'g2a-booking' ); ?></h3>
-			<div class="g2ab-set__field">
-				<label class="g2ab-set__check">
-					<input type="checkbox" name="g2ab_create_user_on_booking" value="1" <?php checked( 1, (int) get_option( 'g2ab_create_user_on_booking', 1 ) ); ?> />
-					<?php esc_html_e( 'Create a Walk-in Customer account for every guest booking', 'g2a-booking' ); ?>
-				</label>
-				<p class="g2ab-set__desc"><?php esc_html_e( 'On: every guest who books a lane gets a WP user with the Walk-in Customer role, and an automatic password-setup email. They are auto-upgraded to the matching Member role if they later buy a membership. Off: bookings are saved against no user (customer fields only).', 'g2a-booking' ); ?></p>
-			</div>
-		</div>
-		<div class="g2ab-set__panel">
-			<h3><?php esc_html_e( 'AI AUTO-REPLY LIMITS', 'g2a-booking' ); ?></h3>
-			<p class="g2ab-set__desc"><?php esc_html_e( 'Cost-runaway protection for the AI Auto-Reply module. Both caps reset at midnight. Admins always bypass the per-IP cap. Set either to 0 to disable that cap entirely.', 'g2a-booking' ); ?></p>
-			<div class="g2ab-set__field"><label><?php esc_html_e( 'Global daily draft cap (across the whole site)', 'g2a-booking' ); ?></label><input type="number" name="g2ab_ai_daily_draft_cap" min="0" max="10000" value="<?php echo esc_attr( get_option( 'g2ab_ai_daily_draft_cap', 200 ) ); ?>" /></div>
-			<div class="g2ab-set__field"><label><?php esc_html_e( 'Per-IP daily draft cap (anonymous callers)', 'g2a-booking' ); ?></label><input type="number" name="g2ab_ai_per_ip_daily_cap" min="0" max="500" value="<?php echo esc_attr( get_option( 'g2ab_ai_per_ip_daily_cap', 20 ) ); ?>" /></div>
-		</div>
-		<div class="g2ab-set__panel">
 			<h3><?php esc_html_e( 'SMS (Twilio)', 'g2a-booking' ); ?></h3>
 			<p class="g2ab-set__desc"><?php esc_html_e( 'Optional SMS reminders. Requires a Twilio account.', 'g2a-booking' ); ?></p>
 			<div class="g2ab-set__field"><label class="g2ab-set__check"><input type="checkbox" name="g2ab_sms_enabled" value="1" <?php checked( 1, (int) get_option( 'g2ab_sms_enabled', 0 ) ); ?> /> <?php esc_html_e( 'Enable SMS reminders', 'g2a-booking' ); ?></label></div>
 			<div class="g2ab-set__field"><label><?php esc_html_e( 'Twilio Account SID', 'g2a-booking' ); ?></label><input type="text" name="g2ab_twilio_sid" value="<?php echo esc_attr( get_option( 'g2ab_twilio_sid', '' ) ); ?>" /></div>
-			<div class="g2ab-set__field"><label><?php esc_html_e( 'Twilio Auth Token', 'g2a-booking' ); ?></label><input type="password" name="g2ab_twilio_token" value="<?php echo esc_attr( get_option( 'g2ab_twilio_token', '' ) ); ?>" autocomplete="new-password" /></div>
+			<div class="g2ab-set__field"><label><?php esc_html_e( 'Twilio Auth Token', 'g2a-booking' ); ?></label><input type="password" name="g2ab_twilio_token" <?php $this->secret_input_attrs( 'g2ab_twilio_token' ); ?> autocomplete="new-password" /></div>
 			<div class="g2ab-set__field"><label><?php esc_html_e( 'Twilio From Number', 'g2a-booking' ); ?></label><input type="text" name="g2ab_twilio_from" value="<?php echo esc_attr( get_option( 'g2ab_twilio_from', '' ) ); ?>" placeholder="+15555555555" /></div>
 		</div>
 		<?php
@@ -531,10 +489,6 @@ final class G2AB_Admin_Settings_Pro {
 		$features     = get_option( 'g2ab_form_features', "Instant confirmation email\nReschedule or cancel anytime\nNo spam — just your booking" );
 		$continue_lbl = get_option( 'g2ab_form_continue_label', 'Continue' );
 		$submit_lbl   = get_option( 'g2ab_form_submit_label', '' );
-		$support_note = get_option(
-			'g2ab_form_support_notice',
-			class_exists( 'G2AB_Frontend' ) ? G2AB_Frontend::default_support_notice() : ''
-		);
 		?>
 		<div class="g2ab-set__panel">
 			<h3><?php esc_html_e( 'PRESETS', 'g2a-booking' ); ?></h3>
@@ -641,15 +595,6 @@ final class G2AB_Admin_Settings_Pro {
 			</div>
 		</div>
 
-		<div class="g2ab-set__panel">
-			<h3><?php esc_html_e( 'SUPPORT NOTICE (UNDER THE FORM)', 'g2a-booking' ); ?></h3>
-			<div class="g2ab-set__field">
-				<label><?php esc_html_e( 'Support notice text', 'g2a-booking' ); ?></label>
-				<textarea name="g2ab_form_support_notice" rows="4"><?php echo esc_textarea( $support_note ); ?></textarea>
-				<small><?php esc_html_e( 'Shown as a small note card below the booking widget. Basic HTML allowed (links, bold). Leave empty to hide the card entirely.', 'g2a-booking' ); ?></small>
-			</div>
-		</div>
-
 		<div class="g2ab-set__panel" style="background:#FAFBFD;">
 			<h3><?php esc_html_e( 'PREVIEW', 'g2a-booking' ); ?></h3>
 			<p class="g2ab-set__desc"><?php esc_html_e( 'Place this shortcode on a page to see the customized form:', 'g2a-booking' ); ?></p>
@@ -662,136 +607,28 @@ final class G2AB_Admin_Settings_Pro {
 	/* ============================================================ */
 	/*  SAVE HANDLER                                                */
 	/* ============================================================ */
-	/**
-	 * Map of gateway-secret option keys → the wp-config.php constant
-	 * name that overrides them. Used by the UI to show "Locked by
-	 * constant" indicators AND by handle_save() to refuse writing the
-	 * stored option when the constant is in force (otherwise the admin
-	 * thinks they saved a value but the constant always wins on read).
-	 *
-	 * Filterable so future gateways can register their own.
-	 */
-	public static function secret_option_constants() {
-		return apply_filters( 'g2ab_secret_option_constants', array(
-			'g2ab_stripe_secret_key'         => 'G2AB_STRIPE_SECRET',
-			'g2ab_stripe_publishable_key'    => 'G2AB_STRIPE_PUBLISHABLE',
-			'g2ab_stripe_webhook_secret'     => 'G2AB_STRIPE_WEBHOOK_SECRET',
-			'g2ab_paypal_client_id'          => 'G2AB_PAYPAL_CLIENT_ID',
-			'g2ab_paypal_secret'             => 'G2AB_PAYPAL_SECRET',
-			'g2ab_paypal_webhook_id'         => 'G2AB_PAYPAL_WEBHOOK_ID',
-			'g2ab_fortis_user_id'            => 'G2AB_FORTIS_USER_ID',
-			'g2ab_fortis_user_api_key'       => 'G2AB_FORTIS_USER_API_KEY',
-			'g2ab_fortis_developer_id'       => 'G2AB_FORTIS_DEVELOPER_ID',
-			'g2ab_fortis_hmac_secret'        => 'G2AB_FORTIS_HMAC_SECRET',
-			'g2ab_fortis_webhook_secret'     => 'G2AB_FORTIS_WEBHOOK_SECRET',
-			'g2ab_authnet_login_id'          => 'G2AB_AUTHNET_LOGIN',
-			'g2ab_authnet_transaction_key'   => 'G2AB_AUTHNET_KEY',
-			'g2ab_authnet_signature_key'     => 'G2AB_AUTHNET_SIGNATURE_KEY',
-		) );
-	}
-
-	/**
-	 * True when the matching wp-config.php constant for this option
-	 * key is defined to a non-empty value.
-	 */
-	public static function option_is_constant_locked( $option_key ) {
-		$map = self::secret_option_constants();
-		if ( ! isset( $map[ $option_key ] ) ) {
-			return false;
-		}
-		$const = $map[ $option_key ];
-		return defined( $const ) && '' !== (string) constant( $const );
-	}
-
-	/**
-	 * Allow-list of option keys writable by each tab. Returning null disables
-	 * the filter (legacy behavior — every g2ab_* key passes). Filter
-	 * `g2ab_settings_pro_writable_options` lets modules extend the list.
-	 *
-	 * @param string $tab Active tab key.
-	 * @return array|null
-	 */
-	public static function allowed_options_for_tab( $tab ) {
-		$map = array(
-			'general'         => array(
-				'g2ab_business_name', 'g2ab_business_phone', 'g2ab_business_address',
-				'g2ab_currency', 'g2ab_timezone', 'g2ab_allow_guest_booking',
-				'g2ab_booking_page_url', 'g2ab_reservation_hold_minutes',
-				'g2ab_default_min_age', 'g2ab_trusted_proxies', 'g2ab_trust_cloudflare',
-			),
-			'payments'        => array(
-				'g2ab_stripe_enabled', 'g2ab_stripe_test_mode', 'g2ab_stripe_publishable_key',
-				'g2ab_stripe_secret_key', 'g2ab_stripe_webhook_secret', 'g2ab_stripe_test_publishable_key',
-				'g2ab_stripe_test_secret_key', 'g2ab_stripe_test_webhook_secret',
-				'g2ab_paypal_enabled', 'g2ab_paypal_test_mode', 'g2ab_paypal_client_id',
-				'g2ab_paypal_client_secret', 'g2ab_paypal_webhook_id',
-				'g2ab_paypal_test_client_id', 'g2ab_paypal_test_client_secret', 'g2ab_paypal_test_webhook_id',
-				'g2ab_authnet_enabled', 'g2ab_authnet_test_mode', 'g2ab_authnet_login_id',
-				'g2ab_authnet_transaction_key', 'g2ab_authnet_signature_key', 'g2ab_authnet_public_client_key',
-				'g2ab_fortis_enabled', 'g2ab_fortis_test_mode', 'g2ab_fortis_user_id',
-				'g2ab_fortis_user_api_key', 'g2ab_fortis_developer_id', 'g2ab_fortis_location_id',
-				'g2ab_fortis_webhook_secret',
-				'g2ab_pay_in_store_enabled', 'g2ab_pay_in_store_label', 'g2ab_pay_in_store_instructions',
-			),
-			'notifications'   => array(
-				'g2ab_admin_notification_email', 'g2ab_email_from_name', 'g2ab_email_from_address',
-				'g2ab_send_confirmation_email', 'g2ab_send_reminder_email', 'g2ab_emails_disabled',
-				'g2ab_sms_enabled', 'g2ab_create_user_on_booking',
-				'g2ab_confirmation_subject', 'g2ab_confirmation_body',
-				'g2ab_reminder_subject', 'g2ab_reminder_body',
-			),
-			'form_customizer' => array(
-				'g2ab_form_animations', 'g2ab_form_primary_color', 'g2ab_form_features',
-				'g2ab_form_theme', 'g2ab_form_layout', 'g2ab_form_font',
-				'g2ab_form_primary', 'g2ab_form_accent', 'g2ab_form_bg',
-				'g2ab_form_surface', 'g2ab_form_surface2', 'g2ab_form_text', 'g2ab_form_muted',
-				'g2ab_form_radius', 'g2ab_form_title', 'g2ab_form_subtitle', 'g2ab_form_description',
-				'g2ab_form_continue_label', 'g2ab_form_submit_label',
-				'g2ab_form_badge_duration', 'g2ab_form_badge_price',
-				'g2ab_form_show_pricing', 'g2ab_form_show_lane_grid',
-				'g2ab_form_support_notice',
-			),
-			'danger'          => array(
-				'g2ab_remove_data_on_uninstall',
-			),
-		);
-		$list = isset( $map[ $tab ] ) ? $map[ $tab ] : null;
-		return apply_filters( 'g2ab_settings_pro_writable_options', $list, $tab );
-	}
-
 	public function handle_save() {
 		if ( ! current_user_can( 'manage_g2ab_settings' ) ) wp_die( 'No permission.' );
 		check_admin_referer( 'g2ab_save_settings_pro', '_g2ab_nonce' );
 		$tab = sanitize_key( $_POST['active_tab'] ?? 'general' );
 
-		// SECURITY: only options that THIS tab is allowed to write may pass.
-		// Previously any g2ab_*-prefixed POST key would overwrite any option,
-		// which let an admin form submission on the "general" tab silently
-		// clobber payment secrets, invoice signing keys, etc.
-		$allowed_for_tab = self::allowed_options_for_tab( $tab );
-		$post_filtered   = is_array( $allowed_for_tab )
-			? array_intersect_key( (array) $_POST, array_flip( $allowed_for_tab ) )
-			: (array) $_POST;
-
-		foreach ( $post_filtered as $k => $v ) {
+		// Generic key/value save based on POST keys starting with g2ab_.
+		foreach ( $_POST as $k => $v ) {
 			if ( 0 !== strpos( $k, 'g2ab_' ) ) continue;
 			if ( in_array( $k, array( 'g2ab_save_settings_pro', '_g2ab_nonce' ), true ) ) continue;
-			// Refuse to overwrite a gateway secret when the wp-config.php
-			// constant is in force. The constant always wins on read,
-			// so persisting the option silently would mislead the admin.
-			if ( self::option_is_constant_locked( $k ) ) {
-				continue;
-			}
 
 			// Determine sanitization based on key prefix/type.
 			if ( in_array( $k, array( 'g2ab_admin_notification_email', 'g2ab_email_from_address' ), true ) ) {
 				$val = sanitize_email( wp_unslash( $v ) );
 				if ( $val && is_email( $val ) ) update_option( $k, $val );
 			} elseif ( strpos( $k, '_secret' ) !== false || strpos( $k, '_key' ) !== false || strpos( $k, '_token' ) !== false || strpos( $k, '_password' ) !== false ) {
-				update_option( $k, sanitize_text_field( wp_unslash( $v ) ) );
+				$val = sanitize_text_field( wp_unslash( $v ) );
+				// Masked secret fields render empty — an empty submit keeps the stored value.
+				if ( '' === $val && in_array( $k, self::SECRET_OPTIONS, true ) ) continue;
+				update_option( $k, $val );
 			} elseif ( in_array( $k, array( 'g2ab_booking_page_url' ), true ) ) {
 				update_option( $k, esc_url_raw( wp_unslash( $v ) ) );
-			} elseif ( strpos( $k, '_message' ) !== false || strpos( $k, '_body' ) !== false || strpos( $k, '_notice' ) !== false || 'g2ab_form_description' === $k ) {
+			} elseif ( strpos( $k, '_message' ) !== false || strpos( $k, '_body' ) !== false ) {
 				update_option( $k, wp_kses_post( wp_unslash( $v ) ) );
 			} elseif ( is_array( $v ) ) {
 				$clean = array_map( 'sanitize_text_field', wp_unslash( $v ) );
@@ -812,13 +649,7 @@ final class G2AB_Admin_Settings_Pro {
 				$bools[] = 'g2ab_' . $gw . '_test_mode';
 			}
 		} elseif ( 'notifications' === $tab ) {
-			$bools = array(
-				'g2ab_send_confirmation_email',
-				'g2ab_send_reminder_email',
-				'g2ab_sms_enabled',
-				'g2ab_emails_disabled',
-				'g2ab_create_user_on_booking',
-			);
+			$bools = array( 'g2ab_send_confirmation_email', 'g2ab_send_reminder_email', 'g2ab_sms_enabled' );
 		} elseif ( 'danger' === $tab ) {
 			$bools = array( 'g2ab_remove_data_on_uninstall' );
 		} elseif ( 'form_customizer' === $tab ) {
@@ -849,7 +680,7 @@ final class G2AB_Admin_Settings_Pro {
 		echo '<style>
 .g2ab-set{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;}
 .g2ab-set__header{background:linear-gradient(135deg,#0F1115 0%,#1A1F26 100%);color:#E8E8E8;padding:24px 28px;margin:20px 0 0;border-left:4px solid #D2691E;}
-.g2ab-set__stencil{font-family:"Rajdhani","Oswald",Impact,sans-serif;font-size:30px;font-weight:700;letter-spacing:.12em;color:#fff;text-shadow:2px 2px 0 #4A5D3A;}
+.g2ab-set__stencil{font-family:"Inter","Segoe UI",system-ui,-apple-system,sans-serif;font-size:30px;font-weight:700;letter-spacing:.04em;color:#fff;}
 .g2ab-set__sub{margin:4px 0 0;color:#8A95A5;font-size:13px;text-transform:uppercase;letter-spacing:.08em;}
 .g2ab-set__tabs{background:#fff;border:1px solid #d0d4d9;border-top:none;display:flex;flex-wrap:wrap;}
 .g2ab-set__tabs a{padding:14px 22px;text-decoration:none;color:#3c434a;font-size:12px;font-weight:700;letter-spacing:.08em;border-right:1px solid #f0f1f3;text-transform:uppercase;}
@@ -859,12 +690,12 @@ final class G2AB_Admin_Settings_Pro {
 .g2ab-set__subtabs a{display:inline-flex;align-items:center;gap:6px;padding:8px 14px;color:#3c434a;text-decoration:none;font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;border-radius:2px;}
 .g2ab-set__subtabs a:hover{background:#f0f1f3;}
 .g2ab-set__subtabs a.is-active{background:#D2691E;color:#fff;}
-.g2ab-set__gw-logo{display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:3px;color:#fff;font-weight:700;font-family:"Rajdhani",sans-serif;font-size:14px;}
+.g2ab-set__gw-logo{display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:3px;color:#fff;font-weight:700;font-family:"Inter","Segoe UI",system-ui,-apple-system,sans-serif;font-size:14px;}
 .g2ab-set__gw-logo--lg{width:48px;height:48px;font-size:24px;border-radius:4px;}
 .g2ab-set__gw-logo--xl{width:64px;height:64px;font-size:32px;border-radius:6px;}
 .g2ab-set__content{margin-top:14px;}
 .g2ab-set__panel{background:#fff;border:1px solid #d0d4d9;padding:22px 28px;margin-bottom:14px;}
-.g2ab-set__panel h3{font-family:"Rajdhani",sans-serif;font-size:13px;letter-spacing:.12em;color:#D2691E;margin:0 0 14px;font-weight:700;}
+.g2ab-set__panel h3{font-family:"Inter","Segoe UI",system-ui,-apple-system,sans-serif;font-size:13px;letter-spacing:.12em;color:#D2691E;margin:0 0 14px;font-weight:700;}
 .g2ab-set__field{margin-bottom:14px;}
 .g2ab-set__field label{display:block;font-size:11px;font-weight:700;letter-spacing:.06em;color:#3c434a;text-transform:uppercase;margin-bottom:5px;}
 .g2ab-set__field input[type="text"],.g2ab-set__field input[type="email"],.g2ab-set__field input[type="url"],.g2ab-set__field input[type="number"],.g2ab-set__field input[type="password"],.g2ab-set__field select,.g2ab-set__field textarea{width:100%;max-width:520px;padding:9px 12px;border:1px solid #d0d4d9;border-radius:2px;font-size:13px;font-family:inherit;}

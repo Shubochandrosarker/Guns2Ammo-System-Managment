@@ -346,23 +346,17 @@ final class G2AB_Addon_Manager {
 /* HERO */
 .g2ab-ax__hero{position:relative;background:linear-gradient(135deg,#0F1115 0%,#1F242C 60%,#2A3038 100%);color:#fff;padding:36px 40px;border-radius:14px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:24px;overflow:hidden;margin-bottom:24px;border:1px solid rgba(255,255,255,.06);}
 .g2ab-ax__hero::before{content:"";position:absolute;top:-50%;right:-10%;width:50%;height:200%;background:radial-gradient(ellipse at center,rgba(74,93,58,.18) 0%,transparent 60%);pointer-events:none;}
-.g2ab-ax__hero.is-agency{background:linear-gradient(135deg,#ffffff 0%,#fff8ef 58%,#f5eadc 100%);border-left-color:#D2691E;color:#0F2044;box-shadow:0 18px 38px rgba(15,32,68,.08);}
-.g2ab-ax__hero.is-agency::before{background:radial-gradient(ellipse at center,rgba(210,105,30,.14) 0%,transparent 60%);}
+.g2ab-ax__hero.is-agency{background:linear-gradient(135deg,#1F1208 0%,#3D2412 50%,#0F1115 100%);}
+.g2ab-ax__hero.is-agency::before{background:radial-gradient(ellipse at center,rgba(210,105,30,.32) 0%,transparent 60%);}
 .g2ab-ax__hero-l{position:relative;z-index:1;flex:1;min-width:280px;}
 .g2ab-ax__eyebrow{display:inline-block;font-size:11px;letter-spacing:.18em;font-weight:700;color:#D2691E;margin-bottom:10px;}
-.g2ab-ax__hero.is-agency .g2ab-ax__eyebrow{color:#D2691E;}
-.g2ab-ax__hero.is-agency .g2ab-ax__hero-title{color:#0F2044!important;text-shadow:none!important;}
-.g2ab-ax__hero.is-agency p{color:#172033!important;}
-.g2ab-ax__hero.is-agency .g2ab-ax__stat{background:#fff;border:1px solid rgba(210,105,30,.24);box-shadow:0 10px 22px rgba(15,32,68,.06);}
-.g2ab-ax__hero.is-agency .g2ab-ax__stat-num{color:#0F2044!important;}
-.g2ab-ax__hero.is-agency .g2ab-ax__stat-label{color:#526078!important;}
-.g2ab-ax__hero.is-agency .g2ab-ax__stat--soon .g2ab-ax__stat-num{color:#D2691E!important;}
-.g2ab-ax__hero-title{color:#fff !important;font-size:30px;line-height:1.15;margin:0 0 8px;font-weight:800;letter-spacing:-.01em;font-family:"Rajdhani","Oswald","Inter",sans-serif;padding:0;}
+.g2ab-ax__hero.is-agency .g2ab-ax__eyebrow{color:#F9A825;}
+.g2ab-ax__hero-title{color:#fff !important;font-size:30px;line-height:1.15;margin:0 0 8px;font-weight:800;letter-spacing:-.01em;font-family:"Inter","Segoe UI",system-ui,-apple-system,sans-serif;padding:0;}
 .g2ab-ax__hero h1.g2ab-ax__hero-title{color:#fff !important;}
 .g2ab-ax__hero-sub{font-size:14px;color:rgba(255,255,255,.65);margin:0;max-width:540px;line-height:1.55;}
 .g2ab-ax__hero-r{position:relative;z-index:1;display:flex;gap:18px;align-items:center;flex-wrap:wrap;}
 .g2ab-ax__stat{background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.08);padding:14px 22px;border-radius:10px;text-align:center;backdrop-filter:blur(10px);min-width:80px;}
-.g2ab-ax__stat-num{display:block;font-size:28px;font-weight:800;line-height:1;color:#fff;font-family:"Rajdhani","Inter",sans-serif;}
+.g2ab-ax__stat-num{display:block;font-size:28px;font-weight:800;line-height:1;color:#fff;font-family:"Inter","Segoe UI",system-ui,-apple-system,sans-serif;}
 .g2ab-ax__stat-label{display:block;font-size:10px;color:rgba(255,255,255,.55);text-transform:uppercase;letter-spacing:.12em;margin-top:6px;}
 .g2ab-ax__stat--soon .g2ab-ax__stat-num{color:#F9A825;}
 .g2ab-ax__hero-form{margin:0;}
@@ -399,7 +393,7 @@ final class G2AB_Addon_Manager {
 
 .g2ab-ax__card-top{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:18px;position:relative;z-index:1;}
 .g2ab-ax__icon-wrap{position:relative;width:52px;height:52px;border-radius:12px;background:linear-gradient(135deg,var(--ic) 0%,color-mix(in srgb,var(--ic) 70%,#000) 100%);display:flex;align-items:center;justify-content:center;box-shadow:0 4px 12px color-mix(in srgb,var(--ic) 30%,transparent);}
-.g2ab-ax__icon{color:#fff;font-family:"Rajdhani","Inter",sans-serif;font-weight:800;font-size:24px;letter-spacing:-.02em;}
+.g2ab-ax__icon{color:#fff;font-family:"Inter","Segoe UI",system-ui,-apple-system,sans-serif;font-weight:800;font-size:24px;letter-spacing:-.02em;}
 
 .g2ab-ax__pills{display:flex;flex-direction:column;gap:5px;align-items:flex-end;}
 .g2ab-ax__pill{display:inline-flex;align-items:center;gap:5px;padding:4px 9px;font-size:9.5px;letter-spacing:.1em;font-weight:800;border-radius:99px;text-transform:uppercase;}
