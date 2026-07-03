@@ -75,16 +75,15 @@ class Executor {
 	}
 
 	private static function handle_create_task( string $query ): string {
-		$tasks   = get_option( 'g2aba_bridgistic_tasks', array() );
-		$tasks   = is_array( $tasks ) ? $tasks : array();
-		$tasks[] = array(
-			'title'     => 'BridGistic: ' . self::first_words( $query, 12 ),
-			'body'      => $query,
-			'createdAt' => gmdate( 'c' ),
-			'status'    => 'open',
+		// Phase 11: BridGistic tasks are now first-class Tasks_Store entries
+		// so they appear alongside AI-Insight and Business-Gap approvals in
+		// the same dashboard queue.
+		$task = ( new \WordPressistic\G2ABA\Tasks\Tasks_Store() )->create(
+			'BridGistic: ' . self::first_words( $query, 12 ),
+			$query,
+			\WordPressistic\G2ABA\Tasks\Tasks_Store::SOURCE_BRIDGISTIC
 		);
-		update_option( 'g2aba_bridgistic_tasks', array_slice( $tasks, -100 ), false );
-		return 'Task created and stored under g2aba_bridgistic_tasks.';
+		return sprintf( 'Task %s created. Review in the dashboard Tasks page.', $task['id'] );
 	}
 
 	private static function handle_cancel_booking( string $query ): string {

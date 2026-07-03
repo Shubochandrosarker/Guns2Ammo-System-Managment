@@ -22,6 +22,7 @@ import { Reports } from '@/pages/Reports'
 import { SystemHealth } from '@/pages/SystemHealth'
 import { Settings } from '@/pages/Settings'
 import { OpsQueue } from '@/pages/OpsQueue'
+import { Tasks } from '@/pages/Tasks'
 
 export function App() {
   const [session, setSession] = useState<Session | null>(() => readSession())
@@ -54,6 +55,7 @@ export function App() {
             <Route path="ai-models"            element={<AIModelsRAGs />} />
             <Route path="reports"              element={<Reports />} />
             <Route path="ops-queue"            element={<OpsQueue />} />
+            <Route path="tasks"                element={<Tasks />} />
             <Route path="system-health"        element={<SystemHealth />} />
             <Route path="settings"             element={<Settings />} />
             <Route path="*"                    element={<Navigate to="/" replace />} />

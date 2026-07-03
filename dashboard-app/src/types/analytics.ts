@@ -76,6 +76,15 @@ export interface StoreAnalytics {
   slowMovers: { id: number; name: string; daysWithoutSale: number }[]
 }
 
+export interface ShooterInsights {
+  knownShooters: number
+  repeatRatePct: number
+  firstTimeThisMonth: number
+  lapsed90d: number
+  segments: { key: string; label: string; value: number; hint: string }[]
+  opportunities: string[]
+}
+
 export interface InsightisticAnalytics {
   range: Range
   sessions: number

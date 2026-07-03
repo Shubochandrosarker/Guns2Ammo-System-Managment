@@ -31,10 +31,13 @@ class ExecutorTest extends TestCase {
 
 		Executor::on_approved( $entry );
 
-		$tasks = get_option( 'g2aba_bridgistic_tasks', array() );
+		// Phase 11: BridGistic tasks are now first-class Tasks_Store entries.
+		$tasks = get_option( 'g2aba_tasks', array() );
 		$this->assertCount( 1, $tasks );
-		$this->assertStringStartsWith( 'BridGistic:', $tasks[0]['title'] );
-		$this->assertSame( 'open', $tasks[0]['status'] );
+		$first = array_values( $tasks )[0];
+		$this->assertStringStartsWith( 'BridGistic:', $first['title'] );
+		$this->assertSame( 'open', $first['status'] );
+		$this->assertSame( 'bridgistic', $first['source'] );
 	}
 
 	public function test_cancel_booking_captures_id_when_present() {

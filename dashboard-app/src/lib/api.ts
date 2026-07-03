@@ -18,6 +18,7 @@ import type {
   Range,
   RevenueOverview,
   SeoAnalytics,
+  ShooterInsights,
   StoreAnalytics,
   SystemHealthCheck,
 } from '@/types/analytics'
@@ -163,6 +164,11 @@ export const api = {
         ? Promise.resolve(mock.insightistic)
         : http<InsightisticAnalytics>(`/analytics/insightistic?from=${range.from}&to=${range.to}`)
     },
+    shooterInsights(): Promise<ShooterInsights> {
+      return env.useMocks
+        ? Promise.resolve(mock.shooterInsights)
+        : http<ShooterInsights>('/analytics/shooter-insights')
+    },
   },
 
   gaps: {
@@ -174,6 +180,45 @@ export const api = {
   insights: {
     list(): Promise<AIInsight[]> {
       return env.useMocks ? Promise.resolve(mock.insights) : http<AIInsight[]>('/ai/insights')
+    },
+    async approve(id: string): Promise<Task> {
+      if (env.useMocks) throw new Error('approve is unavailable in mock mode')
+      const res = await http<{ ok: true; task: Task }>(`/ai/insights/${id}/approve`, { method: 'POST' })
+      return res.task
+    },
+    async dismiss(id: string): Promise<void> {
+      if (env.useMocks) return
+      await http(`/ai/insights/${id}/dismiss`, { method: 'POST' })
+    },
+  },
+
+  gapActions: {
+    async createTask(id: string): Promise<Task> {
+      if (env.useMocks) throw new Error('createTask is unavailable in mock mode')
+      const res = await http<{ ok: true; task: Task }>(`/insights/business-gaps/${id}/create-task`, { method: 'POST' })
+      return res.task
+    },
+  },
+
+  tasks: {
+    async list(status: 'open' | 'all' = 'open'): Promise<Task[]> {
+      if (env.useMocks) return mock.tasks.filter(t => status === 'all' || t.status === 'open')
+      return http<Task[]>(status === 'open' ? '/tasks?status=open' : '/tasks')
+    },
+    async create(title: string, body = '', owner = ''): Promise<Task> {
+      if (env.useMocks) throw new Error('create is unavailable in mock mode')
+      return http<Task>('/tasks', {
+        method: 'POST',
+        body: JSON.stringify({ title, body, owner }),
+      })
+    },
+    async resolve(id: string): Promise<Task> {
+      if (env.useMocks) throw new Error('resolve is unavailable in mock mode')
+      return http<Task>(`/tasks/${id}/resolve`, { method: 'POST' })
+    },
+    async dismiss(id: string): Promise<Task> {
+      if (env.useMocks) throw new Error('dismiss is unavailable in mock mode')
+      return http<Task>(`/tasks/${id}/dismiss`, { method: 'POST' })
     },
   },
 
@@ -375,6 +420,18 @@ export interface AgentHistoryEntry {
 export interface PromptVersion {
   ts: string
   template: string
+}
+
+export interface Task {
+  id: string
+  title: string
+  body: string
+  source: 'ai_insight' | 'business_gap' | 'bridgistic' | 'manual'
+  sourceId: string
+  owner: string
+  status: 'open' | 'done' | 'dismissed'
+  createdAt: string
+  resolvedAt: string | null
 }
 
 export interface AuditLogEntry {

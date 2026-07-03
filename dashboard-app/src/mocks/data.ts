@@ -331,3 +331,37 @@ export const auditLog = [
   { ts: '2026-07-03T08:22:00Z', kind: 'cancellation.completed', summary: 'Cancellation cx_abc123 marked completed', actor: 12, meta: {} },
   { ts: '2026-07-02T18:10:00Z', kind: 'email.discarded', summary: 'Discarded draft em_zzz999', actor: 12, meta: {} },
 ]
+
+export const shooterInsights = {
+  knownShooters: 2168,
+  repeatRatePct: 34.1,
+  firstTimeThisMonth: 148,
+  lapsed90d: 318,
+  segments: [
+    { key: 'range-regulars',    label: 'Range regulars',           value: 612, hint: '≥ 2 lane bookings / 30d' },
+    { key: 'ccw-graduates',     label: 'CCW graduates',            value: 204, hint: 'Completed CCW class, no gun purchase yet' },
+    { key: 'ammo-bulk-buyers',  label: 'Ammo bulk buyers',         value: 118, hint: '≥ 1000rd order in last 60d' },
+    { key: 'ladies-tuesday',    label: 'Ladies Tuesday attend',    value:  97, hint: 'Attended in last 90d' },
+    { key: 'expired-30-90d',    label: 'Members expired 30-90d',   value:  46, hint: 'High-value win-back list' },
+  ],
+  opportunities: [
+    'Send CCW alumni a rifle-class invite (204 shooters)',
+    'Ammo bulk buyers → member conversion offer (118)',
+    'Expired members within 90d → renewal + return credit (46)',
+    'New first-time visitors last 14d → "come back for lane #2" (72)',
+  ],
+}
+
+export const tasks = [
+  {
+    id: 'task_abc123',
+    title: 'CCW class page is leaking traffic',
+    body: 'Summary: 812 clicks landed on /ccw-class/, but only 42 users started the booking flow.\nAction: Promote next-class chip + CTA above the fold.',
+    source: 'ai_insight' as const,
+    sourceId: 'ins-1',
+    owner: '',
+    status: 'open' as const,
+    createdAt: '2026-07-02T09:20:00Z',
+    resolvedAt: null,
+  },
+]

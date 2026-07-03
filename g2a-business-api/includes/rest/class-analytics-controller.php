@@ -15,6 +15,7 @@ use WordPressistic\G2ABA\Providers\Booking_Provider;
 use WordPressistic\G2ABA\Providers\Insightistic_Provider;
 use WordPressistic\G2ABA\Providers\Membership_Provider;
 use WordPressistic\G2ABA\Providers\Revenue_Provider;
+use WordPressistic\G2ABA\Providers\Segments_Provider;
 use WordPressistic\G2ABA\Providers\SEO_Provider;
 use WordPressistic\G2ABA\Providers\Store_Provider;
 use WordPressistic\G2ABA\Range;
@@ -32,12 +33,13 @@ class Analytics_Controller extends REST_Controller {
 
 		foreach (
 			array(
-				'overview'     => 'overview',
-				'bookings'     => 'bookings',
-				'memberships'  => 'memberships',
-				'store'        => 'store',
-				'seo'          => 'seo',
-				'insightistic' => 'insightistic',
+				'overview'         => 'overview',
+				'bookings'         => 'bookings',
+				'memberships'      => 'memberships',
+				'store'            => 'store',
+				'seo'              => 'seo',
+				'insightistic'     => 'insightistic',
+				'shooter-insights' => 'shooter_insights',
 			) as $slug => $method
 		) {
 			register_rest_route(
@@ -108,6 +110,17 @@ class Analytics_Controller extends REST_Controller {
 			300,
 			static function () use ( $range ) {
 				return ( new SEO_Provider() )->analytics( $range );
+			}
+		);
+		return $this->ok( $data );
+	}
+
+	public function shooter_insights() { // phpcs:ignore Squiz.Commenting.FunctionComment.Missing
+		$data = Cache::remember(
+			'shooter_insights',
+			120,
+			static function () {
+				return ( new Segments_Provider() )->shooter_insights();
 			}
 		);
 		return $this->ok( $data );
