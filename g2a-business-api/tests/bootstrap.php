@@ -80,6 +80,39 @@ if ( ! function_exists( 'do_action' ) ) {
 }
 $GLOBALS['g2aba_test_actions'] = array();
 
+// Cron stubs for Automation_Store + Agent tests.
+$GLOBALS['g2aba_test_cron_scheduled']   = array();  // hook => [ts, interval]
+$GLOBALS['g2aba_test_cron_single']      = array();  // hook => [[ts, args], ...]
+if ( ! function_exists( 'wp_schedule_event' ) ) {
+	function wp_schedule_event( $ts, $interval, $hook, $args = array() ) {
+		$GLOBALS['g2aba_test_cron_scheduled'][ $hook ] = array( 'ts' => $ts, 'interval' => $interval, 'args' => $args );
+		return true;
+	}
+}
+if ( ! function_exists( 'wp_schedule_single_event' ) ) {
+	function wp_schedule_single_event( $ts, $hook, $args = array() ) {
+		$GLOBALS['g2aba_test_cron_single'][] = array( 'ts' => $ts, 'hook' => $hook, 'args' => $args );
+		return true;
+	}
+}
+if ( ! function_exists( 'wp_next_scheduled' ) ) {
+	function wp_next_scheduled( $hook, $args = array() ) {
+		return isset( $GLOBALS['g2aba_test_cron_scheduled'][ $hook ] )
+			? $GLOBALS['g2aba_test_cron_scheduled'][ $hook ]['ts']
+			: false;
+	}
+}
+if ( ! function_exists( 'wp_unschedule_event' ) ) {
+	function wp_unschedule_event( $ts, $hook, $args = array() ) {
+		unset( $GLOBALS['g2aba_test_cron_scheduled'][ $hook ] );
+		return true;
+	}
+}
+if ( ! function_exists( 'add_action' ) ) {
+	function add_action( ...$args ) { $GLOBALS['g2aba_test_added_actions'][] = $args; }
+}
+$GLOBALS['g2aba_test_added_actions'] = array();
+
 $GLOBALS['g2aba_test_options']    = array();
 $GLOBALS['g2aba_test_transients'] = array();
 

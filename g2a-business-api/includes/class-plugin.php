@@ -18,6 +18,7 @@ class Plugin {
 		// Cron hooks must be registered on every request (not just admin), so
 		// that WP-Cron can invoke them when a scheduled event fires.
 		\WordPressistic\G2ABA\AI\Insight_Generator::register_cron();
+		\WordPressistic\G2ABA\Agents\Agent_Runner::register();
 
 		// BridGistic executor subscribes to the approval hook.
 		\WordPressistic\G2ABA\BridGistic\Executor::register();

@@ -3,13 +3,16 @@
  * GET  /automations
  * POST /automations/{id}/toggle
  *
- * Automations live in the `g2aba_automations` option — each is a small record
- * describing a trigger + action + status + last-run bookkeeping.
+ * Reads and mutates through Automation_Store, and calls Cron_Scheduler to
+ * apply schedule side effects so the toggle actually changes WP-Cron state.
  *
  * @package G2ABA
  */
 
 namespace WordPressistic\G2ABA\REST;
+
+use WordPressistic\G2ABA\Automation\Automation_Store;
+use WordPressistic\G2ABA\Automation\Cron_Scheduler;
 
 if ( ! defined( 'ABSPATH' ) ) {
 	exit;
@@ -45,26 +48,24 @@ class Automations_Controller extends REST_Controller {
 	}
 
 	public function list() { // phpcs:ignore Squiz.Commenting.FunctionComment.Missing
-		$raw = get_option( 'g2aba_automations', array() );
-		return $this->ok( is_array( $raw ) ? array_values( $raw ) : array() );
+		return $this->ok( ( new Automation_Store() )->all() );
 	}
 
 	public function toggle( \WP_REST_Request $req ) {
-		$id      = (string) $req->get_param( 'id' );
+		$slug    = (string) $req->get_param( 'id' );
 		$enabled = (bool) $req->get_param( 'enabled' );
+		$store   = new Automation_Store();
 
-		$raw = get_option( 'g2aba_automations', array() );
-		if ( ! is_array( $raw ) || ! isset( $raw[ $id ] ) ) {
+		$updated = $store->set_status( $slug, $enabled ? Automation_Store::STATUS_ACTIVE : Automation_Store::STATUS_PAUSED );
+		if ( null === $updated ) {
 			return new \WP_Error(
 				'g2aba_automation_not_found',
-				__( 'Unknown automation id.', 'g2a-business-api' ),
+				__( 'Unknown automation slug.', 'g2a-business-api' ),
 				array( 'status' => 404 )
 			);
 		}
 
-		$raw[ $id ]['status'] = $enabled ? 'active' : 'paused';
-		update_option( 'g2aba_automations', $raw, false );
-
-		return $this->ok( array( 'ok' => true ) );
+		Cron_Scheduler::apply( $updated );
+		return $this->ok( $updated );
 	}
 }

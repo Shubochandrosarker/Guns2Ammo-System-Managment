@@ -2,11 +2,16 @@
 /**
  * GET  /agents
  * POST /agents/{id}/run
+ * GET  /agents/{id}/history
  *
  * @package G2ABA
  */
 
 namespace WordPressistic\G2ABA\REST;
+
+use WordPressistic\G2ABA\Agents\Agent_History;
+use WordPressistic\G2ABA\Agents\Agent_Runner;
+use WordPressistic\G2ABA\Agents\Agent_Store;
 
 if ( ! defined( 'ABSPATH' ) ) {
 	exit;
@@ -33,18 +38,26 @@ class Agents_Controller extends REST_Controller {
 				'permission_callback' => array( $this, 'admin_permissions_check' ),
 			)
 		);
+
+		register_rest_route(
+			$this->namespace,
+			'/agents/(?P<id>[a-z0-9_-]+)/history',
+			array(
+				'methods'             => \WP_REST_Server::READABLE,
+				'callback'            => array( $this, 'history' ),
+				'permission_callback' => array( $this, 'read_permissions_check' ),
+			)
+		);
 	}
 
 	public function list() { // phpcs:ignore Squiz.Commenting.FunctionComment.Missing
-		$raw = get_option( 'g2aba_agents', array() );
-		return $this->ok( is_array( $raw ) ? array_values( $raw ) : array() );
+		return $this->ok( ( new Agent_Store() )->all() );
 	}
 
 	public function run( \WP_REST_Request $req ) {
-		$id  = (string) $req->get_param( 'id' );
-		$raw = get_option( 'g2aba_agents', array() );
-
-		if ( ! is_array( $raw ) || ! isset( $raw[ $id ] ) ) {
+		$id    = (string) $req->get_param( 'id' );
+		$store = new Agent_Store();
+		if ( null === $store->find( $id ) ) {
 			return new \WP_Error(
 				'g2aba_agent_not_found',
 				__( 'Unknown agent id.', 'g2a-business-api' ),
@@ -52,14 +65,21 @@ class Agents_Controller extends REST_Controller {
 			);
 		}
 
-		$raw[ $id ]['lastRun']    = gmdate( 'c' );
-		$raw[ $id ]['lastOutput'] = __( 'Run scheduled — output will appear when the agent completes.', 'g2a-business-api' );
-		update_option( 'g2aba_agents', $raw, false );
-
-		// The generator runs asynchronously via WP-Cron so we don't block the
-		// dashboard's fetch on an LLM roundtrip.
-		wp_schedule_single_event( time() + 5, 'g2aba_run_agent', array( $id ) );
-
+		// Kick the runner via WP-Cron so the REST call doesn't block on the
+		// model roundtrip. Agent_Runner::register() wires the hook.
+		wp_schedule_single_event( time() + 5, Agent_Runner::CRON_HOOK, array( $id ) );
 		return $this->ok( array( 'ok' => true, 'queued' => true ) );
+	}
+
+	public function history( \WP_REST_Request $req ) {
+		$id = (string) $req->get_param( 'id' );
+		if ( null === ( new Agent_Store() )->find( $id ) ) {
+			return new \WP_Error(
+				'g2aba_agent_not_found',
+				__( 'Unknown agent id.', 'g2a-business-api' ),
+				array( 'status' => 404 )
+			);
+		}
+		return $this->ok( Agent_History::for_agent( $id ) );
 	}
 }
