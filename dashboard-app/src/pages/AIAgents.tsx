@@ -1,9 +1,9 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { PageHeader } from '@/components/ui/PageHeader'
 import { Card } from '@/components/ui/Card'
 import { Spinner } from '@/components/ui/Spinner'
 import { useAsync } from '@/lib/hooks'
-import { api, type AgentHistoryEntry } from '@/lib/api'
+import { api, type AgentHistoryEntry, type PromptVersion } from '@/lib/api'
 import type { Agent } from '@/types/analytics'
 import { cn } from '@/lib/cn'
 
@@ -163,18 +163,40 @@ function HistoryPane({ agentId }: { agentId: string }) {
 }
 
 function PromptPane({ agent }: { agent: Agent }) {
-  // The agents endpoint doesn't currently expose the full stored template
-  // to the read path, so we start from an empty box and let the operator
-  // paste / re-type. This is intentional — prompts are treated as sensitive.
   const [template, setTemplate] = useState('')
+  const [history, setHistory] = useState<PromptVersion[]>([])
+  const [loaded, setLoaded] = useState(false)
   const [status, setStatus] = useState<{ ok: boolean; msg: string } | null>(null)
   const [busy, setBusy] = useState(false)
+
+  useEffect(() => {
+    let cancelled = false
+    void api.agentPrompt
+      .get(agent.id)
+      .then(res => {
+        if (cancelled) return
+        setTemplate(res.template)
+        setHistory(res.history)
+        setLoaded(true)
+      })
+      .catch(err => {
+        if (cancelled) return
+        setStatus({ ok: false, msg: err instanceof Error ? err.message : String(err) })
+        setLoaded(true)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [agent.id])
 
   async function save() {
     setBusy(true)
     setStatus(null)
     try {
       const res = await api.agentPrompt.set(agent.id, template)
+      // Re-fetch history — set_prompt appended the previous version.
+      const fresh = await api.agentPrompt.get(agent.id)
+      setHistory(fresh.history)
       setStatus({
         ok: true,
         msg: res.placeholder
@@ -188,15 +210,16 @@ function PromptPane({ agent }: { agent: Agent }) {
     }
   }
 
+  if (!loaded) return <Spinner label="Loading prompt…" />
+
   return (
     <div>
       <p className="text-sm text-ink-600 mb-3">
-        Paste the new prompt template. Use <code className="font-mono text-xs">{'{{snapshot}}'}</code> as
-        the placeholder — the runner replaces it with a JSON analytics
-        snapshot for the last 30 days.
+        Edit the prompt template. Use <code className="font-mono text-xs">{'{{snapshot}}'}</code> as the
+        placeholder — the runner replaces it with a JSON analytics snapshot for the last 30 days.
       </p>
       <textarea
-        className="input font-mono text-xs min-h-[300px]"
+        className="input font-mono text-xs min-h-[280px]"
         value={template}
         onChange={e => setTemplate(e.target.value)}
         placeholder={`You are the analyst for Guns2Ammo.\n\nSNAPSHOT:\n{{snapshot}}`}
@@ -215,6 +238,32 @@ function PromptPane({ agent }: { agent: Agent }) {
           )}
         >
           {status.msg}
+        </div>
+      )}
+
+      {history.length > 0 && (
+        <div className="mt-6">
+          <div className="text-xs font-semibold uppercase tracking-wide text-ink-500 mb-2">
+            Previous versions ({history.length})
+          </div>
+          <ul className="space-y-3">
+            {history.map(v => (
+              <li key={v.ts} className="rounded-lg border border-ink-100 p-3">
+                <div className="flex items-center justify-between text-xs text-ink-500 mb-1">
+                  <span>{new Date(v.ts).toLocaleString()}</span>
+                  <button
+                    className="btn-ghost !py-0.5 !px-2 text-[11px]"
+                    onClick={() => setTemplate(v.template)}
+                  >
+                    Restore
+                  </button>
+                </div>
+                <pre className="font-mono text-[11px] text-ink-700 whitespace-pre-wrap max-h-40 overflow-y-auto">
+                  {v.template}
+                </pre>
+              </li>
+            ))}
+          </ul>
         </div>
       )}
     </div>

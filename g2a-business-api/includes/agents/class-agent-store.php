@@ -88,6 +88,13 @@ class Agent_Store {
 			return array( 'ok' => false, 'error' => 'Unknown agent id.' );
 		}
 
+		$previous = (string) ( $raw[ $id ]['promptTemplate'] ?? '' );
+		if ( '' !== $previous && $previous !== $template ) {
+			// Append the previous version to a bounded per-agent history so
+			// operators can see how the prompt has drifted.
+			self::append_prompt_version( $id, $previous );
+		}
+
 		$raw[ $id ]['promptTemplate'] = $template;
 		update_option( self::OPTION, $raw, false );
 
@@ -96,6 +103,53 @@ class Agent_Store {
 			'record'       => $raw[ $id ],
 			'placeholder'  => false !== strpos( $template, '{{snapshot}}' ),
 		);
+	}
+
+	/**
+	 * Read the current prompt template for an agent + the last 10 previous
+	 * versions. Owner-only surface: this returns plaintext, so callers must
+	 * gate it behind the admin capability.
+	 *
+	 * @return array{template:string,history:array<int,array{ts:string,template:string}>}|null
+	 */
+	public function get_prompt( string $id ): ?array {
+		$rec = $this->find( $id );
+		if ( null === $rec ) {
+			return null;
+		}
+		return array(
+			'template' => (string) ( $rec['promptTemplate'] ?? '' ),
+			'history'  => self::prompt_versions_for( $id ),
+		);
+	}
+
+	private static function append_prompt_version( string $id, string $previous_template ): void {
+		$key = self::prompt_version_key( $id );
+		$raw = get_option( $key, array() );
+		$raw = is_array( $raw ) ? $raw : array();
+		array_unshift(
+			$raw,
+			array(
+				'ts'       => gmdate( 'c' ),
+				'template' => $previous_template,
+			)
+		);
+		if ( count( $raw ) > 10 ) {
+			$raw = array_slice( $raw, 0, 10 );
+		}
+		update_option( $key, $raw, false );
+	}
+
+	/**
+	 * @return array<int, array{ts:string,template:string}>
+	 */
+	public static function prompt_versions_for( string $id ): array {
+		$raw = get_option( self::prompt_version_key( $id ), array() );
+		return is_array( $raw ) ? $raw : array();
+	}
+
+	private static function prompt_version_key( string $id ): string {
+		return 'g2aba_agent_prompt_history_' . preg_replace( '/[^a-z0-9_-]/i', '', $id );
 	}
 
 	/**

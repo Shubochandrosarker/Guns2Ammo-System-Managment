@@ -25,6 +25,11 @@ class Plugin {
 		\WordPressistic\G2ABA\Automation\Handlers\Low_Stock_Handler::register();
 		\WordPressistic\G2ABA\Automation\Handlers\SEO_Drop_Handler::register();
 		\WordPressistic\G2ABA\Automation\Handlers\Membership_Renewal_Handler::register();
+		\WordPressistic\G2ABA\Automation\Handlers\Booking_Reminder_Handler::register();
+		\WordPressistic\G2ABA\Automation\Handlers\Waiver_Reminder_Handler::register();
+		\WordPressistic\G2ABA\Automation\Handlers\Abandoned_Inquiry_Handler::register();
+		\WordPressistic\G2ABA\Automation\Handlers\Ladies_Upsell_Handler::register();
+		\WordPressistic\G2ABA\Automation\Handlers\Churn_Risk_Handler::register();
 
 		// BridGistic executor subscribes to the approval hook.
 		\WordPressistic\G2ABA\BridGistic\Executor::register();
