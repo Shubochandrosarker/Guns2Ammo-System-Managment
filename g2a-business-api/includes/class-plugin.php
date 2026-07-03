@@ -39,6 +39,7 @@ class Plugin {
 			\WordPressistic\G2ABA\Admin\Settings_Page::register();
 			\WordPressistic\G2ABA\Admin\Email_Drafts_Page::register();
 			\WordPressistic\G2ABA\Admin\Cancellations_Page::register();
+			\WordPressistic\G2ABA\Admin\Opt_Outs_Page::register();
 		}
 	}
 

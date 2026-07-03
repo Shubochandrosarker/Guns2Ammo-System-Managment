@@ -70,7 +70,8 @@ class Membership_Renewal_Handler extends Handler_Base {
 					sprintf( 'Membership renewal reminder for %s (%d days out)', $name, $offset ),
 					$email,
 					self::subject_for( $offset ),
-					self::compose_body( $name, (string) ( $row['plan_name'] ?? '' ), (string) ( $row['expires_at'] ?? '' ), $offset )
+					self::compose_body( $name, (string) ( $row['plan_name'] ?? '' ), (string) ( $row['expires_at'] ?? '' ), $offset ),
+					\WordPressistic\G2ABA\Ops\Opt_Out_Store::CATEGORY_RENEWALS
 				);
 				$drafts_created++;
 			}

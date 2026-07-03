@@ -53,13 +53,21 @@ class Email_Draft_Store {
 		);
 	}
 
-	public function enqueue( string $query, string $to = '', string $subject = '', string $body = '' ): array {
+	public function enqueue( string $query, string $to = '', string $subject = '', string $body = '', string $category = Opt_Out_Store::CATEGORY_ALL ): array {
+		$normalised_category = Opt_Out_Store::normalize_category( $category );
+		if ( '' === $normalised_category && Opt_Out_Store::CATEGORY_INTERNAL === $category ) {
+			$normalised_category = Opt_Out_Store::CATEGORY_INTERNAL;
+		}
+		if ( '' === $normalised_category ) {
+			$normalised_category = Opt_Out_Store::CATEGORY_ALL;
+		}
 		$draft = array(
 			'id'        => 'em_' . bin2hex( random_bytes( 6 ) ),
 			'query'     => $query,
 			'to'        => $to,
 			'subject'   => '' !== $subject ? $subject : self::first_sentence( $query ),
 			'body'      => '' !== $body ? $body : $query,
+			'category'  => $normalised_category,
 			'status'    => self::STATUS_PENDING,
 			'createdAt' => gmdate( 'c' ),
 			'sentAt'    => null,

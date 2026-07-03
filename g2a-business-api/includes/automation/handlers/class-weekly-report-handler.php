@@ -44,7 +44,8 @@ class Weekly_Report_Handler extends Handler_Base {
 			'Weekly business report',
 			'',
 			sprintf( 'Weekly business report — %s to %s', $range->from, $range->to ),
-			$body
+			$body,
+			\WordPressistic\G2ABA\Ops\Opt_Out_Store::CATEGORY_INTERNAL
 		);
 
 		return sprintf( 'Weekly report drafted (%s → %s).', $range->from, $range->to );

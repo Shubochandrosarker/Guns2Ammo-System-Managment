@@ -63,7 +63,8 @@ class Waiver_Reminder_Handler extends Handler_Base {
 				sprintf( 'Waiver reminder for booking #%s', (string) ( $row['id'] ?? '' ) ),
 				$email,
 				'Please sign your Guns2Ammo waiver before your visit',
-				self::compose_body( (string) ( $row['name'] ?? '' ) )
+				self::compose_body( (string) ( $row['name'] ?? '' ) ),
+				\WordPressistic\G2ABA\Ops\Opt_Out_Store::CATEGORY_TRANSACTIONAL
 			);
 			$drafted++;
 		}

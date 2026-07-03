@@ -14,7 +14,7 @@ class EmailSenderOptOutTest extends TestCase {
 	}
 
 	public function test_send_refuses_opted_out_recipient() {
-		( new Opt_Out_Store() )->record( 'priya@example.com', 'user_requested' );
+		( new Opt_Out_Store() )->record( 'priya@example.com', Opt_Out_Store::CATEGORY_ALL, 'user_requested' );
 
 		$store = new Email_Draft_Store();
 		$d     = $store->enqueue( 'x' );
@@ -44,6 +44,7 @@ class EmailSenderOptOutTest extends TestCase {
 		$this->assertStringContainsString( 'List-Unsubscribe-Post: List-Unsubscribe=One-Click', $joined );
 
 		$body = $GLOBALS['g2aba_test_wp_mail_calls'][0]['body'];
-		$this->assertStringContainsString( 'To stop receiving Guns2Ammo emails', $body );
+		// Phase 9: footer text got "these" inserted to reflect the category-scoped opt-out.
+		$this->assertStringContainsString( 'To stop receiving these Guns2Ammo emails', $body );
 	}
 }
