@@ -53,14 +53,34 @@ class Agents_Controller extends REST_Controller {
 			$this->namespace,
 			'/agents/(?P<id>[a-z0-9_-]+)/prompt',
 			array(
-				'methods'             => \WP_REST_Server::CREATABLE,
-				'callback'            => array( $this, 'set_prompt' ),
-				'permission_callback' => array( $this, 'admin_permissions_check' ),
-				'args'                => array(
-					'template' => array( 'type' => 'string', 'required' => true ),
+				array(
+					'methods'             => \WP_REST_Server::CREATABLE,
+					'callback'            => array( $this, 'set_prompt' ),
+					'permission_callback' => array( $this, 'admin_permissions_check' ),
+					'args'                => array(
+						'template' => array( 'type' => 'string', 'required' => true ),
+					),
+				),
+				array(
+					'methods'             => \WP_REST_Server::READABLE,
+					'callback'            => array( $this, 'get_prompt' ),
+					'permission_callback' => array( $this, 'admin_permissions_check' ),
 				),
 			)
 		);
+	}
+
+	public function get_prompt( \WP_REST_Request $req ) {
+		$id  = (string) $req->get_param( 'id' );
+		$out = ( new Agent_Store() )->get_prompt( $id );
+		if ( null === $out ) {
+			return new \WP_Error(
+				'g2aba_agent_not_found',
+				__( 'Unknown agent id.', 'g2a-business-api' ),
+				array( 'status' => 404 )
+			);
+		}
+		return $this->ok( $out );
 	}
 
 	public function set_prompt( \WP_REST_Request $req ) {

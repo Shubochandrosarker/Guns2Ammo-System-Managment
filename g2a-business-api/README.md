@@ -60,6 +60,8 @@ All other routes require `g2a_dashboard` (read) or `g2a_dashboard_admin`
 | GET    | `/agents/{id}/history`                      | read   |
 | POST   | `/agents/{id}/prompt`                       | admin  |
 | GET    | `/audit-log?limit=100`                      | read   |
+| GET    | `/agents/{id}/prompt`                       | admin  |
+| POST   | `/public/opt-out`                           | public |
 
 ## Operational review screens
 
@@ -170,6 +172,48 @@ through the existing owner-approved `Email_Sender` path (audit-logged).
 - **`Membership_Renewal_Handler`** — daily. Finds Memberistic
   memberships expiring in exactly 30 / 7 / 1 day and drafts one
   personalised renewal email per member.
+- **`Booking_Reminder_Handler`** — hourly. For any booking whose
+  `start_at` is inside the next 24h window, drafts a friendly
+  reminder addressed to the booking's email (or the linked user's).
+- **`Waiver_Reminder_Handler`** — hourly. Same window as
+  Booking_Reminder but scoped to bookings whose `waiver_signed_at`
+  is null. Drafts a "please sign before you visit" nudge.
+- **`Abandoned_Inquiry_Handler`** — hourly. Reads the WPistic
+  Contact Form submissions table for entries older than 48h with no
+  `replied_at`. Drafts one internal-staff summary email to the
+  `admin_email`.
+- **`Ladies_Upsell_Handler`** — hourly. For Ladies Tuesday bookings
+  created in the last hour, drafts two follow-ups per attendee:
+  "bring a friend" and "graduate to CCW class".
+- **`Churn_Risk_Handler`** — daily. Reads Memberistic for active
+  memberships expiring in the next 14 days and drafts a personalised
+  "we miss you" email per match.
+
+## Opt-out compliance
+
+- **`Ops\Opt_Out_Store`** — persistent list keyed by lowercased
+  email. Case-insensitive lookup + insert. Bounded ring of 5,000
+  entries.
+- **`Ops\Opt_Out_Signer`** — HMAC-SHA256 over `email + '|' + expires`
+  keyed by a derivation of `AUTH_KEY`. Tokens are base64url-encoded,
+  90-day TTL by default, verified with `hash_equals` (constant-time).
+- **`Email_Sender`** — gate: any recipient in the opt-out store is
+  refused before wp_mail is called. The draft transitions to
+  `failed` with `Recipient has opted out`, and an
+  `email.suppressed_opt_out` audit entry lands.
+- Every outgoing message adds the `List-Unsubscribe` header +
+  `List-Unsubscribe-Post: List-Unsubscribe=One-Click` (RFC 8058) and
+  a plain-text unsubscribe footer with the signed link.
+- **`POST /public/opt-out`** (no auth) validates `{email, expires, token}`
+  against the signer, records the opt-out, and writes an audit entry.
+
+## Agent prompt history
+
+Every `set_prompt` that actually changes the template pushes the
+previous template into a bounded per-agent version log
+(`g2aba_agent_prompt_history_<id>`, capped at 10). `GET
+/agents/{id}/prompt` (admin cap) returns the current template + the
+history so operators can review and restore.
 
 ## AI Agents (real runtime)
 

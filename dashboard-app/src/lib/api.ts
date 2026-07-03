@@ -311,6 +311,10 @@ export const api = {
       )
       return { record: res.record, placeholder: res.placeholder }
     },
+    async get(agentId: string): Promise<{ template: string; history: PromptVersion[] }> {
+      if (env.useMocks) return { template: '(edit disabled in mock mode)', history: [] }
+      return http<{ template: string; history: PromptVersion[] }>(`/agents/${agentId}/prompt`)
+    },
   },
 
   auditLog: {
@@ -366,6 +370,11 @@ export interface AgentHistoryEntry {
   ts: string
   output: string
   confidence: number
+}
+
+export interface PromptVersion {
+  ts: string
+  template: string
 }
 
 export interface AuditLogEntry {
