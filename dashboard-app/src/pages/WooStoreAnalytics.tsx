@@ -33,11 +33,11 @@ export function WooStoreAnalytics() {
           <div className="h-56">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={d.categoryRevenue} layout="vertical" margin={{ top: 5, right: 10, left: 30, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#eef0f4" />
-                <XAxis type="number" tick={{ fontSize: 11, fill: '#8b93a3' }} tickFormatter={v => `$${Math.round(v / 100)}`} />
-                <YAxis dataKey="category" type="category" tick={{ fontSize: 12, fill: '#5b6272' }} width={100} />
+                <CartesianGrid strokeDasharray="3 3" stroke="var(--chart-grid)" />
+                <XAxis type="number" tick={{ fontSize: 11, fill: 'var(--chart-axis)' }} tickFormatter={v => `$${Math.round(v / 100)}`} />
+                <YAxis dataKey="category" type="category" tick={{ fontSize: 12, fill: 'var(--chart-axis)' }} width={100} />
                 <Tooltip formatter={(v: number) => [formatCurrency(v), 'Revenue']} />
-                <Bar dataKey="revenue" fill="#e56410" radius={[0, 4, 4, 0]} />
+                <Bar dataKey="revenue" fill="var(--brand)" radius={[0, 4, 4, 0]} />
               </BarChart>
             </ResponsiveContainer>
           </div>
@@ -47,11 +47,11 @@ export function WooStoreAnalytics() {
           <div className="h-56">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={d.brandRevenue} layout="vertical" margin={{ top: 5, right: 10, left: 30, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#eef0f4" />
-                <XAxis type="number" tick={{ fontSize: 11, fill: '#8b93a3' }} tickFormatter={v => `$${Math.round(v / 100)}`} />
-                <YAxis dataKey="brand" type="category" tick={{ fontSize: 12, fill: '#5b6272' }} width={110} />
+                <CartesianGrid strokeDasharray="3 3" stroke="var(--chart-grid)" />
+                <XAxis type="number" tick={{ fontSize: 11, fill: 'var(--chart-axis)' }} tickFormatter={v => `$${Math.round(v / 100)}`} />
+                <YAxis dataKey="brand" type="category" tick={{ fontSize: 12, fill: 'var(--chart-axis)' }} width={110} />
                 <Tooltip formatter={(v: number) => [formatCurrency(v), 'Revenue']} />
-                <Bar dataKey="revenue" fill="#0ea5e9" radius={[0, 4, 4, 0]} />
+                <Bar dataKey="revenue" fill="var(--info)" radius={[0, 4, 4, 0]} />
               </BarChart>
             </ResponsiveContainer>
           </div>
@@ -59,7 +59,7 @@ export function WooStoreAnalytics() {
       </div>
 
       <Card title="Best sellers" className="mt-6">
-        <table className="w-full text-sm">
+        <div className="overflow-x-auto -mx-1 px-1"><table className="w-full text-sm">
           <thead>
             <tr className="text-left text-xs uppercase tracking-wide text-ink-500 border-b border-ink-100">
               <th className="py-2">Product</th>
@@ -78,7 +78,7 @@ export function WooStoreAnalytics() {
               </tr>
             ))}
           </tbody>
-        </table>
+        </table></div>
       </Card>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mt-6">

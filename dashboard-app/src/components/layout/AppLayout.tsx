@@ -28,7 +28,8 @@ export function AppLayout({ session, onSessionChange }: Props) {
 
       {mobileOpen && (
         <div
-          className="fixed inset-0 z-30 lg:hidden bg-ink-900/60"
+          className="fixed inset-0 z-30 lg:hidden"
+          style={{ backgroundColor: 'var(--bg-overlay)' }}
           onClick={() => setMobileOpen(false)}
         >
           <div
@@ -47,7 +48,7 @@ export function AppLayout({ session, onSessionChange }: Props) {
           onOpenSidebar={() => setMobileOpen(true)}
         />
         <main className="flex-1 overflow-y-auto">
-          <div className="px-4 lg:px-8 py-6 max-w-[1400px] mx-auto w-full">
+          <div className="px-3 sm:px-4 lg:px-8 py-4 sm:py-6 max-w-[1400px] mx-auto w-full">
             <Outlet />
           </div>
         </main>
