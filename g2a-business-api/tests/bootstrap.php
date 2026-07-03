@@ -54,6 +54,31 @@ if ( ! function_exists( 'sanitize_title' ) ) {
 		return trim( (string) $t, '-' );
 	}
 }
+if ( ! function_exists( 'get_current_user_id' ) ) {
+	function get_current_user_id() { return $GLOBALS['g2aba_test_current_user_id'] ?? 0; }
+}
+
+// wp_mail stub for Email_Sender tests. Tests can override the outcome per-case
+// by setting $GLOBALS['g2aba_test_wp_mail_return']. Every call is captured.
+$GLOBALS['g2aba_test_wp_mail_return'] = true;
+$GLOBALS['g2aba_test_wp_mail_calls']  = array();
+if ( ! function_exists( 'wp_mail' ) ) {
+	function wp_mail( $to, $subject, $body, $headers = array() ) {
+		$GLOBALS['g2aba_test_wp_mail_calls'][] = array(
+			'to'      => $to,
+			'subject' => $subject,
+			'body'    => $body,
+			'headers' => $headers,
+		);
+		return $GLOBALS['g2aba_test_wp_mail_return'];
+	}
+}
+if ( ! function_exists( 'do_action' ) ) {
+	function do_action( ...$args ) {
+		$GLOBALS['g2aba_test_actions'][] = $args;
+	}
+}
+$GLOBALS['g2aba_test_actions'] = array();
 
 $GLOBALS['g2aba_test_options']    = array();
 $GLOBALS['g2aba_test_transients'] = array();

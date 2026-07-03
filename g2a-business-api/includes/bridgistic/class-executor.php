@@ -65,17 +65,13 @@ class Executor {
 
 	private static function handle_email_draft( string $query ): string {
 		// SAFE by default — we never auto-send. The approved action creates a
-		// draft in the plugin's own draft store; a follow-up admin action
-		// sends it after human review. Storing here is intentionally cheap.
-		$drafts    = get_option( 'g2aba_bridgistic_email_drafts', array() );
-		$drafts    = is_array( $drafts ) ? $drafts : array();
-		$drafts[]  = array(
-			'query'     => $query,
-			'createdAt' => gmdate( 'c' ),
-			'status'    => 'pending_send',
+		// draft in Email_Draft_Store; the WP-admin Email Drafts screen (or
+		// the /email-drafts REST route) is where a human reviews + sends.
+		$draft = ( new \WordPressistic\G2ABA\Ops\Email_Draft_Store() )->enqueue( $query );
+		return sprintf(
+			'Drafted email %s. Review + send from Settings → G2A Business API → Email Drafts.',
+			$draft['id']
 		);
-		update_option( 'g2aba_bridgistic_email_drafts', array_slice( $drafts, -50 ), false );
-		return 'Drafted an email for the request. Nothing was sent — draft is queued for manual send.';
 	}
 
 	private static function handle_create_task( string $query ): string {
@@ -94,21 +90,14 @@ class Executor {
 	private static function handle_cancel_booking( string $query ): string {
 		// Cancelling a real booking touches money. We deliberately do NOT
 		// auto-cancel here — the executor extracts the booking id if the
-		// query names one, records a cancellation request in a review
-		// queue, and returns a clear "requires manual step" result.
-		$id = self::extract_booking_id( $query );
-		$q  = get_option( 'g2aba_bridgistic_cancel_queue', array() );
-		$q  = is_array( $q ) ? $q : array();
-		$q[] = array(
-			'bookingId' => $id,
-			'query'     => $query,
-			'createdAt' => gmdate( 'c' ),
-			'status'    => 'awaiting_manual_action',
-		);
-		update_option( 'g2aba_bridgistic_cancel_queue', array_slice( $q, -50 ), false );
-		return $id
-			? sprintf( 'Cancellation request queued for booking %s. Complete the cancel in the Booking Engine.', $id )
-			: 'Cancellation request queued. Booking id was not detected in the query — resolve manually.';
+		// query names one, records a cancellation *request* in the
+		// Cancellation_Queue for a human to finalize.
+		$booking_id = self::extract_booking_id( $query );
+		$entry      = ( new \WordPressistic\G2ABA\Ops\Cancellation_Queue() )->enqueue( $booking_id, $query );
+
+		return $booking_id
+			? sprintf( 'Cancellation request %s queued for booking %s. Complete the cancel in the Booking Engine.', $entry['id'], $booking_id )
+			: sprintf( 'Cancellation request %s queued. Booking id was not detected in the query — resolve manually.', $entry['id'] );
 	}
 
 	private static function first_words( string $s, int $count ): string {

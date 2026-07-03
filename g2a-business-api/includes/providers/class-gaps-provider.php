@@ -17,7 +17,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 
 class Gaps_Provider {
-	public function detect( array $bookings, array $memberships, array $store, array $seo ): array {
+	public function detect( array $bookings, array $memberships, array $store, array $seo, array $gbp = array() ): array {
 		$gaps = array();
 
 		// Rule 1 — renewal underperformance.
@@ -92,6 +92,42 @@ class Gaps_Provider {
 				'fix'      => 'Audit landing pages for target queries + local-pack signals (GBP, citations).',
 				'priority' => 'medium',
 				'owner'    => 'Content',
+			);
+		}
+
+		// Rule 6 — Google Business Profile action rate is very low.
+		// If we see ≥ 1000 profile views but < 10 calls + directions +
+		// website clicks combined, the listing is being seen but not acted on.
+		$views_total   = (int) ( $gbp['viewsSearch'] ?? 0 ) + (int) ( $gbp['viewsMaps'] ?? 0 );
+		$actions_total = (int) ( $gbp['callsClicked'] ?? 0 )
+			+ (int) ( $gbp['directionsRequested'] ?? 0 )
+			+ (int) ( $gbp['websiteClicked'] ?? 0 );
+		if ( $views_total >= 1000 && $actions_total < 10 ) {
+			$gaps[] = array(
+				'id'       => 'gap-gbp-actions',
+				'problem'  => 'GBP listing gets views but no actions',
+				'evidence' => sprintf( '%d listing views vs %d actions (calls + directions + website).', $views_total, $actions_total ),
+				'impact'   => 'Local searchers see the store but aren\'t routed anywhere.',
+				'fix'      => 'Refresh hours, primary photo, and post a recent update; verify phone + website links.',
+				'priority' => 'high',
+				'owner'    => 'Marketing',
+			);
+		}
+
+		// Rule 7 — low review count relative to review-eligible visits.
+		// If ≥ 20 direction-request signals but < 3 total reviews, ask
+		// customers for reviews after their visit.
+		$reviews = (int) ( $gbp['reviewCount'] ?? 0 );
+		$dir_req = (int) ( $gbp['directionsRequested'] ?? 0 );
+		if ( $dir_req >= 20 && $reviews < 3 ) {
+			$gaps[] = array(
+				'id'       => 'gap-gbp-reviews',
+				'problem'  => 'Low review velocity relative to visitor demand',
+				'evidence' => sprintf( '%d direction requests but only %d Google reviews.', $dir_req, $reviews ),
+				'impact'   => 'Every unlisted 5-star review reduces future click-through.',
+				'fix'      => 'Add a post-visit review-ask (kiosk QR + email) and reply to existing reviews.',
+				'priority' => 'medium',
+				'owner'    => 'Marketing',
 			);
 		}
 
