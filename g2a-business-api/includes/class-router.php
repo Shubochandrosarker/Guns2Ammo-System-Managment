@@ -21,6 +21,7 @@ use WordPressistic\G2ABA\REST\Insights_Controller;
 use WordPressistic\G2ABA\REST\Models_Controller;
 use WordPressistic\G2ABA\REST\Ops_Controller;
 use WordPressistic\G2ABA\REST\Public_Controller;
+use WordPressistic\G2ABA\REST\Tasks_Controller;
 
 if ( ! defined( 'ABSPATH' ) ) {
 	exit;
@@ -45,6 +46,7 @@ class Router {
 			BridGistic_Controller::class,
 			Ops_Controller::class,
 			Public_Controller::class,
+			Tasks_Controller::class,
 		);
 	}
 

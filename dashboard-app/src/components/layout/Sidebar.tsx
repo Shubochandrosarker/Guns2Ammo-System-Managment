@@ -41,6 +41,7 @@ const NAV = [
     group: 'System',
     items: [
       { to: '/reports',              label: 'Reports',               icon: '☰' },
+      { to: '/tasks',                label: 'Tasks',                 icon: '✎' },
       { to: '/ops-queue',            label: 'Ops Queue',             icon: '✓' },
       { to: '/system-health',        label: 'System Health',         icon: '♥' },
       { to: '/settings',             label: 'Settings',              icon: '⚙' },
