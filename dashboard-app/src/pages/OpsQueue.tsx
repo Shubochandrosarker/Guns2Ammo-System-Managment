@@ -151,7 +151,15 @@ function AuditTab() {
   }, [])
 
   return (
-    <Card title="Audit log" subtitle="Every send / discard / mark-completed / drop performed by the plugin">
+    <Card
+      title="Audit log"
+      subtitle="Every send / discard / mark-completed / drop performed by the plugin"
+      actions={
+        <a href={api.exports.auditCsvUrl()} download className="btn-secondary text-xs">
+          Download CSV
+        </a>
+      }
+    >
       {error && (
         <div className="text-sm text-rose-700 bg-rose-50 border border-rose-100 rounded-lg px-3 py-2">
           {error}

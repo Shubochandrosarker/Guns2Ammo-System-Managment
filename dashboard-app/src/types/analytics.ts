@@ -137,6 +137,7 @@ export interface AIInsight {
 
 export interface Automation {
   id: string
+  slug: string
   name: string
   category:
     | 'booking'
@@ -150,6 +151,7 @@ export interface Automation {
     | 'agents'
   trigger: string
   action: string
+  interval: 'hourly' | 'twicedaily' | 'daily' | 'weekly'
   status: 'active' | 'paused' | 'failing'
   lastRun: ISODate | null
   lastResult: 'ok' | 'error' | null

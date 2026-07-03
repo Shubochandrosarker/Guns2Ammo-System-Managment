@@ -233,6 +233,26 @@ export const api = {
         body: JSON.stringify({ enabled }),
       })
     },
+    async updateSchedule(id: string, patch: { interval?: AutomationInterval; status?: 'active' | 'paused' }): Promise<Automation> {
+      if (env.useMocks) throw new Error('updateSchedule is unavailable in mock mode')
+      return http<Automation>(`/automations/${id}`, {
+        method: 'PATCH',
+        body: JSON.stringify(patch),
+      })
+    },
+  },
+
+  exports: {
+    // Build absolute URLs so the browser handles Content-Disposition properly.
+    tasksCsvUrl(): string {
+      return `${env.apiBase.replace(/\/$/, '')}/wp-json/g2a/v1/export/tasks.csv`
+    },
+    auditCsvUrl(): string {
+      return `${env.apiBase.replace(/\/$/, '')}/wp-json/g2a/v1/export/audit-log.csv`
+    },
+    reportTxtUrl(id: string): string {
+      return `${env.apiBase.replace(/\/$/, '')}/wp-json/g2a/v1/export/reports/${id}.txt`
+    },
   },
 
   agents: {
@@ -252,6 +272,31 @@ export const api = {
     async test(id: string): Promise<ModelTestResult> {
       if (env.useMocks) return { ok: true, latencyMs: 240, provider: 'mock', probe: 'mock' }
       return http<ModelTestResult>(`/model-connections/${id}/test`, { method: 'POST' })
+    },
+    async create(patch: ModelPatch): Promise<ModelConnection> {
+      if (env.useMocks) throw new Error('create is unavailable in mock mode')
+      return http<ModelConnection>('/model-connections', {
+        method: 'POST',
+        body: JSON.stringify(patch),
+      })
+    },
+    async update(id: string, patch: ModelPatch): Promise<ModelConnection> {
+      if (env.useMocks) throw new Error('update is unavailable in mock mode')
+      return http<ModelConnection>(`/model-connections/${id}`, {
+        method: 'PATCH',
+        body: JSON.stringify(patch),
+      })
+    },
+    async remove(id: string): Promise<void> {
+      if (env.useMocks) throw new Error('delete is unavailable in mock mode')
+      await http(`/model-connections/${id}`, { method: 'DELETE' })
+    },
+    async setKey(id: string, apiKey: string): Promise<{ ok: true; keyMasked: string }> {
+      if (env.useMocks) throw new Error('setKey is unavailable in mock mode')
+      return http(`/model-connections/${id}/key`, {
+        method: 'POST',
+        body: JSON.stringify({ apiKey }),
+      })
     },
   },
 
@@ -481,6 +526,18 @@ export interface ModelTestResult {
   error?: string
 }
 
+export type ModelPatch = Partial<{
+  provider: 'anthropic' | 'openai' | 'gemini' | 'openrouter' | 'ollama' | 'custom'
+  displayName: string
+  modelName: string
+  apiBaseUrl: string
+  contextLimit: number
+  costLevel: 'free' | 'low' | 'medium' | 'high'
+  useCase: string
+  fallbackId: string | null
+  apiKey: string
+}>
+
 export interface ReportDefinition {
   id: string
   label: string
@@ -499,6 +556,8 @@ export interface ReportDelivery {
   format: string
   range: { from: string; to: string }
 }
+
+export type AutomationInterval = 'hourly' | 'twicedaily' | 'daily' | 'weekly'
 
 export interface DashboardSettings {
   defaultRange: 'last-7' | 'last-30' | 'last-90' | 'month-to-date' | 'quarter-to-date' | 'year-to-date'
