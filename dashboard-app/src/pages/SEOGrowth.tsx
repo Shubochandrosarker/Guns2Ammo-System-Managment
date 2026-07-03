@@ -32,11 +32,11 @@ export function SEOGrowth() {
         <div className="h-64">
           <ResponsiveContainer width="100%" height="100%">
             <LineChart data={d.clicksSeries}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#eef0f4" />
-              <XAxis dataKey="date" tickFormatter={x => x.slice(5)} tick={{ fontSize: 11, fill: '#8b93a3' }} />
-              <YAxis tick={{ fontSize: 11, fill: '#8b93a3' }} width={40} />
+              <CartesianGrid strokeDasharray="3 3" stroke="var(--chart-grid)" />
+              <XAxis dataKey="date" tickFormatter={x => x.slice(5)} tick={{ fontSize: 11, fill: 'var(--chart-axis)' }} />
+              <YAxis tick={{ fontSize: 11, fill: 'var(--chart-axis)' }} width={40} />
               <Tooltip />
-              <Line type="monotone" dataKey="value" stroke="#0ea5e9" strokeWidth={2.5} dot={false} />
+              <Line type="monotone" dataKey="value" stroke="var(--info)" strokeWidth={2.5} dot={false} />
             </LineChart>
           </ResponsiveContainer>
         </div>
@@ -67,7 +67,7 @@ export function SEOGrowth() {
       </div>
 
       <Card title="Top queries" className="mt-6">
-        <table className="w-full text-sm">
+        <div className="overflow-x-auto -mx-1 px-1"><table className="w-full text-sm">
           <thead>
             <tr className="text-left text-xs uppercase tracking-wide text-ink-500 border-b border-ink-100">
               <th className="py-2">Query</th>
@@ -84,7 +84,7 @@ export function SEOGrowth() {
               </tr>
             ))}
           </tbody>
-        </table>
+        </table></div>
       </Card>
     </div>
   )

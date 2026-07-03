@@ -51,11 +51,11 @@ export function BusinessAnalysis() {
           <div className="h-64">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={channelBars} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#eef0f4" />
-                <XAxis dataKey="channel" tick={{ fontSize: 12, fill: '#5b6272' }} />
-                <YAxis tick={{ fontSize: 11, fill: '#8b93a3' }} tickFormatter={v => `$${Math.round(v / 100000)}k`} width={48} />
+                <CartesianGrid strokeDasharray="3 3" stroke="var(--chart-grid)" />
+                <XAxis dataKey="channel" tick={{ fontSize: 12, fill: 'var(--chart-axis)' }} />
+                <YAxis tick={{ fontSize: 11, fill: 'var(--chart-axis)' }} tickFormatter={v => `$${Math.round(v / 100000)}k`} width={48} />
                 <Tooltip formatter={(v: number) => [formatCurrency(v), 'Revenue']} />
-                <Bar dataKey="revenue" fill="#e56410" radius={[6, 6, 0, 0]} />
+                <Bar dataKey="revenue" fill="var(--brand)" radius={[6, 6, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
           </div>
@@ -77,11 +77,11 @@ export function BusinessAnalysis() {
           <div className="h-56">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={s.categoryRevenue} layout="vertical" margin={{ top: 5, right: 10, left: 30, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#eef0f4" />
-                <XAxis type="number" tick={{ fontSize: 11, fill: '#8b93a3' }} tickFormatter={v => `$${Math.round(v / 100)}`} />
-                <YAxis dataKey="category" type="category" tick={{ fontSize: 12, fill: '#5b6272' }} width={100} />
+                <CartesianGrid strokeDasharray="3 3" stroke="var(--chart-grid)" />
+                <XAxis type="number" tick={{ fontSize: 11, fill: 'var(--chart-axis)' }} tickFormatter={v => `$${Math.round(v / 100)}`} />
+                <YAxis dataKey="category" type="category" tick={{ fontSize: 12, fill: 'var(--chart-axis)' }} width={100} />
                 <Tooltip formatter={(v: number) => [formatCurrency(v), 'Revenue']} />
-                <Bar dataKey="revenue" fill="#ff7f1a" radius={[0, 4, 4, 0]} />
+                <Bar dataKey="revenue" fill="var(--brand)" radius={[0, 4, 4, 0]} />
               </BarChart>
             </ResponsiveContainer>
           </div>
@@ -91,11 +91,11 @@ export function BusinessAnalysis() {
           <div className="h-56">
             <ResponsiveContainer width="100%" height="100%">
               <LineChart data={b.revenueSeries} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#eef0f4" />
-                <XAxis dataKey="date" tickFormatter={d => d.slice(5)} tick={{ fontSize: 11, fill: '#8b93a3' }} />
-                <YAxis tick={{ fontSize: 11, fill: '#8b93a3' }} tickFormatter={v => `$${Math.round(v / 100)}`} width={44} />
+                <CartesianGrid strokeDasharray="3 3" stroke="var(--chart-grid)" />
+                <XAxis dataKey="date" tickFormatter={d => d.slice(5)} tick={{ fontSize: 11, fill: 'var(--chart-axis)' }} />
+                <YAxis tick={{ fontSize: 11, fill: 'var(--chart-axis)' }} tickFormatter={v => `$${Math.round(v / 100)}`} width={44} />
                 <Tooltip formatter={(v: number) => [formatCurrency(v), 'Revenue']} />
-                <Line type="monotone" dataKey="value" stroke="#0ea5e9" strokeWidth={2.5} dot={false} />
+                <Line type="monotone" dataKey="value" stroke="var(--info)" strokeWidth={2.5} dot={false} />
               </LineChart>
             </ResponsiveContainer>
           </div>

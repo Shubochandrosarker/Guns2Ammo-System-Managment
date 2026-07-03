@@ -59,15 +59,15 @@ export function DashboardHome() {
           <div className="h-64">
             <ResponsiveContainer width="100%" height="100%">
               <LineChart data={r.series} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#eef0f4" />
-                <XAxis dataKey="date" tick={{ fontSize: 11, fill: '#8b93a3' }} tickFormatter={d => d.slice(5)} />
-                <YAxis tick={{ fontSize: 11, fill: '#8b93a3' }} tickFormatter={v => `$${Math.round(v / 100)}`} width={44} />
+                <CartesianGrid strokeDasharray="3 3" stroke="var(--chart-grid)" />
+                <XAxis dataKey="date" tick={{ fontSize: 11, fill: 'var(--chart-axis)' }} tickFormatter={d => d.slice(5)} />
+                <YAxis tick={{ fontSize: 11, fill: 'var(--chart-axis)' }} tickFormatter={v => `$${Math.round(v / 100)}`} width={44} />
                 <Tooltip
                   contentStyle={{ fontSize: 12 }}
                   labelFormatter={(d: string) => d}
                   formatter={(v: number) => [formatCurrency(v), 'Revenue']}
                 />
-                <Line type="monotone" dataKey="value" stroke="#e56410" strokeWidth={2.5} dot={false} />
+                <Line type="monotone" dataKey="value" stroke="var(--brand)" strokeWidth={2.5} dot={false} />
               </LineChart>
             </ResponsiveContainer>
           </div>

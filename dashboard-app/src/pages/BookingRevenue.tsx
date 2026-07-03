@@ -36,13 +36,13 @@ export function BookingRevenue() {
           <div className="h-64">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={d.bookingsByType} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#eef0f4" />
-                <XAxis dataKey="type" tick={{ fontSize: 11, fill: '#5b6272' }} />
-                <YAxis yAxisId="left"  tick={{ fontSize: 11, fill: '#8b93a3' }} tickFormatter={v => `${v}`} width={40} />
-                <YAxis yAxisId="right" orientation="right" tick={{ fontSize: 11, fill: '#8b93a3' }} tickFormatter={v => `$${Math.round(v / 100)}`} width={50} />
+                <CartesianGrid strokeDasharray="3 3" stroke="var(--chart-grid)" />
+                <XAxis dataKey="type" tick={{ fontSize: 11, fill: 'var(--chart-axis)' }} />
+                <YAxis yAxisId="left"  tick={{ fontSize: 11, fill: 'var(--chart-axis)' }} tickFormatter={v => `${v}`} width={40} />
+                <YAxis yAxisId="right" orientation="right" tick={{ fontSize: 11, fill: 'var(--chart-axis)' }} tickFormatter={v => `$${Math.round(v / 100)}`} width={50} />
                 <Tooltip />
-                <Bar yAxisId="left"  dataKey="count"   fill="#0ea5e9" radius={[4, 4, 0, 0]} name="Bookings" />
-                <Bar yAxisId="right" dataKey="revenue" fill="#e56410" radius={[4, 4, 0, 0]} name="Revenue"  />
+                <Bar yAxisId="left"  dataKey="count"   fill="var(--info)" radius={[4, 4, 0, 0]} name="Bookings" />
+                <Bar yAxisId="right" dataKey="revenue" fill="var(--brand)" radius={[4, 4, 0, 0]} name="Revenue"  />
               </BarChart>
             </ResponsiveContainer>
           </div>
@@ -72,7 +72,7 @@ export function BookingRevenue() {
       </div>
 
       <Card title="Revenue detail by type" className="mt-6">
-        <table className="w-full text-sm">
+        <div className="overflow-x-auto -mx-1 px-1"><table className="w-full text-sm">
           <thead>
             <tr className="text-left text-xs uppercase tracking-wide text-ink-500 border-b border-ink-100">
               <th className="py-2">Type</th>
@@ -91,7 +91,7 @@ export function BookingRevenue() {
               </tr>
             ))}
           </tbody>
-        </table>
+        </table></div>
       </Card>
     </div>
   )

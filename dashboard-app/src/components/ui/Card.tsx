@@ -14,12 +14,20 @@ export function Card({ title, subtitle, actions, children, className, bodyClassN
   return (
     <div className={cn('card', className)}>
       {(title || actions) && (
-        <div className="card-header">
-          <div>
-            {title && <div className="font-semibold text-ink-800">{title}</div>}
-            {subtitle && <div className="text-xs text-ink-500 mt-0.5">{subtitle}</div>}
+        <div className="card-header flex-wrap gap-2">
+          <div className="min-w-0">
+            {title && (
+              <div className="font-semibold" style={{ color: 'var(--text-primary)' }}>
+                {title}
+              </div>
+            )}
+            {subtitle && (
+              <div className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>
+                {subtitle}
+              </div>
+            )}
           </div>
-          {actions && <div className="flex items-center gap-2">{actions}</div>}
+          {actions && <div className="flex items-center gap-2 flex-wrap">{actions}</div>}
         </div>
       )}
       {children != null && <div className={cn('card-body', bodyClassName)}>{children}</div>}

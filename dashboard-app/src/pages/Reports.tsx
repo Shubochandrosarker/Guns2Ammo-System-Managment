@@ -23,7 +23,7 @@ export function Reports() {
       />
 
       <Card bodyClassName="p-0">
-        <table className="w-full text-sm">
+        <div className="overflow-x-auto -mx-1 px-1"><table className="w-full text-sm">
           <thead className="bg-ink-50 text-xs uppercase tracking-wide text-ink-500">
             <tr>
               <th className="text-left px-4 py-2">Report</th>
@@ -45,7 +45,7 @@ export function Reports() {
               </tr>
             ))}
           </tbody>
-        </table>
+        </table></div>
       </Card>
     </div>
   )

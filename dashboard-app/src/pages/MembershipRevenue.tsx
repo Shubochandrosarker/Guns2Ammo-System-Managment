@@ -29,7 +29,7 @@ export function MembershipRevenue() {
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mt-6">
         <Card title="Plan performance" className="lg:col-span-2">
-          <table className="w-full text-sm">
+          <div className="overflow-x-auto -mx-1 px-1"><table className="w-full text-sm">
             <thead>
               <tr className="text-left text-xs uppercase tracking-wide text-ink-500 border-b border-ink-100">
                 <th className="py-2">Plan</th>
@@ -48,7 +48,7 @@ export function MembershipRevenue() {
                 </tr>
               ))}
             </tbody>
-          </table>
+          </table></div>
         </Card>
 
         <Card title="Renewal picture">

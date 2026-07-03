@@ -35,11 +35,11 @@ export function InsightisticAnalytics() {
           <div className="h-64">
             <ResponsiveContainer width="100%" height="100%">
               <LineChart data={d.sessionsSeries} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#eef0f4" />
-                <XAxis dataKey="date" tickFormatter={x => x.slice(5)} tick={{ fontSize: 11, fill: '#8b93a3' }} />
-                <YAxis tick={{ fontSize: 11, fill: '#8b93a3' }} width={40} />
+                <CartesianGrid strokeDasharray="3 3" stroke="var(--chart-grid)" />
+                <XAxis dataKey="date" tickFormatter={x => x.slice(5)} tick={{ fontSize: 11, fill: 'var(--chart-axis)' }} />
+                <YAxis tick={{ fontSize: 11, fill: 'var(--chart-axis)' }} width={40} />
                 <Tooltip formatter={(v: number) => [formatNumber(v), 'Sessions']} />
-                <Line type="monotone" dataKey="value" stroke="#0ea5e9" strokeWidth={2.5} dot={false} />
+                <Line type="monotone" dataKey="value" stroke="var(--info)" strokeWidth={2.5} dot={false} />
               </LineChart>
             </ResponsiveContainer>
           </div>

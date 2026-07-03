@@ -111,15 +111,26 @@ function Row({ label, value }: { label: string; value: string }) {
 
 function Drawer({ agent, kind, onClose }: { agent: Agent; kind: DrawerKind; onClose: () => void }) {
   return (
-    <div className="fixed inset-0 z-30 bg-ink-900/50" onClick={onClose}>
+    <div
+      className="fixed inset-0 z-30"
+      style={{ backgroundColor: 'var(--bg-overlay)' }}
+      onClick={onClose}
+    >
       <div
         className={cn(
-          'absolute inset-y-0 right-0 bg-white shadow-xl',
+          'absolute inset-y-0 right-0 shadow-xl',
           'w-full sm:max-w-lg lg:max-w-xl overflow-y-auto',
         )}
+        style={{ backgroundColor: 'var(--bg-surface)' }}
         onClick={e => e.stopPropagation()}
       >
-        <div className="sticky top-0 bg-white border-b border-ink-100 px-5 py-3 flex items-center justify-between">
+        <div
+          className="sticky top-0 px-4 sm:px-5 py-3 flex items-center justify-between"
+          style={{
+            backgroundColor: 'var(--bg-surface)',
+            borderBottom: '1px solid var(--border-subtle)',
+          }}
+        >
           <div>
             <div className="text-[11px] uppercase tracking-wide text-ink-500">
               {kind === 'history' ? 'Run history' : 'Prompt template'}
@@ -128,7 +139,7 @@ function Drawer({ agent, kind, onClose }: { agent: Agent; kind: DrawerKind; onCl
           </div>
           <button onClick={onClose} className="btn-ghost !px-2">✕</button>
         </div>
-        <div className="p-5">
+        <div className="p-4 sm:p-5">
           {kind === 'history' ? <HistoryPane agentId={agent.id} /> : <PromptPane agent={agent} />}
         </div>
       </div>
