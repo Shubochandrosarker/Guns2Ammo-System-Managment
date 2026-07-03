@@ -24,6 +24,11 @@ import type {
 const AUTH_KEY = 'g2a.auth.token'
 
 export interface Session {
+  // Base64(email:appPassword) for WordPress application-password auth.
+  // The g2a-business-api plugin validates this on the /auth/login handshake;
+  // subsequent requests re-send it as `Authorization: Basic <token>`.
+  //
+  // In mock mode this is just a placeholder — nothing consumes it.
   token: string
   displayName: string
   role: 'owner' | 'manager' | 'staff' | 'analyst'
@@ -64,7 +69,9 @@ async function http<T>(path: string, init?: RequestInit): Promise<T> {
     headers: {
       Accept: 'application/json',
       'Content-Type': 'application/json',
-      ...(session ? { Authorization: `Bearer ${session.token}` } : {}),
+      // WordPress application-password auth. `Basic` because the token
+      // *is* base64(email:appPassword) — see the Session comment.
+      ...(session ? { Authorization: `Basic ${session.token}` } : {}),
       ...(init?.headers || {}),
     },
     credentials: 'include',
@@ -99,12 +106,25 @@ export const api = {
         writeSession(session)
         return session
       }
-      const session = await http<Session>('/auth/login', {
-        method: 'POST',
-        body: JSON.stringify({ email, password }),
-      })
-      writeSession(session)
-      return session
+
+      // Mint the Basic-auth token BEFORE calling /auth/login so the
+      // handshake itself is authenticated — the plugin needs it to check
+      // `current_user_can(g2a_dashboard)` against a real WP user.
+      const basic = btoa(`${email}:${password}`)
+      writeSession({ token: basic, displayName: email, role: 'analyst' })
+
+      try {
+        const server = await http<Omit<Session, 'token'>>('/auth/login', {
+          method: 'POST',
+          body: JSON.stringify({ email, password }),
+        })
+        const session: Session = { token: basic, ...server }
+        writeSession(session)
+        return session
+      } catch (err) {
+        writeSession(null)
+        throw err
+      }
     },
     logout() {
       writeSession(null)

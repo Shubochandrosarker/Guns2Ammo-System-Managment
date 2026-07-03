@@ -62,13 +62,25 @@ The sidebar matches the frontend naming the client asked for:
 
 ## API contract
 
-The dashboard talks to a single WordPress plugin (`g2a-business-api`, to be
-created) mounted at `/wp-json/g2a/v1/*`. See `src/lib/api.ts` for the exact
-routes each page expects. Domain types live in `src/types/analytics.ts` —
+The dashboard talks to the **[`g2a-business-api`](../g2a-business-api/README.md)**
+WordPress plugin mounted at `/wp-json/g2a/v1/*`. See `src/lib/api.ts` for the
+exact routes each page expects. Domain types live in `src/types/analytics.ts` —
 treat that file as the source of truth for on-wire shapes.
 
 Money is always transmitted and stored in **USD cents** (integer). Only the
 UI divides by 100 when rendering.
+
+### Auth against a live WordPress
+
+Sign-in expects a **WordPress application password** (created from a WP user's
+profile → Application Passwords screen). The frontend stores
+`base64(email:appPassword)` in `localStorage` and sends it as
+`Authorization: Basic …` on every request. The plugin validates the
+credential and requires the user to hold the `g2a_dashboard` capability.
+
+The regular WP account password is deliberately NOT accepted — application
+passwords are individually revocable without disturbing the operator's main
+login.
 
 ## Build order (matches the plan)
 
