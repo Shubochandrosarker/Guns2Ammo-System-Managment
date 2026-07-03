@@ -1,13 +1,79 @@
+import { useEffect, useState } from 'react'
 import { PageHeader } from '@/components/ui/PageHeader'
 import { Card } from '@/components/ui/Card'
+import { Spinner } from '@/components/ui/Spinner'
+import { api, type DashboardSettings } from '@/lib/api'
+import { cn } from '@/lib/cn'
+
+const RANGES: Array<{ value: DashboardSettings['defaultRange']; label: string }> = [
+  { value: 'last-7',           label: 'Last 7 days' },
+  { value: 'last-30',          label: 'Last 30 days' },
+  { value: 'last-90',          label: 'Last 90 days' },
+  { value: 'month-to-date',    label: 'Month-to-date' },
+  { value: 'quarter-to-date',  label: 'Quarter-to-date' },
+  { value: 'year-to-date',     label: 'Year-to-date' },
+]
+
+const DAYS: Array<{ value: DashboardSettings['weeklyReportDay']; label: string }> = [
+  { value: 'monday',    label: 'Monday' },
+  { value: 'tuesday',   label: 'Tuesday' },
+  { value: 'wednesday', label: 'Wednesday' },
+  { value: 'thursday',  label: 'Thursday' },
+  { value: 'friday',    label: 'Friday' },
+  { value: 'saturday',  label: 'Saturday' },
+  { value: 'sunday',    label: 'Sunday' },
+]
+
+const HOURS = Array.from({ length: 24 }, (_, i) => i)
 
 export function Settings() {
+  const [values, setValues] = useState<DashboardSettings | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [saving, setSaving] = useState(false)
+  const [status, setStatus] = useState<{ ok: boolean; msg: string } | null>(null)
+
+  useEffect(() => {
+    let cancelled = false
+    void api.settings
+      .get()
+      .then(s => {
+        if (cancelled) return
+        setValues(s)
+        setLoading(false)
+      })
+      .catch(err => {
+        if (cancelled) return
+        setStatus({ ok: false, msg: err instanceof Error ? err.message : String(err) })
+        setLoading(false)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
+  async function save() {
+    if (!values) return
+    setSaving(true)
+    setStatus(null)
+    try {
+      const fresh = await api.settings.update(values)
+      setValues(fresh)
+      setStatus({ ok: true, msg: 'Settings saved.' })
+    } catch (err) {
+      setStatus({ ok: false, msg: err instanceof Error ? err.message : String(err) })
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  if (loading) return <Spinner />
+
   return (
     <div>
       <PageHeader
         eyebrow="Configuration"
         title="Settings"
-        subtitle="Roles, connections, and defaults for the dashboard. Sensitive values live on the WordPress side, never in the browser."
+        subtitle="Dashboard defaults you can change. Sensitive values (API keys, webhook secrets) live in the WordPress admin, never in the browser."
       />
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
@@ -31,14 +97,105 @@ export function Settings() {
           </div>
         </Card>
 
-        <Card title="Defaults">
-          <div className="space-y-3 text-sm">
-            <Row label="Timezone"        value="America/Phoenix (AZ does not observe DST)" />
-            <Row label="Default range"   value="Last 30 days" />
-            <Row label="Currency"        value="USD" />
-            <Row label="Weekly report day" value="Monday 07:00" />
-          </div>
-        </Card>
+        {values && (
+          <Card title="Defaults" subtitle="These persist server-side and drive automation cron.">
+            <div className="space-y-4 text-sm">
+              <Field label="Default analytics range">
+                <select
+                  className="input"
+                  value={values.defaultRange}
+                  onChange={e => setValues({ ...values, defaultRange: e.target.value as DashboardSettings['defaultRange'] })}
+                >
+                  {RANGES.map(r => (
+                    <option key={r.value} value={r.value}>{r.label}</option>
+                  ))}
+                </select>
+              </Field>
+
+              <Field label="Currency">
+                <select className="input" value={values.currency} disabled>
+                  <option value="USD">USD (only supported currency)</option>
+                </select>
+              </Field>
+
+              <Field label="Weekly report">
+                <div className="flex gap-2">
+                  <select
+                    className="input flex-1"
+                    value={values.weeklyReportDay}
+                    onChange={e => setValues({ ...values, weeklyReportDay: e.target.value as DashboardSettings['weeklyReportDay'] })}
+                  >
+                    {DAYS.map(d => (
+                      <option key={d.value} value={d.value}>{d.label}</option>
+                    ))}
+                  </select>
+                  <select
+                    className="input w-28"
+                    value={values.weeklyReportHour}
+                    onChange={e => setValues({ ...values, weeklyReportHour: Number(e.target.value) })}
+                  >
+                    {HOURS.map(h => (
+                      <option key={h} value={h}>{h.toString().padStart(2, '0')}:00</option>
+                    ))}
+                  </select>
+                </div>
+              </Field>
+
+              <Field label="Daily summary hour">
+                <select
+                  className="input w-28"
+                  value={values.dailySummaryHour}
+                  onChange={e => setValues({ ...values, dailySummaryHour: Number(e.target.value) })}
+                >
+                  {HOURS.map(h => (
+                    <option key={h} value={h}>{h.toString().padStart(2, '0')}:00</option>
+                  ))}
+                </select>
+              </Field>
+
+              <Field label="Owner email" hint="Where operational alerts and manual review notifications go.">
+                <input
+                  type="email"
+                  className="input"
+                  placeholder="owner@guns2ammo.com"
+                  value={values.ownerEmail}
+                  onChange={e => setValues({ ...values, ownerEmail: e.target.value })}
+                />
+              </Field>
+
+              <Field label="Timezone" hint="America/Phoenix (AZ does not observe DST).">
+                <input
+                  type="text"
+                  className="input"
+                  value={values.timezone}
+                  onChange={e => setValues({ ...values, timezone: e.target.value })}
+                />
+              </Field>
+
+              <div className="flex items-center gap-3 pt-2">
+                <button
+                  className="btn-primary text-sm"
+                  onClick={() => void save()}
+                  disabled={saving}
+                >
+                  {saving ? 'Saving…' : 'Save changes'}
+                </button>
+                {status && (
+                  <span
+                    className={cn(
+                      'text-sm rounded-lg px-3 py-1',
+                      status.ok
+                        ? 'bg-emerald-50 text-emerald-800 border border-emerald-100'
+                        : 'bg-rose-50 text-rose-800 border border-rose-100',
+                    )}
+                  >
+                    {status.msg}
+                  </span>
+                )}
+              </div>
+            </div>
+          </Card>
+        )}
 
         <Card title="Danger zone">
           <div className="text-sm text-ink-600 space-y-3">
@@ -64,5 +221,15 @@ function Row({ label, value }: { label: string; value: string }) {
       <span className="text-ink-500 shrink-0">{label}</span>
       <span className="text-ink-800 text-right">{value}</span>
     </div>
+  )
+}
+
+function Field({ label, hint, children }: { label: string; hint?: string; children: React.ReactNode }) {
+  return (
+    <label className="block">
+      <span className="text-xs font-medium uppercase tracking-wide text-ink-500">{label}</span>
+      <div className="mt-1">{children}</div>
+      {hint && <div className="mt-1 text-xs text-ink-500">{hint}</div>}
+    </label>
   )
 }

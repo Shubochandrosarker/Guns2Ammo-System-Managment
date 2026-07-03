@@ -1,9 +1,11 @@
+import { useEffect, useState } from 'react'
 import { PageHeader } from '@/components/ui/PageHeader'
 import { Card } from '@/components/ui/Card'
 import { Spinner } from '@/components/ui/Spinner'
 import { useAsync } from '@/lib/hooks'
-import { api } from '@/lib/api'
+import { api, type ModelTestResult } from '@/lib/api'
 import type { ModelConnection } from '@/types/analytics'
+import { cn } from '@/lib/cn'
 
 const COST_STYLE: Record<ModelConnection['costLevel'], string> = {
   free:   'pill-green',
@@ -18,10 +20,42 @@ const STATUS_STYLE: Record<ModelConnection['status'], string> = {
   untested: 'pill-gray',
 }
 
+interface TestState {
+  running: boolean
+  result: ModelTestResult | null
+}
+
 export function AIModelsRAGs() {
   const q = useAsync(() => api.models.list(), [])
+  const [results, setResults] = useState<Record<string, TestState>>({})
+
+  // Reset results if the list refreshes (e.g. new connection added upstream).
+  useEffect(() => {
+    setResults({})
+  }, [q.data])
+
   if (q.loading) return <Spinner />
   const models = q.data ?? []
+
+  async function runTest(m: ModelConnection) {
+    setResults(prev => ({ ...prev, [m.id]: { running: true, result: null } }))
+    try {
+      const result = await api.models.test(m.id)
+      setResults(prev => ({ ...prev, [m.id]: { running: false, result } }))
+    } catch (err) {
+      setResults(prev => ({
+        ...prev,
+        [m.id]: {
+          running: false,
+          result: {
+            ok: false,
+            provider: m.provider,
+            error: err instanceof Error ? err.message : String(err),
+          },
+        },
+      }))
+    }
+  }
 
   return (
     <div>
@@ -49,21 +83,35 @@ export function AIModelsRAGs() {
               </tr>
             </thead>
             <tbody>
-              {models.map(m => (
-                <tr key={m.id} className="border-t border-ink-100">
-                  <td className="px-4 py-3 capitalize font-medium">{m.provider}</td>
-                  <td className="px-4 py-3">{m.displayName}</td>
-                  <td className="px-4 py-3 font-mono text-xs text-ink-600">{m.modelName}</td>
-                  <td className="px-4 py-3 text-right text-ink-600">{m.contextLimit.toLocaleString()}</td>
-                  <td className="px-4 py-3"><span className={COST_STYLE[m.costLevel]}>{m.costLevel}</span></td>
-                  <td className="px-4 py-3 text-ink-600">{m.useCase}</td>
-                  <td className="px-4 py-3 font-mono text-xs text-ink-500">{m.keyMasked}</td>
-                  <td className="px-4 py-3"><span className={STATUS_STYLE[m.status]}>{m.status}</span></td>
-                  <td className="px-4 py-3 text-right">
-                    <button className="btn-ghost text-xs">Test</button>
-                  </td>
-                </tr>
-              ))}
+              {models.map(m => {
+                const state = results[m.id]
+                return (
+                  <tr key={m.id} className="border-t border-ink-100 align-top">
+                    <td className="px-4 py-3 capitalize font-medium">{m.provider}</td>
+                    <td className="px-4 py-3">{m.displayName}</td>
+                    <td className="px-4 py-3 font-mono text-xs text-ink-600">{m.modelName}</td>
+                    <td className="px-4 py-3 text-right text-ink-600">{m.contextLimit.toLocaleString()}</td>
+                    <td className="px-4 py-3"><span className={COST_STYLE[m.costLevel]}>{m.costLevel}</span></td>
+                    <td className="px-4 py-3 text-ink-600">{m.useCase}</td>
+                    <td className="px-4 py-3 font-mono text-xs text-ink-500">{m.keyMasked}</td>
+                    <td className="px-4 py-3">
+                      <div className="flex flex-col gap-1">
+                        <span className={STATUS_STYLE[m.status]}>{m.status}</span>
+                        {state?.result && <TestResultBadge result={state.result} />}
+                      </div>
+                    </td>
+                    <td className="px-4 py-3 text-right">
+                      <button
+                        className="btn-ghost text-xs"
+                        onClick={() => void runTest(m)}
+                        disabled={state?.running}
+                      >
+                        {state?.running ? 'Testing…' : 'Test'}
+                      </button>
+                    </td>
+                  </tr>
+                )
+              })}
             </tbody>
           </table>
         </div>
@@ -97,6 +145,29 @@ export function AIModelsRAGs() {
         </Card>
       </div>
     </div>
+  )
+}
+
+function TestResultBadge({ result }: { result: ModelTestResult }) {
+  if (result.ok) {
+    return (
+      <span
+        className={cn('text-[11px] rounded px-2 py-0.5 self-start whitespace-nowrap',
+          'bg-emerald-50 text-emerald-800 border border-emerald-100')}
+        title={`${result.provider}${result.probe ? ` · ${result.probe}` : ''}`}
+      >
+        ✓ {result.latencyMs ?? '—'}ms
+      </span>
+    )
+  }
+  return (
+    <span
+      className={cn('text-[11px] rounded px-2 py-0.5 self-start max-w-[180px] truncate',
+        'bg-rose-50 text-rose-800 border border-rose-100')}
+      title={result.error ?? 'Failed'}
+    >
+      ✗ {result.error ?? 'Failed'}
+    </span>
   )
 }
 
