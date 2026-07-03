@@ -1,7 +1,7 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
 import { AppLayout } from '@/components/layout/AppLayout'
-import { readSession, type Session } from '@/lib/api'
+import { api, readSession, writeSession, type Session } from '@/lib/api'
 import { Login } from '@/pages/Login'
 import { DashboardHome } from '@/pages/DashboardHome'
 import { BusinessAnalysis } from '@/pages/BusinessAnalysis'
@@ -26,6 +26,31 @@ import { Tasks } from '@/pages/Tasks'
 
 export function App() {
   const [session, setSession] = useState<Session | null>(() => readSession())
+
+  // Verify the stored token is still valid on every mount. If /auth/me
+  // rejects — password revoked, capability removed, WP logged out — clear
+  // localStorage and bounce back to /login. Silent success is the common
+  // case so we don't render a spinner.
+  useEffect(() => {
+    if (!session) return
+    let cancelled = false
+    void api.auth
+      .me()
+      .then(me => {
+        if (cancelled) return
+        // Keep the token, refresh the displayable metadata.
+        setSession(prev => (prev ? { ...prev, displayName: me.displayName, role: me.role } : prev))
+      })
+      .catch(() => {
+        if (cancelled) return
+        writeSession(null)
+        setSession(null)
+      })
+    return () => {
+      cancelled = true
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [session?.token])
 
   const routes = useMemo(
     () => (

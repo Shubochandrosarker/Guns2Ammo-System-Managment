@@ -198,19 +198,83 @@ export function Settings() {
         )}
 
         <Card title="Danger zone">
-          <div className="text-sm text-ink-600 space-y-3">
-            <p>
-              Actions here affect production integrations. BridGistic will not
-              perform any of these — the owner must click through in this UI.
-            </p>
-            <div className="flex flex-wrap gap-2">
-              <button className="btn-secondary text-xs">Rebuild RAG stores</button>
-              <button className="btn-secondary text-xs">Rotate API keys</button>
-              <button className="btn-secondary text-xs">Force re-auth all sessions</button>
-            </div>
-          </div>
+          <DangerZone />
         </Card>
       </div>
+    </div>
+  )
+}
+
+type DangerAction = 'rag' | 'keys' | 'sessions'
+
+const DANGER_COPY: Record<DangerAction, { label: string; confirm: string; success: (r: Record<string, unknown>) => string }> = {
+  rag: {
+    label:   'Rebuild RAG stores',
+    confirm: 'Enqueue a RAG rebuild? Existing agents keep serving the current index until the rebuild completes.',
+    success: r => `Rebuild queued at ${String(r.at ?? '')}.`,
+  },
+  keys: {
+    label:   'Rotate API keys',
+    confirm: 'Mark every stored model key for rotation? The dashboard will keep working; you must supply new keys via the Test/Edit drawer.',
+    success: r => `${Number(r.marked ?? 0)} model connection(s) marked for rotation.`,
+  },
+  sessions: {
+    label:   'Force re-auth all sessions',
+    confirm: 'Revoke every WordPress application password for dashboard users? You will be signed out too.',
+    success: r => `Revoked ${Number(r.revoked ?? 0)} password(s) across ${Number(r.users ?? 0)} user(s).`,
+  },
+}
+
+function DangerZone() {
+  const [busy, setBusy] = useState<DangerAction | null>(null)
+  const [status, setStatus] = useState<{ ok: boolean; msg: string } | null>(null)
+
+  async function run(kind: DangerAction) {
+    const copy = DANGER_COPY[kind]
+    if (!confirm(copy.confirm)) return
+    setBusy(kind)
+    setStatus(null)
+    try {
+      const res =
+        kind === 'rag'      ? await api.system.rebuildRag()      :
+        kind === 'keys'     ? await api.system.rotateKeys()      :
+                              await api.system.revokeSessions()
+      setStatus({ ok: true, msg: copy.success(res.result ?? {}) })
+    } catch (err) {
+      setStatus({ ok: false, msg: err instanceof Error ? err.message : String(err) })
+    } finally {
+      setBusy(null)
+    }
+  }
+
+  return (
+    <div className="text-sm text-ink-600 space-y-3">
+      <p>
+        Actions here affect production integrations. BridGistic will not
+        perform any of these — the owner must click through in this UI.
+      </p>
+      <div className="flex flex-wrap gap-2">
+        {(Object.keys(DANGER_COPY) as DangerAction[]).map(k => (
+          <button
+            key={k}
+            className="btn-secondary text-xs"
+            disabled={busy !== null}
+            onClick={() => void run(k)}
+          >
+            {busy === k ? 'Working…' : DANGER_COPY[k].label}
+          </button>
+        ))}
+      </div>
+      {status && (
+        <div
+          className={cn('text-xs rounded-lg px-3 py-2',
+            status.ok
+              ? 'bg-emerald-50 text-emerald-800 border border-emerald-100'
+              : 'bg-rose-50 text-rose-800 border border-rose-100')}
+        >
+          {status.msg}
+        </div>
+      )}
     </div>
   )
 }
