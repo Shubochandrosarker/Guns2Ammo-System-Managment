@@ -71,7 +71,8 @@ class Low_Stock_Handler extends Handler_Base {
 			'Low-stock alert',
 			'',
 			sprintf( 'Low stock: %d SKU%s below threshold', count( $hits ), 1 === count( $hits ) ? '' : 's' ),
-			self::compose_body( $hits )
+			self::compose_body( $hits ),
+			\WordPressistic\G2ABA\Ops\Opt_Out_Store::CATEGORY_INTERNAL
 		);
 
 		return sprintf( 'Drafted low-stock alert for %d SKU%s.', count( $hits ), 1 === count( $hits ) ? '' : 's' );

@@ -68,7 +68,8 @@ class Booking_Reminder_Handler extends Handler_Base {
 				sprintf( 'Booking reminder for %s (#%s)', $name ?: $email, (string) ( $row['id'] ?? '' ) ),
 				$email,
 				self::subject_for( $type, $start ),
-				self::compose_body( $name, $type, $start )
+				self::compose_body( $name, $type, $start ),
+				\WordPressistic\G2ABA\Ops\Opt_Out_Store::CATEGORY_TRANSACTIONAL
 			);
 			$drafted++;
 		}

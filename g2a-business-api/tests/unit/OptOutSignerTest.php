@@ -56,7 +56,12 @@ class OptOutSignerTest extends TestCase {
 	}
 
 	public function test_make_link_shape() {
-		$link = Opt_Out_Signer::make_link( 'priya@example.com', 'https://guns2ammo.com/opt-out' );
+		// Phase 9: signature is make_link($email, $category, $base_url).
+		$link = Opt_Out_Signer::make_link(
+			'priya@example.com',
+			\WordPressistic\G2ABA\Ops\Opt_Out_Store::CATEGORY_ALL,
+			'https://guns2ammo.com/opt-out'
+		);
 		$this->assertStringStartsWith( 'https://guns2ammo.com/opt-out?email=', $link );
 		$this->assertStringContainsString( '&expires=', $link );
 		$this->assertStringContainsString( '&token=', $link );

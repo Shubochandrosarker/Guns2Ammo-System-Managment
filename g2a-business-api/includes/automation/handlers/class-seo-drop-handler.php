@@ -43,7 +43,8 @@ class SEO_Drop_Handler extends Handler_Base {
 			'SEO click-drop alert',
 			'',
 			sprintf( 'SEO click drop: %d page%s down ≥25%%', count( $drops ), 1 === count( $drops ) ? '' : 's' ),
-			self::compose_body( $drops )
+			self::compose_body( $drops ),
+			\WordPressistic\G2ABA\Ops\Opt_Out_Store::CATEGORY_INTERNAL
 		);
 		return sprintf( 'Drafted SEO alert for %d page%s.', count( $drops ), 1 === count( $drops ) ? '' : 's' );
 	}

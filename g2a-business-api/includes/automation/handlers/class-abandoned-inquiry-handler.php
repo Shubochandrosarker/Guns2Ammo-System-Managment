@@ -61,7 +61,8 @@ class Abandoned_Inquiry_Handler extends Handler_Base {
 			sprintf( 'Abandoned inquiry alert (%d unanswered)', count( $rows ) ),
 			$owner_email,
 			sprintf( '%d inquiry%s awaiting reply', count( $rows ), 1 === count( $rows ) ? '' : 's' ),
-			self::compose_body( $rows )
+			self::compose_body( $rows ),
+			\WordPressistic\G2ABA\Ops\Opt_Out_Store::CATEGORY_INTERNAL
 		);
 
 		return sprintf( 'Drafted staff alert for %d abandoned inquir%s.', count( $rows ), 1 === count( $rows ) ? 'y' : 'ies' );

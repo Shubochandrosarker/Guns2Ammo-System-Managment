@@ -66,7 +66,8 @@ class Churn_Risk_Handler extends Handler_Base {
 					(string) ( $user->display_name ?: $user->user_login ),
 					(string) ( $row['plan_name'] ?? '' ),
 					(string) ( $row['expires_at'] ?? '' )
-				)
+				),
+				\WordPressistic\G2ABA\Ops\Opt_Out_Store::CATEGORY_RENEWALS
 			);
 			$drafted++;
 		}

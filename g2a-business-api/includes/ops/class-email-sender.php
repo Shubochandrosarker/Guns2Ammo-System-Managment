@@ -41,26 +41,37 @@ class Email_Sender {
 			return $updated ?? $draft;
 		}
 
+		// Compliance category — 'internal' bypasses the opt-out gate + the
+		// unsubscribe footer entirely (internal staff notifications don't
+		// carry the same expectation).
+		$category   = (string) ( $draft['category'] ?? Opt_Out_Store::CATEGORY_ALL );
+		$is_internal = ( Opt_Out_Store::CATEGORY_INTERNAL === $category );
+
 		// Compliance gate: recipient opt-outs are honoured for every send
 		// path. This runs BEFORE any transport is touched.
-		if ( ( new Opt_Out_Store() )->opted_out( $to ) ) {
-			$updated = $store->transition( $id, Email_Draft_Store::STATUS_FAILED, 'Recipient has opted out' );
-			$audit->record( 'email.suppressed_opt_out', sprintf( 'Suppressed draft %s: %s is opted out', $id, $to ), array( 'draftId' => $id, 'to' => $to ) );
+		if ( ! $is_internal && ( new Opt_Out_Store() )->opted_out( $to, $category ) ) {
+			$updated = $store->transition( $id, Email_Draft_Store::STATUS_FAILED, sprintf( 'Recipient has opted out (%s)', $category ) );
+			$audit->record(
+				'email.suppressed_opt_out',
+				sprintf( 'Suppressed draft %s: %s is opted out of %s', $id, $to, $category ),
+				array( 'draftId' => $id, 'to' => $to, 'category' => $category )
+			);
 			return $updated ?? $draft;
 		}
 
 		// Append a plain-text unsubscribe footer + a List-Unsubscribe header
-		// so mailbox providers can honour one-click opt-outs.
-		$link       = Opt_Out_Signer::make_link( $to );
+		// so mailbox providers can honour one-click opt-outs. Internal mail
+		// skips this — those emails go to staff and shouldn't carry an
+		// unsubscribe control that would confuse the recipient.
 		$body_final = $body;
-		if ( '' !== $link ) {
-			$body_final .= "\n\n---\nTo stop receiving Guns2Ammo emails, follow this link:\n" . $link;
-		}
-
-		$headers = array( 'Content-Type: text/plain; charset=UTF-8' );
-		if ( '' !== $link ) {
-			$headers[] = 'List-Unsubscribe: <' . $link . '>';
-			$headers[] = 'List-Unsubscribe-Post: List-Unsubscribe=One-Click';
+		$headers    = array( 'Content-Type: text/plain; charset=UTF-8' );
+		if ( ! $is_internal ) {
+			$link = Opt_Out_Signer::make_link( $to, $category );
+			if ( '' !== $link ) {
+				$body_final .= "\n\n---\nTo stop receiving these Guns2Ammo emails, follow this link:\n" . $link;
+				$headers[]   = 'List-Unsubscribe: <' . $link . '>';
+				$headers[]   = 'List-Unsubscribe-Post: List-Unsubscribe=One-Click';
+			}
 		}
 
 		// Fire the Messageistic trigger before wp_mail so the record exists

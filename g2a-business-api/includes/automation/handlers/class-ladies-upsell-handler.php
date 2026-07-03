@@ -69,13 +69,15 @@ class Ladies_Upsell_Handler extends Handler_Base {
 				sprintf( 'Ladies Tuesday follow-up for %s', $name ?: $email ),
 				$email,
 				'Bring a friend next Ladies Tuesday — $15',
-				self::body_bring_friend( $name )
+				self::body_bring_friend( $name ),
+				\WordPressistic\G2ABA\Ops\Opt_Out_Store::CATEGORY_MARKETING
 			);
 			$store->enqueue(
 				sprintf( 'Ladies Tuesday CCW invite for %s', $name ?: $email ),
 				$email,
 				'Ready to carry? Our CCW class is Ladies-Tuesday-friendly',
-				self::body_ccw( $name )
+				self::body_ccw( $name ),
+				\WordPressistic\G2ABA\Ops\Opt_Out_Store::CATEGORY_MARKETING
 			);
 			$drafted += 2;
 		}
