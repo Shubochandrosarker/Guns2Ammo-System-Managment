@@ -15,22 +15,17 @@
 
 namespace WordPressistic\G2ABA\Integrations;
 
-use WordPressistic\G2ABA\Secrets;
-
 if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
 class GSC_Client {
-	private const CRED_SECRET = 'gsc:service-account';
 	private const SITE_OPTION = 'g2aba_gsc_site_url';
 	private const SCOPE       = 'https://www.googleapis.com/auth/webmasters.readonly';
-	private const TOKEN_URL   = 'https://oauth2.googleapis.com/token';
-
-	private const CACHED_TOKEN_TRANSIENT = 'g2aba_gsc_access_token';
 
 	public function is_configured(): bool {
-		return Secrets::has( self::CRED_SECRET ) && '' !== (string) get_option( self::SITE_OPTION, '' );
+		return ( new Google_Service_Account() )->is_configured()
+			&& '' !== (string) get_option( self::SITE_OPTION, '' );
 	}
 
 	public function site_url(): string {
@@ -168,55 +163,6 @@ class GSC_Client {
 	}
 
 	private function access_token(): string {
-		$cached = get_transient( self::CACHED_TOKEN_TRANSIENT );
-		if ( is_string( $cached ) && '' !== $cached ) {
-			return $cached;
-		}
-
-		$creds = $this->decoded_credentials();
-		$email = (string) ( $creds['client_email'] ?? '' );
-		$pem   = (string) ( $creds['private_key'] ?? '' );
-		if ( '' === $email || '' === $pem ) {
-			throw new \RuntimeException( 'GSC service-account key is missing client_email or private_key' );
-		}
-
-		$signer  = new Google_JWT_Signer();
-		$jwt     = $signer->sign( $signer->claims_for( $email, self::SCOPE, time() ), $pem );
-
-		$resp = wp_remote_post(
-			self::TOKEN_URL,
-			array(
-				'timeout' => 8,
-				'body'    => array(
-					'grant_type' => 'urn:ietf:params:oauth:grant-type:jwt-bearer',
-					'assertion'  => $jwt,
-				),
-			)
-		);
-		if ( is_wp_error( $resp ) ) {
-			throw new \RuntimeException( 'GSC token exchange: ' . $resp->get_error_message() );
-		}
-		$json = json_decode( (string) wp_remote_retrieve_body( $resp ), true );
-		if ( ! is_array( $json ) || empty( $json['access_token'] ) ) {
-			throw new \RuntimeException( 'GSC token exchange: unexpected response' );
-		}
-		$token = (string) $json['access_token'];
-		$ttl   = (int) ( $json['expires_in'] ?? 3600 );
-
-		// Refresh a minute before the token expires so retries don't race.
-		set_transient( self::CACHED_TOKEN_TRANSIENT, $token, max( 60, $ttl - 60 ) );
-		return $token;
-	}
-
-	private function decoded_credentials(): array {
-		$raw = Secrets::get( self::CRED_SECRET );
-		if ( null === $raw ) {
-			throw new \RuntimeException( 'GSC service-account key is not stored' );
-		}
-		$decoded = json_decode( $raw, true );
-		if ( ! is_array( $decoded ) ) {
-			throw new \RuntimeException( 'GSC service-account key is not valid JSON' );
-		}
-		return $decoded;
+		return ( new Google_Service_Account() )->access_token( self::SCOPE );
 	}
 }

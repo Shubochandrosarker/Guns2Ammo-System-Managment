@@ -7,6 +7,7 @@ import type {
   Automation,
   BookingAnalytics,
   BusinessGap,
+  InsightisticAnalytics,
   MembershipAnalytics,
   ModelConnection,
   RevenueOverview,
@@ -138,6 +139,15 @@ export const seo: SeoAnalytics = {
     { query: 'guns2ammo mesa',            clicks: 132, position: 1.2 },
   ],
   clicksSeries: trend(180, 60),
+}
+
+export const insightistic: InsightisticAnalytics = {
+  range: revenueOverview.range,
+  sessions: 18_412,
+  engagedSessions: 11_208,
+  revenueAttributed: 4_812_400,
+  bounceRate: 38.2,
+  sessionsSeries: trend(600, 180),
 }
 
 export const gaps: BusinessGap[] = [

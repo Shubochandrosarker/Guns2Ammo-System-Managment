@@ -12,6 +12,7 @@ namespace WordPressistic\G2ABA\REST;
 
 use WordPressistic\G2ABA\Cache;
 use WordPressistic\G2ABA\Providers\Booking_Provider;
+use WordPressistic\G2ABA\Providers\Insightistic_Provider;
 use WordPressistic\G2ABA\Providers\Membership_Provider;
 use WordPressistic\G2ABA\Providers\Revenue_Provider;
 use WordPressistic\G2ABA\Providers\SEO_Provider;
@@ -31,11 +32,12 @@ class Analytics_Controller extends REST_Controller {
 
 		foreach (
 			array(
-				'overview'    => 'overview',
-				'bookings'    => 'bookings',
-				'memberships' => 'memberships',
-				'store'       => 'store',
-				'seo'         => 'seo',
+				'overview'     => 'overview',
+				'bookings'     => 'bookings',
+				'memberships'  => 'memberships',
+				'store'        => 'store',
+				'seo'          => 'seo',
+				'insightistic' => 'insightistic',
 			) as $slug => $method
 		) {
 			register_rest_route(
@@ -106,6 +108,18 @@ class Analytics_Controller extends REST_Controller {
 			300,
 			static function () use ( $range ) {
 				return ( new SEO_Provider() )->analytics( $range );
+			}
+		);
+		return $this->ok( $data );
+	}
+
+	public function insightistic( \WP_REST_Request $req ) {
+		$range = Range::from_request( $req );
+		$data  = Cache::remember(
+			'insightistic_' . $range->from . '_' . $range->to,
+			300,
+			static function () use ( $range ) {
+				return ( new Insightistic_Provider() )->analytics( $range );
 			}
 		);
 		return $this->ok( $data );

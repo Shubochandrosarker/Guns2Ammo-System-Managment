@@ -109,6 +109,30 @@ class Action_Queue {
 		return null;
 	}
 
+	/**
+	 * Overwrite an entry's `result` string in place. Used by Executor after
+	 * it processes an approved action so the owner can see what actually
+	 * happened without re-resolving the entry.
+	 */
+	public function attach_result( string $id, string $result ): ?array {
+		$all      = $this->all();
+		$replaced = null;
+		foreach ( $all as $i => $entry ) {
+			if ( ( $entry['id'] ?? '' ) !== $id ) {
+				continue;
+			}
+			$entry['result'] = $result;
+			$all[ $i ]       = $entry;
+			$replaced        = $entry;
+			break;
+		}
+		if ( null === $replaced ) {
+			return null;
+		}
+		update_option( self::OPTION, $all, false );
+		return $replaced;
+	}
+
 	private static function trim_resolved( array $all, int $max ): array {
 		$resolved_indices = array();
 		foreach ( $all as $i => $entry ) {
