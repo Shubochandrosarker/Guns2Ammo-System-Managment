@@ -3,7 +3,7 @@ import { PageHeader } from '@/components/ui/PageHeader'
 import { Card } from '@/components/ui/Card'
 import { Spinner } from '@/components/ui/Spinner'
 import { useAsync } from '@/lib/hooks'
-import { api } from '@/lib/api'
+import { api, type AutomationInterval } from '@/lib/api'
 import type { Automation } from '@/types/analytics'
 import { cn } from '@/lib/cn'
 
@@ -19,29 +19,50 @@ const CATEGORIES: { key: Automation['category']; label: string }[] = [
   { key: 'agents',     label: 'AI Agents' },
 ]
 
+const INTERVAL_OPTIONS: Array<{ value: AutomationInterval; label: string }> = [
+  { value: 'hourly',     label: 'Hourly' },
+  { value: 'twicedaily', label: 'Twice daily' },
+  { value: 'daily',      label: 'Daily' },
+  { value: 'weekly',     label: 'Weekly' },
+]
+
 export function AutomationCenter() {
   const q = useAsync(() => api.automations.list(), [])
   const [filter, setFilter] = useState<Automation['category'] | 'all'>('all')
+  const [list, setList] = useState<Automation[] | null>(null)
+  const [busy, setBusy] = useState<string | null>(null)
 
-  if (q.loading) return <Spinner />
-  const list = q.data ?? []
-  const visible = filter === 'all' ? list : list.filter(a => a.category === filter)
+  if (q.loading && !list) return <Spinner />
+  const rows = list ?? q.data ?? []
+  const visible = filter === 'all' ? rows : rows.filter(a => a.category === filter)
+
+  async function updateAutomation(slug: string, patch: { interval?: AutomationInterval; status?: 'active' | 'paused' }) {
+    setBusy(slug)
+    try {
+      const updated = await api.automations.updateSchedule(slug, patch)
+      setList(rows.map(a => (a.slug === slug ? { ...a, ...updated } : a)))
+    } catch (err) {
+      console.error(err)
+    } finally {
+      setBusy(null)
+    }
+  }
 
   return (
     <div>
       <PageHeader
         eyebrow="Automations"
         title="Automation Center"
-        subtitle="All triggers and actions that run without a human. Toggle, review runs, and inspect logs."
+        subtitle="All triggers and actions that run without a human. Change the recurrence, toggle on/off, and inspect last-run state."
         actions={<button className="btn-primary text-sm">+ New automation</button>}
       />
 
       <div className="flex flex-wrap gap-2 mb-4">
         <FilterChip active={filter === 'all'} onClick={() => setFilter('all')}>
-          All ({list.length})
+          All ({rows.length})
         </FilterChip>
         {CATEGORIES.map(c => {
-          const n = list.filter(a => a.category === c.key).length
+          const n = rows.filter(a => a.category === c.key).length
           if (n === 0) return null
           return (
             <FilterChip key={c.key} active={filter === c.key} onClick={() => setFilter(c.key)}>
@@ -65,7 +86,9 @@ export function AutomationCenter() {
               <label className="inline-flex items-center gap-2 text-xs cursor-pointer">
                 <input
                   type="checkbox"
-                  defaultChecked={a.status === 'active'}
+                  checked={a.status === 'active'}
+                  disabled={busy === a.slug}
+                  onChange={e => void updateAutomation(a.slug, { status: e.target.checked ? 'active' : 'paused' })}
                   className="h-4 w-4 rounded border-ink-300 text-brand-500 focus:ring-brand-400"
                 />
                 <span className="text-ink-600">Enabled</span>
@@ -77,6 +100,19 @@ export function AutomationCenter() {
               <KV label="Action">{a.action}</KV>
               <KV label="Last run">{a.lastRun ? new Date(a.lastRun).toLocaleString() : '—'}</KV>
               <KV label="Runs / 7d">{a.runsLast7d}</KV>
+              <div className="sm:col-span-2">
+                <div className="text-[11px] uppercase tracking-wide text-ink-500">Schedule</div>
+                <select
+                  className="input mt-1 text-sm"
+                  value={a.interval ?? 'daily'}
+                  disabled={busy === a.slug}
+                  onChange={e => void updateAutomation(a.slug, { interval: e.target.value as AutomationInterval })}
+                >
+                  {INTERVAL_OPTIONS.map(o => (
+                    <option key={o.value} value={o.value}>{o.label}</option>
+                  ))}
+                </select>
+              </div>
             </div>
           </Card>
         ))}

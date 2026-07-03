@@ -58,6 +58,15 @@ export function Tasks() {
         eyebrow="Work queue"
         title="Tasks"
         subtitle="Every AI-insight approval, business-gap task, and BridGistic-created work item lands here."
+        actions={
+          <a
+            href={api.exports.tasksCsvUrl()}
+            className="btn-secondary text-sm"
+            download
+          >
+            Download CSV
+          </a>
+        }
       />
 
       <div className="mb-4 flex gap-2 border-b" style={{ borderColor: 'var(--border-subtle)' }}>

@@ -30,6 +30,8 @@ class Automation_Store {
 	public const STATUS_ACTIVE = 'active';
 	public const STATUS_PAUSED = 'paused';
 
+	public const ALLOWED_INTERVALS = array( 'hourly', 'twicedaily', 'daily', 'weekly' );
+
 	/**
 	 * Seed the store with the automations the client asked for. Idempotent —
 	 * safe to call on every activation. Existing status is preserved so
@@ -70,6 +72,38 @@ class Automation_Store {
 	public function find( string $slug ): ?array {
 		$raw = get_option( self::OPTION, array() );
 		return is_array( $raw ) && isset( $raw[ $slug ] ) ? $raw[ $slug ] : null;
+	}
+
+	/**
+	 * Patch mutable fields on an automation. Accepts `interval` (allow-listed)
+	 * and `status`. Unknown keys are dropped; empty patch is a no-op that
+	 * still returns the fresh record so callers get a canonical shape back.
+	 *
+	 * Returns null when the slug is unknown so the REST controller can 404.
+	 *
+	 * @param array{interval?:string,status?:string} $patch
+	 */
+	public function patch_schedule( string $slug, array $patch ): ?array {
+		$raw = get_option( self::OPTION, array() );
+		if ( ! is_array( $raw ) || ! isset( $raw[ $slug ] ) ) {
+			return null;
+		}
+		if ( isset( $patch['interval'] ) ) {
+			$candidate = strtolower( (string) $patch['interval'] );
+			if ( ! in_array( $candidate, self::ALLOWED_INTERVALS, true ) ) {
+				return null;
+			}
+			$raw[ $slug ]['interval'] = $candidate;
+		}
+		if ( isset( $patch['status'] ) ) {
+			$candidate = (string) $patch['status'];
+			if ( ! in_array( $candidate, array( self::STATUS_ACTIVE, self::STATUS_PAUSED ), true ) ) {
+				return null;
+			}
+			$raw[ $slug ]['status'] = $candidate;
+		}
+		update_option( self::OPTION, $raw, false );
+		return $raw[ $slug ];
 	}
 
 	public function set_status( string $slug, string $status ): ?array {

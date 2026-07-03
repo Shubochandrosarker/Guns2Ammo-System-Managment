@@ -155,11 +155,20 @@ function DeliveryDrawer({ state, onClose }: { state: DrawerState; onClose: () =>
 
           {delivery && (
             <>
-              <div className="text-xs text-ink-500 mb-3">
-                Generated {new Date(delivery.generatedAt).toLocaleString()}
-                {delivery.range?.from && (
-                  <> · Range {delivery.range.from} → {delivery.range.to}</>
-                )}
+              <div className="flex items-start justify-between gap-3 mb-3">
+                <div className="text-xs text-ink-500">
+                  Generated {new Date(delivery.generatedAt).toLocaleString()}
+                  {delivery.range?.from && (
+                    <> · Range {delivery.range.from} → {delivery.range.to}</>
+                  )}
+                </div>
+                <a
+                  href={api.exports.reportTxtUrl(report.id)}
+                  className="btn-ghost text-xs shrink-0"
+                  download
+                >
+                  Download .txt
+                </a>
               </div>
               <pre className="font-mono text-xs text-ink-800 whitespace-pre-wrap rounded-lg border border-ink-100 p-3 max-h-[70vh] overflow-y-auto">
 {delivery.body}
