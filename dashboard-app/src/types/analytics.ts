@@ -76,6 +76,15 @@ export interface StoreAnalytics {
   slowMovers: { id: number; name: string; daysWithoutSale: number }[]
 }
 
+export interface InsightisticAnalytics {
+  range: Range
+  sessions: number
+  engagedSessions: number
+  revenueAttributed: number // USD cents
+  bounceRate: number        // percent
+  sessionsSeries: SeriesPoint[]
+}
+
 export interface SeoAnalytics {
   range: Range
   clicks: number

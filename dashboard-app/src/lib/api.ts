@@ -12,6 +12,7 @@ import type {
   Automation,
   BookingAnalytics,
   BusinessGap,
+  InsightisticAnalytics,
   MembershipAnalytics,
   ModelConnection,
   Range,
@@ -156,6 +157,11 @@ export const api = {
       return env.useMocks
         ? Promise.resolve(mock.seo)
         : http<SeoAnalytics>(`/analytics/seo?from=${range.from}&to=${range.to}`)
+    },
+    insightistic(range: Range = defaultRange()): Promise<InsightisticAnalytics> {
+      return env.useMocks
+        ? Promise.resolve(mock.insightistic)
+        : http<InsightisticAnalytics>(`/analytics/insightistic?from=${range.from}&to=${range.to}`)
     },
   },
 

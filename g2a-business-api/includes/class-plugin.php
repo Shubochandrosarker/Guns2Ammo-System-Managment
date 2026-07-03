@@ -18,6 +18,14 @@ class Plugin {
 		// Cron hooks must be registered on every request (not just admin), so
 		// that WP-Cron can invoke them when a scheduled event fires.
 		\WordPressistic\G2ABA\AI\Insight_Generator::register_cron();
+
+		// BridGistic executor subscribes to the approval hook.
+		\WordPressistic\G2ABA\BridGistic\Executor::register();
+
+		// Owner-facing settings screen (Settings → G2A Business API).
+		if ( is_admin() ) {
+			\WordPressistic\G2ABA\Admin\Settings_Page::register();
+		}
 	}
 
 	public function register_rest_routes(): void {
