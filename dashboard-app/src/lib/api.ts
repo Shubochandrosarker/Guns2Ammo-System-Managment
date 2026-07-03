@@ -249,9 +249,39 @@ export const api = {
     list(): Promise<ModelConnection[]> {
       return env.useMocks ? Promise.resolve(mock.models) : http<ModelConnection[]>('/model-connections')
     },
-    async test(id: string): Promise<{ ok: boolean; latencyMs?: number; error?: string }> {
-      if (env.useMocks) return { ok: true, latencyMs: 240 }
-      return http(`/model-connections/${id}/test`, { method: 'POST' })
+    async test(id: string): Promise<ModelTestResult> {
+      if (env.useMocks) return { ok: true, latencyMs: 240, provider: 'mock', probe: 'mock' }
+      return http<ModelTestResult>(`/model-connections/${id}/test`, { method: 'POST' })
+    },
+  },
+
+  reports: {
+    list(): Promise<ReportDefinition[]> {
+      if (env.useMocks) return Promise.resolve(mock.reports ?? [])
+      return http<ReportDefinition[]>('/reports')
+    },
+    async runNow(id: string): Promise<ReportDelivery> {
+      if (env.useMocks) throw new Error('run-now is unavailable in mock mode')
+      return http<ReportDelivery>(`/reports/${id}/run-now`, { method: 'POST' })
+    },
+    async latest(id: string): Promise<ReportDelivery> {
+      if (env.useMocks) throw new Error('latest is unavailable in mock mode')
+      return http<ReportDelivery>(`/reports/${id}/latest`)
+    },
+  },
+
+  settings: {
+    get(): Promise<DashboardSettings> {
+      if (env.useMocks) return Promise.resolve(mock.dashboardSettings)
+      return http<DashboardSettings>('/settings')
+    },
+    async update(patch: Partial<DashboardSettings>): Promise<DashboardSettings> {
+      if (env.useMocks) throw new Error('settings update unavailable in mock mode')
+      const res = await http<{ ok: true; settings: DashboardSettings }>('/settings', {
+        method: 'PUT',
+        body: JSON.stringify(patch),
+      })
+      return res.settings
     },
   },
 
@@ -440,4 +470,42 @@ export interface AuditLogEntry {
   summary: string
   actor: number
   meta: Record<string, unknown>
+}
+
+export interface ModelTestResult {
+  ok: boolean
+  provider: string
+  probe?: string
+  latencyMs?: number
+  httpCode?: number
+  error?: string
+}
+
+export interface ReportDefinition {
+  id: string
+  label: string
+  description: string
+  schedule: string
+  cronHook: string
+  handlerSlug: string
+  lastDeliveredAt: string | null
+  hasLatest: boolean
+}
+
+export interface ReportDelivery {
+  id: string
+  generatedAt: string
+  body: string
+  format: string
+  range: { from: string; to: string }
+}
+
+export interface DashboardSettings {
+  defaultRange: 'last-7' | 'last-30' | 'last-90' | 'month-to-date' | 'quarter-to-date' | 'year-to-date'
+  currency: 'USD'
+  weeklyReportDay: 'monday' | 'tuesday' | 'wednesday' | 'thursday' | 'friday' | 'saturday' | 'sunday'
+  weeklyReportHour: number
+  dailySummaryHour: number
+  ownerEmail: string
+  timezone: string
 }

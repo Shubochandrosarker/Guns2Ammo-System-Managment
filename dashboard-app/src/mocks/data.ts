@@ -365,3 +365,24 @@ export const tasks = [
     resolvedAt: null,
   },
 ]
+
+export const reports = [
+  { id: 'daily-summary',   label: 'Daily summary',            description: "Yesterday's revenue, bookings, membership churn, top SEO movers.", schedule: 'Every day 07:00', cronHook: 'g2aba_report_daily_summary', handlerSlug: 'daily-summary',   lastDeliveredAt: '2026-07-02T07:00:00Z', hasLatest: true },
+  { id: 'weekly-business', label: 'Weekly business report',   description: 'Last-7-day roll-up across revenue, bookings, memberships, store, SEO.', schedule: 'Monday 07:00', cronHook: 'g2aba_automation_weekly-business-report', handlerSlug: 'weekly-business', lastDeliveredAt: '2026-06-30T07:00:00Z', hasLatest: true },
+  { id: 'monthly-growth',  label: 'Monthly growth report',    description: 'Trailing 30 days vs the previous 30.', schedule: '1st of month 08:00', cronHook: 'g2aba_report_monthly_growth', handlerSlug: 'monthly-growth', lastDeliveredAt: '2026-06-01T08:00:00Z', hasLatest: true },
+  { id: 'seo-report',      label: 'SEO report',               description: 'GSC clicks, impressions, position deltas.', schedule: 'Monday 08:00', cronHook: 'g2aba_report_seo', handlerSlug: 'seo', lastDeliveredAt: '2026-06-30T08:00:00Z', hasLatest: true },
+  { id: 'booking-report',  label: 'Booking report',           description: 'Bookings by type, conversion, cancellations.', schedule: 'Monday 08:15', cronHook: 'g2aba_report_booking', handlerSlug: 'booking', lastDeliveredAt: '2026-06-30T08:15:00Z', hasLatest: true },
+  { id: 'member-report',   label: 'Membership report',        description: 'Active / renewed / expired + MRR + churn.', schedule: 'Monday 08:30', cronHook: 'g2aba_report_member', handlerSlug: 'member', lastDeliveredAt: '2026-06-30T08:30:00Z', hasLatest: true },
+  { id: 'woo-report',      label: 'WooCommerce report',       description: 'Store revenue, orders, AOV, top products.', schedule: 'Monday 08:45', cronHook: 'g2aba_report_woo', handlerSlug: 'woo', lastDeliveredAt: '2026-06-30T08:45:00Z', hasLatest: true },
+  { id: 'ai-recs',         label: 'AI recommendations report', description: 'Open AI insights + business gaps + suggested tasks.', schedule: 'Wednesday 09:00', cronHook: 'g2aba_report_ai_recs', handlerSlug: 'ai-recs', lastDeliveredAt: '2026-06-24T09:00:00Z', hasLatest: true },
+]
+
+export const dashboardSettings = {
+  defaultRange: 'last-30' as const,
+  currency: 'USD' as const,
+  weeklyReportDay: 'monday' as const,
+  weeklyReportHour: 7,
+  dailySummaryHour: 7,
+  ownerEmail: 'owner@guns2ammo.com',
+  timezone: 'America/Phoenix',
+}
