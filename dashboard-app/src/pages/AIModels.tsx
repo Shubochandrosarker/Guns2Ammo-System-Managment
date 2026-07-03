@@ -158,6 +158,24 @@ export function AIModelsRAGs() {
         </div>
       </Card>
 
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mt-6">
+        <RoutingCard models={rows} />
+
+        <Card title="RAG stores" subtitle="Vector indexes powering agents">
+          <ul className="space-y-2 text-sm">
+            <RagRow label="Product catalog RAG"       value="pgvector · 1,204 docs" />
+            <RagRow label="Membership plans RAG"      value="pgvector · 36 docs"    />
+            <RagRow label="Training curriculum RAG"   value="pgvector · 84 docs"    />
+            <RagRow label="FAQ + policies RAG"        value="pgvector · 172 docs"   />
+            <RagRow label="Historical support RAG"    value="pgvector · 3,410 docs" />
+          </ul>
+          <div className="mt-4 text-xs text-ink-500">
+            RAG chunks are indexed by the g2a-business-api plugin. Rebuild is
+            triggered from Settings → Danger zone.
+          </div>
+        </Card>
+      </div>
+
       {editor && (
         <ConnectionEditor
           initial={editor.mode === 'edit' ? editor.model : undefined}
@@ -172,6 +190,79 @@ export function AIModelsRAGs() {
         />
       )}
     </div>
+  )
+}
+
+function RagRow({ label, value }: { label: string; value: string }) {
+  return (
+    <li className="flex items-center justify-between">
+      <span className="text-ink-700">{label}</span>
+      <span className="font-medium text-ink-800">{value}</span>
+    </li>
+  )
+}
+
+function RoutingCard({ models }: { models: ModelConnection[] }) {
+  const q = useAsync(() => api.routing.get(), [])
+  const [routing, setRouting] = useState<Record<string, string | null> | null>(null)
+  const [busy, setBusy] = useState<string | null>(null)
+  const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    if (q.data && !routing) setRouting(q.data.routing)
+  }, [q.data, routing])
+
+  if (q.loading || !q.data) {
+    return (
+      <Card title="Model routing" subtitle="Which model handles what">
+        <Spinner label="Loading routing…" />
+      </Card>
+    )
+  }
+
+  const purposes = q.data.purposes
+  const labels   = q.data.labels
+
+  async function pick(purpose: string, modelId: string) {
+    setBusy(purpose)
+    setError(null)
+    try {
+      const patch: Record<string, string | null> = { [purpose]: modelId === '' ? null : modelId }
+      const fresh = await api.routing.update(patch)
+      setRouting(fresh)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err))
+    } finally {
+      setBusy(null)
+    }
+  }
+
+  return (
+    <Card title="Model routing" subtitle="Which model handles what">
+      {error && (
+        <div className="text-xs rounded-lg px-3 py-2 bg-rose-50 text-rose-800 border border-rose-100 mb-3">
+          {error}
+        </div>
+      )}
+      <ul className="space-y-2 text-sm">
+        {purposes.map(p => (
+          <li key={p} className="flex items-center justify-between gap-2">
+            <span className="text-ink-700">{labels[p] ?? p}</span>
+            <select
+              className="input !py-1 !text-xs max-w-[220px]"
+              value={routing?.[p] ?? ''}
+              disabled={busy === p}
+              onChange={e => void pick(p, e.target.value)}
+            >
+              <option value="">— unset —</option>
+              {models.map(m => (
+                <option key={m.id} value={m.id}>{m.displayName}</option>
+              ))}
+            </select>
+          </li>
+        ))}
+      </ul>
+    </Card>
   )
 }
 

@@ -44,6 +44,54 @@ class Auth_Controller extends REST_Controller {
 				),
 			)
 		);
+
+		register_rest_route(
+			$this->namespace,
+			'/auth/me',
+			array(
+				'methods'             => \WP_REST_Server::READABLE,
+				'callback'            => array( $this, 'me' ),
+				// Reuse read gate — /auth/me is called on every page load and
+				// must reject unauthenticated calls with the same 401/403 shape
+				// the rest of the API uses.
+				'permission_callback' => array( $this, 'read_permissions_check' ),
+			)
+		);
+	}
+
+	/**
+	 * Returns the session envelope for the currently authenticated user.
+	 *
+	 * The frontend calls this on load: if the stored basic-auth token still
+	 * resolves against WP, the dashboard trusts the local session; if the
+	 * token is stale/revoked, WP rejects with 401/403 and the frontend clears
+	 * localStorage + shows the login screen.
+	 */
+	public function me() {
+		$user_id = function_exists( 'get_current_user_id' ) ? (int) get_current_user_id() : 0;
+		if ( $user_id > 0 && function_exists( 'get_user_by' ) ) {
+			$user = get_user_by( 'id', $user_id );
+			if ( $user instanceof \WP_User ) {
+				return $this->ok(
+					array(
+						'displayName' => $user->display_name ? $user->display_name : $user->user_login,
+						'role'        => $this->role_for( $user ),
+						'caps'        => array(
+							'read'  => user_can( $user, Capabilities::READ ),
+							'admin' => user_can( $user, Capabilities::ADMIN ) || user_can( $user, 'manage_options' ),
+						),
+					)
+				);
+			}
+		}
+		// Deliberately generic to avoid signalling capability details when the
+		// session is invalid — read_permissions_check should have already 401'd
+		// unauthenticated calls; this is a defense-in-depth branch.
+		return new \WP_Error(
+			'g2aba_auth_unknown',
+			__( 'Not signed in.', 'g2a-business-api' ),
+			array( 'status' => 401 )
+		);
 	}
 
 	public function login( \WP_REST_Request $req ) {

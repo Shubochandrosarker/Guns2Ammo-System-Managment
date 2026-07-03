@@ -131,6 +131,13 @@ export const api = {
     logout() {
       writeSession(null)
     },
+    async me(): Promise<Omit<Session, 'token'>> {
+      if (env.useMocks) {
+        const s = readSession()
+        return { displayName: s?.displayName ?? 'Owner', role: s?.role ?? 'owner' }
+      }
+      return http<Omit<Session, 'token'>>('/auth/me')
+    },
   },
 
   analytics: {
@@ -238,6 +245,51 @@ export const api = {
       return http<Automation>(`/automations/${id}`, {
         method: 'PATCH',
         body: JSON.stringify(patch),
+      })
+    },
+  },
+
+  routing: {
+    get(): Promise<ModelRoutingResponse> {
+      if (env.useMocks) {
+        return Promise.resolve({
+          purposes: MOCK_PURPOSES,
+          labels: MOCK_ROUTING_LABELS,
+          routing: MOCK_ROUTING,
+        })
+      }
+      return http<ModelRoutingResponse>('/model-routing')
+    },
+    async update(patch: Record<string, string | null>): Promise<Record<string, string | null>> {
+      if (env.useMocks) throw new Error('routing.update is unavailable in mock mode')
+      const res = await http<{ ok: true; routing: Record<string, string | null> }>('/model-routing', {
+        method: 'PUT',
+        body: JSON.stringify(patch),
+      })
+      return res.routing
+    },
+  },
+
+  system: {
+    async rotateKeys(): Promise<SystemActionResult> {
+      if (env.useMocks) throw new Error('rotateKeys is unavailable in mock mode')
+      return http<SystemActionResult>('/system/rotate-keys', {
+        method: 'POST',
+        body: JSON.stringify({ confirm: true }),
+      })
+    },
+    async revokeSessions(): Promise<SystemActionResult> {
+      if (env.useMocks) throw new Error('revokeSessions is unavailable in mock mode')
+      return http<SystemActionResult>('/system/revoke-sessions', {
+        method: 'POST',
+        body: JSON.stringify({ confirm: true }),
+      })
+    },
+    async rebuildRag(): Promise<SystemActionResult> {
+      if (env.useMocks) throw new Error('rebuildRag is unavailable in mock mode')
+      return http<SystemActionResult>('/system/rag/rebuild', {
+        method: 'POST',
+        body: JSON.stringify({ confirm: true }),
       })
     },
   },
@@ -558,6 +610,42 @@ export interface ReportDelivery {
 }
 
 export type AutomationInterval = 'hourly' | 'twicedaily' | 'daily' | 'weekly'
+
+export interface ModelRoutingResponse {
+  purposes: string[]
+  labels: Record<string, string>
+  routing: Record<string, string | null>
+}
+
+export interface SystemActionResult {
+  ok: true
+  result: Record<string, unknown>
+}
+
+const MOCK_PURPOSES = [
+  'business_analysis', 'seo_analysis', 'booking_suggest', 'support_classify',
+  'email_drafts', 'daily_summaries', 'private_inventory',
+]
+
+const MOCK_ROUTING_LABELS: Record<string, string> = {
+  business_analysis: 'Deep business analysis',
+  seo_analysis:      'SEO analysis',
+  booking_suggest:   'Booking suggestions',
+  support_classify:  'Customer support classify',
+  email_drafts:      'Email drafts',
+  daily_summaries:   'Cheap daily summaries',
+  private_inventory: 'Private inventory',
+}
+
+const MOCK_ROUTING: Record<string, string | null> = {
+  business_analysis: 'm1',
+  seo_analysis:      'm1',
+  booking_suggest:   'm2',
+  support_classify:  'm3',
+  email_drafts:      'm4',
+  daily_summaries:   'm4',
+  private_inventory: 'm5',
+}
 
 export interface DashboardSettings {
   defaultRange: 'last-7' | 'last-30' | 'last-90' | 'month-to-date' | 'quarter-to-date' | 'year-to-date'

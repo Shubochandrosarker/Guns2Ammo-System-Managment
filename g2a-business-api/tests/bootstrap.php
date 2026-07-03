@@ -164,6 +164,22 @@ if ( ! class_exists( 'WP_REST_Server' ) ) {
 		public const CREATABLE = 'POST';
 	}
 }
+if ( ! class_exists( 'WP_REST_Request' ) ) {
+	class WP_REST_Request {
+		private array $params;
+		private array $body;
+		public function __construct( array $params = array(), array $body = array() ) {
+			$this->params = $params;
+			$this->body   = $body;
+		}
+		public function get_param( $key ) {
+			return $this->params[ $key ] ?? null;
+		}
+		public function get_json_params() {
+			return $this->body;
+		}
+	}
+}
 if ( ! class_exists( 'WP_REST_Response' ) ) {
 	class WP_REST_Response {
 		public $data;
