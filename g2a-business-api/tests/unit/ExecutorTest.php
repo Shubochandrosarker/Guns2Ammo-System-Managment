@@ -16,12 +16,13 @@ class ExecutorTest extends TestCase {
 
 		Executor::on_approved( $entry );
 
-		$drafts = get_option( 'g2aba_bridgistic_email_drafts', array() );
+		// Phase 5 moved drafts into Email_Draft_Store (option = g2aba_email_drafts).
+		$drafts = get_option( 'g2aba_email_drafts', array() );
 		$this->assertCount( 1, $drafts );
 		$this->assertSame( 'pending_send', $drafts[0]['status'] );
 
 		$after = $q->find( $entry['id'] );
-		$this->assertStringContainsString( 'Drafted an email', $after['result'] );
+		$this->assertStringContainsString( 'Drafted email', $after['result'] );
 	}
 
 	public function test_task_intent_appends_to_task_store() {
@@ -42,12 +43,13 @@ class ExecutorTest extends TestCase {
 
 		Executor::on_approved( $entry );
 
-		$queue = get_option( 'g2aba_bridgistic_cancel_queue', array() );
+		// Phase 5 moved cancellations into Cancellation_Queue (option = g2aba_cancellations).
+		$queue = get_option( 'g2aba_cancellations', array() );
 		$this->assertCount( 1, $queue );
 		$this->assertSame( '92841', $queue[0]['bookingId'] );
 
 		$after = $q->find( $entry['id'] );
-		$this->assertStringContainsString( 'Cancellation request queued', $after['result'] );
+		$this->assertStringContainsString( 'Cancellation request', $after['result'] );
 	}
 
 	public function test_unknown_intent_still_stamps_result_and_no_side_effects() {

@@ -14,6 +14,7 @@ namespace WordPressistic\G2ABA\REST;
 
 use WordPressistic\G2ABA\Providers\Booking_Provider;
 use WordPressistic\G2ABA\Providers\Gaps_Provider;
+use WordPressistic\G2ABA\Providers\GBP_Provider;
 use WordPressistic\G2ABA\Providers\Membership_Provider;
 use WordPressistic\G2ABA\Providers\SEO_Provider;
 use WordPressistic\G2ABA\Providers\Store_Provider;
@@ -43,8 +44,9 @@ class Gaps_Controller extends REST_Controller {
 		$memberships = ( new Membership_Provider() )->analytics( $range );
 		$store       = ( new Store_Provider() )->analytics( $range );
 		$seo         = ( new SEO_Provider() )->analytics( $range );
+		$gbp         = ( new GBP_Provider() )->performance( $range );
 
-		$gaps = ( new Gaps_Provider() )->detect( $bookings, $memberships, $store, $seo );
+		$gaps = ( new Gaps_Provider() )->detect( $bookings, $memberships, $store, $seo, $gbp );
 		return $this->ok( $gaps );
 	}
 }

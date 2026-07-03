@@ -51,6 +51,48 @@ All other routes require `g2a_dashboard` (read) or `g2a_dashboard_admin`
 | GET    | `/bridgistic/actions?status=pending`        | read   |
 | POST   | `/bridgistic/actions/{id}/approve`          | admin  |
 | POST   | `/bridgistic/actions/{id}/reject`           | admin  |
+| GET    | `/email-drafts?status=pending`              | read   |
+| POST   | `/email-drafts/{id}/send`                   | admin  |
+| POST   | `/email-drafts/{id}/discard`                | admin  |
+| GET    | `/cancellations?status=awaiting`            | read   |
+| POST   | `/cancellations/{id}/mark-completed`        | admin  |
+| POST   | `/cancellations/{id}/drop`                  | admin  |
+
+## Operational review screens
+
+Two owner-only sub-pages under **Settings**:
+
+- **Settings → G2A · Email Drafts** — every draft BridGistic created. Reviewer
+  can add/adjust the recipient, then Send (via `wp_mail`, which any installed
+  mailer plugin — Messageistic, WP Mail SMTP, Postmark, … — intercepts) or
+  Discard.
+- **Settings → G2A · Cancellations** — BridGistic never cancels a booking
+  automatically. Every approved `cancel_booking` action lands here for a
+  human to finalize in the Booking Engine, then mark completed.
+
+Every send / discard / mark-completed / drop writes an entry to the
+`g2aba_audit_log` option so the owner has a "who did what, when" record.
+
+## Google Business Profile
+
+`GBP_Client` reuses the shared `Google_Service_Account`. It reads listing
+performance (search + maps impressions, calls, direction requests, website
+clicks) and — best-effort — recent reviews. Setup:
+
+```php
+update_option( 'g2aba_gbp_location_id', 'locations/1234567890' );
+```
+
+GBP APIs require per-account allowlisting by Google, so the client is
+guarded by `is_configured()`; without a location id + service-account,
+`GBP_Provider` returns zeroes and the rest of the plugin keeps working.
+
+Two new gap rules consume GBP data:
+
+- **`gap-gbp-actions`** — ≥ 1000 listing views but < 10 calls + directions +
+  website clicks combined = "seen but not acted on."
+- **`gap-gbp-reviews`** — ≥ 20 direction requests but < 3 total reviews =
+  install a post-visit review-ask flow.
 
 ## Configuration
 

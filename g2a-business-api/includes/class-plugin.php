@@ -22,9 +22,11 @@ class Plugin {
 		// BridGistic executor subscribes to the approval hook.
 		\WordPressistic\G2ABA\BridGistic\Executor::register();
 
-		// Owner-facing settings screen (Settings → G2A Business API).
+		// Owner-facing settings + operations screens.
 		if ( is_admin() ) {
 			\WordPressistic\G2ABA\Admin\Settings_Page::register();
+			\WordPressistic\G2ABA\Admin\Email_Drafts_Page::register();
+			\WordPressistic\G2ABA\Admin\Cancellations_Page::register();
 		}
 	}
 
