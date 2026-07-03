@@ -57,6 +57,7 @@ All other routes require `g2a_dashboard` (read) or `g2a_dashboard_admin`
 | GET    | `/cancellations?status=awaiting`            | read   |
 | POST   | `/cancellations/{id}/mark-completed`        | admin  |
 | POST   | `/cancellations/{id}/drop`                  | admin  |
+| GET    | `/agents/{id}/history`                      | read   |
 
 ## Operational review screens
 
@@ -130,6 +131,43 @@ The connection id defaults to `anthropic-primary`. Store the API key with:
 ```php
 WordPressistic\G2ABA\Secrets::put( 'model:anthropic-primary', 'sk-ant-…' );
 ```
+
+## Automations (real WP-Cron)
+
+**`Automation_Store`** owns the persistent list of scheduled actions
+(booking reminder, waiver reminder, membership renewal 30/7/1-day,
+weekly report, low-stock alert, SEO click-drop alert, …). Each record
+carries a stable slug that doubles as the WP-Cron hook name and the
+interval the scheduler uses.
+
+**`Cron_Scheduler::apply(record)`** is the only code that touches
+`wp_schedule_event` / `wp_unschedule_event`. Toggling an automation via
+`POST /automations/{slug}/toggle` mutates the store then re-applies the
+scheduler — flipping enabled actually changes the WP-Cron state.
+
+`Automation_Store::seed_defaults()` is idempotent: running it preserves
+each record's `status`, `lastRun`, and `runsLast7d` counters, so
+reactivating the plugin doesn't re-enable something a human paused.
+
+## AI Agents (real runtime)
+
+**`Agent_Store`** persists agent metadata + a per-agent `promptTemplate`
+that gets `{{snapshot}}` substituted at run time. Seed is idempotent —
+operator prompt edits survive re-seeds.
+
+**`Agent_Runner`** subscribes to the `g2aba_run_agent` cron hook.
+`POST /agents/{id}/run` schedules a single event so the REST call
+doesn't block on the model roundtrip. The runner:
+
+1. Short-circuits with a helpful message if Anthropic isn't configured
+   (before spending queries on a snapshot).
+2. Builds a snapshot from the analytics providers.
+3. Substitutes `{{snapshot}}` into the agent's prompt.
+4. Calls the connected model.
+5. Records the output as `lastOutput` on the agent + appends to
+   **`Agent_History`** (bounded ring per agent, 50 entries).
+
+`GET /agents/{id}/history` returns the ring for one agent.
 
 ## BridGistic action bridge
 

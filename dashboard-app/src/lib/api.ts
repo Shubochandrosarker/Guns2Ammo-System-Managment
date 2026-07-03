@@ -256,6 +256,51 @@ export const api = {
       return http<BridGisticAction>(`/bridgistic/actions/${id}/reject`, { method: 'POST' })
     },
   },
+
+  emailDrafts: {
+    async list(status: 'pending' | 'all' = 'pending'): Promise<EmailDraft[]> {
+      if (env.useMocks) return mock.emailDrafts.filter(d => status === 'all' || d.status === 'pending_send')
+      const path = status === 'pending' ? '/email-drafts?status=pending' : '/email-drafts'
+      return http<EmailDraft[]>(path)
+    },
+    async send(id: string, overrides: { to?: string; subject?: string; body?: string }): Promise<EmailDraft> {
+      if (env.useMocks) throw new Error('send is unavailable in mock mode')
+      return http<EmailDraft>(`/email-drafts/${id}/send`, {
+        method: 'POST',
+        body: JSON.stringify(overrides),
+      })
+    },
+    async discard(id: string): Promise<EmailDraft> {
+      if (env.useMocks) throw new Error('discard is unavailable in mock mode')
+      return http<EmailDraft>(`/email-drafts/${id}/discard`, { method: 'POST' })
+    },
+  },
+
+  cancellations: {
+    async list(status: 'awaiting' | 'all' = 'awaiting'): Promise<Cancellation[]> {
+      if (env.useMocks) return mock.cancellations.filter(c => status === 'all' || c.status === 'awaiting_manual_action')
+      const path = status === 'awaiting' ? '/cancellations?status=awaiting' : '/cancellations'
+      return http<Cancellation[]>(path)
+    },
+    async markCompleted(id: string, notes: string): Promise<Cancellation> {
+      if (env.useMocks) throw new Error('markCompleted is unavailable in mock mode')
+      return http<Cancellation>(`/cancellations/${id}/mark-completed`, {
+        method: 'POST',
+        body: JSON.stringify({ notes }),
+      })
+    },
+    async drop(id: string): Promise<Cancellation> {
+      if (env.useMocks) throw new Error('drop is unavailable in mock mode')
+      return http<Cancellation>(`/cancellations/${id}/drop`, { method: 'POST' })
+    },
+  },
+
+  agentHistory: {
+    async list(agentId: string): Promise<AgentHistoryEntry[]> {
+      if (env.useMocks) return mock.agentHistory[agentId] ?? []
+      return http<AgentHistoryEntry[]>(`/agents/${agentId}/history`)
+    },
+  },
 }
 
 export interface BridGisticAskResult {
@@ -275,4 +320,32 @@ export interface BridGisticAction {
   createdAt: string
   resolvedAt: string | null
   result: string | null
+}
+
+export interface EmailDraft {
+  id: string
+  query: string
+  to: string
+  subject: string
+  body: string
+  status: 'pending_send' | 'sent' | 'failed' | 'discarded'
+  createdAt: string
+  sentAt: string | null
+  error: string | null
+}
+
+export interface Cancellation {
+  id: string
+  bookingId: string | null
+  query: string
+  status: 'awaiting_manual_action' | 'completed' | 'dropped'
+  createdAt: string
+  resolvedAt: string | null
+  notes: string | null
+}
+
+export interface AgentHistoryEntry {
+  ts: string
+  output: string
+  confidence: number
 }

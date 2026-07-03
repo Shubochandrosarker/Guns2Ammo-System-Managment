@@ -15,12 +15,10 @@ class Activator {
 	public static function activate(): void {
 		Capabilities::grant_defaults();
 
-		if ( ! get_option( 'g2aba_automations' ) ) {
-			update_option( 'g2aba_automations', array(), false );
-		}
-		if ( ! get_option( 'g2aba_agents' ) ) {
-			update_option( 'g2aba_agents', array(), false );
-		}
+		\WordPressistic\G2ABA\Automation\Automation_Store::seed_defaults();
+		\WordPressistic\G2ABA\Automation\Cron_Scheduler::sync_all();
+		\WordPressistic\G2ABA\Agents\Agent_Store::seed_defaults();
+
 		if ( ! get_option( 'g2aba_models' ) ) {
 			update_option( 'g2aba_models', array(), false );
 		}

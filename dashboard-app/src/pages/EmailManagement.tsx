@@ -1,6 +1,9 @@
+import { useCallback, useEffect, useState } from 'react'
 import { PageHeader } from '@/components/ui/PageHeader'
 import { Card } from '@/components/ui/Card'
 import { StatCard } from '@/components/ui/StatCard'
+import { Spinner } from '@/components/ui/Spinner'
+import { api, type EmailDraft } from '@/lib/api'
 
 const CATEGORIES = [
   { key: 'customer',  label: 'Customer inquiries', count: 26 },
@@ -15,34 +18,64 @@ const CATEGORIES = [
   { key: 'marketing', label: 'Marketing campaigns',count:  3 },
 ]
 
-const PENDING = [
-  { subject: 'Re: CCW class rescheduling — need before 07/09',   from: 'Aisha K.',    intent: 'booking',   priority: 'high' },
-  { subject: 'Question about corporate group day rates',         from: 'Corp: Nexa',  intent: 'sales',     priority: 'medium' },
-  { subject: 'Waiver signed on wrong name',                       from: 'Marcus D.',   intent: 'waiver',    priority: 'medium' },
-  { subject: 'Membership renewal card declined',                  from: 'Priya S.',    intent: 'member',    priority: 'high' },
-  { subject: 'Request: private range block for bachelor party',   from: 'Trevor R.',   intent: 'booking',   priority: 'medium' },
-]
-
-const priorityStyle: Record<string, string> = {
-  high:   'pill-red',
-  medium: 'pill-amber',
-  low:    'pill-gray',
-}
-
 export function EmailManagement() {
+  const [drafts, setDrafts] = useState<EmailDraft[] | null>(null)
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [inputs, setInputs] = useState<Record<string, string>>({})
+
+  const refresh = useCallback(async () => {
+    try {
+      const list = await api.emailDrafts.list('pending')
+      setDrafts(list)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err))
+    }
+  }, [])
+
+  useEffect(() => {
+    void refresh()
+  }, [refresh])
+
+  async function send(id: string) {
+    setBusy(true)
+    setError(null)
+    try {
+      await api.emailDrafts.send(id, { to: inputs[id] || '' })
+      await refresh()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  async function discard(id: string) {
+    setBusy(true)
+    setError(null)
+    try {
+      await api.emailDrafts.discard(id)
+      await refresh()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err))
+    } finally {
+      setBusy(false)
+    }
+  }
+
   return (
     <div>
       <PageHeader
         eyebrow="Inbox intelligence"
         title="Email Management"
-        subtitle="Auto-classified inbound email with drafted replies from the Email Manager Agent. Owner approves sends."
+        subtitle="Auto-classified inbound email plus BridGistic-generated drafts. Nothing goes out until you click Send."
       />
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <StatCard label="Unread"          value={38} intent="warn" />
-        <StatCard label="AI drafted"      value={12} intent="success" />
-        <StatCard label="Urgent"          value={ 4} intent="danger" />
-        <StatCard label="Sent last 24h"   value={97} />
+        <StatCard label="Unread"        value={38} intent="warn" />
+        <StatCard label="AI drafted"    value={drafts?.length ?? 0} intent="success" />
+        <StatCard label="Urgent"        value={4}  intent="danger" />
+        <StatCard label="Sent last 24h" value={97} />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mt-6">
@@ -57,22 +90,59 @@ export function EmailManagement() {
           </ul>
         </Card>
 
-        <Card title="Pending owner approval" subtitle="Drafts ready to send" className="lg:col-span-2">
-          <ul className="divide-y divide-ink-100">
-            {PENDING.map(p => (
-              <li key={p.subject} className="py-3 flex items-center gap-3">
-                <span className={priorityStyle[p.priority]}>{p.priority}</span>
-                <div className="min-w-0 flex-1">
-                  <div className="text-sm font-medium text-ink-800 truncate">{p.subject}</div>
-                  <div className="text-xs text-ink-500">from {p.from} · {p.intent}</div>
-                </div>
-                <div className="flex items-center gap-2 shrink-0">
-                  <button className="btn-secondary text-xs">Review</button>
-                  <button className="btn-primary text-xs">Send</button>
-                </div>
-              </li>
-            ))}
-          </ul>
+        <Card
+          title="Pending owner approval"
+          subtitle="BridGistic drafts ready to send"
+          className="lg:col-span-2"
+        >
+          {error && (
+            <div className="mb-3 text-sm text-rose-700 bg-rose-50 border border-rose-100 rounded-lg px-3 py-2">
+              {error}
+            </div>
+          )}
+
+          {drafts === null ? (
+            <Spinner label="Loading drafts…" />
+          ) : drafts.length === 0 ? (
+            <div className="text-sm text-ink-500">
+              No pending drafts. When BridGistic classifies a request as
+              &quot;action&quot; and you approve it, the draft lands here.
+            </div>
+          ) : (
+            <ul className="divide-y divide-ink-100">
+              {drafts.map(d => (
+                <li key={d.id} className="py-3">
+                  <div className="flex items-start gap-3">
+                    <span className="pill-amber">draft</span>
+                    <div className="min-w-0 flex-1">
+                      <div className="text-sm font-medium text-ink-800 truncate">{d.subject}</div>
+                      <div className="text-xs text-ink-500">from BridGistic · {new Date(d.createdAt).toLocaleString()}</div>
+                    </div>
+                  </div>
+                  <div className="mt-2 rounded-lg bg-ink-50 border border-ink-100 p-3 text-sm text-ink-700 whitespace-pre-wrap">
+                    {d.body}
+                  </div>
+                  <div className="mt-3 flex flex-col md:flex-row md:items-center gap-2">
+                    <input
+                      className="input md:flex-1"
+                      type="email"
+                      placeholder="recipient@example.com"
+                      value={inputs[d.id] ?? d.to ?? ''}
+                      onChange={e => setInputs(prev => ({ ...prev, [d.id]: e.target.value }))}
+                    />
+                    <div className="flex items-center gap-2 shrink-0">
+                      <button className="btn-secondary text-xs" disabled={busy} onClick={() => void discard(d.id)}>
+                        Discard
+                      </button>
+                      <button className="btn-primary text-xs" disabled={busy} onClick={() => void send(d.id)}>
+                        Send
+                      </button>
+                    </div>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          )}
         </Card>
       </div>
     </div>

@@ -284,3 +284,44 @@ export const health: SystemHealthCheck[] = [
   { id: 'h11', label: 'Local Ollama endpoint',        group: 'ai',        status: 'warn',  detail: 'Not tested since 2026-06-20',              lastCheckedAt: '2026-07-02T09:20:00Z' },
   { id: 'h12', label: 'Security: 2FA on owner accounts',group: 'security',status: 'ok',    detail: 'All 3 owner accounts enrolled',            lastCheckedAt: '2026-07-02T09:20:00Z' },
 ]
+
+// Phase 6 mocks.
+export const emailDrafts = [
+  {
+    id: 'em_abc123', query: 'send follow-up email to Priya about her renewal',
+    to: '', subject: 'A quick note about your Guns2Ammo membership',
+    body: 'Hi Priya, wanted to check in about your Defender membership — it renewed on the card ending in 4128 but…',
+    status: 'pending_send' as const,
+    createdAt: '2026-07-02T09:14:00Z', sentAt: null, error: null,
+  },
+  {
+    id: 'em_def456', query: 'draft weekly business summary for owner review',
+    to: '', subject: 'Weekly business summary — 07/02',
+    body: 'Revenue up 12.4%. Best channel: Store. Highest-priority gap: renewals (59% vs 72% target).',
+    status: 'pending_send' as const,
+    createdAt: '2026-07-02T07:00:00Z', sentAt: null, error: null,
+  },
+]
+
+export const cancellations = [
+  {
+    id: 'cx_abc123', bookingId: '92841', query: 'cancel booking 92841 for Priya (schedule conflict)',
+    status: 'awaiting_manual_action' as const,
+    createdAt: '2026-07-02T08:42:00Z', resolvedAt: null, notes: null,
+  },
+  {
+    id: 'cx_def456', bookingId: '90112', query: 'cancel booking 90112 — customer no longer available',
+    status: 'awaiting_manual_action' as const,
+    createdAt: '2026-07-01T18:22:00Z', resolvedAt: null, notes: null,
+  },
+]
+
+export const agentHistory: Record<string, Array<{ ts: string; output: string; confidence: number }>> = {
+  'ag-seo': [
+    { ts: '2026-07-02T05:20:00Z', output: 'CCW class page has ranking opportunity for "mesa ccw class" — drafted internal link plan.', confidence: 0.86 },
+    { ts: '2026-07-01T05:20:00Z', output: '/ladies-tuesday/ up 22.6%; /rentals/ down 22.7%. Add a CCW upsell block to /ladies-tuesday/.', confidence: 0.81 },
+  ],
+  'ag-analyst': [
+    { ts: '2026-07-02T04:12:00Z', output: 'Detected renewal gap (59% vs 72% industry) — proposed enabling automation A3.', confidence: 0.92 },
+  ],
+}
