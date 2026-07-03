@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { PageHeader } from '@/components/ui/PageHeader'
 import { Card } from '@/components/ui/Card'
 import { Spinner } from '@/components/ui/Spinner'
-import { api, type Cancellation } from '@/lib/api'
+import { api, type AuditLogEntry, type Cancellation } from '@/lib/api'
 import { cn } from '@/lib/cn'
 
 type Tab = 'cancellations' | 'audit'
@@ -125,21 +125,58 @@ export function OpsQueue() {
           )}
         </Card>
       ) : (
-        <Card title="Notes">
-          <div className="text-sm text-ink-600 space-y-2">
-            <p>
-              Every send / discard / mark-completed / drop is written to the plugin&apos;s
-              audit log (<code className="font-mono text-xs">g2aba_audit_log</code>).
-              A dashboard view of that log is coming in a follow-up.
-            </p>
-            <p>
-              For now, view it directly in WP-admin at <em>Settings → G2A · Email Drafts</em>
-              and <em>Settings → G2A · Cancellations</em>.
-            </p>
-          </div>
-        </Card>
+        <AuditTab />
       )}
     </div>
+  )
+}
+
+function AuditTab() {
+  const [entries, setEntries] = useState<AuditLogEntry[] | null>(null)
+  const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    let cancelled = false
+    void api.auditLog
+      .list(100)
+      .then(list => {
+        if (!cancelled) setEntries(list)
+      })
+      .catch(err => {
+        if (!cancelled) setError(err instanceof Error ? err.message : String(err))
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
+  return (
+    <Card title="Audit log" subtitle="Every send / discard / mark-completed / drop performed by the plugin">
+      {error && (
+        <div className="text-sm text-rose-700 bg-rose-50 border border-rose-100 rounded-lg px-3 py-2">
+          {error}
+        </div>
+      )}
+      {entries === null ? (
+        <Spinner label="Loading audit log…" />
+      ) : entries.length === 0 ? (
+        <div className="text-sm text-ink-500">No entries yet.</div>
+      ) : (
+        <ul className="divide-y divide-ink-100 text-sm">
+          {entries.map(e => (
+            <li key={e.ts + e.summary} className="py-2 flex items-start gap-3">
+              <span className="pill-gray shrink-0">{e.kind}</span>
+              <div className="min-w-0 flex-1">
+                <div className="text-ink-800">{e.summary}</div>
+                <div className="text-xs text-ink-500">
+                  {new Date(e.ts).toLocaleString()} · actor #{e.actor}
+                </div>
+              </div>
+            </li>
+          ))}
+        </ul>
+      )}
+    </Card>
   )
 }
 

@@ -325,3 +325,9 @@ export const agentHistory: Record<string, Array<{ ts: string; output: string; co
     { ts: '2026-07-02T04:12:00Z', output: 'Detected renewal gap (59% vs 72% industry) — proposed enabling automation A3.', confidence: 0.92 },
   ],
 }
+
+export const auditLog = [
+  { ts: '2026-07-03T09:44:00Z', kind: 'email.sent', summary: 'Sent draft em_abc123 to priya@example.com', actor: 12, meta: { draftId: 'em_abc123' } },
+  { ts: '2026-07-03T08:22:00Z', kind: 'cancellation.completed', summary: 'Cancellation cx_abc123 marked completed', actor: 12, meta: {} },
+  { ts: '2026-07-02T18:10:00Z', kind: 'email.discarded', summary: 'Discarded draft em_zzz999', actor: 12, meta: {} },
+]
