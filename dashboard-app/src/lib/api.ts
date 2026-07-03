@@ -301,6 +301,24 @@ export const api = {
       return http<AgentHistoryEntry[]>(`/agents/${agentId}/history`)
     },
   },
+
+  agentPrompt: {
+    async set(agentId: string, template: string): Promise<{ record: Agent; placeholder: boolean }> {
+      if (env.useMocks) throw new Error('prompt editing is unavailable in mock mode')
+      const res = await http<{ ok: true; record: Agent; placeholder: boolean }>(
+        `/agents/${agentId}/prompt`,
+        { method: 'POST', body: JSON.stringify({ template }) },
+      )
+      return { record: res.record, placeholder: res.placeholder }
+    },
+  },
+
+  auditLog: {
+    async list(limit = 100): Promise<AuditLogEntry[]> {
+      if (env.useMocks) return mock.auditLog
+      return http<AuditLogEntry[]>(`/audit-log?limit=${limit}`)
+    },
+  },
 }
 
 export interface BridGisticAskResult {
@@ -348,4 +366,12 @@ export interface AgentHistoryEntry {
   ts: string
   output: string
   confidence: number
+}
+
+export interface AuditLogEntry {
+  ts: string
+  kind: string
+  summary: string
+  actor: number
+  meta: Record<string, unknown>
 }

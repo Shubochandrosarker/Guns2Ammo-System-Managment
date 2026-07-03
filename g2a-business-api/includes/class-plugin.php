@@ -20,6 +20,12 @@ class Plugin {
 		\WordPressistic\G2ABA\AI\Insight_Generator::register_cron();
 		\WordPressistic\G2ABA\Agents\Agent_Runner::register();
 
+		// Concrete automation handlers subscribe to their per-slug cron hooks.
+		\WordPressistic\G2ABA\Automation\Handlers\Weekly_Report_Handler::register();
+		\WordPressistic\G2ABA\Automation\Handlers\Low_Stock_Handler::register();
+		\WordPressistic\G2ABA\Automation\Handlers\SEO_Drop_Handler::register();
+		\WordPressistic\G2ABA\Automation\Handlers\Membership_Renewal_Handler::register();
+
 		// BridGistic executor subscribes to the approval hook.
 		\WordPressistic\G2ABA\BridGistic\Executor::register();
 

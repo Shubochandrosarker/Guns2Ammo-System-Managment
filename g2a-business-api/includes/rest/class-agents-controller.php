@@ -48,6 +48,35 @@ class Agents_Controller extends REST_Controller {
 				'permission_callback' => array( $this, 'read_permissions_check' ),
 			)
 		);
+
+		register_rest_route(
+			$this->namespace,
+			'/agents/(?P<id>[a-z0-9_-]+)/prompt',
+			array(
+				'methods'             => \WP_REST_Server::CREATABLE,
+				'callback'            => array( $this, 'set_prompt' ),
+				'permission_callback' => array( $this, 'admin_permissions_check' ),
+				'args'                => array(
+					'template' => array( 'type' => 'string', 'required' => true ),
+				),
+			)
+		);
+	}
+
+	public function set_prompt( \WP_REST_Request $req ) {
+		$id       = (string) $req->get_param( 'id' );
+		$template = (string) $req->get_param( 'template' );
+
+		$result = ( new Agent_Store() )->set_prompt( $id, $template );
+		if ( ! ( $result['ok'] ?? false ) ) {
+			$status = ( 'Unknown agent id.' === ( $result['error'] ?? '' ) ) ? 404 : 400;
+			return new \WP_Error(
+				'g2aba_agent_prompt_invalid',
+				(string) ( $result['error'] ?? 'Invalid prompt.' ),
+				array( 'status' => $status )
+			);
+		}
+		return $this->ok( $result );
 	}
 
 	public function list() { // phpcs:ignore Squiz.Commenting.FunctionComment.Missing

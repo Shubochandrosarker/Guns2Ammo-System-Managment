@@ -58,6 +58,8 @@ All other routes require `g2a_dashboard` (read) or `g2a_dashboard_admin`
 | POST   | `/cancellations/{id}/mark-completed`        | admin  |
 | POST   | `/cancellations/{id}/drop`                  | admin  |
 | GET    | `/agents/{id}/history`                      | read   |
+| POST   | `/agents/{id}/prompt`                       | admin  |
+| GET    | `/audit-log?limit=100`                      | read   |
 
 ## Operational review screens
 
@@ -148,6 +150,26 @@ scheduler — flipping enabled actually changes the WP-Cron state.
 `Automation_Store::seed_defaults()` is idempotent: running it preserves
 each record's `status`, `lastRun`, and `runsLast7d` counters, so
 reactivating the plugin doesn't re-enable something a human paused.
+
+### Handlers (safe by default)
+
+Concrete handlers subscribe to their per-slug hook and are wired via
+`Handler_Base::register()`. Every handler in this plugin writes to
+`Email_Draft_Store` — it does **not** auto-send. Sending still goes
+through the existing owner-approved `Email_Sender` path (audit-logged).
+
+- **`Weekly_Report_Handler`** — Monday weekly cadence. Builds a
+  compact text summary (revenue, bookings, memberships, store, SEO)
+  and drafts one email.
+- **`Low_Stock_Handler`** — twice-daily. Walks WooCommerce products at
+  or under their per-product low-stock threshold (site-wide fallback
+  when no per-product override is set) and drafts one email listing
+  up to 20 SKUs. Skips gracefully when Woo is absent.
+- **`SEO_Drop_Handler`** — daily. Compares GSC top-page clicks vs the
+  previous 7 days and drafts an alert for any page down ≥ 25%.
+- **`Membership_Renewal_Handler`** — daily. Finds Memberistic
+  memberships expiring in exactly 30 / 7 / 1 day and drafts one
+  personalised renewal email per member.
 
 ## AI Agents (real runtime)
 

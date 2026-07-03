@@ -20,6 +20,8 @@ use WordPressistic\G2ABA\Ops\Cancellation_Queue;
 use WordPressistic\G2ABA\Ops\Email_Draft_Store;
 use WordPressistic\G2ABA\Ops\Email_Sender;
 
+// Route: GET /audit-log — read the bounded audit log the ops subsystem writes to.
+
 if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
@@ -93,6 +95,28 @@ class Ops_Controller extends REST_Controller {
 				'permission_callback' => array( $this, 'admin_permissions_check' ),
 			)
 		);
+
+		register_rest_route(
+			$this->namespace,
+			'/audit-log',
+			array(
+				'methods'             => \WP_REST_Server::READABLE,
+				'callback'            => array( $this, 'audit_log' ),
+				'permission_callback' => array( $this, 'read_permissions_check' ),
+				'args'                => array(
+					'limit' => array( 'type' => 'integer' ),
+				),
+			)
+		);
+	}
+
+	public function audit_log( \WP_REST_Request $req ) {
+		$limit = (int) $req->get_param( 'limit' );
+		if ( $limit <= 0 ) {
+			$limit = 100;
+		}
+		$limit = min( 500, $limit );
+		return $this->ok( array_slice( ( new Audit_Log() )->all(), 0, $limit ) );
 	}
 
 	public function list_email_drafts( \WP_REST_Request $req ) {

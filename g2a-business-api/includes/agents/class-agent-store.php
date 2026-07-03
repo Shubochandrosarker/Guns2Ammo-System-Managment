@@ -66,6 +66,39 @@ class Agent_Store {
 	}
 
 	/**
+	 * Replace the prompt template. Empty or oversized inputs are refused —
+	 * a prompt that lacks the `{{snapshot}}` placeholder would still work
+	 * (the runner substitutes only when the placeholder is present), but
+	 * we surface a hint to the caller so they don't lose the data injection
+	 * unintentionally.
+	 *
+	 * @return array{ok:true,record:array}|array{ok:false,error:string}
+	 */
+	public function set_prompt( string $id, string $template ): array {
+		$template = trim( $template );
+		if ( '' === $template ) {
+			return array( 'ok' => false, 'error' => 'Prompt template cannot be empty.' );
+		}
+		if ( strlen( $template ) > 8000 ) {
+			return array( 'ok' => false, 'error' => 'Prompt template exceeds 8 KiB. Trim it or store context via RAG.' );
+		}
+
+		$raw = get_option( self::OPTION, array() );
+		if ( ! is_array( $raw ) || ! isset( $raw[ $id ] ) ) {
+			return array( 'ok' => false, 'error' => 'Unknown agent id.' );
+		}
+
+		$raw[ $id ]['promptTemplate'] = $template;
+		update_option( self::OPTION, $raw, false );
+
+		return array(
+			'ok'           => true,
+			'record'       => $raw[ $id ],
+			'placeholder'  => false !== strpos( $template, '{{snapshot}}' ),
+		);
+	}
+
+	/**
 	 * Update the record with the last-run output. `output` becomes
 	 * `lastOutput`; a full snapshot is appended to the per-agent history.
 	 *
