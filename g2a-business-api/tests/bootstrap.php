@@ -42,6 +42,18 @@ if ( ! function_exists( 'wp_date' ) ) {
 if ( ! function_exists( '__' ) ) {
 	function __( $text ) { return $text; }
 }
+if ( ! function_exists( 'wp_json_encode' ) ) {
+	function wp_json_encode( $data, $options = 0, $depth = 512 ) {
+		return json_encode( $data, $options, $depth );
+	}
+}
+if ( ! function_exists( 'sanitize_title' ) ) {
+	function sanitize_title( $title ) {
+		$t = strtolower( (string) $title );
+		$t = preg_replace( '/[^a-z0-9-]+/', '-', $t );
+		return trim( (string) $t, '-' );
+	}
+}
 
 $GLOBALS['g2aba_test_options']    = array();
 $GLOBALS['g2aba_test_transients'] = array();

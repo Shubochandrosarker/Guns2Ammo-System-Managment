@@ -209,4 +209,64 @@ export const api = {
       return env.useMocks ? Promise.resolve(mock.health) : http<SystemHealthCheck[]>('/system/health')
     },
   },
+
+  bridgistic: {
+    async ask(query: string): Promise<BridGisticAskResult> {
+      if (env.useMocks) {
+        // Deterministic client-side classifier so the mock UX matches the
+        // server's decision rules — same verb list as the PHP classifier.
+        const lower = query.toLowerCase()
+        const isDraft  = /\b(draft|prepare|write|compose|propose|suggest)\b/.test(lower)
+        const isAction = /\b(send|email|sms|create|add|schedule|book|update|change|edit|modify|delete|remove|cancel|refund|charge|issue|approve|reject|ban|suspend)\b/.test(lower)
+        const category = isDraft ? 'draft' : isAction ? 'action' : 'read'
+        return {
+          query,
+          category,
+          requiresApproval: category !== 'read',
+          answer:
+            category === 'action'
+              ? 'Action detected. Queued for owner approval.'
+              : category === 'draft'
+              ? 'Draft prepared. Review + approve before sending.'
+              : 'Read-only query — served without any state change.',
+          actionId: category === 'action' ? 'mock-action' : undefined,
+        }
+      }
+      return http<BridGisticAskResult>('/bridgistic/ask', {
+        method: 'POST',
+        body: JSON.stringify({ query }),
+      })
+    },
+    async pending(): Promise<BridGisticAction[]> {
+      if (env.useMocks) return []
+      return http<BridGisticAction[]>('/bridgistic/actions?status=pending')
+    },
+    async approve(id: string): Promise<BridGisticAction> {
+      if (env.useMocks) throw new Error('approve is unavailable in mock mode')
+      return http<BridGisticAction>(`/bridgistic/actions/${id}/approve`, { method: 'POST' })
+    },
+    async reject(id: string): Promise<BridGisticAction> {
+      if (env.useMocks) throw new Error('reject is unavailable in mock mode')
+      return http<BridGisticAction>(`/bridgistic/actions/${id}/reject`, { method: 'POST' })
+    },
+  },
+}
+
+export interface BridGisticAskResult {
+  query: string
+  category: 'read' | 'draft' | 'action'
+  answer: string
+  requiresApproval: boolean
+  actionId?: string
+}
+
+export interface BridGisticAction {
+  id: string
+  query: string
+  intent: 'read' | 'draft' | 'action'
+  status: 'pending' | 'approved' | 'rejected'
+  requesterId: number
+  createdAt: string
+  resolvedAt: string | null
+  result: string | null
 }

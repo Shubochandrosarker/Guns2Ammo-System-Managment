@@ -14,6 +14,7 @@ use WordPressistic\G2ABA\REST\Agents_Controller;
 use WordPressistic\G2ABA\REST\Analytics_Controller;
 use WordPressistic\G2ABA\REST\Auth_Controller;
 use WordPressistic\G2ABA\REST\Automations_Controller;
+use WordPressistic\G2ABA\REST\BridGistic_Controller;
 use WordPressistic\G2ABA\REST\Gaps_Controller;
 use WordPressistic\G2ABA\REST\Health_Controller;
 use WordPressistic\G2ABA\REST\Insights_Controller;
@@ -39,6 +40,7 @@ class Router {
 			Agents_Controller::class,
 			Models_Controller::class,
 			Health_Controller::class,
+			BridGistic_Controller::class,
 		);
 	}
 
