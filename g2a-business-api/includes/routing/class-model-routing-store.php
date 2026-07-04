@@ -104,6 +104,26 @@ class Model_Routing_Store {
 	}
 
 	/**
+	 * Resolve the connection id runtime code should hand to Anthropic_Client
+	 * for a purpose. Falls back to $default when the purpose has no route,
+	 * the routed connection no longer exists, or the routed connection isn't
+	 * an Anthropic one — Anthropic_Client is the only executor today, so a
+	 * route to another provider can't be honoured yet.
+	 */
+	public function connection_for( string $purpose, string $default ): string {
+		$routed = $this->get_for( $purpose );
+		if ( null === $routed ) {
+			return $default;
+		}
+		$raw = get_option( 'g2aba_models', array() );
+		if ( ! is_array( $raw ) || ! isset( $raw[ $routed ] ) || ! is_array( $raw[ $routed ] ) ) {
+			return $default;
+		}
+		$provider = strtolower( (string) ( $raw[ $routed ]['provider'] ?? '' ) );
+		return 'anthropic' === $provider ? $routed : $default;
+	}
+
+	/**
 	 * @return array<int,string>
 	 */
 	private static function known_model_ids(): array {

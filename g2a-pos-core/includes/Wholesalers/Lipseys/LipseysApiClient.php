@@ -59,8 +59,10 @@ final class LipseysApiClient {
 				),
 				'body'    => wp_json_encode(
 					array(
-						'Email'    => $this->email,
-						'Password' => $this->password,
+						// Trim defensively: a stray space pasted into the admin
+						// form must not turn into a hard "Login Failed".
+						'Email'    => trim( $this->email ),
+						'Password' => trim( $this->password ),
 					)
 				),
 			)
@@ -174,7 +176,9 @@ final class LipseysApiClient {
 	}
 
 	public function fetchCatalog(): array {
-		return $this->get( '/api/Integration/Items/CatalogFeed' );
+		// The full catalog feed is a single large JSON document (Lipsey's has
+		// no pagination); give it more room than the default request timeout.
+		return $this->get( '/api/Integration/Items/CatalogFeed', 120 );
 	}
 
 	public function catalogFeedItem( string $upc ): array {

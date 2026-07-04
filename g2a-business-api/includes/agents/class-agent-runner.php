@@ -22,6 +22,7 @@ use WordPressistic\G2ABA\Providers\Revenue_Provider;
 use WordPressistic\G2ABA\Providers\SEO_Provider;
 use WordPressistic\G2ABA\Providers\Store_Provider;
 use WordPressistic\G2ABA\Range;
+use WordPressistic\G2ABA\Routing\Model_Routing_Store;
 
 if ( ! defined( 'ABSPATH' ) ) {
 	exit;
@@ -44,7 +45,15 @@ class Agent_Runner {
 		// Short-circuit BEFORE gathering the snapshot — snapshot queries touch
 		// $wpdb + WooCommerce, which is a lot of work to throw away if there's
 		// no API key configured.
-		$client = new Anthropic_Client( (string) ( $agent['model'] ?? 'anthropic-primary' ) );
+		//
+		// Connection selection: the dashboard's model-routing map wins when a
+		// route exists for this agent's purpose; otherwise the agent's own
+		// `model` connection id is used, exactly as before.
+		$default_connection = (string) ( $agent['model'] ?? 'anthropic-primary' );
+		$purpose            = self::purpose_for_department( (string) ( $agent['department'] ?? '' ) );
+		$connection_id      = ( new Model_Routing_Store() )->connection_for( $purpose, $default_connection );
+
+		$client = new Anthropic_Client( $connection_id );
 		if ( ! $client->is_configured() ) {
 			$store->record_run( $agent_id, 'Anthropic connection not configured. Set an API key under Settings → G2A Business API.', 0.0 );
 			return;
