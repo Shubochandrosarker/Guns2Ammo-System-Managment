@@ -16,6 +16,7 @@ import { AIInsights } from '@/pages/AIInsights'
 import { AutomationCenter } from '@/pages/AutomationCenter'
 import { AIAgents } from '@/pages/AIAgents'
 import { EmailManagement } from '@/pages/EmailManagement'
+import { Leads } from '@/pages/Leads'
 import { BridGistic } from '@/pages/BridGistic'
 import { AIModelsRAGs } from '@/pages/AIModels'
 import { Reports } from '@/pages/Reports'
@@ -76,6 +77,7 @@ export function App() {
             <Route path="automation-center"    element={<AutomationCenter />} />
             <Route path="ai-agents"            element={<AIAgents />} />
             <Route path="email-management"     element={<EmailManagement />} />
+            <Route path="leads"                element={<Leads />} />
             <Route path="bridgistic"           element={<BridGistic />} />
             <Route path="ai-models"            element={<AIModelsRAGs />} />
             <Route path="reports"              element={<Reports />} />

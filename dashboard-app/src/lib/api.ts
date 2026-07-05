@@ -11,10 +11,17 @@ import type {
   Agent,
   Automation,
   BookingAnalytics,
+  BrainIngestResult,
+  BrainQueryResult,
+  BrainStats,
   BusinessGap,
   EmailOverview,
   InsightisticAnalytics,
   IntegrationsStatus,
+  Lead,
+  LeadsPage,
+  LeadStats,
+  LeadStatus,
   MembershipAnalytics,
   ModelConnection,
   Range,
@@ -324,6 +331,85 @@ export const api = {
     },
   },
 
+  leads: {
+    list(params: LeadsListParams = {}): Promise<LeadsPage> {
+      if (env.useMocks) {
+        let items = mock.leads
+        if (params.category) items = items.filter(l => l.category === params.category)
+        if (params.status)   items = items.filter(l => l.status === params.status)
+        if (params.source)   items = items.filter(l => l.source === params.source)
+        if (params.search) {
+          const q = params.search.toLowerCase()
+          items = items.filter(l =>
+            (l.contactName ?? '').toLowerCase().includes(q) ||
+            (l.contactEmail ?? '').toLowerCase().includes(q) ||
+            (l.subject ?? '').toLowerCase().includes(q),
+          )
+        }
+        // Same string comparison the real repository uses (created_at >= / <= date_from/date_to).
+        if (params.dateFrom) items = items.filter(l => l.createdAt >= params.dateFrom!)
+        if (params.dateTo)   items = items.filter(l => l.createdAt <= params.dateTo!)
+        items = [...items].sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+        const total = items.length
+        const perPage = params.perPage || 20
+        const page = params.page || 1
+        const start = (page - 1) * perPage
+        return Promise.resolve({ items: items.slice(start, start + perPage), total })
+      }
+      const qs = new URLSearchParams()
+      if (params.category)  qs.set('category', params.category)
+      if (params.status)    qs.set('status', params.status)
+      if (params.source)    qs.set('source', params.source)
+      if (params.search)    qs.set('search', params.search)
+      if (params.dateFrom)  qs.set('date_from', params.dateFrom)
+      if (params.dateTo)    qs.set('date_to', params.dateTo)
+      if (params.page)      qs.set('page', String(params.page))
+      if (params.perPage)   qs.set('per_page', String(params.perPage))
+      const suffix = qs.toString()
+      return http<LeadsPage>(`/leads${suffix ? `?${suffix}` : ''}`)
+    },
+    stats(): Promise<LeadStats> {
+      return env.useMocks ? Promise.resolve(mock.leadStats) : http<LeadStats>('/leads/stats')
+    },
+    get(id: number): Promise<Lead> {
+      if (env.useMocks) {
+        const found = mock.leads.find(l => l.id === id)
+        if (!found) throw new ApiError(404, 'Lead not found')
+        return Promise.resolve(found)
+      }
+      return http<Lead>(`/leads/${id}`)
+    },
+    async updateStatus(id: number, patch: { status?: LeadStatus; assignedAgent?: string | null }): Promise<Lead> {
+      if (env.useMocks) throw new Error('updateStatus is unavailable in mock mode')
+      const body: Record<string, unknown> = {}
+      if (patch.status !== undefined) body.status = patch.status
+      if (patch.assignedAgent !== undefined) body.assigned_agent = patch.assignedAgent
+      return http<Lead>(`/leads/${id}`, { method: 'PATCH', body: JSON.stringify(body) })
+    },
+  },
+
+  brain: {
+    query(q: string, k?: number, scope?: string): Promise<BrainQueryResult> {
+      if (env.useMocks) return Promise.resolve(mock.brainQueryResult)
+      const qs = new URLSearchParams({ q })
+      if (k) qs.set('k', String(k))
+      if (scope) qs.set('scope', scope)
+      return http<BrainQueryResult>(`/brain/query?${qs.toString()}`)
+    },
+    stats(scope?: string): Promise<BrainStats> {
+      if (env.useMocks) return Promise.resolve(mock.brainStats)
+      const qs = scope ? `?scope=${encodeURIComponent(scope)}` : ''
+      return http<BrainStats>(`/brain/stats${qs}`)
+    },
+    async ingest(label: string, body: string, opts: { tags?: string; scope?: string } = {}): Promise<BrainIngestResult> {
+      if (env.useMocks) throw new Error('ingest is unavailable in mock mode')
+      return http<BrainIngestResult>('/brain/ingest', {
+        method: 'POST',
+        body: JSON.stringify({ label, body, ...opts }),
+      })
+    },
+  },
+
   models: {
     list(): Promise<ModelConnection[]> {
       return env.useMocks ? Promise.resolve(mock.models) : http<ModelConnection[]>('/model-connections')
@@ -555,6 +641,17 @@ export interface Cancellation {
   createdAt: string
   resolvedAt: string | null
   notes: string | null
+}
+
+export interface LeadsListParams {
+  category?: string
+  status?: string
+  source?: string
+  search?: string
+  dateFrom?: string
+  dateTo?: string
+  page?: number
+  perPage?: number
 }
 
 export interface AgentHistoryEntry {

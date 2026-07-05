@@ -4,8 +4,9 @@ import { Card } from '@/components/ui/Card'
 import { Spinner } from '@/components/ui/Spinner'
 import { useAsync } from '@/lib/hooks'
 import { api, type AgentHistoryEntry, type PromptVersion } from '@/lib/api'
-import type { Agent } from '@/types/analytics'
+import type { Agent, BrainQueryResult, BrainStatsData } from '@/types/analytics'
 import { cn } from '@/lib/cn'
+import { formatNumber } from '@/lib/format'
 
 const STATUS_STYLE: Record<Agent['status'], string> = {
   active:        'pill-green',
@@ -89,12 +90,248 @@ export function AIAgents() {
         ))}
       </div>
 
+      <div className="mt-6">
+        <BrainSection />
+      </div>
+
       {drawer && (
         <Drawer
           agent={drawer.agent}
           kind={drawer.kind}
           onClose={() => setDrawer(null)}
         />
+      )}
+    </div>
+  )
+}
+
+function BrainSection() {
+  const stats = useAsync(() => api.brain.stats(), [])
+  const data = stats.data
+
+  return (
+    <Card
+      title="Business Knowledge Brain"
+      subtitle="The shared knowledge store every agent reads from — g2a-pos-core's AI Brain"
+    >
+      {stats.loading ? (
+        <Spinner label="Checking knowledge brain…" />
+      ) : !data || !data.ok ? (
+        <div className="text-sm text-ink-600 bg-ink-50 border border-ink-100 rounded-lg p-3">
+          <div className="font-medium text-ink-800">Knowledge brain not active</div>
+          <div className="mt-1 text-xs text-ink-500">
+            Connect the in-store AI plugin to enable the shared knowledge brain.
+          </div>
+        </div>
+      ) : (
+        <BrainStatsGrid data={data.results} />
+      )}
+
+      <div className="mt-6 grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <BrainIngestForm onIngested={() => stats.refresh()} />
+        <BrainSearchTool />
+      </div>
+    </Card>
+  )
+}
+
+function BrainStatsGrid({ data }: { data: BrainStatsData }) {
+  return (
+    <div>
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        <MiniStat label="Documents" value={formatNumber(data.documents)} />
+        <MiniStat label="Chunks"    value={formatNumber(data.chunks)} />
+        <MiniStat label="Embedded"  value={`${data.embedded_pct.toFixed(1)}% (${formatNumber(data.embedded_chunks)})`} />
+        <MiniStat label="Backend"   value={data.backend} />
+      </div>
+      {data.by_source_type.length > 0 && (
+        <div className="mt-4">
+          <div className="text-[11px] uppercase tracking-wide text-ink-500 mb-1.5">By source type</div>
+          <ul className="text-sm space-y-1">
+            {data.by_source_type.map(t => (
+              <li key={t.source_type} className="flex items-center justify-between">
+                <span className="text-ink-700">{t.source_type}</span>
+                <span className="font-medium text-ink-800">
+                  {formatNumber(t.documents)} doc{t.documents === 1 ? '' : 's'} · {formatNumber(t.chunks)} chunk{t.chunks === 1 ? '' : 's'}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+    </div>
+  )
+}
+
+function MiniStat({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="bg-ink-50 rounded-lg px-3 py-2">
+      <div className="text-[11px] uppercase tracking-wide text-ink-500">{label}</div>
+      <div className="text-base font-semibold text-ink-800">{value}</div>
+    </div>
+  )
+}
+
+function BrainIngestForm({ onIngested }: { onIngested: () => void }) {
+  const [label, setLabel] = useState('')
+  const [body, setBody] = useState('')
+  const [tags, setTags] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [status, setStatus] = useState<{ ok: boolean; msg: string } | null>(null)
+
+  const bodyTrimmed = body.trim()
+  const disabled = busy || label.trim() === '' || bodyTrimmed.length < 10
+
+  async function submit() {
+    setBusy(true)
+    setStatus(null)
+    try {
+      const res = await api.brain.ingest(label.trim(), bodyTrimmed, { tags: tags.trim() || undefined })
+      if (!res.ok) {
+        // Outer ok:false — g2a-pos-core isn't active (or threw).
+        setStatus({
+          ok: false,
+          msg: res.reason === 'pos_brain_inactive'
+            ? 'Connect the in-store AI plugin to enable the shared knowledge brain.'
+            : res.reason,
+        })
+      } else if (!res.results.ok) {
+        // Inner ok:false — brain is active, but this specific ingest failed
+        // (e.g. body normalized to empty).
+        setStatus({ ok: false, msg: res.results.error })
+      } else {
+        setStatus({
+          ok: true,
+          msg: res.results.skipped
+            ? 'Already up to date in the knowledge brain — no changes needed.'
+            : `Added to the knowledge brain (${res.results.chunks} chunk${res.results.chunks === 1 ? '' : 's'}, embedded: ${res.results.embedded ? 'yes' : 'no'}).`,
+        })
+        setLabel('')
+        setBody('')
+        setTags('')
+        onIngested()
+      }
+    } catch (err) {
+      setStatus({ ok: false, msg: err instanceof Error ? err.message : String(err) })
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <div>
+      <div className="text-sm font-semibold text-ink-800 mb-2">Add to knowledge brain</div>
+      <div className="space-y-2">
+        <input
+          className="input"
+          placeholder="Label (e.g. Range hours)"
+          value={label}
+          onChange={e => setLabel(e.target.value)}
+        />
+        <textarea
+          className="input min-h-[100px] text-sm"
+          placeholder="Body — at least 10 characters"
+          value={body}
+          onChange={e => setBody(e.target.value)}
+        />
+        <input
+          className="input"
+          placeholder="Tags (optional)"
+          value={tags}
+          onChange={e => setTags(e.target.value)}
+        />
+        {bodyTrimmed.length > 0 && bodyTrimmed.length < 10 && (
+          <div className="text-xs text-ink-500">Body must be at least 10 characters.</div>
+        )}
+        <button className="btn-primary text-sm" disabled={disabled} onClick={() => void submit()}>
+          {busy ? 'Adding…' : 'Add to knowledge brain'}
+        </button>
+      </div>
+      {status && (
+        <div
+          className={cn(
+            'mt-3 text-sm rounded-lg px-3 py-2',
+            status.ok ? 'bg-emerald-50 text-emerald-800 border border-emerald-100'
+                      : 'bg-rose-50 text-rose-800 border border-rose-100',
+          )}
+        >
+          {status.msg}
+        </div>
+      )}
+    </div>
+  )
+}
+
+function BrainSearchTool() {
+  const [q, setQ] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [result, setResult] = useState<BrainQueryResult | null>(null)
+
+  async function search() {
+    const query = q.trim()
+    if (query === '') return
+    setBusy(true)
+    setError(null)
+    try {
+      setResult(await api.brain.query(query))
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <div>
+      <div className="text-sm font-semibold text-ink-800 mb-2">Search the knowledge brain</div>
+      <div className="flex items-center gap-2">
+        <input
+          className="input flex-1"
+          placeholder="Ask a question…"
+          value={q}
+          onChange={e => setQ(e.target.value)}
+          onKeyDown={e => {
+            if (e.key === 'Enter') void search()
+          }}
+        />
+        <button className="btn-secondary text-sm shrink-0" disabled={busy || q.trim() === ''} onClick={() => void search()}>
+          {busy ? 'Searching…' : 'Search'}
+        </button>
+      </div>
+
+      {error && (
+        <div className="mt-3 text-sm rounded-lg px-3 py-2 bg-rose-50 text-rose-800 border border-rose-100">
+          {error}
+        </div>
+      )}
+
+      {result && !result.ok && (
+        <div className="mt-3 text-sm text-ink-500">
+          {result.reason === 'pos_brain_inactive'
+            ? 'Connect the in-store AI plugin to enable the shared knowledge brain.'
+            : (result.reason ?? 'Search failed.')}
+        </div>
+      )}
+
+      {result && result.ok && result.results.length === 0 && (
+        <div className="mt-3 text-sm text-ink-500">No matches yet.</div>
+      )}
+
+      {result && result.ok && result.results.length > 0 && (
+        <ul className="mt-3 space-y-2">
+          {result.results.map(r => (
+            <li key={r.id} className="rounded-lg border border-ink-100 p-3 text-sm">
+              {r.source_label && <div className="font-medium text-ink-800">{r.source_label}</div>}
+              <div className="text-ink-700 whitespace-pre-wrap">{r.text_content}</div>
+              {(typeof r.score === 'number' || typeof r.match_score === 'number') && (
+                <div className="mt-1 text-xs text-ink-500">
+                  {typeof r.score === 'number' ? `score ${r.score.toFixed(2)}` : `match ${r.match_score}`}
+                </div>
+              )}
+            </li>
+          ))}
+        </ul>
       )}
     </div>
   )
