@@ -12,7 +12,9 @@ import type {
   Automation,
   BookingAnalytics,
   BusinessGap,
+  EmailOverview,
   InsightisticAnalytics,
+  IntegrationsStatus,
   MembershipAnalytics,
   ModelConnection,
   Range,
@@ -271,6 +273,11 @@ export const api = {
   },
 
   system: {
+    integrations(): Promise<IntegrationsStatus> {
+      return env.useMocks
+        ? Promise.resolve(mock.integrations)
+        : http<IntegrationsStatus>('/system/integrations')
+    },
     async rotateKeys(): Promise<SystemActionResult> {
       if (env.useMocks) throw new Error('rotateKeys is unavailable in mock mode')
       return http<SystemActionResult>('/system/rotate-keys', {
@@ -430,6 +437,14 @@ export const api = {
     async reject(id: string): Promise<BridGisticAction> {
       if (env.useMocks) throw new Error('reject is unavailable in mock mode')
       return http<BridGisticAction>(`/bridgistic/actions/${id}/reject`, { method: 'POST' })
+    },
+  },
+
+  emails: {
+    overview(): Promise<EmailOverview> {
+      return env.useMocks
+        ? Promise.resolve(mock.emailOverview)
+        : http<EmailOverview>('/emails/overview')
     },
   },
 
@@ -671,4 +686,6 @@ export interface DashboardSettings {
   dailySummaryHour: number
   ownerEmail: string
   timezone: string
+  // CORS allow-list for the hosted dashboard, e.g. ['https://app.guns2ammo.com'].
+  allowedOrigins: string[]
 }

@@ -116,6 +116,15 @@ if ( ! function_exists( 'add_action' ) ) {
 }
 $GLOBALS['g2aba_test_added_actions'] = array();
 
+if ( ! function_exists( 'add_filter' ) ) {
+	function add_filter( ...$args ) { $GLOBALS['g2aba_test_added_filters'][] = $args; }
+}
+$GLOBALS['g2aba_test_added_filters'] = array();
+
+if ( ! function_exists( 'apply_filters' ) ) {
+	function apply_filters( $tag, $value ) { return $value; }
+}
+
 $GLOBALS['g2aba_test_options']    = array();
 $GLOBALS['g2aba_test_transients'] = array();
 

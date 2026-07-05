@@ -28,6 +28,9 @@ const HOURS = Array.from({ length: 24 }, (_, i) => i)
 
 export function Settings() {
   const [values, setValues] = useState<DashboardSettings | null>(null)
+  // The origins list is edited as free text (one per line) so typing
+  // newlines works; it is parsed back into an array on save.
+  const [originsText, setOriginsText] = useState('')
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [status, setStatus] = useState<{ ok: boolean; msg: string } | null>(null)
@@ -39,6 +42,7 @@ export function Settings() {
       .then(s => {
         if (cancelled) return
         setValues(s)
+        setOriginsText((s.allowedOrigins ?? []).join('\n'))
         setLoading(false)
       })
       .catch(err => {
@@ -56,8 +60,13 @@ export function Settings() {
     setSaving(true)
     setStatus(null)
     try {
-      const fresh = await api.settings.update(values)
+      const allowedOrigins = originsText
+        .split('\n')
+        .map(line => line.trim())
+        .filter(Boolean)
+      const fresh = await api.settings.update({ ...values, allowedOrigins })
       setValues(fresh)
+      setOriginsText((fresh.allowedOrigins ?? []).join('\n'))
       setStatus({ ok: true, msg: 'Settings saved.' })
     } catch (err) {
       setStatus({ ok: false, msg: err instanceof Error ? err.message : String(err) })
@@ -169,6 +178,19 @@ export function Settings() {
                   className="input"
                   value={values.timezone}
                   onChange={e => setValues({ ...values, timezone: e.target.value })}
+                />
+              </Field>
+
+              <Field
+                label="Allowed dashboard origins"
+                hint="CORS allow-list for this dashboard's API access — one origin per line (scheme + host, no path). Invalid entries are dropped server-side; an empty list falls back to https://app.guns2ammo.com."
+              >
+                <textarea
+                  className="input"
+                  rows={3}
+                  placeholder={'https://app.guns2ammo.com'}
+                  value={originsText}
+                  onChange={e => setOriginsText(e.target.value)}
                 />
               </Field>
 

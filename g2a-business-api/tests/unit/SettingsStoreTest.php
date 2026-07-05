@@ -73,4 +73,44 @@ class SettingsStoreTest extends TestCase {
 		$out = ( new Settings_Store() )->update( array( 'weeklyReportDay' => 'someday' ) );
 		$this->assertSame( 'monday', $out['settings']['weeklyReportDay'] );
 	}
+
+	public function test_allowed_origins_default_to_hosted_dashboard() {
+		$out = ( new Settings_Store() )->all();
+		$this->assertSame( array( 'https://app.guns2ammo.com' ), $out['allowedOrigins'] );
+	}
+
+	public function test_allowed_origins_are_normalised_and_deduped() {
+		$out = ( new Settings_Store() )->update( array(
+			'allowedOrigins' => array(
+				'HTTPS://App.Guns2Ammo.com/',
+				'https://app.guns2ammo.com',
+				'http://localhost:5173',
+			),
+		) );
+		$this->assertSame(
+			array( 'https://app.guns2ammo.com', 'http://localhost:5173' ),
+			$out['settings']['allowedOrigins']
+		);
+	}
+
+	public function test_invalid_origins_are_dropped() {
+		$out = ( new Settings_Store() )->update( array(
+			'allowedOrigins' => array(
+				'https://ok.example.com',
+				'https://bad.example.com/path',
+				'*',
+				'javascript:alert(1)',
+				42,
+			),
+		) );
+		$this->assertSame( array( 'https://ok.example.com' ), $out['settings']['allowedOrigins'] );
+	}
+
+	public function test_empty_origin_list_falls_back_to_default() {
+		$out = ( new Settings_Store() )->update( array( 'allowedOrigins' => array( 'not-an-origin' ) ) );
+		$this->assertSame( array( 'https://app.guns2ammo.com' ), $out['settings']['allowedOrigins'] );
+
+		$out2 = ( new Settings_Store() )->update( array( 'allowedOrigins' => 'not-even-an-array' ) );
+		$this->assertSame( array( 'https://app.guns2ammo.com' ), $out2['settings']['allowedOrigins'] );
+	}
 }

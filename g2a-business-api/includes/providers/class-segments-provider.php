@@ -88,19 +88,23 @@ class Segments_Provider {
 			return 0;
 		}
 		global $wpdb;
-		$table = $wpdb->prefix . 'g2ab_bookings';
-		$since = gmdate( 'Y-m-d H:i:s', strtotime( '-30 days' ) );
+		$table   = $wpdb->prefix . 'g2ab_bookings';
+		$types   = $wpdb->prefix . 'g2ab_booking_types';
+		$since   = gmdate( 'Y-m-d H:i:s', strtotime( '-30 days' ) );
+		$shooter = self::shooter_expr( 'b' );
+		$paid_in = self::paid_status_list();
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.PreparedSQL.InterpolatedNotPrepared
 		return (int) $wpdb->get_var(
 			$wpdb->prepare(
 				"SELECT COUNT(*) FROM (
-					SELECT COALESCE(email, CONCAT('u:', user_id)) AS shooter, COUNT(*) AS bookings
-					FROM {$table}
-					WHERE type LIKE %s AND created_at >= %s AND status IN ('paid','completed')
+					SELECT {$shooter} AS shooter, COUNT(*) AS bookings
+					FROM {$table} b
+					LEFT JOIN {$types} t ON t.id = b.booking_type_id
+					WHERE t.category = %s AND b.created_at >= %s AND b.status IN ({$paid_in})
 					GROUP BY shooter
 					HAVING bookings >= 2
 				) x",
-				'%Lane%',
+				'lane',
 				$since
 			)
 		);
@@ -111,12 +115,15 @@ class Segments_Provider {
 			return 0;
 		}
 		global $wpdb;
-		$table = $wpdb->prefix . 'g2ab_bookings';
+		$table   = $wpdb->prefix . 'g2ab_bookings';
+		$types   = $wpdb->prefix . 'g2ab_booking_types';
+		$shooter = self::shooter_expr( 'b' );
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.PreparedSQL.InterpolatedNotPrepared
 		return (int) $wpdb->get_var(
 			$wpdb->prepare(
-				"SELECT COUNT(DISTINCT COALESCE(email, CONCAT('u:', user_id))) FROM {$table}
-					WHERE type LIKE %s AND status = 'completed'",
+				"SELECT COUNT(DISTINCT {$shooter}) FROM {$table} b
+					LEFT JOIN {$types} t ON t.id = b.booking_type_id
+					WHERE t.name LIKE %s AND b.status = 'completed'",
 				'%CCW%'
 			)
 		);
@@ -168,14 +175,18 @@ class Segments_Provider {
 			return 0;
 		}
 		global $wpdb;
-		$table = $wpdb->prefix . 'g2ab_bookings';
-		$since = gmdate( 'Y-m-d H:i:s', strtotime( '-90 days' ) );
+		$table   = $wpdb->prefix . 'g2ab_bookings';
+		$types   = $wpdb->prefix . 'g2ab_booking_types';
+		$since   = gmdate( 'Y-m-d H:i:s', strtotime( '-90 days' ) );
+		$shooter = self::shooter_expr( 'b' );
+		$paid_in = self::paid_status_list();
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.PreparedSQL.InterpolatedNotPrepared
 		return (int) $wpdb->get_var(
 			$wpdb->prepare(
-				"SELECT COUNT(DISTINCT COALESCE(email, CONCAT('u:', user_id))) FROM {$table}
-					WHERE type = %s AND created_at >= %s AND status IN ('paid','completed')",
-				'Ladies Tuesday',
+				"SELECT COUNT(DISTINCT {$shooter}) FROM {$table} b
+					LEFT JOIN {$types} t ON t.id = b.booking_type_id
+					WHERE t.name LIKE %s AND b.created_at >= %s AND b.status IN ({$paid_in})",
+				'%Ladies%',
 				$since
 			)
 		);
@@ -192,8 +203,8 @@ class Segments_Provider {
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.PreparedSQL.InterpolatedNotPrepared
 		return (int) $wpdb->get_var(
 			$wpdb->prepare(
-				"SELECT COUNT(DISTINCT user_id) FROM {$table}
-					WHERE status = 'expired' AND expires_at BETWEEN %s AND %s",
+				"SELECT COUNT(DISTINCT COALESCE(primary_user_id, id)) FROM {$table}
+					WHERE status = 'expired' AND COALESCE(end_date, updated_at) BETWEEN %s AND %s",
 				$lower,
 				$upper
 			)
@@ -205,15 +216,16 @@ class Segments_Provider {
 			return 0;
 		}
 		global $wpdb;
-		$table = $wpdb->prefix . 'g2ab_bookings';
-		$since = gmdate( 'Y-m-d H:i:s', strtotime( '-' . max( 1, $window_days ) . ' days' ) );
+		$table   = $wpdb->prefix . 'g2ab_bookings';
+		$since   = gmdate( 'Y-m-d H:i:s', strtotime( '-' . max( 1, $window_days ) . ' days' ) );
+		$shooter = self::shooter_expr();
 		// A shooter is "first time" if their earliest booking on record is
 		// inside the window.
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.PreparedSQL.InterpolatedNotPrepared
 		return (int) $wpdb->get_var(
 			$wpdb->prepare(
 				"SELECT COUNT(*) FROM (
-					SELECT COALESCE(email, CONCAT('u:', user_id)) AS shooter, MIN(created_at) AS first_seen
+					SELECT {$shooter} AS shooter, MIN(created_at) AS first_seen
 					FROM {$table}
 					GROUP BY shooter
 					HAVING first_seen >= %s
@@ -228,14 +240,15 @@ class Segments_Provider {
 			return 0;
 		}
 		global $wpdb;
-		$table  = $wpdb->prefix . 'g2ab_bookings';
-		$cutoff = gmdate( 'Y-m-d H:i:s', strtotime( '-90 days' ) );
+		$table   = $wpdb->prefix . 'g2ab_bookings';
+		$cutoff  = gmdate( 'Y-m-d H:i:s', strtotime( '-90 days' ) );
+		$shooter = self::shooter_expr();
 		// Distinct shooters whose most recent booking was more than 90 days ago.
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.PreparedSQL.InterpolatedNotPrepared
 		return (int) $wpdb->get_var(
 			$wpdb->prepare(
 				"SELECT COUNT(*) FROM (
-					SELECT COALESCE(email, CONCAT('u:', user_id)) AS shooter, MAX(created_at) AS last_seen
+					SELECT {$shooter} AS shooter, MAX(created_at) AS last_seen
 					FROM {$table}
 					GROUP BY shooter
 					HAVING last_seen < %s
@@ -251,9 +264,10 @@ class Segments_Provider {
 		if ( ! $this->table_exists( $table ) ) {
 			return 0;
 		}
+		$shooter = self::shooter_expr();
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.PreparedSQL.InterpolatedNotPrepared
 		return (int) $wpdb->get_var(
-			"SELECT COUNT(DISTINCT COALESCE(email, CONCAT('u:', user_id))) FROM {$table}"
+			"SELECT COUNT(DISTINCT {$shooter}) FROM {$table}"
 		);
 	}
 
@@ -263,10 +277,11 @@ class Segments_Provider {
 		if ( ! $this->table_exists( $table ) ) {
 			return 0.0;
 		}
+		$shooter = self::shooter_expr();
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.PreparedSQL.InterpolatedNotPrepared
 		$counts = $wpdb->get_col(
 			"SELECT COUNT(*) FROM {$table}
-				GROUP BY COALESCE(email, CONCAT('u:', user_id))"
+				GROUP BY {$shooter}"
 		);
 		$counts = is_array( $counts ) ? array_map( 'intval', $counts ) : array();
 		if ( empty( $counts ) ) {
@@ -280,5 +295,27 @@ class Segments_Provider {
 		global $wpdb;
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.SchemaChange, WordPress.DB.PreparedSQL.InterpolatedNotPrepared
 		return (bool) $wpdb->get_var( $wpdb->prepare( 'SHOW TABLES LIKE %s', $table ) );
+	}
+
+	/**
+	 * SQL expression identifying one shooter on a `g2ab_bookings` row.
+	 *
+	 * `customer_email` defaults to '' (not NULL), so NULLIF is required
+	 * before COALESCE. Falls back to the WP user, then the row itself so
+	 * fully-anonymous rows never collapse into a single NULL group.
+	 *
+	 * @param string $alias Optional table alias (e.g. 'b').
+	 */
+	private static function shooter_expr( string $alias = '' ): string {
+		$p = '' === $alias ? '' : $alias . '.';
+		return "COALESCE(NULLIF({$p}customer_email, ''), CONCAT('u:', {$p}user_id), CONCAT('b:', {$p}id))";
+	}
+
+	/**
+	 * Quoted, comma-joined paid statuses for interpolation in an IN().
+	 * Values come from the Booking_Provider constant — trusted, not user input.
+	 */
+	private static function paid_status_list(): string {
+		return "'" . implode( "','", Booking_Provider::paid_statuses() ) . "'";
 	}
 }

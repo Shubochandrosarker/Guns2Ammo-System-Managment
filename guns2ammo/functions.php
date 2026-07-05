@@ -380,11 +380,11 @@ function g2a_handle_reservation() {
 	}
 	wp_mail( $to, 'Website Request: ' . $subject, implode( "\n", $lines ), $headers );
 
-	// Also log the submission into the WPistic Contact Form dashboard so
-	// staff can review + reply from one place. Silent no-op if the plugin
-	// isn't active. Passes notify_admin=false because we already mailed
-	// the admin above and don't want a duplicate notification.
-	g2a_capture_to_wpcf( 'Reservation: ' . $subject, $fields );
+	// Also log the submission into the Formistic (or legacy WPistic CF)
+	// dashboard so staff can review + reply from one place. Silent no-op if
+	// neither plugin is active. Passes notify=false because we already
+	// mailed the admin above and don't want a duplicate notification.
+	g2a_capture_to_formistic( 'Reservation: ' . $subject, $fields );
 
 	$back = wp_get_referer() ?: home_url( '/' );
 	wp_safe_redirect( add_query_arg( 'g2a_sent', '1', remove_query_arg( 'g2a_sent', $back ) ) . '#reserve' );
@@ -435,8 +435,8 @@ function g2a_handle_request() {
 	$headers = ( $reply && is_email( $reply ) ) ? [ 'Reply-To: ' . $reply ] : [];
 	wp_mail( $to, 'Website Request: ' . $subject, implode( "\n", $lines ), $headers );
 
-	// Also log into the WPistic Contact Form dashboard for unified inbox.
-	g2a_capture_to_wpcf( $subject, $fields );
+	// Also log into the Formistic (or legacy WPistic CF) unified inbox.
+	g2a_capture_to_formistic( $subject, $fields );
 
 	$back = wp_get_referer() ?: home_url( '/' );
 	wp_safe_redirect( add_query_arg( 'g2a_sent', '1', remove_query_arg( 'g2a_sent', $back ) ) . '#request' );
@@ -493,10 +493,11 @@ add_action( 'template_redirect', 'g2a_route_frontend_form', 0 );
  * The footer + blog "range updates" forms used to fetch() /wp-admin/admin-ajax.php,
  * which — like admin-post.php — is blocked for logged-OUT visitors on sites
  * behind a wp-admin firewall, so newsletter signups failed for everyone not
- * logged in. This posts to the site home instead and reuses the WPistic Contact
- * Form newsletter routine (which carries its own per-IP throttle). Returns JSON
- * so the inline status keeps working; same cache-resilient verification as the
- * other theme forms.
+ * logged in. This posts to the site home instead and reuses the Formistic
+ * newsletter routine (falling back to the legacy WPistic Contact Form one),
+ * both of which carry their own per-IP throttle. Returns JSON so the inline
+ * status keeps working; same cache-resilient verification as the other theme
+ * forms.
  *
  * @return void
  */
@@ -510,6 +511,14 @@ function g2a_route_frontend_newsletter() {
 	if ( ! g2a_verify_form_request( 'g2a_newsletter' ) ) {
 		wp_send_json( array( 'status' => 'error', 'message' => __( 'Could not verify your request. Please reload the page and try again.', 'guns2ammo' ) ), 403 );
 	}
+	// Preferred: Formistic newsletter (same return shape as the legacy
+	// plugin, own per-IP throttle, dedicated subscribers table).
+	if ( class_exists( 'Wpistic_Formistic_Newsletter' ) && is_callable( array( 'Wpistic_Formistic_Newsletter', 'process' ) ) ) {
+		$res = Wpistic_Formistic_Newsletter::process( $email, $source );
+		$ok  = in_array( ( $res['status'] ?? '' ), array( 'ok', 'duplicate' ), true );
+		wp_send_json( $res, $ok ? 200 : 400 );
+	}
+	// Legacy fallback: original WPistic Contact Form newsletter.
 	if ( class_exists( 'WPISTIC_CF_Newsletter' ) && is_callable( array( 'WPISTIC_CF_Newsletter', 'process' ) ) ) {
 		$res = WPISTIC_CF_Newsletter::process( $email, $source );
 		$ok  = in_array( ( $res['status'] ?? '' ), array( 'ok', 'duplicate' ), true );
@@ -520,30 +529,58 @@ function g2a_route_frontend_newsletter() {
 add_action( 'template_redirect', 'g2a_route_frontend_newsletter', 0 );
 
 /**
- * Capture a theme form submission into the WPistic Contact Form dashboard.
+ * Capture a theme form submission into the site's contact-inbox plugin.
  *
  * Single bridge so every Guns 2 Ammo theme form (reservation, sell-your-gun,
- * transfer-request, get-support, contact, etc.) lands in WPCF's submissions
+ * transfer-request, get-support, contact, etc.) lands in one submissions
  * list and can be replied to from one inbox. wp_mail to the admin already
- * fires separately in the calling handler — passing notify_admin=false here
- * prevents WPCF from sending its own duplicate notification.
+ * fires separately in the calling handler — passing notify=false here
+ * prevents the plugin from sending its own duplicate notification.
  *
- * Silent no-op when WPistic Contact Form is not active.
+ * Prefers Formistic (the v2 rebrand of WPistic Contact Form); falls back to
+ * the legacy WPISTIC_CF_Capture path so nothing breaks whichever plugin is
+ * active during the transition. Silent no-op when neither is active.
  *
- * @param string $form_name Human-readable label shown in the WPCF list.
+ * @param string $form_name Human-readable label shown in the inbox list.
  * @param array  $fields    Label => value pairs from the form.
+ * @return int Submission ID, or 0 when not stored.
  */
-function g2a_capture_to_wpcf( $form_name, array $fields ) {
-	if ( ! class_exists( 'WPISTIC_CF_Capture' ) ) {
-		return 0;
-	}
+function g2a_capture_to_formistic( $form_name, array $fields ) {
 	try {
-		return ( new WPISTIC_CF_Capture() )->store( (string) $form_name, $fields, false );
+		// Preferred: Formistic public helper (sanitizes + spam stack).
+		if ( function_exists( 'formistic_capture_contact' ) ) {
+			return (int) formistic_capture_contact( $fields, array(
+				'form_name' => (string) $form_name,
+				'notify'    => false,
+			) );
+		}
+		// Formistic loaded but helper unavailable — use the class directly.
+		if ( class_exists( 'Wpistic_Formistic_Capture' ) ) {
+			return (int) ( new Wpistic_Formistic_Capture() )->store( (string) $form_name, $fields, false );
+		}
+		// Legacy fallback: original WPistic Contact Form plugin.
+		if ( class_exists( 'WPISTIC_CF_Capture' ) ) {
+			return (int) ( new WPISTIC_CF_Capture() )->store( (string) $form_name, $fields, false );
+		}
 	} catch ( \Throwable $e ) {
 		// Never let a logging side-effect break the form post.
 		if ( function_exists( 'error_log' ) ) {
-			error_log( '[g2a_capture_to_wpcf] ' . $e->getMessage() );
+			error_log( '[g2a_capture_to_formistic] ' . $e->getMessage() );
 		}
-		return 0;
 	}
+	return 0;
+}
+
+/**
+ * Back-compat alias for the old bridge name, in case custom code outside the
+ * theme still calls it.
+ *
+ * @deprecated 1.27.4 Use g2a_capture_to_formistic() instead.
+ *
+ * @param string $form_name Human-readable label shown in the inbox list.
+ * @param array  $fields    Label => value pairs from the form.
+ * @return int Submission ID, or 0 when not stored.
+ */
+function g2a_capture_to_wpcf( $form_name, array $fields ) {
+	return g2a_capture_to_formistic( $form_name, $fields );
 }

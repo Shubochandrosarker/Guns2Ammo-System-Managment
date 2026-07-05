@@ -7,7 +7,9 @@ import type {
   Automation,
   BookingAnalytics,
   BusinessGap,
+  EmailOverview,
   InsightisticAnalytics,
+  IntegrationsStatus,
   MembershipAnalytics,
   ModelConnection,
   RevenueOverview,
@@ -395,4 +397,53 @@ export const dashboardSettings = {
   dailySummaryHour: 7,
   ownerEmail: 'owner@guns2ammo.com',
   timezone: 'America/Phoenix',
+  allowedOrigins: ['https://app.guns2ammo.com'],
+}
+
+// GET /emails/overview — Formistic inbox + newsletter + Messageistic SMS.
+export const emailOverview: EmailOverview = {
+  formistic: {
+    active: true,
+    totalSubmissions: 486,
+    newToday: 6,
+    last7d: 41,
+    byStatus: { new: 14, read: 22, replied: 450 },
+    recentSubmissions: [
+      { id: 486, formName: 'Contact',        name: 'Priya Sharma',  email: 'priya@example.com',  subject: 'CCW class availability', messageExcerpt: 'Hi — do you have any CCW class seats left for the July 12th session? Two of us would like to join…', createdAt: '2026-07-02T15:24:00Z', status: 'new' },
+      { id: 485, formName: 'Range Booking',  name: 'Mark DeLuca',   email: 'mark.d@example.com', subject: 'Lane rental question',   messageExcerpt: 'Can I bring my own ammo for the rental pistols, or is range ammo required?', createdAt: '2026-07-02T13:02:00Z', status: 'new' },
+      { id: 484, formName: 'Contact',        name: 'Angela Reyes',  email: 'angela@example.com', subject: 'Ladies Tuesday',         messageExcerpt: 'Is Ladies Tuesday beginner-friendly? I have never fired a handgun before.', createdAt: '2026-07-02T09:48:00Z', status: 'read' },
+      { id: 483, formName: 'FFL Transfer',   name: 'Tom Brandt',    email: 'tom.b@example.com',  subject: 'Incoming transfer',      messageExcerpt: 'Bud’s order #99321 shipping to you — what do you need from me for pickup?', createdAt: '2026-07-01T19:15:00Z', status: 'replied' },
+      { id: 482, formName: 'Contact',        name: 'Dana Whitfield',email: 'dana.w@example.com', subject: 'Membership upgrade',     messageExcerpt: 'I want to move from Defender to Patriot — does the annual price prorate?', createdAt: '2026-07-01T16:40:00Z', status: 'replied' },
+    ],
+  },
+  subscribers: {
+    active: true,
+    total: 1842,
+    last30d: 96,
+  },
+  messageistic: {
+    active: true,
+    stats: {
+      totalSent: 1204,
+      delivered: 1181,
+      failed: 23,
+      replies: 88,
+      contacts: 2214,
+      optedOut: 41,
+      activeCampaigns: 2,
+    },
+  },
+}
+
+// GET /system/integrations — everything green in the demo except GBP.
+export const integrations: IntegrationsStatus = {
+  ga4Configured: true,
+  gscConfigured: true,
+  gbpConfigured: false,
+  wooActive: true,
+  bookingEngineActive: true,
+  memberisticActive: true,
+  messageisticActive: true,
+  formisticActive: true,
+  aiConnectionConfigured: true,
 }
