@@ -28,6 +28,28 @@ final class InventoryRepository extends Repository {
 		return (int) $wpdb->insert_id;
 	}
 
+	/**
+	 * Latest known on-hand quantity for a product at a location, read with a
+	 * locking SELECT so concurrent adjustments serialize. Must be called
+	 * inside an open transaction (mirrors GiftCardRepository::redeem()).
+	 * Returns null when the product has no log history yet.
+	 */
+	public function latest_qty_locked( int $product_id, int $location_id ): ?float {
+		global $wpdb;
+
+		$table = $this->table( 'g2a_inventory_logs' );
+		$val   = $wpdb->get_var(
+			$wpdb->prepare(
+				"SELECT after_qty FROM {$table}
+	             WHERE product_id = %d AND location_id = %d ORDER BY id DESC LIMIT 1 FOR UPDATE",
+				$product_id,
+				$location_id
+			)
+		);
+
+		return $val === null ? null : (float) $val;
+	}
+
 	public function has_event_source( string $source_ref, string $event_type ): bool {
 		global $wpdb;
 

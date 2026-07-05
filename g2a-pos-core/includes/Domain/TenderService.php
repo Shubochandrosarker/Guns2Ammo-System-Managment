@@ -143,7 +143,7 @@ final class TenderService {
 				}
 				$amount       = round( $redeem['applied_cents'] / 100, 2 );
 				$reference    = self::mask_gift_code( $code );
-				$external_ref = 'gift_card_balance_cents_after=' . $redeem['balance_cents'];
+				$external_ref = 'gift_card_id=' . (int) ( $redeem['gift_card_id'] ?? 0 ) . ';balance_cents_after=' . $redeem['balance_cents'];
 				break;
 
 			case 'store_credit':
@@ -278,7 +278,8 @@ final class TenderService {
 			);
 		}
 		// Reverse the side effect for ledger-touching methods.
-		$amount_cents = (int) round( (float) $tender['amount'] * 100 );
+		$amount_cents        = (int) round( (float) $tender['amount'] * 100 );
+		$gift_card_restored  = null;
 		switch ( $tender['tender_method'] ) {
 			case 'store_credit':
 			case 'tradein_credit':
@@ -296,9 +297,24 @@ final class TenderService {
 				}
 				break;
 			case 'gift_card':
-				// We don't auto-credit the gift card back — the merchant would
-				// re-issue or apply a manual gift_card credit via the existing
-				// gift-card endpoints. We just void the line.
+				// Put the debited value back on the card (locked transaction +
+				// ledger row inside GiftCardRepository::credit()). Legacy
+				// tender lines predating gift_card_id capture can't be
+				// auto-reversed — those still need a manual re-issue.
+				if ( preg_match( '/gift_card_id=(\d+)/', (string) $tender['external_ref'], $m ) && (int) $m[1] > 0 ) {
+					$credit = ( new GiftCardRepository() )->credit( (int) $m[1], $amount_cents, (int) $tender['pos_order_id'], 'void_refund' );
+					if ( empty( $credit['ok'] ) ) {
+						return array(
+							'ok'    => false,
+							'error' => $credit['error'] ?? 'gift_card_credit_failed',
+						);
+					}
+					$gift_card_restored = array(
+						'gift_card_id'        => (int) $m[1],
+						'restored_cents'      => $amount_cents,
+						'balance_cents_after' => $credit['balance_cents'],
+					);
+				}
 				break;
 		}
 		$ok = ( new TenderRepository() )->void( $tender_id, $reason );
@@ -310,6 +326,7 @@ final class TenderService {
 			array(
 				'tender_id' => $tender_id,
 				'reason'    => $reason,
+				'gift_card' => $gift_card_restored,
 			)
 		);
 		return array(
@@ -386,6 +403,13 @@ final class TenderService {
 				'payment_method' => $method,
 			)
 		);
+
+		// The counter sale is fully paid — move the linked WC order out of
+		// 'pending' so WooCommerce records payment and decrements stock.
+		$order = ( new OrderRepository() )->find_with_items( $order_id );
+		if ( ! empty( $order['wc_order_id'] ) ) {
+			WooBridge::complete_payment( (int) $order['wc_order_id'] );
+		}
 	}
 
 	private static function mask_gift_code( string $code ): string {

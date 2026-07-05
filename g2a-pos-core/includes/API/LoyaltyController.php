@@ -2,6 +2,7 @@
 
 namespace G2A\POS\API;
 
+use G2A\POS\Database\AuditLogRepository;
 use G2A\POS\Database\GiftCardRepository;
 use G2A\POS\Database\LoyaltyRepository;
 use WP_REST_Request;
@@ -26,6 +27,20 @@ final class LoyaltyController {
 		if ( ! $result['ok'] ) {
 			return new \WP_Error( $result['error'], $result['error'], array( 'status' => 422 ) );
 		}
+		( new AuditLogRepository() )->add(
+			'loyalty.adjust',
+			'loyalty_account',
+			(string) $id,
+			null,
+			array(
+				'tx_type'            => (string) ( $body['tx_type'] ?? 'adjust' ),
+				'delta_points'       => (int) ( $body['delta_points'] ?? 0 ),
+				'delta_credit_cents' => (int) ( $body['delta_credit_cents'] ?? 0 ),
+				'reason'             => sanitize_text_field( (string) ( $body['reason'] ?? '' ) ),
+				'points_after'       => $result['points'] ?? null,
+				'credit_cents_after' => $result['credit_cents'] ?? null,
+			)
+		);
 		return $result;
 	}
 
@@ -44,6 +59,17 @@ final class LoyaltyController {
 		if ( ! $result['ok'] ) {
 			return new \WP_Error( $result['error'], $result['error'], array( 'status' => 422 ) );
 		}
+		( new AuditLogRepository() )->add(
+			'gift_card.issue',
+			'gift_card',
+			(string) $result['id'],
+			null,
+			array(
+				'balance_cents' => (int) $result['balance_cents'],
+				'customer_id'   => isset( $body['customer_id'] ) ? (int) $body['customer_id'] : null,
+				'expires_at'    => $body['expires_at'] ?? null,
+			)
+		);
 		return $result;
 	}
 

@@ -31,6 +31,11 @@ final class Roles {
 		'g2a_pos_view_waivers',
 		'g2a_pos_view_waiver_sensitive_data',
 		'g2a_pos_checkin_range_customer',
+		// v1.1.0 — money-minting operations (store credit / loyalty
+		// adjustments, gift-card issuance). Granted to the same tier as
+		// g2a_pos_manage_settings via register_caps(), which runs on every
+		// boot, so existing installs self-heal on upgrade.
+		'g2a_pos_manage_finance',
 	);
 
 	public static function register_roles(): void {
