@@ -14,12 +14,14 @@ use WordPressistic\G2ABA\REST\Agents_Controller;
 use WordPressistic\G2ABA\REST\Analytics_Controller;
 use WordPressistic\G2ABA\REST\Auth_Controller;
 use WordPressistic\G2ABA\REST\Automations_Controller;
+use WordPressistic\G2ABA\REST\Brain_Controller;
 use WordPressistic\G2ABA\REST\BridGistic_Controller;
 use WordPressistic\G2ABA\REST\Email_Overview_Controller;
 use WordPressistic\G2ABA\REST\Export_Controller;
 use WordPressistic\G2ABA\REST\Gaps_Controller;
 use WordPressistic\G2ABA\REST\Health_Controller;
 use WordPressistic\G2ABA\REST\Insights_Controller;
+use WordPressistic\G2ABA\REST\Leads_Controller;
 use WordPressistic\G2ABA\REST\Models_Controller;
 use WordPressistic\G2ABA\REST\Ops_Controller;
 use WordPressistic\G2ABA\REST\Public_Controller;
@@ -49,6 +51,7 @@ class Router {
 			Agents_Controller::class,
 			Models_Controller::class,
 			Health_Controller::class,
+			Brain_Controller::class,
 			BridGistic_Controller::class,
 			Email_Overview_Controller::class,
 			Ops_Controller::class,
@@ -59,6 +62,7 @@ class Router {
 			System_Controller::class,
 			Tasks_Controller::class,
 			Export_Controller::class,
+			Leads_Controller::class,
 		);
 	}
 
