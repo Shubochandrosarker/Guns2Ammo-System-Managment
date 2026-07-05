@@ -32,6 +32,7 @@ const NAV = [
       { to: '/ai-insights',          label: 'AI Insights',           icon: '✨' },
       { to: '/automation-center',    label: 'Automation Center',     icon: '⚙' },
       { to: '/ai-agents',            label: 'AI Agents',             icon: '⌬' },
+      { to: '/leads',                label: 'Leads',                 icon: '☍' },
       { to: '/email-management',     label: 'Email Management',      icon: '✉' },
       { to: '/bridgistic',           label: 'BridGistic',            icon: '⇌' },
       { to: '/ai-models',            label: 'AI Models & RAGs',      icon: '⛁' },

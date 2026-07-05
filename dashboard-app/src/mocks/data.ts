@@ -6,10 +6,14 @@ import type {
   Agent,
   Automation,
   BookingAnalytics,
+  BrainQueryResult,
+  BrainStats,
   BusinessGap,
   EmailOverview,
   InsightisticAnalytics,
   IntegrationsStatus,
+  Lead,
+  LeadStats,
   MembershipAnalytics,
   ModelConnection,
   RevenueOverview,
@@ -446,4 +450,122 @@ export const integrations: IntegrationsStatus = {
   messageisticActive: true,
   formisticActive: true,
   aiConnectionConfigured: true,
+}
+
+// GET /leads — a handful of leads spanning every category + status the
+// categorizer/repository support (see Lead_Categorizer / Leads_Repository).
+export const leads: Lead[] = [
+  {
+    id: 501, category: 'lane_booking', source: 'g2a_booking_engine', sourceRefId: '92841',
+    status: 'new', contactName: 'Priya Sharma', contactEmail: 'priya@example.com', contactPhone: '480-555-0142',
+    subject: 'Lane reservation — Sat 10am', excerpt: 'Would like 2 lanes Saturday morning, first time renting rifles.',
+    assignedAgent: null, meta: { lanes: 2 }, createdAt: '2026-07-05T08:12:00Z', updatedAt: '2026-07-05T08:12:00Z',
+  },
+  {
+    id: 500, category: 'ccw_class', source: 'formistic', sourceRefId: '486',
+    status: 'in_progress', contactName: 'Mark DeLuca', contactEmail: 'mark.d@example.com', contactPhone: null,
+    subject: 'CCW class availability', excerpt: 'Do you have any CCW class seats left for the July 12th session?',
+    assignedAgent: 'ag-booking', meta: null, createdAt: '2026-07-04T15:24:00Z', updatedAt: '2026-07-05T09:02:00Z',
+  },
+  {
+    id: 499, category: 'range_enquiry', source: 'formistic', sourceRefId: '485',
+    status: 'contacted', contactName: 'Angela Reyes', contactEmail: 'angela@example.com', contactPhone: '602-555-0110',
+    subject: 'Lane rental question', excerpt: 'Can I bring my own ammo for the rental pistols, or is range ammo required?',
+    assignedAgent: 'ag-support', meta: null, createdAt: '2026-07-03T13:02:00Z', updatedAt: '2026-07-03T18:40:00Z',
+  },
+  {
+    id: 498, category: 'new_member', source: 'memberistic', sourceRefId: '7741',
+    status: 'won', contactName: 'Dana Whitfield', contactEmail: 'dana.w@example.com', contactPhone: '602-555-0199',
+    subject: 'New Defender membership', excerpt: 'Signed up for the Defender plan after the open-house event.',
+    assignedAgent: 'ag-member', meta: { plan: 'Defender' }, createdAt: '2026-07-02T16:40:00Z', updatedAt: '2026-07-02T17:05:00Z',
+  },
+  {
+    id: 497, category: 'ffl_transfer', source: 'formistic', sourceRefId: '483',
+    status: 'in_progress', contactName: 'Tom Brandt', contactEmail: 'tom.b@example.com', contactPhone: '480-555-0177',
+    subject: 'Incoming transfer', excerpt: "Bud's order #99321 shipping to you — what do you need from me for pickup?",
+    assignedAgent: null, meta: null, createdAt: '2026-07-01T19:15:00Z', updatedAt: '2026-07-01T19:15:00Z',
+  },
+  {
+    id: 496, category: 'nfa', source: 'formistic', sourceRefId: '479',
+    status: 'new', contactName: 'Ellis Cho', contactEmail: 'ellis.cho@example.com', contactPhone: null,
+    subject: 'Suppressor trust question', excerpt: 'Looking to set up a gun trust before ordering a suppressor — do you help with that?',
+    assignedAgent: null, meta: null, createdAt: '2026-06-30T11:05:00Z', updatedAt: '2026-06-30T11:05:00Z',
+  },
+  {
+    id: 495, category: 'membership', source: 'formistic', sourceRefId: '482',
+    status: 'contacted', contactName: 'Dana Whitfield', contactEmail: 'dana.w@example.com', contactPhone: null,
+    subject: 'Membership upgrade', excerpt: 'I want to move from Defender to Patriot — does the annual price prorate?',
+    assignedAgent: 'ag-member', meta: null, createdAt: '2026-06-29T16:40:00Z', updatedAt: '2026-06-30T09:00:00Z',
+  },
+  {
+    id: 494, category: 'event_booking', source: 'g2a_booking_engine', sourceRefId: '90112',
+    status: 'lost', contactName: 'Group Sales', contactEmail: 'events@example.com', contactPhone: '602-555-0133',
+    subject: 'Private corporate event — 20 guests', excerpt: 'Requested a Friday evening private event slot; went with a competitor over pricing.',
+    assignedAgent: 'ag-sales', meta: { guests: 20 }, createdAt: '2026-06-27T14:22:00Z', updatedAt: '2026-06-28T10:00:00Z',
+  },
+  {
+    id: 493, category: 'general', source: 'formistic', sourceRefId: '470',
+    status: 'spam', contactName: 'Unknown', contactEmail: 'noreply@spamdomain.example', contactPhone: null,
+    subject: 'SEO services for your website', excerpt: 'We noticed your website could rank higher — reply for a free audit.',
+    assignedAgent: null, meta: null, createdAt: '2026-06-25T04:10:00Z', updatedAt: '2026-06-25T04:10:00Z',
+  },
+]
+
+// GET /leads/stats
+export const leadStats: LeadStats = {
+  byCategory: {
+    lane_booking: 64,
+    ccw_class: 41,
+    range_enquiry: 37,
+    new_member: 22,
+    ffl_transfer: 18,
+    nfa: 6,
+    membership: 15,
+    event_booking: 9,
+    general: 12,
+  },
+  byStatus: {
+    new: 38,
+    in_progress: 27,
+    contacted: 44,
+    won: 62,
+    lost: 19,
+    spam: 34,
+  },
+  today: 6,
+  last7d: 58,
+  last30d: 224,
+}
+
+// GET /brain/stats — the shared knowledge brain is "active" in mock mode so
+// the ingest form / search tool are browsable without a live g2a-pos-core.
+// Field names match AiBrainRepository::stats() + BrainFacade::stats() in
+// g2a-pos-core exactly (documents/chunks/embedded_chunks/embedded_pct/
+// by_source_type/backend) — not guessed camelCase.
+export const brainStats: BrainStats = {
+  ok: true,
+  results: {
+    documents: 128,
+    chunks: 942,
+    embedded_chunks: 908,
+    embedded_pct: 96.4,
+    backend: 'local',
+    by_source_type: [
+      { source_type: 'formistic_faq', documents: 54, chunks: 402 },
+      { source_type: 'range_policy',  documents: 22, chunks: 210 },
+      { source_type: 'manual',        documents: 52, chunks: 330 },
+    ],
+  },
+}
+
+// GET /brain/query — hit shape matches AiBrainRepository::search()/
+// search_text() (id/document_id/text_content/source_type/source_label/
+// source_uri/score).
+export const brainQueryResult: BrainQueryResult = {
+  ok: true,
+  results: [
+    { id: 1, document_id: 41, text_content: 'The range is open 9am-9pm Monday through Saturday, 10am-6pm Sunday.', source_type: 'range_policy', source_label: 'Range hours', source_uri: '', score: 0.93 },
+    { id: 2, document_id: 12, text_content: 'CCW class requires attendees to be 21+ and bring a valid state ID; no firearm experience required.', source_type: 'formistic_faq', source_label: 'CCW class prerequisites', source_uri: '', score: 0.88 },
+    { id: 3, document_id: 41, text_content: 'Range ammo is required for all rental firearms; outside ammo is only permitted with owned firearms.', source_type: 'range_policy', source_label: 'Rental ammo policy', source_uri: '', score: 0.81 },
+  ],
 }

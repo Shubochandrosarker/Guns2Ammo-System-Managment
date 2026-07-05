@@ -271,3 +271,119 @@ export interface IntegrationsStatus {
   formisticActive: boolean
   aiConnectionConfigured: boolean
 }
+
+// GET /leads, /leads/stats, /leads/{id}, PATCH /leads/{id} — g2a-business-api's
+// Leads_Repository::shape_row() (includes/leads/class-leads-repository.php)
+// is the source of truth for these field names; do not rename to "look nicer"
+// without updating the PHP first.
+
+export type LeadStatus = 'new' | 'in_progress' | 'contacted' | 'won' | 'lost' | 'spam'
+
+// Mirrors the CATEGORY_* constants in includes/leads/class-lead-categorizer.php.
+export type LeadCategory =
+  | 'lane_booking'
+  | 'ccw_class'
+  | 'range_enquiry'
+  | 'new_member'
+  | 'ffl_transfer'
+  | 'nfa'
+  | 'membership'
+  | 'event_booking'
+  | 'general'
+
+export interface Lead {
+  id: number
+  category: string
+  source: string
+  sourceRefId: string | null
+  status: LeadStatus
+  contactName: string | null
+  contactEmail: string | null
+  contactPhone: string | null
+  subject: string | null
+  excerpt: string | null
+  assignedAgent: string | null
+  meta: Record<string, unknown> | null
+  createdAt: ISODate
+  updatedAt: ISODate
+}
+
+export interface LeadsPage {
+  items: Lead[]
+  total: number
+}
+
+// Mirrors Leads_Repository::stats()'s return shape exactly.
+export interface LeadStats {
+  byCategory: Record<string, number>
+  byStatus: Record<string, number>
+  today: number
+  last7d: number
+  last30d: number
+}
+
+// GET /brain/query, /brain/stats, POST /brain/ingest — thin passthrough onto
+// g2a-pos-core's BrainFacade (see Brain_Client in g2a-business-api). Every
+// method degrades to `{ ok:false, results:[], reason:'pos_brain_inactive' }`
+// (or `reason:'error: ...'`) when g2a-pos-core is inactive or throws, so
+// every consumer must check `ok` before trusting `results`.
+//
+// Field names below are taken directly from g2a-pos-core's
+// AiBrainRepository::search()/search_text() (local backends),
+// CloudflareBrain::query() (cloudflare backend — normalized to the same
+// keys), and AiBrainRepository::stats()/BrainFacade::stats() — NOT guessed
+// camelCase equivalents.
+
+// `score` comes from the vector/cloudflare backends; `match_score` from the
+// keyword-tokenized local-text fallback; the plain LIKE fallback (no
+// tokens matched) has neither.
+export interface BrainQueryHit {
+  id: string | number
+  document_id: number
+  text_content: string
+  source_type: string
+  source_label: string
+  source_uri: string
+  score?: number
+  match_score?: number
+}
+
+// Discriminated on `ok` so callers narrow `results` just by checking it —
+// matches Brain_Client's actual contract (ok:false is a normal 200 response
+// with an empty `results` array, not a thrown error).
+export type BrainQueryResult =
+  | { ok: true; results: BrainQueryHit[] }
+  | { ok: false; results: []; reason: string }
+
+// AiBrainRepository::stats()'s per-source_type breakdown.
+export interface BrainSourceTypeStat {
+  source_type: string
+  documents: number
+  chunks: number
+}
+
+// AiBrainRepository::stats() + BrainFacade::stats()'s added `backend` field.
+export interface BrainStatsData {
+  documents: number
+  chunks: number
+  embedded_chunks: number
+  embedded_pct: number
+  by_source_type: BrainSourceTypeStat[]
+  backend: string
+}
+
+export type BrainStats =
+  | { ok: true; results: BrainStatsData }
+  | { ok: false; results: []; reason: string }
+
+// BrainService::ingest_text()'s return shape — the inner `results` of a
+// successful /brain/ingest call. Its own `ok:false` means "empty body after
+// normalization" (`error` field), distinct from the outer `ok:false`
+// ("brain unavailable", `reason` field on BrainIngestResult below).
+export type BrainIngestData =
+  | { ok: true; document_id: number; chunks: number; embedded: boolean; skipped?: boolean; notice?: string }
+  | { ok: false; error: string }
+
+export type BrainIngestResult =
+  | { ok: true; results: BrainIngestData }
+  | { ok: false; results: []; reason: string }
