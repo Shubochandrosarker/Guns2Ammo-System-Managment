@@ -186,18 +186,51 @@ final class AiBrainRepository extends Repository {
 	 * Aggregate brain stats for the dashboard: document/chunk totals, how much
 	 * of the corpus is embedded, and a per-source_type breakdown.
 	 *
+	 * @param ?string $scope When set, every count is restricted to documents
+	 *                       whose `scope` column matches exactly. Null
+	 *                       (default) reports across every scope, unchanged
+	 *                       from before.
+	 *
 	 * @return array{documents:int,chunks:int,embedded_chunks:int,embedded_pct:float,by_source_type:array<int,array{source_type:string,documents:int,chunks:int}>}
 	 */
-	public function stats(): array {
+	public function stats( ?string $scope = null ): array {
 		global $wpdb;
-		$docs            = (int) $wpdb->get_var( "SELECT COUNT(*) FROM {$this->table('g2a_ai_brain_documents')}" );
-		$chunks          = (int) $wpdb->get_var( "SELECT COUNT(*) FROM {$this->table('g2a_ai_brain_chunks')}" );
-		$embedded_chunks = (int) $wpdb->get_var( "SELECT COUNT(*) FROM {$this->table('g2a_ai_brain_chunks')} WHERE embedding IS NOT NULL" );
-		$by_type         = $wpdb->get_results(
-			"SELECT source_type, COUNT(*) AS documents, COALESCE(SUM(chunk_count), 0) AS chunks
-	         FROM {$this->table('g2a_ai_brain_documents')} GROUP BY source_type ORDER BY documents DESC",
-			ARRAY_A
-		) ?: array();
+		$docs_table   = $this->table( 'g2a_ai_brain_documents' );
+		$chunks_table = $this->table( 'g2a_ai_brain_chunks' );
+
+		if ( null === $scope ) {
+			$docs            = (int) $wpdb->get_var( "SELECT COUNT(*) FROM {$docs_table}" );
+			$chunks          = (int) $wpdb->get_var( "SELECT COUNT(*) FROM {$chunks_table}" );
+			$embedded_chunks = (int) $wpdb->get_var( "SELECT COUNT(*) FROM {$chunks_table} WHERE embedding IS NOT NULL" );
+			$by_type         = $wpdb->get_results(
+				"SELECT source_type, COUNT(*) AS documents, COALESCE(SUM(chunk_count), 0) AS chunks
+		         FROM {$docs_table} GROUP BY source_type ORDER BY documents DESC",
+				ARRAY_A
+			) ?: array();
+		} else {
+			$docs            = (int) $wpdb->get_var( $wpdb->prepare( "SELECT COUNT(*) FROM {$docs_table} WHERE scope = %s", $scope ) );
+			$chunks          = (int) $wpdb->get_var(
+				$wpdb->prepare(
+					"SELECT COUNT(*) FROM {$chunks_table} c JOIN {$docs_table} d ON d.id = c.document_id WHERE d.scope = %s",
+					$scope
+				)
+			);
+			$embedded_chunks = (int) $wpdb->get_var(
+				$wpdb->prepare(
+					"SELECT COUNT(*) FROM {$chunks_table} c JOIN {$docs_table} d ON d.id = c.document_id
+			         WHERE c.embedding IS NOT NULL AND d.scope = %s",
+					$scope
+				)
+			);
+			$by_type         = $wpdb->get_results(
+				$wpdb->prepare(
+					"SELECT source_type, COUNT(*) AS documents, COALESCE(SUM(chunk_count), 0) AS chunks
+			         FROM {$docs_table} WHERE scope = %s GROUP BY source_type ORDER BY documents DESC",
+					$scope
+				),
+				ARRAY_A
+			) ?: array();
+		}
 		foreach ( $by_type as &$row ) {
 			$row['documents'] = (int) $row['documents'];
 			$row['chunks']    = (int) $row['chunks'];
@@ -252,8 +285,13 @@ final class AiBrainRepository extends Repository {
 	 * Naive in-PHP cosine retrieval. Pulls every chunk with the same
 	 * embedding model + dim and ranks; fine for thousands of chunks,
 	 * swap for a vector DB when the brain grows.
+	 *
+	 * @param ?string $scope When set, restricts the candidate chunks to
+	 *                       documents whose `scope` column matches exactly
+	 *                       (e.g. 'staff' vs 'public'). Null (default)
+	 *                       searches every scope, unchanged from before.
 	 */
-	public function search( array $query_embedding, int $limit = 5, ?string $model = null ): array {
+	public function search( array $query_embedding, int $limit = 5, ?string $model = null, ?string $scope = null ): array {
 		global $wpdb;
 		$dim = count( $query_embedding );
 		if ( $dim === 0 ) {
@@ -264,6 +302,10 @@ final class AiBrainRepository extends Repository {
 		if ( $model ) {
 			$where[] = 'embedding_model = %s';
 			$args[]  = $model;
+		}
+		if ( null !== $scope ) {
+			$where[] = 'd.scope = %s';
+			$args[]  = $scope;
 		}
 		$sql  = "SELECT c.id, c.document_id, c.text_content, c.embedding,
                        d.source_type, d.source_label, d.source_uri
@@ -309,23 +351,32 @@ final class AiBrainRepository extends Repository {
 	 * terms they contain, so a natural-language question ("what are your range
 	 * hours?") matches relevant chunks instead of requiring the whole phrase to
 	 * appear verbatim.
+	 *
+	 * @param ?string $scope When set, restricts results to documents whose
+	 *                       `scope` column matches exactly. Null (default)
+	 *                       searches every scope, unchanged from before.
 	 */
-	public function search_text( string $query, int $limit = 5 ): array {
+	public function search_text( string $query, int $limit = 5, ?string $scope = null ): array {
 		global $wpdb;
-		$limit  = max( 1, min( 50, $limit ) );
-		$chunks = $this->table( 'g2a_ai_brain_chunks' );
-		$docs   = $this->table( 'g2a_ai_brain_documents' );
-		$tokens = self::tokenize( $query );
+		$limit       = max( 1, min( 50, $limit ) );
+		$chunks      = $this->table( 'g2a_ai_brain_chunks' );
+		$docs        = $this->table( 'g2a_ai_brain_documents' );
+		$tokens      = self::tokenize( $query );
+		$scope_where = null !== $scope ? ' AND d.scope = %s' : '';
 
 		if ( ! $tokens ) {
 			$like = '%' . $wpdb->esc_like( trim( $query ) ) . '%';
+			$args = array( $like );
+			if ( null !== $scope ) {
+				$args[] = $scope;
+			}
+			$args[] = $limit;
 			return $wpdb->get_results(
 				$wpdb->prepare(
 					"SELECT c.id, c.document_id, c.text_content, d.source_type, d.source_label, d.source_uri
                      FROM {$chunks} c JOIN {$docs} d ON d.id = c.document_id
-                     WHERE c.text_content LIKE %s ORDER BY c.id DESC LIMIT %d",
-					$like,
-					$limit
+                     WHERE c.text_content LIKE %s{$scope_where} ORDER BY c.id DESC LIMIT %d",
+					$args
 				),
 				ARRAY_A
 			) ?: array();
@@ -348,10 +399,10 @@ final class AiBrainRepository extends Repository {
 		$sql   = "SELECT c.id, c.document_id, c.text_content, d.source_type, d.source_label, d.source_uri,
                          ({$score}) AS match_score
                   FROM {$chunks} c JOIN {$docs} d ON d.id = c.document_id
-                  WHERE {$where}
+                  WHERE ({$where}){$scope_where}
                   ORDER BY match_score DESC, c.id DESC
                   LIMIT %d";
-		$args  = array_merge( $score_args, $where_args, array( $limit ) );
+		$args  = array_merge( $score_args, $where_args, null !== $scope ? array( $scope ) : array(), array( $limit ) );
 		return $wpdb->get_results( $wpdb->prepare( $sql, $args ), ARRAY_A ) ?: array();
 	}
 

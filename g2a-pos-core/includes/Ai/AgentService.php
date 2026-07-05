@@ -17,6 +17,10 @@ use G2A\POS\Database\AiPendingActionRepository;
  *        - preview → execute (read-only) + return preview to UI
  *        - confirm → enqueue PendingAction, do NOT execute yet
  *   5. Persist the assistant message + tool call rows + audit row.
+ *
+ * BrainFacade (see BrainFacade.php) exposes this retrieval to other plugins
+ * on the same WordPress install (e.g. g2a-business-api's dashboard agents)
+ * without duplicating the vector store.
  */
 final class AgentService {
 

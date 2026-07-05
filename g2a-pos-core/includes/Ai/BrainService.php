@@ -163,8 +163,14 @@ final class BrainService {
 		);
 	}
 
-	public static function retrieve( string $query, int $k = 5 ): array {
-		return self::retrieve_with_meta( $query, $k )['hits'];
+	/**
+	 * @param ?string $scope Restricts retrieval to documents ingested under
+	 *                       this scope (e.g. 'staff'). Null (default)
+	 *                       searches every scope — the existing in-store POS
+	 *                       assistant behavior is unchanged.
+	 */
+	public static function retrieve( string $query, int $k = 5, ?string $scope = null ): array {
+		return self::retrieve_with_meta( $query, $k, $scope )['hits'];
 	}
 
 	/**
@@ -172,9 +178,13 @@ final class BrainService {
 	 * endpoint) can surface which backend answered and whether a Cloudflare
 	 * failure forced a local fallback.
 	 *
+	 * Scope filtering only applies to the local backends — the Cloudflare
+	 * Worker path has no scope concept yet, so a scoped query against the
+	 * cloudflare backend still queries the full Vectorize index.
+	 *
 	 * @return array{hits:array<int,array<string,mixed>>,backend:string,notice:?string}
 	 */
-	public static function retrieve_with_meta( string $query, int $k = 5 ): array {
+	public static function retrieve_with_meta( string $query, int $k = 5, ?string $scope = null ): array {
 		$repo = new AiBrainRepository();
 		$cfg  = Gateway::config();
 
@@ -189,7 +199,7 @@ final class BrainService {
 				);
 			}
 			return array(
-				'hits'    => $repo->search_text( $query, $k ),
+				'hits'    => $repo->search_text( $query, $k, $scope ),
 				'backend' => 'local_fallback',
 				'notice'  => 'Cloudflare Worker unavailable (' . (string) $error . ') — using local keyword search.',
 			);
@@ -199,14 +209,14 @@ final class BrainService {
 			$vec = Gateway::embed( $query );
 			if ( $vec ) {
 				return array(
-					'hits'    => $repo->search( $vec, $k, $cfg['embed_model'] ),
+					'hits'    => $repo->search( $vec, $k, $cfg['embed_model'], $scope ),
 					'backend' => 'local_vector',
 					'notice'  => null,
 				);
 			}
 		}
 		return array(
-			'hits'    => $repo->search_text( $query, $k ),
+			'hits'    => $repo->search_text( $query, $k, $scope ),
 			'backend' => 'local_text',
 			'notice'  => null,
 		);
