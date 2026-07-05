@@ -12,6 +12,12 @@ final class LipseysProvider extends AbstractWholesalerProvider {
 
 	public const CODE = 'lipseys';
 
+	/**
+	 * How many catalog items to upsert per batch during an API catalog
+	 * import, between object-cache flushes / execution-clock resets.
+	 */
+	private const API_IMPORT_BATCH = 200;
+
 	public function code(): string {
 		return self::CODE; }
 	public function displayName(): string {
@@ -34,6 +40,33 @@ final class LipseysProvider extends AbstractWholesalerProvider {
 	public function importCatalogCsv( int $wholesalerId, string $absoluteFilePath, array $options = array() ): array {
 		$importer = new LipseysCsvImporter();
 		return $importer->import( $wholesalerId, $absoluteFilePath, $options );
+	}
+
+	/**
+	 * Run only the Lipsey's authentication step for the stored credentials —
+	 * no feed access — so admins can verify a login without pulling data.
+	 * A forced (non-cached) login is used so the stored credentials are what
+	 * is actually being tested.
+	 */
+	public function testCredentials( int $wholesalerId ): array {
+		$client = $this->client( $wholesalerId );
+		if ( ! $client ) {
+			return array(
+				'ok'     => false,
+				'error'  => 'credentials_missing',
+				'detail' => 'No API email/password stored for this wholesaler.',
+			);
+		}
+		try {
+			$client->authenticate( true );
+			return array( 'ok' => true );
+		} catch ( \Throwable $e ) {
+			return array(
+				'ok'     => false,
+				'error'  => 'lipseys_auth_failed',
+				'detail' => $e->getMessage(),
+			);
+		}
 	}
 
 	/**
@@ -70,11 +103,10 @@ final class LipseysProvider extends AbstractWholesalerProvider {
 		$authorized = $feed['authorized'] ?? $feed['Authorized'] ?? true;
 		$success    = $feed['success'] ?? $feed['Success'] ?? true;
 		if ( false === $authorized || false === $success ) {
-			$errs = $feed['errors'] ?? $feed['Errors'] ?? array();
 			return array(
-				'ok'    => false,
-				'error' => 'lipseys_api_rejected',
-				'detail' => is_array( $errs ) ? implode( '; ', array_map( 'strval', $errs ) ) : (string) $errs,
+				'ok'     => false,
+				'error'  => 'lipseys_api_rejected',
+				'detail' => self::rejectionDetail( $feed ),
 			);
 		}
 		$items = $feed['data'] ?? $feed['Items'] ?? $feed['items'] ?? null;
@@ -93,6 +125,10 @@ final class LipseysProvider extends AbstractWholesalerProvider {
 			);
 		}
 
+		// The feed can carry tens of thousands of items — free the envelope
+		// before mapping so only the item list stays in memory.
+		unset( $feed );
+
 		$productRepo = new WholesalerProductRepository();
 		$mapRepo     = new MapRuleRepository();
 		$now         = current_time( 'mysql' );
@@ -106,51 +142,63 @@ final class LipseysProvider extends AbstractWholesalerProvider {
 			'errors'             => array(),
 		);
 
-		foreach ( $items as $item ) {
-			if ( ! is_array( $item ) ) {
-				continue;
-			}
-			++$stats['rows_total'];
-			try {
-				$mapped = LipseysCatalogMapper::mapApiItem( $item );
-				$sku    = (string) ( $mapped['vendor_sku'] ?? '' );
-				if ( $sku === '' ) {
-					++$stats['rows_skipped'];
+		// Process in batches (mirrors LipseysCsvImporter's BATCH_FLUSH rhythm):
+		// flush the runtime object cache and reset the execution clock between
+		// batches so a full-catalog import survives PHP time/memory limits.
+		foreach ( array_chunk( $items, self::API_IMPORT_BATCH ) as $batch ) {
+			foreach ( $batch as $item ) {
+				if ( ! is_array( $item ) ) {
 					continue;
 				}
-				$mapped['wholesaler_id'] = $wholesalerId;
-				$mapped['last_seen_at']  = $now;
+				++$stats['rows_total'];
+				try {
+					$mapped = LipseysCatalogMapper::mapApiItem( $item );
+					$sku    = (string) ( $mapped['vendor_sku'] ?? '' );
+					if ( $sku === '' ) {
+						++$stats['rows_skipped'];
+						continue;
+					}
+					$mapped['wholesaler_id'] = $wholesalerId;
+					$mapped['last_seen_at']  = $now;
 
-				$result = $productRepo->upsert( $mapped );
-				if ( $result === 'created' ) {
-					++$stats['rows_created'];
-				} elseif ( $result === 'updated' ) {
-					++$stats['rows_updated'];
-				} else {
-					++$stats['rows_skipped'];
-				}
+					$result = $productRepo->upsert( $mapped );
+					if ( $result === 'created' ) {
+						++$stats['rows_created'];
+					} elseif ( $result === 'updated' ) {
+						++$stats['rows_updated'];
+					} else {
+						++$stats['rows_skipped'];
+					}
 
-				// Mirror the CSV importer: persist the vendor MAP so the
-				// storefront MAP-pricing guard knows the floor. Without this,
-				// API-synced products could be advertised below MAP.
-				if ( ! empty( $mapped['map_price'] ) && (float) $mapped['map_price'] > 0 ) {
-					$mapRepo->upsertFromVendor(
-						array(
-							'sku'           => $sku,
-							'upc'           => $mapped['upc'] ?? null,
-							'manufacturer'  => $mapped['manufacturer'] ?? null,
-							'map_price'     => (float) $mapped['map_price'],
-							'wholesaler_id' => $wholesalerId,
-							'source'        => 'lipseys_api',
-						)
-					);
-					++$stats['map_rules_upserted'];
+					// Mirror the CSV importer: persist the vendor MAP so the
+					// storefront MAP-pricing guard knows the floor. Without this,
+					// API-synced products could be advertised below MAP.
+					if ( ! empty( $mapped['map_price'] ) && (float) $mapped['map_price'] > 0 ) {
+						$mapRepo->upsertFromVendor(
+							array(
+								'sku'           => $sku,
+								'upc'           => $mapped['upc'] ?? null,
+								'manufacturer'  => $mapped['manufacturer'] ?? null,
+								'map_price'     => (float) $mapped['map_price'],
+								'wholesaler_id' => $wholesalerId,
+								'source'        => 'lipseys_api',
+							)
+						);
+						++$stats['map_rules_upserted'];
+					}
+				} catch ( \Throwable $e ) {
+					++$stats['rows_failed'];
+					if ( count( $stats['errors'] ) < 20 ) {
+						$stats['errors'][] = $e->getMessage();
+					}
 				}
-			} catch ( \Throwable $e ) {
-				++$stats['rows_failed'];
-				if ( count( $stats['errors'] ) < 20 ) {
-					$stats['errors'][] = $e->getMessage();
-				}
+			}
+
+			if ( function_exists( 'wp_cache_flush' ) ) {
+				wp_cache_flush();
+			}
+			if ( function_exists( 'set_time_limit' ) ) {
+				@set_time_limit( 60 ); // phpcs:ignore WordPress.PHP.NoSilencedErrors.Discouraged
 			}
 		}
 
@@ -190,11 +238,10 @@ final class LipseysProvider extends AbstractWholesalerProvider {
 		$authorized = $snapshot['authorized'] ?? $snapshot['Authorized'] ?? true;
 		$success    = $snapshot['success'] ?? $snapshot['Success'] ?? true;
 		if ( false === $authorized || false === $success ) {
-			$errs = $snapshot['errors'] ?? $snapshot['Errors'] ?? array();
 			return array(
 				'ok'     => false,
 				'error'  => 'lipseys_api_rejected',
-				'detail' => is_array( $errs ) ? implode( '; ', array_map( 'strval', $errs ) ) : (string) $errs,
+				'detail' => self::rejectionDetail( $snapshot ),
 			);
 		}
 
@@ -440,6 +487,24 @@ final class LipseysProvider extends AbstractWholesalerProvider {
 				'error' => $e->getMessage(),
 			);
 		}
+	}
+
+	/**
+	 * Human-readable reason for a Lipsey's soft rejection (HTTP 200 +
+	 * authorized:false/success:false). Prefer the feed's own errors[]; fall
+	 * back to the envelope summary the client attaches after its re-auth
+	 * retry has already failed. An auth that succeeds but a feed that is
+	 * rejected usually means the dealer account lacks the feed entitlement.
+	 *
+	 * @param array<string,mixed> $envelope Decoded Lipsey's response.
+	 */
+	private static function rejectionDetail( array $envelope ): string {
+		$errs   = $envelope['errors'] ?? $envelope['Errors'] ?? array();
+		$detail = is_array( $errs ) ? implode( '; ', array_map( 'strval', $errs ) ) : (string) $errs;
+		if ( '' === trim( $detail ) ) {
+			$detail = (string) ( $envelope['_detail'] ?? '' );
+		}
+		return $detail;
 	}
 
 	private function client( int $wholesalerId ): ?LipseysApiClient {

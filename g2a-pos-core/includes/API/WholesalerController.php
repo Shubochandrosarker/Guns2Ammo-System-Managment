@@ -44,6 +44,9 @@ final class WholesalerController {
 		$repo = new WholesalerRepository();
 		$id   = $repo->upsert(
 			array(
+				// Pass the row id through when editing so the repository can
+				// update in place even if the account number changed.
+				'id'             => isset( $params['id'] ) ? (int) $params['id'] : 0,
 				'provider_code'  => $code,
 				'display_name'   => sanitize_text_field( (string) ( $params['display_name'] ?? '' ) ),
 				'account_number' => sanitize_text_field( (string) ( $params['account_number'] ?? '' ) ),
@@ -166,7 +169,7 @@ final class WholesalerController {
 				'catalog_sync_failed',
 				(string) ( $result['error'] ?? 'unknown' ),
 				array(
-					'status' => 502,
+					'status' => ( $result['error'] ?? '' ) === 'credentials_missing' ? 400 : 502,
 					'detail' => $result,
 				)
 			);
@@ -187,10 +190,47 @@ final class WholesalerController {
 			return new WP_Error( 'unsupported', 'Provider does not support live inventory', array( 'status' => 400 ) );
 		}
 		$result = $provider->syncInventory( $wholesalerId );
-		if ( ! empty( $result['ok'] ) ) {
-			$repoW->markSyncedNow( $wholesalerId );
+		if ( empty( $result['ok'] ) ) {
+			// Mirror sync_catalog_api/import_csv: report upstream failures with
+			// a real error status and keep the provider's error + detail in the
+			// response body so the admin UI can show the actual reason.
+			return new WP_Error(
+				'inventory_sync_failed',
+				(string) ( $result['error'] ?? 'unknown' ),
+				array(
+					'status' => ( $result['error'] ?? '' ) === 'credentials_missing' ? 400 : 502,
+					'detail' => $result,
+				)
+			);
 		}
+		$repoW->markSyncedNow( $wholesalerId );
 		return new WP_REST_Response( $result );
+	}
+
+	/**
+	 * POST /wholesalers/{id}/test-credentials — run only the provider's
+	 * authentication step for the stored credentials (no feed access) and
+	 * report the exact upstream response summary.
+	 */
+	public static function test_credentials( WP_REST_Request $req ) {
+		$wholesalerId = (int) $req->get_param( 'wholesaler_id' );
+		$repoW        = new WholesalerRepository();
+		$w            = $repoW->find( $wholesalerId );
+		if ( ! $w ) {
+			return new WP_Error( 'not_found', 'Wholesaler not found', array( 'status' => 404 ) );
+		}
+		$provider = WholesalerRegistry::get( (string) $w['provider_code'] );
+		if ( ! $provider || ! method_exists( $provider, 'testCredentials' ) ) {
+			return new WP_Error( 'unsupported', 'Provider does not support credential testing', array( 'status' => 400 ) );
+		}
+		$result = $provider->testCredentials( $wholesalerId );
+		if ( ! empty( $result['ok'] ) ) {
+			return new WP_REST_Response( $result );
+		}
+		return new WP_REST_Response(
+			$result,
+			( $result['error'] ?? '' ) === 'credentials_missing' ? 400 : 502
+		);
 	}
 
 	public static function submit_dropship( WP_REST_Request $req ) {

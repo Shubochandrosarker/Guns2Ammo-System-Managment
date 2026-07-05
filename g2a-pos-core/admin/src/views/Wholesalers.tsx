@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { get, post, errorMessage } from '../api';
+import { get, post, errorMessage, ApiError } from '../api';
 import PageHeader from '../components/PageHeader';
 import DataTable, { type Column } from '../components/DataTable';
 
@@ -14,13 +14,30 @@ interface Wholesaler {
   settings?: Record<string, unknown>;
 }
 
+interface CatalogStats {
+  rows_total?: number;
+  rows_created?: number;
+  rows_updated?: number;
+  rows_skipped?: number;
+  rows_failed?: number;
+}
+
 interface SyncRow {
   ok: boolean;
   rows_updated?: number;
+  stats?: CatalogStats;
   error?: string;
+  detail?: string;
+}
+
+interface TestRow {
+  ok: boolean;
+  error?: string;
+  detail?: string;
 }
 
 const EMPTY_FORM = {
+  id: 0,
   provider_code: 'lipseys',
   display_name: "Lipsey's — Production",
   account_number: '',
@@ -30,12 +47,36 @@ const EMPTY_FORM = {
   password: '',
 };
 
+/**
+ * Extract a { error, detail } pair from a failed request. The REST layer
+ * returns WP_Error bodies ({ code, message, data: { detail: { error, detail } } })
+ * for sync failures and plain { ok, error, detail } payloads for
+ * test-credentials, so check both shapes.
+ */
+function apiFailure(e: unknown, fallback: string): { error: string; detail?: string } {
+  if (e instanceof ApiError) {
+    const p = e.payload as {
+      message?: string;
+      error?: string;
+      detail?: string;
+      data?: { detail?: { error?: string; detail?: string } };
+    } | null;
+    const nested = p?.data?.detail;
+    return {
+      error: nested?.error || p?.error || p?.message || e.message || fallback,
+      detail: nested?.detail || p?.detail || undefined,
+    };
+  }
+  return { error: errorMessage(e, fallback) };
+}
+
 export default function Wholesalers() {
   const [items, setItems] = useState<Wholesaler[]>([]);
   const [loading, setLoading] = useState(true);
   const [form, setForm] = useState({ ...EMPTY_FORM });
   const [busy, setBusy] = useState<string | null>(null);
   const [syncResult, setSyncResult] = useState<Record<number, SyncRow>>({});
+  const [testResult, setTestResult] = useState<Record<number, TestRow>>({});
   const [error, setError] = useState<string | null>(null);
 
   const load = async () => {
@@ -58,6 +99,7 @@ export default function Wholesalers() {
     setError(null);
     try {
       await post('/wholesalers', {
+        id: form.id || undefined,
         provider_code: form.provider_code,
         display_name: form.display_name,
         account_number: form.account_number,
@@ -74,6 +116,19 @@ export default function Wholesalers() {
     }
   };
 
+  const edit = (r: Wholesaler) => {
+    setForm({
+      id: r.id,
+      provider_code: r.provider_code,
+      display_name: r.display_name,
+      account_number: r.account_number || '',
+      api_endpoint: r.api_endpoint || 'https://api.lipseys.com',
+      status: r.status,
+      email: '',
+      password: '',
+    });
+  };
+
   const runSync = async (id: number) => {
     setBusy(`sync-${id}`);
     try {
@@ -81,10 +136,44 @@ export default function Wholesalers() {
       setSyncResult((s) => ({ ...s, [id]: r }));
       await load();
     } catch (e) {
-      setSyncResult((s) => ({ ...s, [id]: { ok: false, error: errorMessage(e, 'sync failed') } }));
+      setSyncResult((s) => ({ ...s, [id]: { ok: false, ...apiFailure(e, 'sync failed') } }));
     } finally {
       setBusy(null);
     }
+  };
+
+  const runCatalogSync = async (id: number) => {
+    setBusy(`catalog-${id}`);
+    try {
+      const r = await post<SyncRow>(`/wholesalers/${id}/catalog/api-sync`);
+      setSyncResult((s) => ({ ...s, [id]: r }));
+      await load();
+    } catch (e) {
+      setSyncResult((s) => ({ ...s, [id]: { ok: false, ...apiFailure(e, 'catalog sync failed') } }));
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const runTest = async (id: number) => {
+    setBusy(`test-${id}`);
+    try {
+      const r = await post<TestRow>(`/wholesalers/${id}/test-credentials`);
+      setTestResult((s) => ({ ...s, [id]: r }));
+    } catch (e) {
+      setTestResult((s) => ({ ...s, [id]: { ok: false, ...apiFailure(e, 'credential test failed') } }));
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const syncSummary = (r: SyncRow): string => {
+    if (!r.ok) return [r.error, r.detail].filter(Boolean).join(' — ');
+    if (r.stats) {
+      const s = r.stats;
+      return `✓ ${s.rows_total ?? 0} items (created ${s.rows_created ?? 0}, updated ${s.rows_updated ?? 0}, failed ${s.rows_failed ?? 0})`;
+    }
+    return `↻ ${r.rows_updated ?? 0} rows`;
   };
 
   const cols: Column<Wholesaler>[] = [
@@ -100,13 +189,29 @@ export default function Wholesalers() {
     { key: 'last_sync_at', label: 'Last Sync', render: (r) => r.last_sync_at || '—' },
     {
       key: 'actions', label: '', render: (r) => (
-        <div className="flex items-center gap-2">
-          <button className="btn-secondary" disabled={busy === `sync-${r.id}`} onClick={() => runSync(r.id)}>
-            {busy === `sync-${r.id}` ? 'Syncing…' : 'Sync inventory'}
-          </button>
+        <div className="flex flex-col gap-1">
+          <div className="flex items-center gap-2">
+            <button className="btn-secondary" onClick={() => edit(r)}>Edit</button>
+            <button className="btn-secondary" disabled={busy === `test-${r.id}`} onClick={() => runTest(r.id)}>
+              {busy === `test-${r.id}` ? 'Testing…' : 'Test credentials'}
+            </button>
+            <button className="btn-secondary" disabled={busy === `sync-${r.id}`} onClick={() => runSync(r.id)}>
+              {busy === `sync-${r.id}` ? 'Syncing…' : 'Sync inventory'}
+            </button>
+            <button className="btn-secondary" disabled={busy === `catalog-${r.id}`} onClick={() => runCatalogSync(r.id)}>
+              {busy === `catalog-${r.id}` ? 'Importing…' : 'Sync catalog'}
+            </button>
+          </div>
+          {testResult[r.id] && (
+            <span className={`text-xs ${testResult[r.id].ok ? 'text-emerald-600' : 'text-rose-600'}`}>
+              {testResult[r.id].ok
+                ? '✓ Credentials OK — Lipsey\'s login succeeded'
+                : [testResult[r.id].error, testResult[r.id].detail].filter(Boolean).join(' — ')}
+            </span>
+          )}
           {syncResult[r.id] && (
             <span className={`text-xs ${syncResult[r.id].ok ? 'text-emerald-600' : 'text-rose-600'}`}>
-              {syncResult[r.id].ok ? `↻ ${syncResult[r.id].rows_updated ?? 0} rows` : syncResult[r.id].error}
+              {syncSummary(syncResult[r.id])}
             </span>
           )}
         </div>
@@ -126,7 +231,17 @@ export default function Wholesalers() {
       <DataTable rows={items} columns={cols} loading={loading} rowKey={(r) => r.id} empty="No wholesalers configured yet." />
 
       <div className="card mt-6 p-6">
-        <h3 className="mb-4 text-lg font-semibold">Add / update wholesaler</h3>
+        <h3 className="mb-4 text-lg font-semibold">
+          {form.id ? `Edit wholesaler #${form.id}` : 'Add / update wholesaler'}
+        </h3>
+        <div className="mb-4 rounded border border-amber-300 bg-amber-50 p-3 text-xs text-amber-800 dark:border-amber-700 dark:bg-amber-900/30 dark:text-amber-200">
+          <strong>Lipsey&apos;s API note:</strong> API integration credentials are <em>separate</em> from your
+          dealer portal login and must be enabled by Lipsey&apos;s before they will authenticate. Feed/catalog
+          access is a separate entitlement on top of that — if &quot;Test credentials&quot; succeeds but syncs fail
+          with <code>lipseys_api_rejected</code>, your account lacks the feed entitlement; contact your
+          Lipsey&apos;s rep to enable it.
+          {form.id ? ' When editing, leave the email/password blank to keep the stored values.' : ''}
+        </div>
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
           <Field label="Provider">
             <select className="input" value={form.provider_code} onChange={(e) => setForm({ ...form, provider_code: e.target.value })}>
@@ -142,10 +257,10 @@ export default function Wholesalers() {
           <Field label="API endpoint">
             <input className="input" value={form.api_endpoint} onChange={(e) => setForm({ ...form, api_endpoint: e.target.value })} />
           </Field>
-          <Field label="API email">
+          <Field label={form.id ? 'API email (blank = keep stored)' : 'API email'}>
             <input className="input" type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} />
           </Field>
-          <Field label="API password">
+          <Field label={form.id ? 'API password (blank = keep stored)' : 'API password'}>
             <input className="input" type="password" autoComplete="new-password" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} />
           </Field>
           <Field label="Status">
@@ -156,7 +271,12 @@ export default function Wholesalers() {
             </select>
           </Field>
         </div>
-        <div className="mt-4 flex justify-end">
+        <div className="mt-4 flex justify-end gap-2">
+          {form.id > 0 && (
+            <button className="btn-secondary" disabled={busy === 'save'} onClick={() => setForm({ ...EMPTY_FORM })}>
+              Cancel edit
+            </button>
+          )}
           <button className="btn-primary" disabled={busy === 'save'} onClick={save}>
             {busy === 'save' ? 'Saving…' : 'Save wholesaler'}
           </button>

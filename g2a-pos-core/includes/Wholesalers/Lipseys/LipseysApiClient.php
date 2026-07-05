@@ -23,7 +23,8 @@ namespace G2A\POS\Wholesalers\Lipseys;
  *   POST /api/Integration/Shipping/OneDay          -> body = "<MM/DD/YYYY>", returns availability
  *   GET  /api/Integration/Order/OrderStatus/{po}   -> status for a previously submitted PO
  *
- * All calls retry transient 5xx and transparently re-auth on 401.
+ * All calls retry transient 5xx and transparently re-auth on 401 — and on
+ * Lipsey's soft token rejection (HTTP 200 + authorized:false/success:false).
  */
 final class LipseysApiClient {
 
@@ -213,19 +214,19 @@ final class LipseysApiClient {
 		return $this->get( '/api/Integration/Order/OrderStatus/' . rawurlencode( $poNumber ) );
 	}
 
-	private function get( string $path ): array {
-		return $this->request( 'GET', $path, null );
+	private function get( string $path, int $timeout = 60 ): array {
+		return $this->request( 'GET', $path, null, 1, $timeout );
 	}
 
 	private function post( string $path, $payload ): array {
 		return $this->request( 'POST', $path, $payload );
 	}
 
-	private function request( string $method, string $path, $payload, int $attempt = 1 ): array {
+	private function request( string $method, string $path, $payload, int $attempt = 1, int $timeout = 60 ): array {
 		$token = $this->authenticate();
 		$args  = array(
 			'method'  => $method,
-			'timeout' => 60,
+			'timeout' => $timeout,
 			'headers' => array(
 				'Token'        => $token,
 				'Content-Type' => 'application/json',
@@ -239,23 +240,40 @@ final class LipseysApiClient {
 		if ( is_wp_error( $res ) ) {
 			if ( $attempt < 3 ) {
 				usleep( ( $attempt * 750 ) * 1000 );
-				return $this->request( $method, $path, $payload, $attempt + 1 );
+				return $this->request( $method, $path, $payload, $attempt + 1, $timeout );
 			}
 			throw new \RuntimeException( 'lipseys_http_error: ' . $res->get_error_message() );
 		}
 		$code = (int) wp_remote_retrieve_response_code( $res );
 		if ( $code === 401 && $attempt === 1 ) {
 			$this->authenticate( true );
-			return $this->request( $method, $path, $payload, $attempt + 1 );
+			return $this->request( $method, $path, $payload, $attempt + 1, $timeout );
 		}
 		if ( $code >= 500 && $attempt < 3 ) {
 			usleep( ( $attempt * 1000 ) * 1000 );
-			return $this->request( $method, $path, $payload, $attempt + 1 );
+			return $this->request( $method, $path, $payload, $attempt + 1, $timeout );
 		}
-		$body = json_decode( (string) wp_remote_retrieve_body( $res ), true );
+		$rawBody = (string) wp_remote_retrieve_body( $res );
+		$body    = json_decode( $rawBody, true );
 		if ( ! is_array( $body ) ) {
-			$body = array( 'raw' => (string) wp_remote_retrieve_body( $res ) );
+			$body = array( 'raw' => $rawBody );
 		}
+
+		// Lipsey's soft-rejects an expired/invalid token with HTTP 200 +
+		// authorized:false / success:false instead of a 401. Clear the cached
+		// token, re-authenticate, and retry the request once. If the rejection
+		// persists, attach a summary of the envelope so callers can surface
+		// the real reason (errors[], authorized, success) instead of a bare code.
+		$authorized = $body['authorized'] ?? $body['Authorized'] ?? true;
+		$success    = $body['success'] ?? $body['Success'] ?? true;
+		if ( false === $authorized || false === $success ) {
+			if ( $attempt === 1 ) {
+				$this->authenticate( true );
+				return $this->request( $method, $path, $payload, $attempt + 1, $timeout );
+			}
+			$body['_detail'] = self::describeAuthFailure( $code, $body, $rawBody );
+		}
+
 		$body['_status'] = $code;
 		return $body;
 	}
