@@ -16,6 +16,8 @@
 
 namespace WordPressistic\G2ABA\Settings;
 
+use WordPressistic\G2ABA\Cors;
+
 if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
@@ -53,6 +55,7 @@ class Settings_Store {
 	 *   dailySummaryHour: int,
 	 *   ownerEmail: string,
 	 *   timezone: string,
+	 *   allowedOrigins: array<int, string>,
 	 * }
 	 */
 	public function all(): array {
@@ -88,6 +91,7 @@ class Settings_Store {
 			'dailySummaryHour' => 7,
 			'ownerEmail'       => '',
 			'timezone'         => 'America/Phoenix',
+			'allowedOrigins'   => Cors::DEFAULT_ORIGINS,
 		);
 	}
 
@@ -116,7 +120,34 @@ class Settings_Store {
 			'dailySummaryHour' => self::clamp_hour( $raw['dailySummaryHour'] ?? 7 ),
 			'ownerEmail'       => self::sanitise_email( (string) ( $raw['ownerEmail'] ?? '' ) ),
 			'timezone'         => self::sanitise_tz( (string) ( $raw['timezone'] ?? '' ) ),
+			'allowedOrigins'   => self::sanitise_origins( $raw['allowedOrigins'] ?? array() ),
 		);
+	}
+
+	/**
+	 * Normalise the CORS allow-list. Invalid entries (paths, wildcards,
+	 * non-http schemes) are dropped; an empty result falls back to the
+	 * default so the owner can never lock the hosted dashboard out.
+	 *
+	 * @param mixed $raw Whatever the REST payload carried.
+	 * @return array<int, string>
+	 */
+	public static function sanitise_origins( $raw ): array {
+		$raw = is_array( $raw ) ? $raw : array();
+		$out = array();
+		foreach ( $raw as $origin ) {
+			if ( ! is_string( $origin ) ) {
+				continue;
+			}
+			$norm = Cors::normalize_origin( $origin );
+			if ( null !== $norm && ! in_array( $norm, $out, true ) ) {
+				$out[] = $norm;
+			}
+		}
+		if ( empty( $out ) ) {
+			return Cors::DEFAULT_ORIGINS;
+		}
+		return $out;
 	}
 
 	public static function clamp_hour( $raw ): int {

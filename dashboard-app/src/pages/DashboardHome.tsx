@@ -15,6 +15,7 @@ export function DashboardHome() {
   const seo        = useAsync(() => api.analytics.seo(),             [])
   const insights   = useAsync(() => api.insights.list(),             [])
   const health     = useAsync(() => api.health.checks(),             [])
+  const integrations = useAsync(() => api.system.integrations(),     [])
 
   if (revenue.loading || bookings.loading || memberships.loading || seo.loading) {
     return <Spinner label="Loading business snapshot…" />
@@ -102,23 +103,38 @@ export function DashboardHome() {
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mt-6">
         <Card title="SEO snapshot" subtitle="Search Console — last 30d">
-          <div className="grid grid-cols-2 gap-3">
-            <MiniStat label="Clicks"      value={formatNumber(s.clicks)} />
-            <MiniStat label="Impressions" value={formatNumber(s.impressions)} />
-            <MiniStat label="CTR"         value={`${s.ctr.toFixed(1)}%`} />
-            <MiniStat label="Avg pos."    value={s.position.toFixed(1)} />
-          </div>
-          <div className="mt-4">
-            <div className="text-xs font-medium text-ink-500 uppercase tracking-wide mb-1">Top pages</div>
-            <ul className="text-sm space-y-1">
-              {s.topPages.slice(0, 3).map(p => (
-                <li key={p.url} className="flex justify-between gap-3">
-                  <span className="truncate text-ink-700">{p.url}</span>
-                  <span className="text-emerald-600 text-xs shrink-0">+{p.deltaPct.toFixed(1)}%</span>
-                </li>
-              ))}
-            </ul>
-          </div>
+          {integrations.data && !integrations.data.gscConfigured ? (
+            <div className="text-sm text-ink-600 bg-ink-50 border border-ink-100 rounded-lg p-3">
+              <div className="font-medium text-ink-800">Search Console not configured</div>
+              <div className="mt-1 text-xs text-ink-500">
+                These numbers stay at zero until a Google service-account key
+                and property are connected in the WordPress admin.
+              </div>
+              <Link to="/system-health" className="btn-ghost text-xs mt-2 inline-block">
+                View integration status →
+              </Link>
+            </div>
+          ) : (
+            <>
+              <div className="grid grid-cols-2 gap-3">
+                <MiniStat label="Clicks"      value={formatNumber(s.clicks)} />
+                <MiniStat label="Impressions" value={formatNumber(s.impressions)} />
+                <MiniStat label="CTR"         value={`${s.ctr.toFixed(1)}%`} />
+                <MiniStat label="Avg pos."    value={s.position.toFixed(1)} />
+              </div>
+              <div className="mt-4">
+                <div className="text-xs font-medium text-ink-500 uppercase tracking-wide mb-1">Top pages</div>
+                <ul className="text-sm space-y-1">
+                  {s.topPages.slice(0, 3).map(p => (
+                    <li key={p.url} className="flex justify-between gap-3">
+                      <span className="truncate text-ink-700">{p.url}</span>
+                      <span className="text-emerald-600 text-xs shrink-0">+{p.deltaPct.toFixed(1)}%</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            </>
+          )}
         </Card>
 
         <Card title="Booking pulse" subtitle={`${b.paidVsUnpaid.paid + b.paidVsUnpaid.unpaid} bookings`}>

@@ -4,7 +4,7 @@ import { StatCard } from '@/components/ui/StatCard'
 import { Spinner } from '@/components/ui/Spinner'
 import { useAsync } from '@/lib/hooks'
 import { api } from '@/lib/api'
-import type { SystemHealthCheck } from '@/types/analytics'
+import type { IntegrationsStatus, SystemHealthCheck } from '@/types/analytics'
 
 const STATUS_STYLE: Record<SystemHealthCheck['status'], string> = {
   ok:    'pill-green',
@@ -23,8 +23,23 @@ const GROUP_LABEL: Record<SystemHealthCheck['group'], string> = {
   security:  'Security',
 }
 
+// Integrations that need explicit configuration link to the Settings page;
+// the rest are plugins that are simply active or not.
+const INTEGRATION_ITEMS: Array<{ key: keyof IntegrationsStatus; label: string; kind: 'configured' | 'active' }> = [
+  { key: 'ga4Configured',          label: 'Google Analytics 4',      kind: 'configured' },
+  { key: 'gscConfigured',          label: 'Google Search Console',   kind: 'configured' },
+  { key: 'gbpConfigured',          label: 'Google Business Profile', kind: 'configured' },
+  { key: 'aiConnectionConfigured', label: 'AI model connection',     kind: 'configured' },
+  { key: 'wooActive',              label: 'WooCommerce',             kind: 'active' },
+  { key: 'bookingEngineActive',    label: 'G2A Booking Engine',      kind: 'active' },
+  { key: 'memberisticActive',      label: 'Memberistic',             kind: 'active' },
+  { key: 'messageisticActive',     label: 'Messageistic',            kind: 'active' },
+  { key: 'formisticActive',        label: 'Formistic',               kind: 'active' },
+]
+
 export function SystemHealth() {
   const q = useAsync(() => api.health.checks(), [])
+  const integrations = useAsync(() => api.system.integrations(), [])
   if (q.loading) return <Spinner />
   const checks = q.data ?? []
   const grouped = new Map<SystemHealthCheck['group'], SystemHealthCheck[]>()
@@ -51,6 +66,44 @@ export function SystemHealth() {
         <StatCard label="Warnings" value={warn}  intent="warn" />
         <StatCard label="Errors"   value={error} intent="danger" />
         <StatCard label="Checks"   value={checks.length} />
+      </div>
+
+      <div className="mt-6">
+        <Card
+          title="Integrations"
+          subtitle="What the dashboard can actually read right now"
+        >
+          {integrations.loading ? (
+            <Spinner label="Checking integrations…" />
+          ) : integrations.error ? (
+            <div className="text-sm text-rose-700 bg-rose-50 border border-rose-100 rounded-lg px-3 py-2">
+              {integrations.error}
+            </div>
+          ) : (
+            <ul className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-6 divide-y sm:divide-y-0 divide-ink-100">
+              {INTEGRATION_ITEMS.map(item => {
+                const on = Boolean(integrations.data?.[item.key])
+                return (
+                  <li key={item.key} className="py-2.5 flex items-center justify-between gap-3">
+                    <span className="text-sm text-ink-700">{item.label}</span>
+                    <span className={on ? 'pill-green' : 'pill-amber'}>
+                      {on
+                        ? item.kind === 'configured' ? 'configured' : 'active'
+                        : item.kind === 'configured' ? 'not configured' : 'not active'}
+                    </span>
+                  </li>
+                )
+              })}
+            </ul>
+          )}
+          {integrations.data && !(integrations.data.ga4Configured && integrations.data.gscConfigured) && (
+            <div className="mt-3 text-xs text-ink-500">
+              Google integrations that show &quot;not configured&quot; report zeros on the
+              analytics pages until a service-account key and property are set in
+              the WordPress admin (G2A Business API → Settings).
+            </div>
+          )}
+        </Card>
       </div>
 
       <div className="space-y-4 mt-6">

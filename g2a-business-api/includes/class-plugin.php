@@ -15,6 +15,10 @@ class Plugin {
 	public function run(): void {
 		add_action( 'rest_api_init', array( $this, 'register_rest_routes' ) );
 
+		// CORS for the off-site dashboard (app.guns2ammo.com). Must be wired
+		// on every request so REST preflights are answered.
+		Cors::register();
+
 		// Cron hooks must be registered on every request (not just admin), so
 		// that WP-Cron can invoke them when a scheduled event fires.
 		\WordPressistic\G2ABA\AI\Insight_Generator::register_cron();

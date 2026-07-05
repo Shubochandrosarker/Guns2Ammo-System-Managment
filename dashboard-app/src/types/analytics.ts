@@ -210,3 +210,64 @@ export interface SystemHealthCheck {
   detail: string
   lastCheckedAt: ISODate
 }
+
+// GET /emails/overview — real email traffic for the Email Management page.
+// Each section carries `active: false` + null metrics when its source
+// plugin isn't installed, so the UI can degrade gracefully.
+
+export interface EmailOverviewSubmission {
+  id: number
+  formName: string
+  name: string
+  email: string
+  subject: string
+  messageExcerpt: string
+  createdAt: ISODate
+  status: 'new' | 'read' | 'replied'
+}
+
+export interface MessageisticStats {
+  totalSent: number
+  delivered: number
+  failed: number
+  replies: number
+  contacts: number
+  optedOut: number
+  activeCampaigns: number
+}
+
+export interface EmailOverview {
+  formistic: {
+    active: boolean
+    totalSubmissions: number | null
+    newToday: number | null
+    last7d: number | null
+    byStatus: { new: number; read: number; replied: number } | null
+    recentSubmissions: EmailOverviewSubmission[]
+  }
+  // Newsletter subscribers are deliberately a separate section — the owner
+  // wants the newsletter split from the enquiry inbox.
+  subscribers: {
+    active: boolean
+    total: number | null
+    last30d: number | null
+  }
+  messageistic: {
+    active: boolean
+    stats: MessageisticStats | null
+  }
+}
+
+// GET /system/integrations — configured/active booleans so pages can show
+// "Not configured — connect in Settings" instead of zeroed charts.
+export interface IntegrationsStatus {
+  ga4Configured: boolean
+  gscConfigured: boolean
+  gbpConfigured: boolean
+  wooActive: boolean
+  bookingEngineActive: boolean
+  memberisticActive: boolean
+  messageisticActive: boolean
+  formisticActive: boolean
+  aiConnectionConfigured: boolean
+}

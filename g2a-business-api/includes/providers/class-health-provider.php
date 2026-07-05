@@ -90,6 +90,40 @@ class Health_Provider {
 		return $checks;
 	}
 
+	/**
+	 * Boolean configured/active flags for every integration the dashboard
+	 * renders. Lets the frontend show "Not configured — connect in Settings"
+	 * instead of zeroed charts when a provider is simply unconfigured.
+	 *
+	 * @return array<string, bool>
+	 */
+	public function integrations(): array {
+		global $wpdb;
+
+		$models = get_option( 'g2aba_models', array() );
+
+		return array(
+			'ga4Configured'          => ( new \WordPressistic\G2ABA\Integrations\GA4_Client() )->is_configured(),
+			'gscConfigured'          => ( new \WordPressistic\G2ABA\Integrations\GSC_Client() )->is_configured(),
+			'gbpConfigured'          => ( new \WordPressistic\G2ABA\Integrations\GBP_Client() )->is_configured(),
+			'wooActive'              => function_exists( 'wc_get_orders' ),
+			'bookingEngineActive'    => class_exists( '\G2AB_Analytics' )
+				|| $this->table_exists( $wpdb->prefix . 'g2ab_bookings' ),
+			'memberisticActive'      => class_exists( '\WordPressistic\Memberistic\Database\Schema' )
+				|| $this->table_exists( $wpdb->prefix . 'memberistic_memberships' ),
+			'messageisticActive'     => class_exists( '\Messageistic\REST\Dashboard_API' ),
+			'formisticActive'        => class_exists( 'Wpistic_Formistic_Database' )
+				|| $this->table_exists( $wpdb->prefix . 'wpistic_formistic_submissions' ),
+			'aiConnectionConfigured' => is_array( $models ) && count( $models ) > 0,
+		);
+	}
+
+	private function table_exists( string $table ): bool {
+		global $wpdb;
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.SchemaChange, WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+		return (bool) $wpdb->get_var( $wpdb->prepare( 'SHOW TABLES LIKE %s', $table ) );
+	}
+
 	private function is_plugin_installed( array $active_plugins, string $slug ): bool {
 		foreach ( $active_plugins as $active ) {
 			if ( 0 === strpos( (string) $active, $slug . '/' ) ) {
