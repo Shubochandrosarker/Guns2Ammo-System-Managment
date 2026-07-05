@@ -249,25 +249,35 @@ export const automations: Automation[] = [
 ]
 
 export const agents: Agent[] = [
-  { id: 'ag-seo',       name: 'SEO Growth Agent',        department: 'seo',        status: 'active',        model: 'Claude Opus 4.7',   assignedTasks: 6, lastRun: '2026-07-02T05:20:00Z', lastOutput: 'CCW class page has ranking opportunity for "mesa ccw class" — drafted internal link plan.', confidence: 0.86, reviewRequired: false },
-  { id: 'ag-analyst',   name: 'Business Analyst Agent',  department: 'analyst',    status: 'active',        model: 'Claude Opus 4.7',   assignedTasks: 4, lastRun: '2026-07-02T04:12:00Z', lastOutput: 'Detected renewal gap (59% vs 72% industry) — proposed enabling automation A3.', confidence: 0.92, reviewRequired: false },
-  { id: 'ag-booking',   name: 'Booking Agent',           department: 'booking',    status: 'active',        model: 'GPT-5.5 Turbo',      assignedTasks: 3, lastRun: '2026-07-02T02:44:00Z', lastOutput: 'Ladies Tuesday climbing +22%; suggested capacity boost on 2026-07-14.', confidence: 0.78, reviewRequired: true  },
-  { id: 'ag-member',    name: 'Membership Agent',        department: 'membership', status: 'active',        model: 'Claude Opus 4.7',   assignedTasks: 5, lastRun: '2026-07-02T04:01:00Z', lastOutput: 'Drafted retention emails for 34 churn-risk members.', confidence: 0.81, reviewRequired: true  },
-  { id: 'ag-support',   name: 'Customer Support Agent',  department: 'support',    status: 'active',        model: 'Gemini Pro 2',      assignedTasks: 2, lastRun: '2026-07-02T07:11:00Z', lastOutput: 'Classified 26 support emails, escalated 3 urgent.', confidence: 0.74, reviewRequired: false },
+  { id: 'ag-seo',       name: 'SEO Growth Agent',        department: 'seo',        status: 'active',        model: 'Claude Opus 4.8',   assignedTasks: 6, lastRun: '2026-07-02T05:20:00Z', lastOutput: 'CCW class page has ranking opportunity for "mesa ccw class" — drafted internal link plan.', confidence: 0.86, reviewRequired: false },
+  { id: 'ag-analyst',   name: 'Business Analyst Agent',  department: 'analyst',    status: 'active',        model: 'Claude Opus 4.8',   assignedTasks: 4, lastRun: '2026-07-02T04:12:00Z', lastOutput: 'Detected renewal gap (59% vs 72% industry) — proposed enabling automation A3.', confidence: 0.92, reviewRequired: false },
+  { id: 'ag-booking',   name: 'Booking Agent',           department: 'booking',    status: 'active',        model: 'GPT-4o mini',      assignedTasks: 3, lastRun: '2026-07-02T02:44:00Z', lastOutput: 'Ladies Tuesday climbing +22%; suggested capacity boost on 2026-07-14.', confidence: 0.78, reviewRequired: true  },
+  { id: 'ag-member',    name: 'Membership Agent',        department: 'membership', status: 'active',        model: 'Claude Opus 4.8',   assignedTasks: 5, lastRun: '2026-07-02T04:01:00Z', lastOutput: 'Drafted retention emails for 34 churn-risk members.', confidence: 0.81, reviewRequired: true  },
+  { id: 'ag-support',   name: 'Customer Support Agent',  department: 'support',    status: 'active',        model: 'Gemini 2.5 Flash',      assignedTasks: 2, lastRun: '2026-07-02T07:11:00Z', lastOutput: 'Classified 26 support emails, escalated 3 urgent.', confidence: 0.74, reviewRequired: false },
   { id: 'ag-email',     name: 'Email Manager Agent',     department: 'email',      status: 'active',        model: 'Qwen 2.5 (OpenRouter)', assignedTasks: 7, lastRun: '2026-07-02T06:44:00Z', lastOutput: 'Drafted 8 replies pending approval.', confidence: 0.69, reviewRequired: true },
   { id: 'ag-sales',     name: 'Sales Follow-up Agent',   department: 'sales',      status: 'paused',        model: 'Claude Sonnet 5',    assignedTasks: 0, lastRun: '2026-06-28T14:00:00Z', lastOutput: 'Paused pending owner review of tone.', confidence: 0.61, reviewRequired: true },
   { id: 'ag-inv',       name: 'Inventory Insight Agent', department: 'inventory',  status: 'active',        model: 'Local Ollama Llama 3.1', assignedTasks: 1, lastRun: '2026-07-02T01:00:00Z', lastOutput: 'Flagged 3 slow-moving SKUs and drafted clearance bundle.', confidence: 0.72, reviewRequired: false },
-  { id: 'ag-reports',   name: 'Report Agent',            department: 'reports',    status: 'active',        model: 'Claude Opus 4.7',   assignedTasks: 1, lastRun: '2026-06-30T14:00:00Z', lastOutput: 'Weekly report generated — sent to owner.', confidence: 0.94, reviewRequired: false },
-  { id: 'ag-auto',      name: 'Automation Manager Agent',department: 'automation', status: 'needs_review',  model: 'GPT-5.5 Turbo',      assignedTasks: 2, lastRun: '2026-07-02T00:20:00Z', lastOutput: 'Recommends enabling A3 (renewal reminders). Requires approval.', confidence: 0.88, reviewRequired: true  },
-  { id: 'ag-compliance',name: 'Compliance Workflow Agent',department: 'compliance',status: 'active',        model: 'Claude Opus 4.7',   assignedTasks: 3, lastRun: '2026-07-02T03:12:00Z', lastOutput: 'Verified FFL transfer queue; no anomalies.', confidence: 0.97, reviewRequired: false },
+  { id: 'ag-reports',   name: 'Report Agent',            department: 'reports',    status: 'active',        model: 'Claude Opus 4.8',   assignedTasks: 1, lastRun: '2026-06-30T14:00:00Z', lastOutput: 'Weekly report generated — sent to owner.', confidence: 0.94, reviewRequired: false },
+  { id: 'ag-auto',      name: 'Automation Manager Agent',department: 'automation', status: 'needs_review',  model: 'GPT-4o mini',      assignedTasks: 2, lastRun: '2026-07-02T00:20:00Z', lastOutput: 'Recommends enabling A3 (renewal reminders). Requires approval.', confidence: 0.88, reviewRequired: true  },
+  { id: 'ag-compliance',name: 'Compliance Workflow Agent',department: 'compliance',status: 'active',        model: 'Claude Opus 4.8',   assignedTasks: 3, lastRun: '2026-07-02T03:12:00Z', lastOutput: 'Verified FFL transfer queue; no anomalies.', confidence: 0.97, reviewRequired: false },
 ]
 
 export const models: ModelConnection[] = [
-  { id: 'm1', provider: 'anthropic',  displayName: 'Claude Opus 4.7',       apiBaseUrl: 'https://api.anthropic.com',  modelName: 'claude-opus-4-7',        contextLimit: 200_000, costLevel: 'high',   useCase: 'Deep business analysis, SEO, agents', status: 'ok',       fallbackId: 'm3', keyMasked: 'sk-ant-****abcd' },
-  { id: 'm2', provider: 'openai',     displayName: 'GPT-5.5 Turbo',         apiBaseUrl: 'https://api.openai.com/v1',  modelName: 'gpt-5.5-turbo',          contextLimit: 128_000, costLevel: 'medium', useCase: 'Booking + email drafting',            status: 'ok',       fallbackId: 'm4', keyMasked: 'sk-****9f12' },
-  { id: 'm3', provider: 'gemini',     displayName: 'Gemini Pro 2',          apiBaseUrl: 'https://generativelanguage.googleapis.com', modelName: 'gemini-pro-2', contextLimit: 128_000, costLevel: 'medium', useCase: 'Customer support classification',    status: 'ok',       fallbackId: 'm4', keyMasked: 'AIza****kL7q' },
-  { id: 'm4', provider: 'openrouter', displayName: 'Qwen 2.5 (OpenRouter)', apiBaseUrl: 'https://openrouter.ai/api/v1', modelName: 'qwen/qwen2.5-72b',     contextLimit:  32_000, costLevel: 'low',    useCase: 'Cheap email drafts + summaries',      status: 'ok',       fallbackId: null, keyMasked: 'sk-or-****771a' },
+  { id: 'm1', provider: 'anthropic',  displayName: 'Claude Opus 4.8',       apiBaseUrl: 'https://api.anthropic.com',  modelName: 'claude-opus-4-8',        contextLimit: 200_000, costLevel: 'high',   useCase: 'Deep business analysis, SEO, agents', status: 'ok',       fallbackId: 'm3', keyMasked: 'sk-ant-****abcd' },
+  { id: 'm2', provider: 'openai',     displayName: 'GPT-4o mini',           apiBaseUrl: 'https://api.openai.com/v1',  modelName: 'gpt-4o-mini',          contextLimit: 128_000, costLevel: 'medium', useCase: 'Booking + email drafting',            status: 'ok',       fallbackId: 'm4', keyMasked: 'sk-****9f12' },
+  { id: 'm3', provider: 'gemini',     displayName: 'Gemini 2.5 Flash',      apiBaseUrl: 'https://generativelanguage.googleapis.com', modelName: 'gemini-2.5-flash', contextLimit: 128_000, costLevel: 'medium', useCase: 'Customer support classification',    status: 'ok',       fallbackId: 'm4', keyMasked: 'AIza****kL7q' },
+  { id: 'm4', provider: 'openrouter', displayName: 'Qwen 2.5 (OpenRouter)', apiBaseUrl: 'https://openrouter.ai/api/v1', modelName: 'qwen/qwen-2.5-72b-instruct',     contextLimit:  32_000, costLevel: 'low',    useCase: 'Cheap email drafts + summaries',      status: 'ok',       fallbackId: null, keyMasked: 'sk-or-****771a' },
   { id: 'm5', provider: 'ollama',     displayName: 'Local Llama 3.1',       apiBaseUrl: 'http://ollama.local:11434',  modelName: 'llama3.1:70b',           contextLimit:  32_000, costLevel: 'free',   useCase: 'Private inventory analysis',          status: 'untested', fallbackId: 'm4', keyMasked: '(local)' },
+]
+
+// Mock provider model catalog — mirrors GET /model-connections/{id}/catalog.
+export const modelCatalog = [
+  { id: 'claude-opus-4-8',            name: 'Claude Opus 4.8' },
+  { id: 'claude-sonnet-4-6',          name: 'Claude Sonnet 4.6' },
+  { id: 'claude-haiku-4-5',           name: 'Claude Haiku 4.5' },
+  { id: 'gpt-4o-mini',                name: 'gpt-4o-mini' },
+  { id: 'gemini-2.5-flash',           name: 'Gemini 2.5 Flash' },
+  { id: 'qwen/qwen-2.5-72b-instruct', name: 'Qwen 2.5 72B Instruct' },
 ]
 
 export const health: SystemHealthCheck[] = [

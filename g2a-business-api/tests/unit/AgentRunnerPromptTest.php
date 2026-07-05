@@ -23,6 +23,21 @@ class AgentRunnerPromptTest extends TestCase {
 		$this->assertSame( 'just literal text', $out );
 	}
 
+	public function test_purpose_for_department_maps_known_departments() {
+		$this->assertSame( 'seo_analysis',      Agent_Runner::purpose_for_department( 'seo' ) );
+		$this->assertSame( 'business_analysis', Agent_Runner::purpose_for_department( 'analyst' ) );
+		$this->assertSame( 'booking_suggest',   Agent_Runner::purpose_for_department( 'booking' ) );
+		$this->assertSame( 'support_classify',  Agent_Runner::purpose_for_department( 'support' ) );
+		$this->assertSame( 'email_drafts',      Agent_Runner::purpose_for_department( 'email' ) );
+		$this->assertSame( 'daily_summaries',   Agent_Runner::purpose_for_department( 'reports' ) );
+		$this->assertSame( 'private_inventory', Agent_Runner::purpose_for_department( 'inventory' ) );
+	}
+
+	public function test_purpose_for_department_defaults_to_business_analysis() {
+		$this->assertSame( 'business_analysis', Agent_Runner::purpose_for_department( 'compliance' ) );
+		$this->assertSame( 'business_analysis', Agent_Runner::purpose_for_department( '' ) );
+	}
+
 	public function test_missing_agent_is_a_noop() {
 		Agent_Store::seed_defaults();
 		Agent_Runner::run( 'ag-does-not-exist' ); // Must not throw.

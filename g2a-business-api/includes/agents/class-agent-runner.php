@@ -71,6 +71,26 @@ class Agent_Runner {
 	}
 
 	/**
+	 * Map an agent department onto a model-routing purpose. Departments
+	 * without a dedicated purpose fall into `business_analysis` — the
+	 * catch-all analytical route.
+	 *
+	 * @internal Exposed for tests.
+	 */
+	public static function purpose_for_department( string $department ): string {
+		$map = array(
+			'seo'       => 'seo_analysis',
+			'analyst'   => 'business_analysis',
+			'booking'   => 'booking_suggest',
+			'support'   => 'support_classify',
+			'email'     => 'email_drafts',
+			'reports'   => 'daily_summaries',
+			'inventory' => 'private_inventory',
+		);
+		return $map[ $department ] ?? 'business_analysis';
+	}
+
+	/**
 	 * @internal Exposed for tests.
 	 */
 	public static function render_prompt( string $template, array $snapshot ): string {

@@ -350,6 +350,10 @@ export const api = {
         body: JSON.stringify({ apiKey }),
       })
     },
+    async catalog(id: string): Promise<ModelCatalogResult> {
+      if (env.useMocks) return { ok: true, provider: 'mock', models: mock.modelCatalog }
+      return http<ModelCatalogResult>(`/model-connections/${id}/catalog`)
+    },
   },
 
   reports: {
@@ -575,6 +579,18 @@ export interface ModelTestResult {
   probe?: string
   latencyMs?: number
   httpCode?: number
+  error?: string
+}
+
+export interface ModelCatalogEntry {
+  id: string
+  name: string
+}
+
+export interface ModelCatalogResult {
+  ok: boolean
+  provider: string
+  models: ModelCatalogEntry[]
   error?: string
 }
 

@@ -3,7 +3,7 @@ import { PageHeader } from '@/components/ui/PageHeader'
 import { Card } from '@/components/ui/Card'
 import { Spinner } from '@/components/ui/Spinner'
 import { useAsync } from '@/lib/hooks'
-import { api, type ModelPatch, type ModelTestResult } from '@/lib/api'
+import { api, type ModelCatalogEntry, type ModelPatch, type ModelTestResult } from '@/lib/api'
 import type { ModelConnection } from '@/types/analytics'
 import { cn } from '@/lib/cn'
 
@@ -162,16 +162,12 @@ export function AIModelsRAGs() {
         <RoutingCard models={rows} />
 
         <Card title="RAG stores" subtitle="Vector indexes powering agents">
-          <ul className="space-y-2 text-sm">
-            <RagRow label="Product catalog RAG"       value="pgvector · 1,204 docs" />
-            <RagRow label="Membership plans RAG"      value="pgvector · 36 docs"    />
-            <RagRow label="Training curriculum RAG"   value="pgvector · 84 docs"    />
-            <RagRow label="FAQ + policies RAG"        value="pgvector · 172 docs"   />
-            <RagRow label="Historical support RAG"    value="pgvector · 3,410 docs" />
-          </ul>
-          <div className="mt-4 text-xs text-ink-500">
-            RAG chunks are indexed by the g2a-business-api plugin. Rebuild is
-            triggered from Settings → Danger zone.
+          <div className="text-sm text-ink-600">
+            No RAG stores are configured yet.
+          </div>
+          <div className="mt-2 text-xs text-ink-500">
+            RAG stores will appear here once a knowledge backend is connected
+            to the g2a-business-api plugin.
           </div>
         </Card>
       </div>
@@ -190,15 +186,6 @@ export function AIModelsRAGs() {
         />
       )}
     </div>
-  )
-}
-
-function RagRow({ label, value }: { label: string; value: string }) {
-  return (
-    <li className="flex items-center justify-between">
-      <span className="text-ink-700">{label}</span>
-      <span className="font-medium text-ink-800">{value}</span>
-    </li>
   )
 }
 
@@ -312,6 +299,25 @@ function ConnectionEditor({
   const [apiKey, setApiKey] = useState('')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [catalog, setCatalog] = useState<ModelCatalogEntry[] | null>(null)
+
+  // The provider's model list makes the modelName field a picker instead of
+  // guesswork. Only possible for saved connections (the catalog call needs
+  // the stored key) — and if the fetch fails, free text still works.
+  useEffect(() => {
+    if (!initial) return
+    let cancelled = false
+    api.models.catalog(initial.id)
+      .then(res => {
+        if (!cancelled && res.ok && res.models.length > 0) setCatalog(res.models)
+      })
+      .catch(() => {
+        /* degrade to free text */
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [initial])
 
   async function save() {
     setBusy(true)
@@ -361,8 +367,23 @@ function ConnectionEditor({
           <Field label="Display name">
             <input className="input" value={values.displayName ?? ''} onChange={e => setValues({ ...values, displayName: e.target.value })} />
           </Field>
-          <Field label="Model name">
-            <input className="input" value={values.modelName ?? ''} onChange={e => setValues({ ...values, modelName: e.target.value })} />
+          <Field
+            label="Model name"
+            hint={catalog ? 'Suggestions come from the provider — free text also works.' : undefined}
+          >
+            <input
+              className="input"
+              list={catalog ? 'g2a-model-catalog' : undefined}
+              value={values.modelName ?? ''}
+              onChange={e => setValues({ ...values, modelName: e.target.value })}
+            />
+            {catalog && (
+              <datalist id="g2a-model-catalog">
+                {catalog.map(m => (
+                  <option key={m.id} value={m.id}>{m.name}</option>
+                ))}
+              </datalist>
+            )}
           </Field>
           <Field label="API base URL" hint="Required for Ollama + custom providers.">
             <input className="input" value={values.apiBaseUrl ?? ''} onChange={e => setValues({ ...values, apiBaseUrl: e.target.value })} />
