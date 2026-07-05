@@ -22,9 +22,10 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 class Anthropic_Client {
 	private const ENDPOINT = 'https://api.anthropic.com/v1/messages';
-	// Pinned by design — the operator chooses a different model from Model
-	// Connections, but the fallback stays deterministic.
-	private const FALLBACK_MODEL = 'claude-opus-4-7';
+	// Last resort only — completions use the connection's configured
+	// `modelName` (see resolve_model()); this pin is what keeps a
+	// half-configured connection deterministic.
+	private const FALLBACK_MODEL = 'claude-opus-4-8';
 
 	private string $connection_id;
 
@@ -34,6 +35,23 @@ class Anthropic_Client {
 
 	public function is_configured(): bool {
 		return Secrets::has( 'model:' . $this->connection_id );
+	}
+
+	/**
+	 * The model id completions default to: the connection record's
+	 * `modelName` from the g2aba_models option (the same store the
+	 * Models_Controller writes), falling back to FALLBACK_MODEL when the
+	 * connection has no modelName configured.
+	 */
+	public function resolve_model(): string {
+		$raw = get_option( 'g2aba_models', array() );
+		if ( is_array( $raw ) && isset( $raw[ $this->connection_id ] ) && is_array( $raw[ $this->connection_id ] ) ) {
+			$name = trim( (string) ( $raw[ $this->connection_id ]['modelName'] ?? '' ) );
+			if ( '' !== $name ) {
+				return $name;
+			}
+		}
+		return self::FALLBACK_MODEL;
 	}
 
 	/**
@@ -48,7 +66,7 @@ class Anthropic_Client {
 		}
 
 		$body = array(
-			'model'      => '' === $model ? self::FALLBACK_MODEL : $model,
+			'model'      => '' === $model ? $this->resolve_model() : $model,
 			'max_tokens' => $max_tokens,
 			'messages'   => array(
 				array(

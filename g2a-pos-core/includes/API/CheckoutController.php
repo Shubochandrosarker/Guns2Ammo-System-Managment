@@ -31,13 +31,17 @@ final class CheckoutController {
 		foreach ( $normalized_items as $line ) {
 			$subtotal += (float) $line['line_total'];
 		}
-		$totals  = array(
-			'subtotal'       => round( $subtotal, 2 ),
-			'tax_total'      => 0.0,
-			'discount_total' => 0.0,
-			'grand_total'    => round( $subtotal, 2 ),
+		$subtotal = round( $subtotal, 2 );
+		// Clerks may pass a discount; tax is always computed server-side.
+		$discount = min( $subtotal, max( 0.0, (float) ( $input['discount_total'] ?? 0 ) ) );
+		$tax      = \G2A\POS\Domain\TaxService::tax_for_lines( $normalized_items, $discount );
+		$totals   = array(
+			'subtotal'       => $subtotal,
+			'tax_total'      => $tax,
+			'discount_total' => $discount,
+			'grand_total'    => round( $subtotal + $tax - $discount, 2 ),
 		);
-		$payload = array(
+		$payload  = array(
 			'register_code'    => $input['register_code'] ?? $cart['register_code'] ?? '',
 			'location_id'      => $input['location_id'] ?? $cart['location_id'] ?? 1,
 			'customer_id'      => $input['customer_id'] ?? $cart['customer_id'] ?? null,

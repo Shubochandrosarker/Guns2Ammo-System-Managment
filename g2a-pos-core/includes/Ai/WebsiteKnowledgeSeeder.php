@@ -31,7 +31,7 @@ defined( 'ABSPATH' ) || exit;
 final class WebsiteKnowledgeSeeder {
 
 	public const CRON_HOOK    = 'g2a_pos_brain_site_refresh';
-	public const SEED_VERSION = '2026-06-29.1';
+	public const SEED_VERSION = '2026-07-04.1';
 
 	private const OPTION_SEEDED = 'g2a_pos_brain_seeded_version';
 	private const TAG_DEFAULT   = 'g2a-website-default';
@@ -47,11 +47,55 @@ final class WebsiteKnowledgeSeeder {
 			return;
 		}
 		try {
+			self::seed_curated_pack();
 			self::seed_default_pack();
 			update_option( self::OPTION_SEEDED, self::SEED_VERSION, false );
 		} catch ( \Throwable $e ) {
 			Logger::exception( 'Website knowledge seeding failed', $e );
 		}
+	}
+
+	/**
+	 * Ingest the verified Guns 2 Ammo default knowledge pack
+	 * (DefaultKnowledgePack — identity/NAP/hours, memberships, training,
+	 * instructors, facility). Stable labels + the content-hash upsert make
+	 * re-seeding idempotent: unchanged docs are skipped, superseded versions
+	 * are purged. Runs on the nightly refresh and via
+	 * POST /ai/brain/seed-defaults.
+	 *
+	 * @return array{ok:bool,documents:int,chunks:int,skipped:int}
+	 */
+	public static function seed_default_pack(): array {
+		$result  = array(
+			'ok'        => true,
+			'documents' => 0,
+			'chunks'    => 0,
+			'skipped'   => 0,
+		);
+		$touched = array();
+		foreach ( DefaultKnowledgePack::documents() as $doc ) {
+			$r = BrainService::ingest_text(
+				(string) $doc['label'],
+				(string) $doc['body'],
+				array(
+					'source_type' => DefaultKnowledgePack::SOURCE_TYPE,
+					'tags'        => (string) $doc['tags'],
+					'scope'       => (string) $doc['scope'],
+				)
+			);
+			if ( ! empty( $r['ok'] ) ) {
+				++$result['documents'];
+				$result['chunks'] += (int) ( $r['chunks'] ?? 0 );
+				if ( ! empty( $r['skipped'] ) ) {
+					++$result['skipped'];
+				}
+				$touched[] = (int) $r['document_id'];
+			}
+		}
+		// Drop superseded pack versions (same tag, content hash no longer in
+		// the pack) without touching the just-ingested documents.
+		self::purge_tag( DefaultKnowledgePack::TAG, $touched );
+		return $result;
 	}
 
 	public static function cron_refresh(): void {
@@ -73,17 +117,27 @@ final class WebsiteKnowledgeSeeder {
 		$result = array(
 			'ok'               => true,
 			'default_sections' => 0,
+			'default_pack'     => 0,
 			'live_sections'    => 0,
 			'crawled_pages'    => 0,
+			'products'         => 0,
 			'chunks'           => 0,
 			'live_source'      => null,
 		);
 
-		$result['default_sections'] = self::seed_default_pack( $result['chunks'] );
+		$result['default_sections'] = self::seed_curated_pack( $result['chunks'] );
 
-		// Refresh all live-tagged docs in one pass: purge once, then re-ingest
-		// the DB snapshot and the website copy so neither deletes the other.
-		self::purge_tag( self::TAG_LIVE );
+		// Verified business facts pack (idempotent, hash-gated).
+		$pack                   = self::seed_default_pack();
+		$result['default_pack'] = (int) $pack['documents'];
+		$result['chunks']      += (int) $pack['chunks'];
+
+		// Refresh all live-tagged docs in one pass. Everything is hash-gated:
+		// unchanged content resolves to the same document (skipped, no
+		// re-embed), changed content lands in new rows, and only documents
+		// that were NOT touched this run get purged at the end — so a nightly
+		// refresh re-embeds edits, not the whole corpus.
+		$touched = array();
 
 		// Authoritative live snapshot straight from the database: the real
 		// Memberistic plan names/prices and the current WooCommerce catalog
@@ -102,12 +156,27 @@ final class WebsiteKnowledgeSeeder {
 			if ( ! empty( $r['ok'] ) ) {
 				++$result['live_sections'];
 				$result['chunks'] += (int) ( $r['chunks'] ?? 0 );
+				$touched[]         = (int) $r['document_id'];
 			}
 		}
 
-		// Live site content — the theme serves /llms-full.txt with current copy.
+		// Live site content. Same WP install as the theme, so prefer calling
+		// the llms.txt generator directly (no HTTP round-trip, works even
+		// when loopback requests are blocked); fall back to fetching
+		// /llms-full.txt for split-theme installs.
 		$url  = function_exists( 'home_url' ) ? home_url( '/llms-full.txt' ) : '';
-		$body = $url ? self::fetch( $url ) : null;
+		$body = null;
+		if ( function_exists( 'g2a_llms_full' ) ) {
+			try {
+				$body = (string) g2a_llms_full();
+			} catch ( \Throwable $e ) {
+				Logger::exception( 'g2a_llms_full() failed', $e );
+				$body = null;
+			}
+		}
+		if ( ( $body === null || $body === '' ) && $url ) {
+			$body = self::fetch( $url );
+		}
 		if ( $body !== null && $body !== '' ) {
 			$sections = self::split_sections( $body );
 			foreach ( $sections as $i => $section ) {
@@ -124,15 +193,23 @@ final class WebsiteKnowledgeSeeder {
 				if ( ! empty( $r['ok'] ) ) {
 					++$result['live_sections'];
 					$result['chunks'] += (int) ( $r['chunks'] ?? 0 );
+					$touched[]         = (int) $r['document_id'];
 				}
 			}
-			$result['live_source'] = $url;
+			$result['live_source'] = function_exists( 'g2a_llms_full' ) ? 'g2a_llms_full()' : $url;
 		}
 
 		// Full-site crawl: index every published page/post/product so the brain
 		// reflects the actual website, not only the curated pack and the theme's
-		// /llms-full.txt. Tagged live, so it refreshes (replaces) on each run.
-		self::crawl_published_content( $result );
+		// /llms-full.txt. Tagged live, so stale copies purge at the end of the run.
+		self::crawl_published_content( $result, $touched );
+
+		// WooCommerce catalog: title, price, category and short description per
+		// product, batched into documents. Hash-dedup keeps nightly re-runs cheap.
+		self::ingest_products( $result, $touched );
+
+		// Purge only stale live docs (deleted pages, changed content's old rows).
+		self::purge_tag( self::TAG_LIVE, $touched );
 
 		update_option( self::OPTION_SEEDED, self::SEED_VERSION, false );
 		update_option(
@@ -146,10 +223,10 @@ final class WebsiteKnowledgeSeeder {
 		return $result;
 	}
 
-	/** Ingest the curated pack (replacing any previous copy). Returns section count. */
-	private static function seed_default_pack( int &$chunks = 0 ): int {
-		self::purge_tag( self::TAG_DEFAULT );
-		$count = 0;
+	/** Ingest the curated pack (hash-gated; stale versions purged). Returns section count. */
+	private static function seed_curated_pack( int &$chunks = 0 ): int {
+		$count   = 0;
+		$touched = array();
 		foreach ( self::default_pack() as $label => $body ) {
 			$r = BrainService::ingest_text(
 				$label,
@@ -162,9 +239,11 @@ final class WebsiteKnowledgeSeeder {
 			);
 			if ( ! empty( $r['ok'] ) ) {
 				++$count;
-				$chunks += (int) ( $r['chunks'] ?? 0 );
+				$chunks   += (int) ( $r['chunks'] ?? 0 );
+				$touched[] = (int) $r['document_id'];
 			}
 		}
+		self::purge_tag( self::TAG_DEFAULT, $touched );
 		return $count;
 	}
 
@@ -304,9 +383,10 @@ final class WebsiteKnowledgeSeeder {
 	 * (purged at the start of refresh) so each run replaces the prior crawl.
 	 * Capped so a single cron run stays bounded.
 	 *
-	 * @param array<string,mixed> $result Mutated in place with counts.
+	 * @param array<string,mixed> $result  Mutated in place with counts.
+	 * @param array<int,int>      $touched Mutated in place with ingested document ids.
 	 */
-	private static function crawl_published_content( array &$result ): void {
+	private static function crawl_published_content( array &$result, array &$touched ): void {
 		if ( ! class_exists( '\WP_Query' ) || ! function_exists( 'get_permalink' ) ) {
 			return;
 		}
@@ -358,11 +438,94 @@ final class WebsiteKnowledgeSeeder {
 			if ( ! empty( $r['ok'] ) ) {
 				++$result['crawled_pages'];
 				$result['chunks'] += (int) ( $r['chunks'] ?? 0 );
+				$touched[]         = (int) $r['document_id'];
 			}
 		}
 
 		if ( function_exists( 'wp_reset_postdata' ) ) {
 			wp_reset_postdata();
+		}
+	}
+
+	/**
+	 * Ingest the WooCommerce catalog as compact fact sheets: title, price,
+	 * categories and short description per product, 25 products per document,
+	 * capped at 500 products. Content hashing means an unchanged batch is a
+	 * no-op on the nightly run.
+	 *
+	 * @param array<string,mixed> $result  Mutated in place with counts.
+	 * @param array<int,int>      $touched Mutated in place with ingested document ids.
+	 */
+	private static function ingest_products( array &$result, array &$touched ): void {
+		if ( ! class_exists( 'WooCommerce' ) || ! class_exists( '\WP_Query' )
+			|| ! function_exists( 'post_type_exists' ) || ! post_type_exists( 'product' ) ) {
+			return;
+		}
+		$per_doc = 25;
+		$cap     = 500;
+		$page    = 1;
+		$seen    = 0;
+		$batch_n = 0;
+		while ( $seen < $cap ) {
+			$query = new \WP_Query(
+				array(
+					'post_type'              => 'product',
+					'post_status'            => 'publish',
+					'posts_per_page'         => $per_doc,
+					'paged'                  => $page,
+					'orderby'                => 'ID',
+					'order'                  => 'ASC',
+					'no_found_rows'          => true,
+					'ignore_sticky_posts'    => true,
+					'suppress_filters'       => true,
+					'update_post_term_cache' => false,
+				)
+			);
+			$products = $query->posts;
+			if ( ! $products ) {
+				break;
+			}
+			$lines = array();
+			foreach ( $products as $post ) {
+				$name  = trim( (string) get_the_title( $post ) );
+				$price = trim( (string) get_post_meta( (int) $post->ID, '_price', true ) );
+				$cats  = function_exists( 'wp_get_post_terms' )
+					? wp_get_post_terms( (int) $post->ID, 'product_cat', array( 'fields' => 'names' ) )
+					: array();
+				$cats  = is_array( $cats ) ? implode( ', ', $cats ) : '';
+				$short = trim( wp_strip_all_tags( (string) ( $post->post_excerpt ?? '' ) ) );
+				$line  = '- ' . $name;
+				if ( $price !== '' ) {
+					$line .= " — \${$price}";
+				}
+				if ( $cats !== '' ) {
+					$line .= " (category: {$cats})";
+				}
+				if ( $short !== '' ) {
+					$line .= '. ' . $short;
+				}
+				$lines[] = $line;
+				++$seen;
+			}
+			++$batch_n;
+			$r = BrainService::ingest_text(
+				"Store catalog — products (batch {$batch_n})",
+				"Products currently sold in the Guns 2 Ammo online store (name — price, category, description):\n" . implode( "\n", $lines ),
+				array(
+					'source_type' => 'woocommerce',
+					'tags'        => self::TAG_LIVE . ',products',
+					'scope'       => 'public',
+				)
+			);
+			if ( ! empty( $r['ok'] ) ) {
+				$result['products'] += count( $lines );
+				$result['chunks']   += (int) ( $r['chunks'] ?? 0 );
+				$touched[]           = (int) $r['document_id'];
+			}
+			if ( count( $products ) < $per_doc ) {
+				break;
+			}
+			++$page;
 		}
 	}
 
@@ -485,10 +648,22 @@ final class WebsiteKnowledgeSeeder {
 		);
 	}
 
-	private static function purge_tag( string $tag ): void {
+	/**
+	 * Delete tagged documents, keeping those touched by the current run so
+	 * hash-gated re-ingestion (same doc id for unchanged content) survives.
+	 * Routed through BrainService::delete_document so the Cloudflare Worker
+	 * vectors are removed too when that backend is active.
+	 *
+	 * @param array<int,int> $keep_ids Document ids to preserve.
+	 */
+	private static function purge_tag( string $tag, array $keep_ids = array() ): void {
 		$repo = new AiBrainRepository();
+		$keep = array_map( 'intval', $keep_ids );
 		foreach ( $repo->document_ids_by_tag( $tag ) as $id ) {
-			$repo->delete_document( $id );
+			if ( in_array( (int) $id, $keep, true ) ) {
+				continue;
+			}
+			BrainService::delete_document( (int) $id );
 		}
 	}
 }

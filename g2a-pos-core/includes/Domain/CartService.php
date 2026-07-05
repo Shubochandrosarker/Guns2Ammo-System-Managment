@@ -110,11 +110,13 @@ final class CartService {
 		foreach ( $cart['items'] as $item ) {
 			$subtotal += (float) ( $item['line_total'] ?? 0 );
 		}
+		$subtotal  = round( $subtotal, 2 );
+		$tax_total = TaxService::tax_for_lines( $cart['items'] );
 		return array(
-			'subtotal'       => round( $subtotal, 2 ),
-			'tax_total'      => 0.0,
+			'subtotal'       => $subtotal,
+			'tax_total'      => $tax_total,
 			'discount_total' => 0.0,
-			'grand_total'    => round( $subtotal, 2 ),
+			'grand_total'    => round( $subtotal + $tax_total, 2 ),
 		);
 	}
 

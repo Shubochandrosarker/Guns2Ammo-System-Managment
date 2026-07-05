@@ -1137,11 +1137,29 @@ final class Routes {
 		);
 		register_rest_route(
 			'g2a-pos/v1',
+			'/wholesalers/(?P<wholesaler_id>\d+)/catalog/api-sync',
+			array(
+				'methods'             => 'POST',
+				'callback'            => array( WholesalerController::class, 'sync_catalog_api' ),
+				'permission_callback' => static fn() => current_user_can( 'g2a_pos_manage_wholesalers' ) || current_user_can( 'g2a_pos_manage_inventory' ),
+			)
+		);
+		register_rest_route(
+			'g2a-pos/v1',
 			'/wholesalers/(?P<wholesaler_id>\d+)/inventory/sync',
 			array(
 				'methods'             => 'POST',
 				'callback'            => array( WholesalerController::class, 'sync_inventory' ),
 				'permission_callback' => static fn() => current_user_can( 'g2a_pos_manage_wholesalers' ) || current_user_can( 'g2a_pos_manage_inventory' ),
+			)
+		);
+		register_rest_route(
+			'g2a-pos/v1',
+			'/wholesalers/(?P<wholesaler_id>\d+)/test-credentials',
+			array(
+				'methods'             => 'POST',
+				'callback'            => array( WholesalerController::class, 'test_credentials' ),
+				'permission_callback' => static fn() => current_user_can( 'g2a_pos_manage_wholesalers' ) || current_user_can( 'g2a_pos_manage_settings' ),
 			)
 		);
 		register_rest_route(
@@ -1742,7 +1760,7 @@ final class Routes {
 			array(
 				'methods'             => 'POST',
 				'callback'            => array( LoyaltyController::class, 'adjust' ),
-				'permission_callback' => static fn() => current_user_can( 'g2a_pos_access' ),
+				'permission_callback' => static fn() => current_user_can( 'g2a_pos_manage_finance' ),
 			)
 		);
 		register_rest_route(
@@ -1769,7 +1787,7 @@ final class Routes {
 			array(
 				'methods'             => 'POST',
 				'callback'            => array( LoyaltyController::class, 'gift_card_issue' ),
-				'permission_callback' => static fn() => current_user_can( 'g2a_pos_manage_register' ) || current_user_can( 'g2a_pos_access' ),
+				'permission_callback' => static fn() => current_user_can( 'g2a_pos_manage_finance' ),
 			)
 		);
 		register_rest_route(
@@ -2695,6 +2713,51 @@ final class Routes {
 				'methods'             => 'GET',
 				'callback'            => array( AiController::class, 'brain_search' ),
 				'permission_callback' => static fn() => current_user_can( 'g2a_pos_use_ai' ),
+			)
+		);
+		register_rest_route(
+			'g2a-pos/v1',
+			'/ai/gateway/test',
+			array(
+				'methods'             => 'POST',
+				'callback'            => array( AiController::class, 'gateway_test' ),
+				'permission_callback' => static fn() => current_user_can( 'g2a_pos_manage_ai' ) || current_user_can( 'g2a_pos_manage_settings' ),
+			)
+		);
+		register_rest_route(
+			'g2a-pos/v1',
+			'/ai/brain/seed-defaults',
+			array(
+				'methods'             => 'POST',
+				'callback'            => array( AiController::class, 'brain_seed_defaults' ),
+				'permission_callback' => static fn() => current_user_can( 'g2a_pos_manage_ai' ) || current_user_can( 'g2a_pos_manage_settings' ),
+			)
+		);
+		register_rest_route(
+			'g2a-pos/v1',
+			'/ai/brain/stats',
+			array(
+				'methods'             => 'GET',
+				'callback'            => array( AiController::class, 'brain_stats' ),
+				'permission_callback' => static fn() => current_user_can( 'g2a_pos_manage_ai' ) || current_user_can( 'g2a_pos_use_ai' ),
+			)
+		);
+		register_rest_route(
+			'g2a-pos/v1',
+			'/ai/brain/cloudflare/test',
+			array(
+				'methods'             => 'POST',
+				'callback'            => array( AiController::class, 'brain_cloudflare_test' ),
+				'permission_callback' => static fn() => current_user_can( 'g2a_pos_manage_ai' ) || current_user_can( 'g2a_pos_manage_settings' ),
+			)
+		);
+		register_rest_route(
+			'g2a-pos/v1',
+			'/ai/brain/migrate-cloudflare',
+			array(
+				'methods'             => 'POST',
+				'callback'            => array( AiController::class, 'brain_migrate_cloudflare' ),
+				'permission_callback' => static fn() => current_user_can( 'g2a_pos_manage_ai' ) || current_user_can( 'g2a_pos_manage_settings' ),
 			)
 		);
 		register_rest_route(

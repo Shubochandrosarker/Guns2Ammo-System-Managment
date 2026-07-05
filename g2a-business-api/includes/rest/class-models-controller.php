@@ -89,6 +89,16 @@ class Models_Controller extends REST_Controller {
 				'permission_callback' => array( $this, 'admin_permissions_check' ),
 			)
 		);
+
+		register_rest_route(
+			$this->namespace,
+			'/model-connections/(?P<id>[a-z0-9_-]+)/catalog',
+			array(
+				'methods'             => \WP_REST_Server::READABLE,
+				'callback'            => array( $this, 'catalog' ),
+				'permission_callback' => array( $this, 'admin_permissions_check' ),
+			)
+		);
 	}
 
 	public function list() { // phpcs:ignore Squiz.Commenting.FunctionComment.Missing
@@ -245,6 +255,72 @@ class Models_Controller extends REST_Controller {
 		return $this->ok( $this->execute_probe( $provider, $plan ) );
 	}
 
+	/**
+	 * GET /model-connections/{id}/catalog — the provider's model list, for
+	 * the dashboard's modelName picker. Providers without a list endpoint
+	 * (Ollama base URLs vary, custom is opaque) return ok:false and the UI
+	 * degrades to free text. Cached in a transient for 10 minutes.
+	 */
+	public function catalog( \WP_REST_Request $req ) {
+		$id  = (string) $req->get_param( 'id' );
+		$raw = self::read_raw();
+		if ( ! isset( $raw[ $id ] ) ) {
+			return $this->not_found();
+		}
+
+		$record   = is_array( $raw[ $id ] ) ? $raw[ $id ] : array();
+		$provider = strtolower( (string) ( $record['provider'] ?? 'custom' ) );
+
+		$cache_key = 'g2aba_model_catalog_' . $id;
+		$cached    = get_transient( $cache_key );
+		if ( is_array( $cached ) ) {
+			return $this->ok( $cached );
+		}
+
+		$plain = Secrets::get( 'model:' . $id );
+		$plan  = self::plan_catalog( $provider, (string) ( $plain ?? '' ) );
+		if ( isset( $plan['error'] ) ) {
+			return $this->ok(
+				array( 'ok' => false, 'provider' => $provider, 'models' => array(), 'error' => (string) $plan['error'] )
+			);
+		}
+
+		$res = wp_remote_get(
+			(string) $plan['url'],
+			array(
+				'timeout'     => 8,
+				'redirection' => 2,
+				'headers'     => (array) ( $plan['headers'] ?? array() ),
+			)
+		);
+		if ( is_wp_error( $res ) ) {
+			return $this->ok(
+				array( 'ok' => false, 'provider' => $provider, 'models' => array(), 'error' => $res->get_error_message() )
+			);
+		}
+
+		$code = (int) wp_remote_retrieve_response_code( $res );
+		$body = wp_remote_retrieve_body( $res );
+		if ( $code < 200 || $code >= 300 ) {
+			return $this->ok(
+				array(
+					'ok'       => false,
+					'provider' => $provider,
+					'models'   => array(),
+					'error'    => self::extract_error_summary( is_string( $body ) ? $body : '' ),
+				)
+			);
+		}
+
+		$out = array(
+			'ok'       => true,
+			'provider' => $provider,
+			'models'   => self::parse_catalog_body( $provider, is_string( $body ) ? $body : '' ),
+		);
+		set_transient( $cache_key, $out, 10 * MINUTE_IN_SECONDS );
+		return $this->ok( $out );
+	}
+
 	private function not_found(): \WP_Error {
 		return new \WP_Error(
 			'g2aba_model_not_found',
@@ -385,6 +461,7 @@ class Models_Controller extends REST_Controller {
 	 *   headers:array<string,string>,
 	 *   body?:string,
 	 *   probeName?:string,
+	 *   verifyModel?:string,
 	 *   error?:string,
 	 * }
 	 */
@@ -400,7 +477,7 @@ class Models_Controller extends REST_Controller {
 						'content-type'      => 'application/json',
 					),
 					'body'      => wp_json_encode( array(
-						'model'      => (string) ( $record['modelName'] ?? 'claude-3-haiku-20240307' ),
+						'model'      => (string) ( $record['modelName'] ?? 'claude-opus-4-8' ),
 						'max_tokens' => 1,
 						'messages'   => array( array( 'role' => 'user', 'content' => 'ping' ) ),
 					) ),
@@ -409,22 +486,24 @@ class Models_Controller extends REST_Controller {
 
 			case 'openai':
 				return array(
-					'method'    => 'GET',
-					'url'       => 'https://api.openai.com/v1/models',
-					'headers'   => array( 'authorization' => 'Bearer ' . $key ),
-					'probeName' => 'openai:list-models',
+					'method'      => 'GET',
+					'url'         => 'https://api.openai.com/v1/models',
+					'headers'     => array( 'authorization' => 'Bearer ' . $key ),
+					'probeName'   => 'openai:list-models',
+					'verifyModel' => trim( (string) ( $record['modelName'] ?? '' ) ),
 				);
 
 			case 'openrouter':
 				return array(
-					'method'    => 'GET',
-					'url'       => 'https://openrouter.ai/api/v1/models',
-					'headers'   => array( 'authorization' => 'Bearer ' . $key ),
-					'probeName' => 'openrouter:list-models',
+					'method'      => 'GET',
+					'url'         => 'https://openrouter.ai/api/v1/models',
+					'headers'     => array( 'authorization' => 'Bearer ' . $key ),
+					'probeName'   => 'openrouter:list-models',
+					'verifyModel' => trim( (string) ( $record['modelName'] ?? '' ) ),
 				);
 
 			case 'gemini':
-				$model = (string) ( $record['modelName'] ?? 'gemini-1.5-flash' );
+				$model = (string) ( $record['modelName'] ?? 'gemini-2.5-flash' );
 				return array(
 					'method'    => 'GET',
 					'url'       => sprintf(
@@ -503,6 +582,24 @@ class Models_Controller extends REST_Controller {
 
 		$code = (int) wp_remote_retrieve_response_code( $res );
 		if ( $code >= 200 && $code < 300 ) {
+			// List-style probes (OpenAI, OpenRouter) only prove the key works —
+			// also confirm the configured modelName actually exists on the
+			// provider, so a connection can't test green then 404 at runtime.
+			$verify_model = trim( (string) ( $plan['verifyModel'] ?? '' ) );
+			if ( '' !== $verify_model ) {
+				$list_body = wp_remote_retrieve_body( $res );
+				$mismatch  = self::verify_model_in_list( $verify_model, is_string( $list_body ) ? $list_body : '' );
+				if ( null !== $mismatch ) {
+					return array(
+						'ok'        => false,
+						'provider'  => $provider,
+						'probe'     => (string) ( $plan['probeName'] ?? '' ),
+						'latencyMs' => $ms,
+						'httpCode'  => $code,
+						'error'     => $mismatch,
+					);
+				}
+			}
 			return array(
 				'ok'        => true,
 				'provider'  => $provider,
@@ -520,6 +617,109 @@ class Models_Controller extends REST_Controller {
 			'httpCode'  => $code,
 			'error'     => self::extract_error_summary( is_string( $body_raw ) ? $body_raw : '' ),
 		);
+	}
+
+	/**
+	 * Public for tests. Given a provider list-models response body, confirm
+	 * $model appears among the returned `data[].id` slugs. Returns null when
+	 * the model is present (or the body is not a recognisable list — a
+	 * working key shouldn't fail the probe just because the payload shape
+	 * changed); otherwise a human-readable error naming a few valid ids.
+	 */
+	public static function verify_model_in_list( string $model, string $body ): ?string {
+		$decoded = json_decode( $body, true );
+		if ( ! is_array( $decoded ) || ! isset( $decoded['data'] ) || ! is_array( $decoded['data'] ) ) {
+			return null;
+		}
+		$ids = array();
+		foreach ( $decoded['data'] as $entry ) {
+			if ( is_array( $entry ) && isset( $entry['id'] ) && is_string( $entry['id'] ) ) {
+				$ids[] = $entry['id'];
+			}
+		}
+		if ( array() === $ids || in_array( $model, $ids, true ) ) {
+			return null;
+		}
+		return sprintf(
+			"model '%s' not found on provider — pick one of %s",
+			$model,
+			implode( ', ', array_slice( $ids, 0, 3 ) )
+		);
+	}
+
+	/**
+	 * Public for tests. Builds the list-models HTTP call per provider —
+	 * pure, no I/O. Providers without a hosted catalog return an error.
+	 *
+	 * @return array{method?:string, url?:string, headers?:array<string,string>, error?:string}
+	 */
+	public static function plan_catalog( string $provider, string $key ): array {
+		if ( self::provider_requires_key( $provider ) && '' === $key ) {
+			return array( 'error' => 'No API key stored for this model connection.' );
+		}
+
+		switch ( $provider ) {
+			case 'anthropic':
+				return array(
+					'method'  => 'GET',
+					'url'     => 'https://api.anthropic.com/v1/models',
+					'headers' => array(
+						'x-api-key'         => $key,
+						'anthropic-version' => '2023-06-01',
+					),
+				);
+
+			case 'openai':
+				return array(
+					'method'  => 'GET',
+					'url'     => 'https://api.openai.com/v1/models',
+					'headers' => array( 'authorization' => 'Bearer ' . $key ),
+				);
+
+			case 'openrouter':
+				return array(
+					'method'  => 'GET',
+					'url'     => 'https://openrouter.ai/api/v1/models',
+					'headers' => array( 'authorization' => 'Bearer ' . $key ),
+				);
+
+			default:
+				return array( 'error' => 'Model catalog is not available for this provider.' );
+		}
+	}
+
+	/**
+	 * Public for tests. Normalise a provider list-models body into
+	 * `[{id, name}]`, capped at 300 entries. OpenAI returns bare ids,
+	 * OpenRouter carries `name`, Anthropic carries `display_name`.
+	 *
+	 * @return array<int, array{id:string, name:string}>
+	 */
+	public static function parse_catalog_body( string $provider, string $body ): array {
+		$decoded = json_decode( $body, true );
+		if ( ! is_array( $decoded ) || ! isset( $decoded['data'] ) || ! is_array( $decoded['data'] ) ) {
+			return array();
+		}
+		$out = array();
+		foreach ( $decoded['data'] as $entry ) {
+			if ( ! is_array( $entry ) || ! isset( $entry['id'] ) || ! is_string( $entry['id'] ) || '' === $entry['id'] ) {
+				continue;
+			}
+			$name = '';
+			if ( isset( $entry['name'] ) && is_string( $entry['name'] ) ) {
+				$name = $entry['name'];
+			} elseif ( isset( $entry['display_name'] ) && is_string( $entry['display_name'] ) ) {
+				$name = $entry['display_name'];
+			}
+			$out[] = array(
+				'id'   => $entry['id'],
+				'name' => '' !== $name ? $name : $entry['id'],
+			);
+			if ( count( $out ) >= 300 ) {
+				break;
+			}
+		}
+		return $out;
 	}
 
 	public static function extract_error_summary( string $body ): string {

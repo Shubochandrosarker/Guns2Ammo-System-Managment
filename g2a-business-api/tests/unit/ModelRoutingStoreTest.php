@@ -8,8 +8,8 @@ class ModelRoutingStoreTest extends TestCase {
 	protected function setUp(): void {
 		$GLOBALS['g2aba_test_options'] = array(
 			'g2aba_models' => array(
-				'm1' => array( 'id' => 'm1' ),
-				'm2' => array( 'id' => 'm2' ),
+				'm1' => array( 'id' => 'm1', 'provider' => 'anthropic' ),
+				'm2' => array( 'id' => 'm2', 'provider' => 'openai' ),
 			),
 		);
 	}
@@ -62,6 +62,30 @@ class ModelRoutingStoreTest extends TestCase {
 		$store->update( array( 'business_analysis' => 'm1' ) );
 		$this->assertSame( 'm1', $store->get_for( 'business_analysis' ) );
 		$this->assertNull( $store->get_for( 'nonexistent' ) );
+	}
+
+	public function test_connection_for_returns_routed_anthropic_connection() {
+		$store = new Model_Routing_Store();
+		$store->update( array( 'business_analysis' => 'm1' ) );
+		$this->assertSame( 'm1', $store->connection_for( 'business_analysis', 'anthropic-primary' ) );
+	}
+
+	public function test_connection_for_falls_back_when_purpose_is_unrouted() {
+		$store = new Model_Routing_Store();
+		$this->assertSame( 'anthropic-primary', $store->connection_for( 'business_analysis', 'anthropic-primary' ) );
+	}
+
+	public function test_connection_for_falls_back_when_route_targets_non_anthropic_provider() {
+		$store = new Model_Routing_Store();
+		$store->update( array( 'email_drafts' => 'm2' ) );
+		$this->assertSame( 'anthropic-primary', $store->connection_for( 'email_drafts', 'anthropic-primary' ) );
+	}
+
+	public function test_connection_for_falls_back_when_routed_connection_was_deleted() {
+		$store = new Model_Routing_Store();
+		$store->update( array( 'business_analysis' => 'm1' ) );
+		unset( $GLOBALS['g2aba_test_options']['g2aba_models']['m1'] );
+		$this->assertSame( 'anthropic-primary', $store->connection_for( 'business_analysis', 'anthropic-primary' ) );
 	}
 
 	public function test_labels_covers_every_purpose() {

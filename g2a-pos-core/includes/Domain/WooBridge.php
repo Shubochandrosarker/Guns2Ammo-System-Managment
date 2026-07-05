@@ -41,11 +41,36 @@ final class WooBridge {
 		}
 
 		$order->calculate_totals();
+		// Mirror the POS-side totals so the WC order matches what was actually
+		// charged at the counter (POS computes tax/discount server-side).
+		if ( isset( $payload['discount_total'] ) ) {
+			$order->set_discount_total( max( 0.0, (float) $payload['discount_total'] ) );
+		}
+		if ( isset( $payload['grand_total'] ) ) {
+			$order->set_total( max( 0.0, (float) $payload['grand_total'] ) );
+		}
 		// Keep draft-like lifecycle until POS payment/compliance completion confirms final state.
 		$order->set_status( 'pending', 'Created by G2A POS' );
 		$order->save();
 
 		return (int) $order->get_id();
+	}
+
+	/**
+	 * Mark a POS-paid WC order as payment-complete. WooCommerce moves the
+	 * order out of 'pending' (processing/completed) and runs its own
+	 * wc_maybe_reduce_stock_levels, so counter sales actually decrement
+	 * stock instead of sitting in a draft state forever.
+	 */
+	public static function complete_payment( int $wc_order_id ): void {
+		if ( $wc_order_id <= 0 || ! function_exists( 'wc_get_order' ) ) {
+			return;
+		}
+		$order = wc_get_order( $wc_order_id );
+		if ( ! $order || $order->is_paid() ) {
+			return;
+		}
+		$order->payment_complete();
 	}
 
 	public static function reduce_stock( array $items ): void {

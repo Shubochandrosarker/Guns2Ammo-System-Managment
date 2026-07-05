@@ -88,45 +88,55 @@ final class LayawayRepository extends Repository {
 
 	public function record_payment( int $layaway_id, float $amount, string $method, array $opts = array() ): int {
 		global $wpdb;
-		$row = $wpdb->get_row(
-			$wpdb->prepare(
-				"SELECT grand_total, paid_amount, status FROM {$this->table('g2a_layaways')} WHERE id = %d",
-				$layaway_id
-			),
-			ARRAY_A
-		);
-		if ( ! $row || $row['status'] !== 'active' ) {
+		$now = $this->now();
+		// Lock the layaway row so concurrent payments serialize instead of
+		// clobbering paid_amount (same pattern as GiftCardRepository::redeem()).
+		$wpdb->query( 'START TRANSACTION' );
+		try {
+			$row = $wpdb->get_row(
+				$wpdb->prepare(
+					"SELECT grand_total, paid_amount, status FROM {$this->table('g2a_layaways')} WHERE id = %d FOR UPDATE",
+					$layaway_id
+				),
+				ARRAY_A
+			);
+			if ( ! $row || $row['status'] !== 'active' ) {
+				$wpdb->query( 'ROLLBACK' );
+				return 0;
+			}
+			$new_paid = (float) $row['paid_amount'] + $amount;
+			$balance  = max( 0, (float) $row['grand_total'] - $new_paid );
+			$wpdb->insert(
+				$this->table( 'g2a_layaway_payments' ),
+				array(
+					'layaway_id'          => $layaway_id,
+					'amount'              => $amount,
+					'payment_method'      => sanitize_text_field( $method ),
+					'reference'           => sanitize_text_field( $opts['reference'] ?? '' ),
+					'register_session_id' => isset( $opts['register_session_id'] ) ? (int) $opts['register_session_id'] : null,
+					'actor_id'            => get_current_user_id(),
+					'received_at'         => $now,
+					'created_at'          => $now,
+				)
+			);
+			$payment_id = (int) $wpdb->insert_id;
+
+			$update = array(
+				'paid_amount' => $new_paid,
+				'balance_due' => $balance,
+				'updated_at'  => $now,
+			);
+			if ( $balance <= 0.001 ) {
+				$update['status']       = 'paid';
+				$update['completed_at'] = $now;
+			}
+			$wpdb->update( $this->table( 'g2a_layaways' ), $update, array( 'id' => $layaway_id ) );
+			$wpdb->query( 'COMMIT' );
+			return $payment_id;
+		} catch ( \Throwable $e ) {
+			$wpdb->query( 'ROLLBACK' );
 			return 0;
 		}
-		$new_paid = (float) $row['paid_amount'] + $amount;
-		$balance  = max( 0, (float) $row['grand_total'] - $new_paid );
-		$now      = $this->now();
-		$wpdb->insert(
-			$this->table( 'g2a_layaway_payments' ),
-			array(
-				'layaway_id'          => $layaway_id,
-				'amount'              => $amount,
-				'payment_method'      => sanitize_text_field( $method ),
-				'reference'           => sanitize_text_field( $opts['reference'] ?? '' ),
-				'register_session_id' => isset( $opts['register_session_id'] ) ? (int) $opts['register_session_id'] : null,
-				'actor_id'            => get_current_user_id(),
-				'received_at'         => $now,
-				'created_at'          => $now,
-			)
-		);
-		$payment_id = (int) $wpdb->insert_id;
-
-		$update = array(
-			'paid_amount' => $new_paid,
-			'balance_due' => $balance,
-			'updated_at'  => $now,
-		);
-		if ( $balance <= 0.001 ) {
-			$update['status']       = 'paid';
-			$update['completed_at'] = $now;
-		}
-		$wpdb->update( $this->table( 'g2a_layaways' ), $update, array( 'id' => $layaway_id ) );
-		return $payment_id;
 	}
 
 	public function cancel( int $layaway_id, string $reason, float $forfeited = 0.0 ): bool {

@@ -268,16 +268,16 @@ final class Pages
             $product_id = (int) ($_POST['product_id'] ?? 0);
             $location_id = (int) ($_POST['location_id'] ?? (int) get_option('g2a_pos_default_location_id', 1));
             $delta = (float) ($_POST['quantity_delta'] ?? 0);
-            $before_qty = (float) ($_POST['before_qty'] ?? 0);
 
             if ($product_id <= 0 || $location_id <= 0 || $delta == 0.0) {
                 $error = 'product_id, location_id, and non-zero quantity delta are required.';
             } else {
+                // before/after are computed server-side from the ledger inside
+                // a locked transaction; nothing client-supplied is trusted.
                 $res = InventoryEngine::adjust([
                     'product_id' => $product_id,
                     'location_id' => $location_id,
                     'quantity_delta' => $delta,
-                    'before_qty' => $before_qty,
                     'event_type' => 'manual_adjustment',
                     'source_ref' => 'admin_inventory',
                 ]);
@@ -308,8 +308,7 @@ final class Pages
         echo '<table class="form-table">';
         echo '<tr><th>Product ID</th><td><input type="number" name="product_id" value="' . esc_attr((string) ($product_id ?: 0)) . '" required></td></tr>';
         echo '<tr><th>Location ID</th><td><input type="number" name="location_id" value="' . esc_attr((string) (int) get_option('g2a_pos_default_location_id', 1)) . '" required></td></tr>';
-        echo '<tr><th>Before Qty (known)</th><td><input type="number" step="0.001" name="before_qty" value="0"></td></tr>';
-        echo '<tr><th>Quantity Delta</th><td><input type="number" step="0.001" name="quantity_delta" required><p class="description">Use negative for sale shrink, positive for receiving/restock.</p></td></tr>';
+        echo '<tr><th>Quantity Delta</th><td><input type="number" step="0.001" name="quantity_delta" required><p class="description">Use negative for sale shrink, positive for receiving/restock. Before/after quantities are computed from the inventory ledger.</p></td></tr>';
         echo '</table><p class="submit"><button class="button button-primary" name="g2a_inventory_adjust" value="1">Apply Adjustment</button></p>';
         echo '</form>';
 

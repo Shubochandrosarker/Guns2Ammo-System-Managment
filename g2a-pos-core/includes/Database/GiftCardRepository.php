@@ -127,7 +127,72 @@ final class GiftCardRepository extends Repository {
 			$wpdb->query( 'COMMIT' );
 			return array(
 				'ok'            => true,
+				'gift_card_id'  => (int) $row['id'],
 				'applied_cents' => $apply,
+				'balance_cents' => $new_bal,
+			);
+		} catch ( \Throwable $e ) {
+			$wpdb->query( 'ROLLBACK' );
+			return array(
+				'ok'    => false,
+				'error' => $e->getMessage(),
+			);
+		}
+	}
+
+	/**
+	 * Put value back on a card (voided/reversed tender). Uses the same
+	 * locked transaction as redeem() and appends to the transaction ledger,
+	 * so the reversal is atomic and auditable. Re-activates a depleted card.
+	 */
+	public function credit( int $card_id, int $cents, ?int $pos_order_id = null, string $tx_type = 'void_refund' ): array {
+		global $wpdb;
+		if ( $card_id <= 0 || $cents <= 0 ) {
+			return array(
+				'ok'    => false,
+				'error' => 'invalid_credit',
+			);
+		}
+		$now = $this->now();
+		$wpdb->query( 'START TRANSACTION' );
+		try {
+			$row = $wpdb->get_row(
+				$wpdb->prepare(
+					"SELECT id, balance_cents, status FROM {$this->table('g2a_gift_cards')}
+                 WHERE id = %d FOR UPDATE",
+					$card_id
+				),
+				ARRAY_A
+			);
+			if ( ! $row ) {
+				$wpdb->query( 'ROLLBACK' );
+				return array(
+					'ok'    => false,
+					'error' => 'not_found',
+				);
+			}
+			if ( ! in_array( $row['status'], array( 'active', 'depleted' ), true ) ) {
+				$wpdb->query( 'ROLLBACK' );
+				return array(
+					'ok'    => false,
+					'error' => 'card_not_creditable',
+				);
+			}
+			$new_bal = (int) $row['balance_cents'] + $cents;
+			$wpdb->update(
+				$this->table( 'g2a_gift_cards' ),
+				array(
+					'balance_cents' => $new_bal,
+					'status'        => 'active',
+					'updated_at'    => $now,
+				),
+				array( 'id' => (int) $row['id'] )
+			);
+			$this->record_tx( (int) $row['id'], $tx_type, $cents, $new_bal, $pos_order_id );
+			$wpdb->query( 'COMMIT' );
+			return array(
+				'ok'            => true,
+				'gift_card_id'  => (int) $row['id'],
 				'balance_cents' => $new_bal,
 			);
 		} catch ( \Throwable $e ) {

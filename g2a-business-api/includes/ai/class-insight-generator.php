@@ -22,6 +22,7 @@ use WordPressistic\G2ABA\Providers\Revenue_Provider;
 use WordPressistic\G2ABA\Providers\SEO_Provider;
 use WordPressistic\G2ABA\Providers\Store_Provider;
 use WordPressistic\G2ABA\Range;
+use WordPressistic\G2ABA\Routing\Model_Routing_Store;
 
 if ( ! defined( 'ABSPATH' ) ) {
 	exit;
@@ -39,7 +40,11 @@ class Insight_Generator {
 	}
 
 	public static function run(): void {
-		$client = new Anthropic_Client();
+		// Honour the dashboard's model-routing map — insights are the
+		// `business_analysis` purpose. No route (or a non-Anthropic route)
+		// keeps the historical default connection.
+		$connection_id = ( new Model_Routing_Store() )->connection_for( 'business_analysis', 'anthropic-primary' );
+		$client        = new Anthropic_Client( $connection_id );
 		if ( ! $client->is_configured() ) {
 			update_option( 'g2aba_insights_last_error', 'Anthropic connection not configured', false );
 			return;

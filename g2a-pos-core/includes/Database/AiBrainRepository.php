@@ -48,10 +48,54 @@ final class AiBrainRepository extends Repository {
 		return (int) $wpdb->insert_id;
 	}
 
+	/** Find an existing document row by its body hash (dedupe / skip re-embed). */
+	public function find_document_by_hash( string $hash ): ?array {
+		global $wpdb;
+		if ( $hash === '' ) {
+			return null;
+		}
+		$row = $wpdb->get_row(
+			$wpdb->prepare(
+				"SELECT id, source_type, source_label, chunk_count, status
+	             FROM {$this->table('g2a_ai_brain_documents')} WHERE content_hash = %s",
+				$hash
+			),
+			ARRAY_A
+		);
+		return is_array( $row ) ? $row : null;
+	}
+
+	public function set_document_status( int $id, string $status ): void {
+		global $wpdb;
+		$wpdb->update(
+			$this->table( 'g2a_ai_brain_documents' ),
+			array(
+				'status'     => sanitize_key( $status ),
+				'updated_at' => $this->now(),
+			),
+			array( 'id' => $id )
+		);
+	}
+
+	public function document_has_embeddings( int $id ): bool {
+		global $wpdb;
+		return (bool) $wpdb->get_var(
+			$wpdb->prepare(
+				"SELECT 1 FROM {$this->table('g2a_ai_brain_chunks')}
+	             WHERE document_id = %d AND embedding IS NOT NULL LIMIT 1",
+				$id
+			)
+		);
+	}
+
 	public function add_chunks( int $document_id, array $chunks, ?string $embedding_model = null ): int {
 		global $wpdb;
 		$now   = $this->now();
 		$count = 0;
+		// Replace semantics: callers always pass the full chunk set for the
+		// document, so drop any previous chunks first — re-ingesting the same
+		// document must never accumulate duplicates.
+		$wpdb->delete( $this->table( 'g2a_ai_brain_chunks' ), array( 'document_id' => $document_id ) );
 		foreach ( $chunks as $i => $chunk ) {
 			$text = (string) ( $chunk['text'] ?? '' );
 			if ( $text === '' ) {
@@ -103,6 +147,71 @@ final class AiBrainRepository extends Repository {
 		) ?: array();
 	}
 
+	/**
+	 * A page of documents for batched work (Cloudflare migration). Ordered by
+	 * id so offsets stay stable while the batch loop runs.
+	 */
+	public function documents_page( int $offset = 0, int $limit = 25 ): array {
+		global $wpdb;
+		return $wpdb->get_results(
+			$wpdb->prepare(
+				"SELECT id, source_type, source_label, source_uri, chunk_count, tags, scope, status
+	             FROM {$this->table('g2a_ai_brain_documents')} ORDER BY id ASC LIMIT %d OFFSET %d",
+				max( 1, min( 200, $limit ) ),
+				max( 0, $offset )
+			),
+			ARRAY_A
+		) ?: array();
+	}
+
+	public function count_documents(): int {
+		global $wpdb;
+		return (int) $wpdb->get_var( "SELECT COUNT(*) FROM {$this->table('g2a_ai_brain_documents')}" );
+	}
+
+	/** All chunks (text only) for one document, in chunk order. */
+	public function chunks_for_document( int $document_id ): array {
+		global $wpdb;
+		return $wpdb->get_results(
+			$wpdb->prepare(
+				"SELECT chunk_index, text_content AS text
+	             FROM {$this->table('g2a_ai_brain_chunks')} WHERE document_id = %d ORDER BY chunk_index ASC",
+				$document_id
+			),
+			ARRAY_A
+		) ?: array();
+	}
+
+	/**
+	 * Aggregate brain stats for the dashboard: document/chunk totals, how much
+	 * of the corpus is embedded, and a per-source_type breakdown.
+	 *
+	 * @return array{documents:int,chunks:int,embedded_chunks:int,embedded_pct:float,by_source_type:array<int,array{source_type:string,documents:int,chunks:int}>}
+	 */
+	public function stats(): array {
+		global $wpdb;
+		$docs            = (int) $wpdb->get_var( "SELECT COUNT(*) FROM {$this->table('g2a_ai_brain_documents')}" );
+		$chunks          = (int) $wpdb->get_var( "SELECT COUNT(*) FROM {$this->table('g2a_ai_brain_chunks')}" );
+		$embedded_chunks = (int) $wpdb->get_var( "SELECT COUNT(*) FROM {$this->table('g2a_ai_brain_chunks')} WHERE embedding IS NOT NULL" );
+		$by_type         = $wpdb->get_results(
+			"SELECT source_type, COUNT(*) AS documents, COALESCE(SUM(chunk_count), 0) AS chunks
+	         FROM {$this->table('g2a_ai_brain_documents')} GROUP BY source_type ORDER BY documents DESC",
+			ARRAY_A
+		) ?: array();
+		foreach ( $by_type as &$row ) {
+			$row['documents'] = (int) $row['documents'];
+			$row['chunks']    = (int) $row['chunks'];
+		}
+		unset( $row );
+		return array(
+			'documents'       => $docs,
+			'chunks'          => $chunks,
+			'embedded_chunks' => $embedded_chunks,
+			'embedded_pct'    => $chunks > 0 ? round( 100.0 * $embedded_chunks / $chunks, 1 ) : 0.0,
+			'by_source_type'  => $by_type,
+		);
+	}
+
 	/** Document ids whose comma-separated tags contain $tag (exact tag match). */
 	public function document_ids_by_tag( string $tag ): array {
 		global $wpdb;
@@ -118,6 +227,19 @@ final class AiBrainRepository extends Repository {
 			$out[] = (int) $id;
 		}
 		return $out;
+	}
+
+	public function find_document( int $id ): ?array {
+		global $wpdb;
+		$row = $wpdb->get_row(
+			$wpdb->prepare(
+				"SELECT id, source_type, source_label, source_uri, chunk_count, tags, scope, status
+	             FROM {$this->table('g2a_ai_brain_documents')} WHERE id = %d",
+				$id
+			),
+			ARRAY_A
+		);
+		return is_array( $row ) ? $row : null;
 	}
 
 	public function delete_document( int $id ): bool {

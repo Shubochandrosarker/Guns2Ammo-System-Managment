@@ -60,6 +60,7 @@ final class Plugin {
 		self::maybe_upgrade();
 
 		add_action( 'rest_api_init', array( Routes::class, 'register' ) );
+		add_action( 'rest_api_init', array( \G2A\POS\API\SettingsController::class, 'register_routes' ) );
 		add_action( self::CRON_HOOK, array( Worker::class, 'process_pending' ) );
 		add_action(
 			self::NICS_CRON_HOOK,
@@ -218,16 +219,68 @@ final class Plugin {
 		}
 	}
 
-	private static function maybe_upgrade(): void {
-		// Self-heal the minute-interval events: older versions scheduled them
-		// during activation before the 'minute' interval existed, so the queue
-		// worker and messaging flush never ran.
+	/**
+	 * Idempotently (re)schedule every recurring event the plugin depends on.
+	 * Shared by activate() and maybe_upgrade() so an install that missed the
+	 * activation hook (plugin-file replace, aborted activation, cleared cron
+	 * array) self-heals on the next boot instead of silently never running
+	 * NICS default-proceeds, KPI snapshots, billing, reminders, or syncs.
+	 */
+	private static function schedule_all_crons(): void {
+		// Register the custom 'minute' interval first — scheduling a 'minute'
+		// event before the interval exists silently fails.
+		Cron::register_intervals();
+
 		if ( ! wp_next_scheduled( self::CRON_HOOK ) ) {
 			wp_schedule_event( time() + MINUTE_IN_SECONDS, 'minute', self::CRON_HOOK );
+		}
+		if ( ! wp_next_scheduled( self::NICS_CRON_HOOK ) ) {
+			wp_schedule_event( time() + HOUR_IN_SECONDS, 'hourly', self::NICS_CRON_HOOK );
+		}
+		if ( ! wp_next_scheduled( self::DISTRIBUTOR_SYNC_HOOK ) ) {
+			wp_schedule_event( time() + DAY_IN_SECONDS, 'daily', self::DISTRIBUTOR_SYNC_HOOK );
+		}
+		if ( ! wp_next_scheduled( self::DISTRIBUTOR_HOURLY_HOOK ) ) {
+			wp_schedule_event( time() + HOUR_IN_SECONDS, 'hourly', self::DISTRIBUTOR_HOURLY_HOOK );
+		}
+		if ( ! wp_next_scheduled( self::WHOLESALER_INV_HOOK ) ) {
+			// Stagger first run 5 minutes out so it doesn't fight the current request, then run hourly.
+			wp_schedule_event( time() + 5 * MINUTE_IN_SECONDS, 'hourly', self::WHOLESALER_INV_HOOK );
 		}
 		if ( ! wp_next_scheduled( self::MESSAGING_FLUSH_HOOK ) ) {
 			wp_schedule_event( time() + MINUTE_IN_SECONDS, 'minute', self::MESSAGING_FLUSH_HOOK );
 		}
+		if ( ! wp_next_scheduled( self::KPI_SNAPSHOT_HOOK ) ) {
+			wp_schedule_event( time() + DAY_IN_SECONDS, 'daily', self::KPI_SNAPSHOT_HOOK );
+		}
+		if ( ! wp_next_scheduled( self::MEMBERSHIP_BILLING_HOOK ) ) {
+			wp_schedule_event( time() + DAY_IN_SECONDS, 'daily', self::MEMBERSHIP_BILLING_HOOK );
+		}
+		if ( ! wp_next_scheduled( self::LAYAWAY_REMINDER_HOOK ) ) {
+			wp_schedule_event( time() + DAY_IN_SECONDS, 'daily', self::LAYAWAY_REMINDER_HOOK );
+		}
+		if ( ! wp_next_scheduled( self::COMPLIANCE_CALENDAR_HOOK ) ) {
+			wp_schedule_event( time() + DAY_IN_SECONDS, 'daily', self::COMPLIANCE_CALENDAR_HOOK );
+		}
+		if ( ! wp_next_scheduled( self::VENDOR_PRICE_CAPTURE_HOOK ) ) {
+			wp_schedule_event( time() + 6 * HOUR_IN_SECONDS, 'weekly', self::VENDOR_PRICE_CAPTURE_HOOK );
+		}
+		if ( ! wp_next_scheduled( self::WOO_CATALOG_SYNC_HOOK ) ) {
+			// Nightly full WooCommerce catalog re-scan.
+			wp_schedule_event( time() + 2 * HOUR_IN_SECONDS, 'daily', self::WOO_CATALOG_SYNC_HOOK );
+		}
+		if ( ! wp_next_scheduled( self::BRAIN_SITE_REFRESH_HOOK ) ) {
+			// Nightly website-knowledge refresh (full-site crawl) for the AI brain.
+			wp_schedule_event( self::next_nightly_run(), 'daily', self::BRAIN_SITE_REFRESH_HOOK );
+		}
+	}
+
+	private static function maybe_upgrade(): void {
+		// Self-heal every recurring event: older versions scheduled some hooks
+		// only during activation (which never re-runs on a plugin-file
+		// replace) and scheduled the minute-interval events before the
+		// 'minute' interval existed, so several jobs never ran.
+		self::schedule_all_crons();
 
 		// Seed the default website knowledge pack once per pack version
 		// (guarded internally by option g2a_pos_brain_seeded_version).
@@ -268,57 +321,15 @@ final class Plugin {
 	}
 
 	public static function activate(): void {
-		// Register the custom 'minute' interval before scheduling — activation
-		// runs before our plugins_loaded boot, so without this the 'minute'
-		// events below would silently fail to schedule.
-		Cron::register_intervals();
-
 		Migrator::run();
 		Roles::register_roles();
 		Roles::register_caps();
 
-		if ( ! wp_next_scheduled( self::CRON_HOOK ) ) {
-			wp_schedule_event( time() + MINUTE_IN_SECONDS, 'minute', self::CRON_HOOK );
-		}
-		if ( ! wp_next_scheduled( self::NICS_CRON_HOOK ) ) {
-			wp_schedule_event( time() + HOUR_IN_SECONDS, 'hourly', self::NICS_CRON_HOOK );
-		}
-		if ( ! wp_next_scheduled( self::DISTRIBUTOR_SYNC_HOOK ) ) {
-			wp_schedule_event( time() + DAY_IN_SECONDS, 'daily', self::DISTRIBUTOR_SYNC_HOOK );
-		}
-		if ( ! wp_next_scheduled( self::DISTRIBUTOR_HOURLY_HOOK ) ) {
-			wp_schedule_event( time() + HOUR_IN_SECONDS, 'hourly', self::DISTRIBUTOR_HOURLY_HOOK );
-		}
-		if ( ! wp_next_scheduled( self::WHOLESALER_INV_HOOK ) ) {
-			// Stagger first run 5 minutes after activation so it doesn't fight the activation request, then run hourly.
-			wp_schedule_event( time() + 5 * MINUTE_IN_SECONDS, 'hourly', self::WHOLESALER_INV_HOOK );
-		}
-		if ( ! wp_next_scheduled( self::MESSAGING_FLUSH_HOOK ) ) {
-			wp_schedule_event( time() + MINUTE_IN_SECONDS, 'minute', self::MESSAGING_FLUSH_HOOK );
-		}
-		if ( ! wp_next_scheduled( self::KPI_SNAPSHOT_HOOK ) ) {
-			wp_schedule_event( time() + DAY_IN_SECONDS, 'daily', self::KPI_SNAPSHOT_HOOK );
-		}
-		if ( ! wp_next_scheduled( self::MEMBERSHIP_BILLING_HOOK ) ) {
-			wp_schedule_event( time() + DAY_IN_SECONDS, 'daily', self::MEMBERSHIP_BILLING_HOOK );
-		}
-		if ( ! wp_next_scheduled( self::LAYAWAY_REMINDER_HOOK ) ) {
-			wp_schedule_event( time() + DAY_IN_SECONDS, 'daily', self::LAYAWAY_REMINDER_HOOK );
-		}
-		if ( ! wp_next_scheduled( self::COMPLIANCE_CALENDAR_HOOK ) ) {
-			wp_schedule_event( time() + DAY_IN_SECONDS, 'daily', self::COMPLIANCE_CALENDAR_HOOK );
-		}
-		if ( ! wp_next_scheduled( self::VENDOR_PRICE_CAPTURE_HOOK ) ) {
-			wp_schedule_event( time() + 6 * HOUR_IN_SECONDS, 'weekly', self::VENDOR_PRICE_CAPTURE_HOOK );
-		}
-		if ( ! wp_next_scheduled( self::WOO_CATALOG_SYNC_HOOK ) ) {
-			// Nightly full WooCommerce catalog re-scan.
-			wp_schedule_event( time() + 2 * HOUR_IN_SECONDS, 'daily', self::WOO_CATALOG_SYNC_HOOK );
-		}
-		if ( ! wp_next_scheduled( self::BRAIN_SITE_REFRESH_HOOK ) ) {
-			// Nightly website-knowledge refresh (full-site crawl) for the AI brain.
-			wp_schedule_event( self::next_nightly_run(), 'daily', self::BRAIN_SITE_REFRESH_HOOK );
-		}
+		// schedule_all_crons() registers the custom 'minute' interval before
+		// scheduling — activation runs before our plugins_loaded boot, so
+		// without that the 'minute' events would silently fail to schedule.
+		self::schedule_all_crons();
+
 		// Populate the brain shortly after install without blocking activation.
 		wp_schedule_single_event( time() + 2 * MINUTE_IN_SECONDS, self::BRAIN_SITE_REFRESH_HOOK );
 

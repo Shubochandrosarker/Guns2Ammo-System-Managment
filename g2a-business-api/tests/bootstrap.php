@@ -28,6 +28,9 @@ if ( ! defined( 'G2ABA_REST_NAMESPACE' ) ) {
 if ( ! defined( 'DAY_IN_SECONDS' ) ) {
 	define( 'DAY_IN_SECONDS', 86400 );
 }
+if ( ! defined( 'MINUTE_IN_SECONDS' ) ) {
+	define( 'MINUTE_IN_SECONDS', 60 );
+}
 
 // Minimal WP function stubs.
 if ( ! function_exists( 'esc_url_raw' ) ) {

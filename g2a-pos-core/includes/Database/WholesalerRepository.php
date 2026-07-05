@@ -40,17 +40,28 @@ final class WholesalerRepository extends Repository {
 		$providerCode = sanitize_key( (string) ( $data['provider_code'] ?? '' ) );
 		$account      = (string) ( $data['account_number'] ?? '' );
 
-		$existing = $wpdb->get_var(
-			$wpdb->prepare(
-				"SELECT id FROM {$t} WHERE provider_code=%s AND (account_number=%s OR (%s='' AND (account_number IS NULL OR account_number='')))",
-				$providerCode,
-				$account,
-				$account
-			)
-		);
+		// Prefer an explicit id when the caller is editing a known row —
+		// matching on provider_code+account_number alone means changing the
+		// account number silently creates a duplicate row instead of updating.
+		$existing = null;
+		if ( ! empty( $data['id'] ) && (int) $data['id'] > 0 ) {
+			$row      = $this->find( (int) $data['id'] );
+			$existing = $row ? (int) $row['id'] : null;
+		}
+		if ( ! $existing ) {
+			$existing = $wpdb->get_var(
+				$wpdb->prepare(
+					"SELECT id FROM {$t} WHERE provider_code=%s AND (account_number=%s OR (%s='' AND (account_number IS NULL OR account_number='')))",
+					$providerCode,
+					$account,
+					$account
+				)
+			);
+		}
 
 		$credentials = $data['credentials'] ?? null;
 		if ( is_array( $credentials ) ) {
+			$credentials = $this->normalizeCredentials( $credentials, $existing ? (int) $existing : 0 );
 			$credentials = $this->encryptCredentials( $credentials );
 		}
 
@@ -94,6 +105,36 @@ final class WholesalerRepository extends Repository {
 	public function decodeCredentials( array $row ): array {
 		$raw = (string) ( $row['credentials'] ?? '' );
 		return $raw === '' ? array() : CredentialCipher::decrypt( $raw );
+	}
+
+	/**
+	 * Trim credential fields and, when updating an existing row, keep the
+	 * stored email/password if the incoming value is blank. The admin forms
+	 * always submit a credentials object with an empty password field, so
+	 * re-saving a wholesaler must never wipe a previously stored secret.
+	 *
+	 * @param array<string,mixed> $credentials Incoming credential fields.
+	 */
+	private function normalizeCredentials( array $credentials, int $existingId ): array {
+		foreach ( array( 'email', 'password' ) as $field ) {
+			if ( isset( $credentials[ $field ] ) && is_string( $credentials[ $field ] ) ) {
+				$credentials[ $field ] = trim( $credentials[ $field ] );
+			}
+		}
+
+		if ( $existingId > 0 ) {
+			$row    = $this->find( $existingId );
+			$stored = $row ? $this->decodeCredentials( $row ) : array();
+			foreach ( array( 'email', 'password' ) as $field ) {
+				$incoming = $credentials[ $field ] ?? '';
+				if ( ( ! is_string( $incoming ) || $incoming === '' )
+					&& isset( $stored[ $field ] ) && is_string( $stored[ $field ] ) && $stored[ $field ] !== '' ) {
+					$credentials[ $field ] = $stored[ $field ];
+				}
+			}
+		}
+
+		return $credentials;
 	}
 
 	private function encryptCredentials( array $data ): string {

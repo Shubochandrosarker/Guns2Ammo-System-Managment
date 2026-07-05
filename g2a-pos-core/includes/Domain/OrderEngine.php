@@ -65,9 +65,11 @@ final class OrderEngine {
 			$items[ $idx ]['line_total'] = round( $unit_price * $qty, 2 );
 			$subtotal                   += $items[ $idx ]['line_total'];
 		}
-		$subtotal       = round( $subtotal, 2 );
-		$tax_total      = max( 0.0, (float) ( $payload['tax_total'] ?? 0 ) );
-		$discount_total = max( 0.0, (float) ( $payload['discount_total'] ?? 0 ) );
+		$subtotal = round( $subtotal, 2 );
+		// Discounts are legitimately clerk-entered but never exceed the
+		// subtotal; tax is always computed server-side (client value ignored).
+		$discount_total = min( $subtotal, max( 0.0, (float) ( $payload['discount_total'] ?? 0 ) ) );
+		$tax_total      = TaxService::tax_for_lines( $items, $discount_total );
 		$grand_total    = round( $subtotal + $tax_total - $discount_total, 2 );
 
 		if ( $has_firearm && ! current_user_can( 'g2a_pos_process_firearm_sale' ) ) {
@@ -89,6 +91,8 @@ final class OrderEngine {
 					'customer_id'    => $payload['customer_id'] ?? null,
 					'items'          => $items,
 					'payment_method' => $payload['payment_method'] ?? '',
+					'discount_total' => $discount_total,
+					'grand_total'    => $grand_total,
 				)
 			);
 
@@ -135,6 +139,13 @@ final class OrderEngine {
 				}
 			}
 			return array( 'error' => $e->getMessage() );
+		}
+
+		// Counter sales that arrive already paid must not leave the WC order
+		// sitting in 'pending' — payment_complete() moves it forward and lets
+		// WooCommerce decrement stock (guarded internally against re-running).
+		if ( $wc_order_id && in_array( $payment_status, $finalizing_states, true ) ) {
+			WooBridge::complete_payment( (int) $wc_order_id );
 		}
 
 		return array(

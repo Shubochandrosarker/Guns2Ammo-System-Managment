@@ -40,6 +40,11 @@ final class InventoryController {
 			}
 		}
 
-		return InventoryEngine::adjust( $payload );
+		$result = InventoryEngine::adjust( $payload );
+		if ( isset( $result['error'] ) ) {
+			return new \WP_Error( 'adjust_failed', $result['error'], array( 'status' => 422 ) );
+		}
+
+		return $result;
 	}
 }
