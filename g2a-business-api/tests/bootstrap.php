@@ -218,5 +218,29 @@ if ( ! class_exists( 'WP_Error' ) ) {
 	}
 }
 
+// Stubs added for the leads pipeline (Leads_Installer / Leads_Repository /
+// Lead_Ingestion) — a real $wpdb table needs ARRAY_A, current_time(),
+// dbDelta(), and is_email() which nothing in this suite required before.
+if ( ! defined( 'ARRAY_A' ) ) {
+	define( 'ARRAY_A', 'ARRAY_A' );
+}
+if ( ! function_exists( 'current_time' ) ) {
+	function current_time( $type = 'mysql' ) {
+		return 'timestamp' === $type ? time() : gmdate( 'Y-m-d H:i:s' );
+	}
+}
+if ( ! function_exists( 'is_email' ) ) {
+	function is_email( $email ) {
+		return (bool) filter_var( (string) $email, FILTER_VALIDATE_EMAIL );
+	}
+}
+if ( ! function_exists( 'dbDelta' ) ) {
+	function dbDelta( $sql ) {
+		$GLOBALS['g2aba_test_dbdelta_calls'][] = $sql;
+		return array();
+	}
+}
+$GLOBALS['g2aba_test_dbdelta_calls'] = array();
+
 require_once dirname( __DIR__ ) . '/includes/class-autoloader.php';
 \WordPressistic\G2ABA\Autoloader::register();

@@ -18,6 +18,7 @@ class Activator {
 		\WordPressistic\G2ABA\Automation\Automation_Store::seed_defaults();
 		\WordPressistic\G2ABA\Automation\Cron_Scheduler::sync_all();
 		\WordPressistic\G2ABA\Agents\Agent_Store::seed_defaults();
+		\WordPressistic\G2ABA\Leads\Leads_Installer::maybe_install();
 
 		if ( ! get_option( 'g2aba_models' ) ) {
 			update_option( 'g2aba_models', array(), false );

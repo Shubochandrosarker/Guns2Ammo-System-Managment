@@ -19,6 +19,12 @@ class Plugin {
 		// on every request so REST preflights are answered.
 		Cors::register();
 
+		// Cheap version check every load; only runs dbDelta when the leads
+		// schema version actually changed (plugin updates don't re-fire the
+		// activation hook, so activation alone can't be relied on here).
+		\WordPressistic\G2ABA\Leads\Leads_Installer::maybe_install();
+		\WordPressistic\G2ABA\Leads\Lead_Ingestion::register();
+
 		// Cron hooks must be registered on every request (not just admin), so
 		// that WP-Cron can invoke them when a scheduled event fires.
 		\WordPressistic\G2ABA\AI\Insight_Generator::register_cron();
