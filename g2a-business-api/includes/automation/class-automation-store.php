@@ -33,6 +33,17 @@ class Automation_Store {
 	public const ALLOWED_INTERVALS = array( 'hourly', 'twicedaily', 'daily', 'weekly' );
 
 	/**
+	 * Bump this whenever `default_records()` gains/changes a record in a way
+	 * that needs to reach an already-activated install. `Activator::activate()`
+	 * only fires on activation, never on a plugin *update* — see
+	 * `Leads_Installer::maybe_install()` for the version-gate idiom this
+	 * mirrors.
+	 */
+	public const DEFS_VERSION = '1.1.0';
+
+	private const DEFS_VERSION_OPTION = 'g2aba_automation_defs_version';
+
+	/**
 	 * Seed the store with the automations the client asked for. Idempotent —
 	 * safe to call on every activation. Existing status is preserved so
 	 * reactivating the plugin doesn't re-enable something an owner paused.
@@ -59,6 +70,27 @@ class Automation_Store {
 			}
 		}
 		update_option( self::OPTION, $existing, false );
+	}
+
+	/**
+	 * Re-run `seed_defaults()` + `Cron_Scheduler::sync_all()` +
+	 * `Agent_Store::seed_defaults()` only when the stored defs version is
+	 * behind `DEFS_VERSION` — the version-gated self-heal so an
+	 * already-activated install picks up new/changed automations and agent
+	 * behaviours on the next request, not just on a fresh activation. Cheap
+	 * (one `get_option()`) to call on every request when the version already
+	 * matches, so it's safe to wire into `Plugin::run()`.
+	 */
+	public static function maybe_reseed(): void {
+		if ( get_option( self::DEFS_VERSION_OPTION ) === self::DEFS_VERSION ) {
+			return;
+		}
+
+		self::seed_defaults();
+		Cron_Scheduler::sync_all();
+		\WordPressistic\G2ABA\Agents\Agent_Store::seed_defaults();
+
+		update_option( self::DEFS_VERSION_OPTION, self::DEFS_VERSION, false );
 	}
 
 	/**
@@ -248,6 +280,32 @@ class Automation_Store {
 				'action'     => 'Draft outreach email',
 				'interval'   => 'daily',
 				'handler'    => 'g2aba_run_agent_churn_risk',
+				'status'     => self::STATUS_ACTIVE,
+				'lastRun'    => null,
+				'lastResult' => null,
+				'runsLast7d' => 0,
+			),
+			'agent-refresh-hourly' => array(
+				'slug'       => 'agent-refresh-hourly',
+				'name'       => 'Agent: hourly refresh',
+				'category'   => 'ai',
+				'trigger'    => 'Every hour',
+				'action'     => 'Draft replies for new enquiries',
+				'interval'   => 'hourly',
+				'handler'    => 'g2aba_run_agent_refresh_hourly',
+				'status'     => self::STATUS_ACTIVE,
+				'lastRun'    => null,
+				'lastResult' => null,
+				'runsLast7d' => 0,
+			),
+			'agent-refresh-daily' => array(
+				'slug'       => 'agent-refresh-daily',
+				'name'       => 'Agent: daily refresh',
+				'category'   => 'ai',
+				'trigger'    => 'Every day',
+				'action'     => 'Refresh Analyst/Booking/Membership/Store/Sales/SEO agents',
+				'interval'   => 'daily',
+				'handler'    => 'g2aba_run_agent_refresh_daily',
 				'status'     => self::STATUS_ACTIVE,
 				'lastRun'    => null,
 				'lastResult' => null,
