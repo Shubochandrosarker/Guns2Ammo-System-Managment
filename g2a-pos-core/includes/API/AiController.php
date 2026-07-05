@@ -29,7 +29,28 @@ final class AiController {
 		if ( ! in_array( $mode, array( 'stub', 'live' ), true ) ) {
 			return new \WP_Error( 'invalid_mode', 'mode must be stub or live', array( 'status' => 400 ) );
 		}
-		foreach ( array( 'chat_endpoint', 'embed_endpoint' ) as $key ) {
+		if ( array_key_exists( 'provider', $body ) ) {
+			$provider = sanitize_key( (string) $body['provider'] );
+			if ( ! in_array( $provider, \G2A\POS\Ai\Gateway::PROVIDERS, true ) ) {
+				return new \WP_Error( 'invalid_provider', 'provider must be openrouter, openai_compatible or ollama', array( 'status' => 400 ) );
+			}
+			$current['provider'] = $provider;
+		}
+		if ( array_key_exists( 'embed_provider', $body ) ) {
+			$embed_provider = sanitize_key( (string) $body['embed_provider'] );
+			if ( ! in_array( $embed_provider, \G2A\POS\Ai\Gateway::EMBED_PROVIDERS, true ) ) {
+				return new \WP_Error( 'invalid_embed_provider', 'embed_provider must be openai, ollama, cloudflare, none or empty', array( 'status' => 400 ) );
+			}
+			$current['embed_provider'] = $embed_provider;
+		}
+		if ( array_key_exists( 'brain_backend', $body ) ) {
+			$backend = sanitize_key( (string) $body['brain_backend'] );
+			if ( ! in_array( $backend, array( 'local', 'cloudflare' ), true ) ) {
+				return new \WP_Error( 'invalid_brain_backend', 'brain_backend must be local or cloudflare', array( 'status' => 400 ) );
+			}
+			$current['brain_backend'] = $backend;
+		}
+		foreach ( array( 'chat_endpoint', 'embed_endpoint', 'cloudflare_worker_url' ) as $key ) {
 			if ( ! array_key_exists( $key, $body ) ) {
 				continue;
 			}
@@ -45,14 +66,21 @@ final class AiController {
 		$current['temperature']     = max( 0.0, min( 2.0, (float) ( $body['temperature'] ?? ( $current['temperature'] ?? 0.2 ) ) ) );
 		$current['max_tokens']      = max( 1, min( 32768, (int) ( $body['max_tokens'] ?? ( $current['max_tokens'] ?? 800 ) ) ) );
 		$current['request_timeout'] = max( 5, min( 120, (int) ( $body['request_timeout'] ?? ( $current['request_timeout'] ?? 60 ) ) ) );
-		$apiKey                     = trim( (string) ( $body['api_key'] ?? '' ) );
-		if ( $apiKey !== '' ) {
-			$current['api_key'] = SecretStore::seal( $apiKey );
-		} elseif ( ! empty( $current['api_key'] ) && ! str_starts_with( (string) $current['api_key'], 'enc2:' ) ) {
-			$current['api_key'] = SecretStore::seal( SecretStore::open( (string) $current['api_key'] ) );
+		foreach ( array( 'api_key', 'embed_api_key', 'cloudflare_worker_token' ) as $secret ) {
+			$value = trim( (string) ( $body[ $secret ] ?? '' ) );
+			if ( $value !== '' ) {
+				$current[ $secret ] = SecretStore::seal( $value );
+			} elseif ( ! empty( $current[ $secret ] ) && ! str_starts_with( (string) $current[ $secret ], 'enc2:' ) ) {
+				$current[ $secret ] = SecretStore::seal( SecretStore::open( (string) $current[ $secret ] ) );
+			}
 		}
 		update_option( 'g2a_pos_ai_gateway', $current, false );
 		return array( 'gateway' => self::publicGatewayConfig() );
+	}
+
+	/** POST /ai/gateway/test — 1-shot chat round-trip against the configured provider. */
+	public static function gateway_test( WP_REST_Request $request ) {
+		return \G2A\POS\Ai\Gateway::test_connection();
 	}
 
 	public static function conversations( WP_REST_Request $request ) {
@@ -157,8 +185,7 @@ final class AiController {
 
 	public static function brain_delete( WP_REST_Request $request ) {
 		$id = (int) $request['id'];
-		$ok = ( new AiBrainRepository() )->delete_document( $id );
-		return array( 'ok' => $ok );
+		return BrainService::delete_document( $id );
 	}
 
 	/** POST /ai/brain/refresh-site — re-ingest the Guns 2 Ammo website knowledge pack. */
@@ -166,15 +193,49 @@ final class AiController {
 		return \G2A\POS\Ai\WebsiteKnowledgeSeeder::refresh();
 	}
 
+	/** POST /ai/brain/seed-defaults — (re)ingest the verified Guns2Ammo default knowledge pack. */
+	public static function brain_seed_defaults( WP_REST_Request $request ) {
+		return \G2A\POS\Ai\WebsiteKnowledgeSeeder::seed_default_pack();
+	}
+
+	/** GET /ai/brain/stats — corpus size, embedded %, per-source breakdown, last refresh. */
+	public static function brain_stats( WP_REST_Request $request ) {
+		$stats            = ( new AiBrainRepository() )->stats();
+		$stats['backend'] = BrainService::backend();
+		$refreshed        = get_option( 'g2a_pos_brain_site_refreshed_at', array() );
+		$stats['last_refresh_at'] = is_array( $refreshed ) ? ( $refreshed['at'] ?? null ) : null;
+		if ( 'cloudflare' === $stats['backend'] ) {
+			$cf                   = \G2A\POS\Ai\CloudflareBrain::stats();
+			$stats['cloudflare'] = $cf;
+		}
+		return $stats;
+	}
+
+	/** POST /ai/brain/cloudflare/test — round-trip the Worker's /stats with the saved token. */
+	public static function brain_cloudflare_test( WP_REST_Request $request ) {
+		return \G2A\POS\Ai\CloudflareBrain::test_connection();
+	}
+
+	/** POST /ai/brain/migrate-cloudflare — push a batch of local chunks to the Worker. */
+	public static function brain_migrate_cloudflare( WP_REST_Request $request ) {
+		$body = $request->get_json_params() ?: array();
+		return BrainService::migrate_to_cloudflare(
+			(int) ( $body['offset'] ?? 0 ),
+			(int) ( $body['limit'] ?? 20 )
+		);
+	}
+
 	public static function brain_search( WP_REST_Request $request ) {
 		$q = (string) $request->get_param( 'q' );
 		if ( $q === '' ) {
 			return new \WP_Error( 'invalid_input', 'q required', array( 'status' => 400 ) );
 		}
-		$hits = BrainService::retrieve( $q, (int) ( $request->get_param( 'k' ) ?: 5 ) );
+		$res = BrainService::retrieve_with_meta( $q, (int) ( $request->get_param( 'k' ) ?: 5 ) );
 		return array(
-			'count' => count( $hits ),
-			'hits'  => $hits,
+			'count'   => count( $res['hits'] ),
+			'hits'    => $res['hits'],
+			'backend' => $res['backend'],
+			'notice'  => $res['notice'],
 		);
 	}
 
@@ -192,11 +253,17 @@ final class AiController {
 	}
 
 	private static function publicGatewayConfig(): array {
-		$config     = \G2A\POS\Ai\Gateway::config();
-		$configured = (string) ( $config['api_key'] ?? '' ) !== '';
+		$config = \G2A\POS\Ai\Gateway::config();
+		// Never echo secrets back to the browser — only whether they're set.
+		$config['api_key_configured']                 = (string) ( $config['api_key'] ?? '' ) !== '';
+		$config['embed_api_key_configured']           = (string) ( $config['embed_api_key'] ?? '' ) !== '';
+		$config['cloudflare_worker_token_configured'] = (string) ( $config['cloudflare_worker_token'] ?? '' ) !== '';
 		unset( $config['api_key'] );
-		$config['api_key']            = '';
-		$config['api_key_configured'] = $configured;
+		unset( $config['embed_api_key'] );
+		unset( $config['cloudflare_worker_token'] );
+		$config['api_key']                 = '';
+		$config['embed_api_key']           = '';
+		$config['cloudflare_worker_token'] = '';
 		return $config;
 	}
 }

@@ -1,0 +1,16 @@
+name = "g2a-rag-worker"
+main = "src/index.ts"
+compatibility_date = "2025-06-01"
+
+# Workers AI — used to embed chunks/queries with @cf/baai/bge-m3 (1024 dims).
+[ai]
+binding = "AI"
+
+# Vectorize index — create it before the first deploy:
+#   wrangler vectorize create g2a-brain --dimensions=1024 --metric=cosine
+[[vectorize]]
+binding = "VECTOR_INDEX"
+index_name = "g2a-brain"
+
+# Secrets (never put values in this file):
+#   wrangler secret put AUTH_TOKEN
