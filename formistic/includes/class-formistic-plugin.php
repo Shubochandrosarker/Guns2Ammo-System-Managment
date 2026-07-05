@@ -73,6 +73,8 @@ final class Wpistic_Formistic_Plugin {
 			( new Wpistic_Formistic_Settings() )->register();
 			( new Wpistic_Formistic_Export() )->register();
 			( new Wpistic_Formistic_Bulk() )->register();
+			( new Wpistic_Formistic_G2A_Defaults() )->register();
+			( new Wpistic_Formistic_Migrate() )->register();
 
 			if ( Wpistic_Formistic_Addons::is_active( 'templates' ) ) {
 				( new Wpistic_Formistic_Templates() )->register();

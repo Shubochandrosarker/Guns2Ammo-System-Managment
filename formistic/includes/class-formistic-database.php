@@ -223,7 +223,7 @@ class Wpistic_Formistic_Database {
 	/**
 	 * Query submissions with optional filters + pagination.
 	 *
-	 * @param array $args search, form, status, paged, per_page.
+	 * @param array $args search, form, status, date_from (Y-m-d), date_to (Y-m-d), paged, per_page.
 	 * @return array { items: object[], total: int }
 	 */
 	public static function query_submissions( array $args = [] ) {
@@ -252,6 +252,14 @@ class Wpistic_Formistic_Database {
 			$params[] = $like;
 			$params[] = $like;
 			$params[] = $like;
+		}
+		if ( ! empty( $args['date_from'] ) ) {
+			$where   .= ' AND created_at >= %s';
+			$params[] = $args['date_from'] . ' 00:00:00';
+		}
+		if ( ! empty( $args['date_to'] ) ) {
+			$where   .= ' AND created_at <= %s';
+			$params[] = $args['date_to'] . ' 23:59:59';
 		}
 
 		$count_sql = "SELECT COUNT(*) FROM {$table} {$where}";

@@ -490,7 +490,20 @@ class Wpistic_Formistic_Capture {
 			$dedupe_key = 'wpf_dedupe_' . md5( $form_name . '|' . (string) $ip . '|' . wp_json_encode( $fields ) );
 			$prior = get_transient( $dedupe_key );
 			if ( false !== $prior ) {
-				return (int) $prior;
+				$prior = (int) $prior;
+				// 0 means a concurrent identical request reserved the key but
+				// hasn't finished its insert yet. Poll briefly for the real ID
+				// so this duplicate resolves to the same submission (success)
+				// instead of reporting a bogus failure to its caller.
+				for ( $i = 0; 0 === $prior && $i < 5; $i++ ) {
+					usleep( 150000 ); // 150ms, worst case ~0.75s and only on a true race.
+					$raw = get_transient( $dedupe_key );
+					if ( false === $raw ) {
+						break; // Reservation released — the racing insert was blocked/failed.
+					}
+					$prior = (int) $raw;
+				}
+				return $prior;
 			}
 			// Reserve the key immediately so concurrent requests can't both pass.
 			set_transient( $dedupe_key, 0, $window );

@@ -256,6 +256,65 @@ class Wpistic_Formistic_Newsletter {
 		];
 	}
 
+	/**
+	 * Query subscribers with optional filters + pagination. Used by the
+	 * read-only REST API (and reusable by any other consumer).
+	 *
+	 * @param array $args status (active|unsubscribed), search, paged, per_page.
+	 * @return array { items: object[], total: int }
+	 */
+	public static function query_subscribers( array $args = [] ) {
+		global $wpdb;
+		$table = self::table();
+
+		$per_page = max( 1, (int) ( $args['per_page'] ?? 25 ) );
+		$paged    = max( 1, (int) ( $args['paged'] ?? 1 ) );
+		$offset   = ( $paged - 1 ) * $per_page;
+
+		$where  = 'WHERE 1=1';
+		$params = [];
+		if ( ! empty( $args['status'] ) && in_array( $args['status'], [ 'active', 'unsubscribed' ], true ) ) {
+			$where   .= ' AND status = %s';
+			$params[] = $args['status'];
+		}
+		if ( ! empty( $args['search'] ) ) {
+			$like     = '%' . $wpdb->esc_like( $args['search'] ) . '%';
+			$where   .= ' AND (email LIKE %s OR source LIKE %s)';
+			$params[] = $like;
+			$params[] = $like;
+		}
+
+		$count_sql = "SELECT COUNT(*) FROM {$table} {$where}";
+		$total     = (int) ( $params
+			? $wpdb->get_var( $wpdb->prepare( $count_sql, $params ) )
+			: $wpdb->get_var( $count_sql ) );
+
+		$list_sql    = "SELECT * FROM {$table} {$where} ORDER BY consent_at DESC LIMIT %d OFFSET %d";
+		$list_params = array_merge( $params, [ $per_page, $offset ] );
+		$items       = $wpdb->get_results( $wpdb->prepare( $list_sql, $list_params ) ) ?: [];
+
+		return [ 'items' => $items, 'total' => $total ];
+	}
+
+	/**
+	 * Subscriber counts per status — powers the /stats REST endpoint.
+	 *
+	 * @return array{active:int,unsubscribed:int,total:int}
+	 */
+	public static function subscriber_counts() {
+		global $wpdb;
+		$table = self::table();
+		$out   = [ 'active' => 0, 'unsubscribed' => 0, 'total' => 0 ];
+		$rows  = $wpdb->get_results( "SELECT status, COUNT(*) AS n FROM {$table} GROUP BY status", ARRAY_A );
+		foreach ( (array) $rows as $r ) {
+			if ( isset( $out[ $r['status'] ] ) ) {
+				$out[ $r['status'] ] = (int) $r['n'];
+			}
+			$out['total'] += (int) $r['n'];
+		}
+		return $out;
+	}
+
 	private static function client_ip() {
 		$ip = isset( $_SERVER['REMOTE_ADDR'] ) ? sanitize_text_field( wp_unslash( $_SERVER['REMOTE_ADDR'] ) ) : '';
 		return substr( $ip, 0, 64 );

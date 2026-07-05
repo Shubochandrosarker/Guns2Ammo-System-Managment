@@ -303,6 +303,43 @@ class Wpistic_Formistic_Settings {
 				<div class="notice notice-success is-dismissible"><p><?php esc_html_e( 'Template deleted.', 'formistic' ); ?></p></div>
 			<?php elseif ( 'template_invalid' === $notice ) : ?>
 				<div class="notice notice-error is-dismissible"><p><?php esc_html_e( 'A template needs at least a name and a body.', 'formistic' ); ?></p></div>
+			<?php elseif ( 'g2a_seeded' === $notice ) : ?>
+				<div class="notice notice-success is-dismissible"><p>
+					<?php
+					if ( $count > 0 ) {
+						printf(
+							/* translators: %d: number of options seeded */
+							esc_html( _n( 'Guns 2 Ammo defaults seeded (%d option filled).', 'Guns 2 Ammo defaults seeded (%d options filled).', $count, 'formistic' ) ),
+							(int) $count
+						);
+					} else {
+						esc_html_e( 'Nothing to seed — every Guns 2 Ammo default target already has a value (existing values are never overwritten).', 'formistic' );
+					}
+					?>
+				</p></div>
+			<?php elseif ( 'wpcf_import' === $notice ) : ?>
+				<?php $report = get_transient( Wpistic_Formistic_Migrate::REPORT_TRANSIENT ); ?>
+				<div class="notice notice-success is-dismissible"><p>
+					<?php
+					if ( is_array( $report ) ) {
+						printf(
+							/* translators: 1-6: imported row counts, 7: skipped count */
+							esc_html__( 'Import from Wpistic Contact Form finished — %1$d submissions, %2$d replies, %3$d attachments, %4$d notes, %5$d impressions, %6$d subscribers imported (%7$d rows skipped as already imported / orphaned).', 'formistic' ),
+							(int) $report['submissions'],
+							(int) $report['replies'],
+							(int) $report['attachments'],
+							(int) $report['notes'],
+							(int) $report['impressions'],
+							(int) $report['subscribers'],
+							(int) $report['skipped']
+						);
+					} else {
+						esc_html_e( 'Import from Wpistic Contact Form finished.', 'formistic' );
+					}
+					?>
+				</p></div>
+			<?php elseif ( 'wpcf_import_missing' === $notice ) : ?>
+				<div class="notice notice-error is-dismissible"><p><?php esc_html_e( 'The legacy Wpistic Contact Form tables were not found — nothing to import.', 'formistic' ); ?></p></div>
 			<?php endif; ?>
 
 			<nav class="wpistic-formistic-tabs">
@@ -389,6 +426,31 @@ class Wpistic_Formistic_Settings {
 					<?php if ( $emails_disabled_const ) : ?>
 						<p class="description" style="color:#b32d2e;"><?php esc_html_e( 'Locked: WPISTIC_FORMISTIC_EMAIL_DISABLED constant is set in wp-config.php.', 'formistic' ); ?></p>
 					<?php endif; ?>
+				</td>
+			</tr>
+		</table>
+
+		<h2 style="margin-top:32px;"><?php esc_html_e( 'Tools', 'formistic' ); ?></h2>
+		<table class="form-table" role="presentation">
+			<?php if ( class_exists( 'Wpistic_Formistic_Migrate' ) && Wpistic_Formistic_Migrate::old_tables_exist() ) :
+				$import_url = wp_nonce_url(
+					admin_url( 'admin-post.php?action=' . Wpistic_Formistic_Migrate::ACTION ),
+					Wpistic_Formistic_Migrate::ACTION
+				);
+				?>
+				<tr>
+					<th scope="row"><?php esc_html_e( 'Import from Wpistic Contact Form', 'formistic' ); ?></th>
+					<td>
+						<a class="button" href="<?php echo esc_url( $import_url ); ?>" onclick="return confirm('<?php echo esc_js( __( 'Import all submissions, replies, attachments, notes, impressions, and newsletter subscribers from the old Wpistic Contact Form tables? Already-imported rows are skipped, so it is safe to run more than once.', 'formistic' ) ); ?>');"><?php esc_html_e( 'Import from Wpistic Contact Form', 'formistic' ); ?></a>
+						<p class="description"><?php esc_html_e( 'One-time copy of the legacy plugin\'s data into Formistic. Idempotent (re-runs skip anything already imported) and batched, so large inboxes import safely. The old tables are left untouched.', 'formistic' ); ?></p>
+					</td>
+				</tr>
+			<?php endif; ?>
+			<tr>
+				<th scope="row"><?php esc_html_e( 'Guns 2 Ammo defaults', 'formistic' ); ?></th>
+				<td>
+					<a class="button" href="<?php echo esc_url( wp_nonce_url( admin_url( 'admin-post.php?action=' . Wpistic_Formistic_G2A_Defaults::ACTION ), Wpistic_Formistic_G2A_Defaults::ACTION ) ); ?>"><?php esc_html_e( 'Seed Guns 2 Ammo defaults', 'formistic' ); ?></a>
+					<p class="description"><?php esc_html_e( 'Fills the AI FAQs, Knowledge Base, keyword auto-reply rules, and auto-reply subject with verified Guns 2 Ammo business info. Only empty fields are filled — anything you have edited is never overwritten.', 'formistic' ); ?></p>
 				</td>
 			</tr>
 		</table>
@@ -833,6 +895,10 @@ class Wpistic_Formistic_Settings {
 		</table>
 
 		<h2><?php esc_html_e( 'Train with Custom Data', 'formistic' ); ?></h2>
+		<p class="description">
+			<a class="button" href="<?php echo esc_url( wp_nonce_url( admin_url( 'admin-post.php?action=' . Wpistic_Formistic_G2A_Defaults::ACTION ), Wpistic_Formistic_G2A_Defaults::ACTION ) ); ?>"><?php esc_html_e( 'Seed Guns 2 Ammo defaults', 'formistic' ); ?></a>
+			<?php esc_html_e( 'Fills empty FAQ / Knowledge Base / auto-reply fields below with verified Guns 2 Ammo business info. Fields you have already filled in are never overwritten.', 'formistic' ); ?>
+		</p>
 		<table class="form-table" role="presentation">
 			<tr>
 				<th scope="row"><label for="wpistic_formistic_ai_faq_text"><?php esc_html_e( 'FAQs', 'formistic' ); ?></label></th>

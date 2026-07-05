@@ -15,6 +15,16 @@ if ( ! defined( 'ABSPATH' ) ) {
 class Wpistic_Formistic_AI {
 
 	/**
+	 * Human-readable reason the last external generation attempt failed
+	 * (empty when it succeeded or was never attempted). The ai_meta schema
+	 * has no dedicated error column, so this is folded into the
+	 * source_provider value for post-mortem visibility.
+	 *
+	 * @var string
+	 */
+	public static $last_error = '';
+
+	/**
 	 * Register hooks.
 	 */
 	public function register() {
@@ -41,12 +51,21 @@ class Wpistic_Formistic_AI {
 			$draft = $this->wpistic_formistic_generate_smart_reply( $row, $fields );
 		}
 
+		// Record the provider; when the external call failed and we fell back
+		// to local rules, note why. There is no dedicated error column in the
+		// ai_meta schema, so the reason rides along inside source_provider
+		// (VARCHAR 100 — upsert_ai_meta truncates).
+		$provider = (string) get_option( 'wpistic_formistic_ai_provider', 'local_rules' );
+		if ( '' !== self::$last_error ) {
+			$provider .= ' [error: ' . self::$last_error . ']';
+		}
+
 		Wpistic_Formistic_Database::upsert_ai_meta(
 			(int) $submission_id,
 			(int) $spam_score,
 			implode( ', ', $tags ),
 			$draft,
-			(string) get_option( 'wpistic_formistic_ai_provider', 'local_rules' )
+			$provider
 		);
 
 		if ( '1' === get_option( 'wpistic_formistic_ai_auto_reply_enabled', '0' ) ) {
@@ -118,15 +137,20 @@ class Wpistic_Formistic_AI {
 	 * @return string
 	 */
 	protected function wpistic_formistic_generate_smart_reply( $row, $fields ) {
+		// Persona + knowledge context travel as the SYSTEM part; chat-style
+		// providers (OpenRouter) get it as a system message, single-prompt
+		// providers get it prepended to the prompt inside generate_text().
 		$context = $this->wpistic_formistic_get_knowledge_context();
-		$prompt  = "You are the Formistic assistant for this website. Write a concise professional reply.\n";
-		$prompt .= "Sender name: " . (string) $row->sender_name . "\n";
+		$system  = "You are the Formistic assistant for this website. Write a concise professional reply.";
+		if ( '' !== trim( $context ) ) {
+			$system .= "\nKnowledge Context:\n" . $context;
+		}
+		$prompt  = "Sender name: " . (string) $row->sender_name . "\n";
 		$prompt .= "Sender email: " . (string) $row->sender_email . "\n";
 		$prompt .= "Form: " . (string) $row->form_name . "\n";
 		$prompt .= "Message: " . (string) $row->message . "\n";
 		$prompt .= "Fields: " . wp_json_encode( $fields ) . "\n";
-		$prompt .= "Knowledge Context:\n" . $context . "\n";
-		$generated = $this->wpistic_formistic_ai_generate_text( $prompt );
+		$generated = $this->wpistic_formistic_ai_generate_text( $prompt, $system );
 		if ( '' !== trim( $generated ) ) {
 			return $generated;
 		}
@@ -392,12 +416,29 @@ class Wpistic_Formistic_AI {
 	}
 
 	/**
-	 * Provider-based text generation.
+	 * Provider-based text generation. Request/response shapes are
+	 * provider-aware:
 	 *
-	 * @param string $prompt Prompt text.
+	 * - openrouter  → OpenAI-style chat completions ({model, messages[],
+	 *                 max_tokens}) with Bearer auth + HTTP-Referer/X-Title
+	 *                 attribution headers; endpoint auto-defaults to
+	 *                 https://openrouter.ai/api/v1/chat/completions.
+	 * - huggingface → Inference API ({inputs}); parses [0].generated_text.
+	 * - ollama      → /api/generate ({model, prompt, stream:false}).
+	 * - custom      → generic {model, prompt}.
+	 *
+	 * Failures return '' (callers fall back to local rules) and leave the
+	 * reason in self::$last_error.
+	 *
+	 * @param string $prompt Prompt text (the user-turn content).
+	 * @param string $system Optional persona/knowledge context. Sent as a
+	 *                       system message on chat providers, otherwise
+	 *                       prepended to the prompt.
 	 * @return string
 	 */
-	protected function wpistic_formistic_ai_generate_text( $prompt ) {
+	protected function wpistic_formistic_ai_generate_text( $prompt, $system = '' ) {
+		self::$last_error = '';
+
 		$provider = (string) get_option( 'wpistic_formistic_ai_provider', 'local_rules' );
 		if ( 'local_rules' === $provider ) {
 			return '';
@@ -405,20 +446,48 @@ class Wpistic_Formistic_AI {
 		$endpoint = (string) get_option( 'wpistic_formistic_ai_endpoint', '' );
 		$model    = (string) get_option( 'wpistic_formistic_ai_model', '' );
 		$api_key  = (string) get_option( 'wpistic_formistic_ai_api_key', '' );
+		if ( '' === $endpoint && 'openrouter' === $provider ) {
+			$endpoint = 'https://openrouter.ai/api/v1/chat/completions';
+		}
 		if ( '' === $endpoint ) {
+			self::$last_error = 'no endpoint configured';
 			return '';
 		}
 		$headers = [ 'Content-Type' => 'application/json' ];
 		if ( '' !== $api_key ) {
 			$headers['Authorization'] = 'Bearer ' . $api_key;
 		}
-		$body = [
-			'model'  => $model,
-			'prompt' => $prompt,
-		];
-		if ( 'ollama' === $provider ) {
-			$body = [ 'model' => $model, 'prompt' => $prompt, 'stream' => false ];
+
+		// Single-prompt providers get the system context folded in up front.
+		$full_prompt = '' !== trim( $system ) ? $system . "\n\n" . $prompt : $prompt;
+
+		switch ( $provider ) {
+			case 'openrouter':
+				$messages = [];
+				if ( '' !== trim( $system ) ) {
+					$messages[] = [ 'role' => 'system', 'content' => $system ];
+				}
+				$messages[] = [ 'role' => 'user', 'content' => $prompt ];
+				$body = [
+					'model'      => $model,
+					'messages'   => $messages,
+					'max_tokens' => (int) apply_filters( 'wpistic_formistic_ai_max_tokens', 600 ),
+				];
+				// App-attribution headers OpenRouter asks integrations to send.
+				$headers['HTTP-Referer'] = home_url( '/' );
+				$headers['X-Title']      = wp_specialchars_decode( get_bloginfo( 'name' ), ENT_QUOTES );
+				break;
+			case 'huggingface':
+				$body = [ 'inputs' => $full_prompt ];
+				break;
+			case 'ollama':
+				$body = [ 'model' => $model, 'prompt' => $full_prompt, 'stream' => false ];
+				break;
+			default: // custom endpoint — keep the legacy generic shape.
+				$body = [ 'model' => $model, 'prompt' => $full_prompt ];
+				break;
 		}
+
 		$res = wp_remote_post(
 			$endpoint,
 			[
@@ -428,18 +497,36 @@ class Wpistic_Formistic_AI {
 			]
 		);
 		if ( is_wp_error( $res ) ) {
+			self::$last_error = substr( $res->get_error_message(), 0, 60 );
 			return '';
 		}
+		$code = (int) wp_remote_retrieve_response_code( $res );
 		$data = json_decode( (string) wp_remote_retrieve_body( $res ), true );
+		if ( $code < 200 || $code >= 300 ) {
+			$detail = '';
+			if ( isset( $data['error']['message'] ) ) {
+				$detail = (string) $data['error']['message'];
+			} elseif ( isset( $data['error'] ) && is_string( $data['error'] ) ) {
+				$detail = $data['error'];
+			}
+			self::$last_error = substr( trim( 'HTTP ' . $code . ' ' . $detail ), 0, 60 );
+			return '';
+		}
+
+		// Provider-specific shapes first, then the generic fallbacks.
+		if ( 'huggingface' === $provider && isset( $data[0]['generated_text'] ) ) {
+			return sanitize_textarea_field( (string) $data[0]['generated_text'] );
+		}
 		if ( isset( $data['response'] ) ) {
 			return sanitize_textarea_field( (string) $data['response'] );
-		}
-		if ( isset( $data['choices'][0]['text'] ) ) {
-			return sanitize_textarea_field( (string) $data['choices'][0]['text'] );
 		}
 		if ( isset( $data['choices'][0]['message']['content'] ) ) {
 			return sanitize_textarea_field( (string) $data['choices'][0]['message']['content'] );
 		}
+		if ( isset( $data['choices'][0]['text'] ) ) {
+			return sanitize_textarea_field( (string) $data['choices'][0]['text'] );
+		}
+		self::$last_error = 'unrecognized response shape';
 		return '';
 	}
 

@@ -57,14 +57,19 @@ require_once WPISTIC_FORMISTIC_PATH . 'includes/class-formistic-addons.php';
 require_once WPISTIC_FORMISTIC_PATH . 'includes/class-formistic-api.php';
 require_once WPISTIC_FORMISTIC_PATH . 'includes/class-formistic-admin.php';
 require_once WPISTIC_FORMISTIC_PATH . 'includes/class-formistic-newsletter.php';
+require_once WPISTIC_FORMISTIC_PATH . 'includes/class-formistic-g2a-defaults.php';
+require_once WPISTIC_FORMISTIC_PATH . 'includes/class-formistic-migrate.php';
 require_once WPISTIC_FORMISTIC_PATH . 'includes/class-formistic-ajax.php';
 require_once WPISTIC_FORMISTIC_PATH . 'includes/class-formistic-plugin.php';
 
-/* Activation — create database tables + schedule daily cleanup cron. */
+/* Activation — create database tables, schedule daily cleanup cron, and
+ * fill-only seed the Guns 2 Ammo AI knowledge + reply-rule defaults
+ * (never overwrites options an operator already edited). */
 register_activation_hook(__FILE__, function () {
 	Wpistic_Formistic_Database::install();
 	Wpistic_Formistic_Newsletter::install();
 	Wpistic_Formistic_Gdpr::maybe_schedule();
+	Wpistic_Formistic_G2A_Defaults::seed();
 });
 
 /* Deactivation — unschedule the cron (options + data persist). */
