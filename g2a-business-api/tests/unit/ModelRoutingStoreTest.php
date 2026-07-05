@@ -95,4 +95,20 @@ class ModelRoutingStoreTest extends TestCase {
 			$this->assertNotEmpty( $labels[ $p ] );
 		}
 	}
+
+	public function test_sales_pipeline_is_a_known_purpose_with_a_label() {
+		$this->assertContains( 'sales_pipeline', Model_Routing_Store::PURPOSES );
+		$this->assertArrayHasKey( 'sales_pipeline', Model_Routing_Store::labels() );
+		$this->assertNotEmpty( Model_Routing_Store::labels()['sales_pipeline'] );
+	}
+
+	public function test_sales_pipeline_purpose_routes_like_any_other() {
+		$store = new Model_Routing_Store();
+		$out   = $store->update( array( 'sales_pipeline' => 'm1' ) );
+
+		$this->assertTrue( $out['ok'] );
+		$this->assertSame( 'm1', $out['routing']['sales_pipeline'] );
+		$this->assertSame( 'm1', $store->get_for( 'sales_pipeline' ) );
+		$this->assertSame( 'm1', $store->connection_for( 'sales_pipeline', 'anthropic-primary' ) );
+	}
 }

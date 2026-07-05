@@ -222,8 +222,11 @@ class Agent_Store {
 				'confidence'     => 0.0,
 				'reviewRequired' => true,
 				'promptTemplate' =>
-					"You are the booking-flow analyst. From this snapshot, identify one booking type with rising demand and suggest a capacity or promotion change.\n\n"
-					. "SNAPSHOT:\n{{snapshot}}",
+					"You are the booking-flow analyst. From this snapshot, identify one booking type with rising demand and suggest a capacity or promotion change.\n"
+					. "Then review the open booking/CCW/range leads below and name the ONE lead most worth prioritizing today. Ground any pricing or policy claim in the pricing/policy facts below — never invent a number that isn't there.\n\n"
+					. "SNAPSHOT:\n{{snapshot}}\n\n"
+					. "OPEN LEADS:\n{{leads}}\n\n"
+					. "KNOWLEDGE:\n{{knowledge}}",
 			),
 			'ag-member' => array(
 				'id'             => 'ag-member',
@@ -237,13 +240,16 @@ class Agent_Store {
 				'confidence'     => 0.0,
 				'reviewRequired' => true,
 				'promptTemplate' =>
-					"You are the membership retention analyst. From the snapshot, propose the retention tactic most likely to recover the current churn queue.\n\n"
-					. "SNAPSHOT:\n{{snapshot}}",
+					"You are the membership retention analyst. From the snapshot, propose the retention tactic most likely to recover the current churn queue.\n"
+					. "Then review the open membership leads below and name the ONE lead most worth a personal follow-up today. Ground any plan or guest-pricing claim in the pricing/policy facts below — never invent a number that isn't there.\n\n"
+					. "SNAPSHOT:\n{{snapshot}}\n\n"
+					. "OPEN LEADS:\n{{leads}}\n\n"
+					. "KNOWLEDGE:\n{{knowledge}}",
 			),
-			'ag-inventory' => array(
-				'id'             => 'ag-inventory',
-				'name'           => 'Inventory Insight Agent',
-				'department'     => 'inventory',
+			'ag-store' => array(
+				'id'             => 'ag-store',
+				'name'           => 'Store Manager Agent',
+				'department'     => 'store',
 				'status'         => self::STATUS_ACTIVE,
 				'model'          => 'anthropic-primary',
 				'assignedTasks'  => 1,
@@ -252,8 +258,10 @@ class Agent_Store {
 				'confidence'     => 0.0,
 				'reviewRequired' => false,
 				'promptTemplate' =>
-					"You are the inventory analyst. From the snapshot, name one clearance bundle worth building this week (SKUs + bundle price).\n\n"
-					. "SNAPSHOT:\n{{snapshot}}",
+					"You are the store manager analyst. From the snapshot, name the best and worst sellers, flag any low-stock risk, "
+					. "and recommend ONE restock or bundle move worth making this week (SKUs + bundle price). Ground any product or pricing claim in the facts below — never invent a number that isn't there.\n\n"
+					. "SNAPSHOT:\n{{snapshot}}\n\n"
+					. "KNOWLEDGE:\n{{knowledge}}",
 			),
 			'ag-reports' => array(
 				'id'             => 'ag-reports',
@@ -268,7 +276,45 @@ class Agent_Store {
 				'reviewRequired' => false,
 				'promptTemplate' =>
 					"You are the weekly reporter. Summarize the week in 5 bullet points: revenue, top movers, misses, biggest risk, top action.\n\n"
-					. "SNAPSHOT:\n{{snapshot}}",
+					. "SNAPSHOT:\n{{snapshot}}\n\n"
+					. "KNOWLEDGE:\n{{knowledge}}",
+			),
+			'ag-email' => array(
+				'id'             => 'ag-email',
+				'name'           => 'Email Manager Agent',
+				'department'     => 'email',
+				'status'         => self::STATUS_ACTIVE,
+				'model'          => 'anthropic-primary',
+				'assignedTasks'  => 0,
+				'lastRun'        => null,
+				'lastOutput'     => 'No runs yet.',
+				'confidence'     => 0.0,
+				'reviewRequired' => true,
+				'promptTemplate' =>
+					"You are the Email Manager for Guns2Ammo. Draft a warm, accurate, on-brand reply to the ONE customer enquiry below.\n"
+					. "Keep it to 2-4 sentences plus one clear next step. Ground every fact in the knowledge below — never invent a price or policy that isn't there. "
+					. "Sign off with \"— Guns 2 Ammo Team\".\n\n"
+					. "SNAPSHOT:\n{{snapshot}}\n\n"
+					. "ENQUIRY:\n{{lead}}\n\n"
+					. "KNOWLEDGE:\n{{knowledge}}",
+			),
+			'ag-sales' => array(
+				'id'             => 'ag-sales',
+				'name'           => 'Sales Agent',
+				'department'     => 'sales',
+				'status'         => self::STATUS_ACTIVE,
+				'model'          => 'anthropic-primary',
+				'assignedTasks'  => 0,
+				'lastRun'        => null,
+				'lastOutput'     => 'No runs yet.',
+				'confidence'     => 0.0,
+				'reviewRequired' => false,
+				'promptTemplate' =>
+					"You are the Sales Agent. Review the leads funnel snapshot below and the list of open/stale leads. "
+					. "Name the ONE lead most worth following up on today and say why, then flag any category with an unusually high lost-rate.\n\n"
+					. "SNAPSHOT:\n{{snapshot}}\n\n"
+					. "LEADS:\n{{leads}}\n\n"
+					. "KNOWLEDGE:\n{{knowledge}}",
 			),
 		);
 	}
