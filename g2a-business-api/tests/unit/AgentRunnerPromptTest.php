@@ -45,6 +45,27 @@ class AgentRunnerPromptTest extends TestCase {
 		$this->assertStringNotContainsString( '{{lead}}', $out );
 	}
 
+	public function test_render_prompt_substitutes_the_agents_placeholder() {
+		$template = "SNAPSHOT:\n{{snapshot}}\nDEPARTMENT AGENT FINDINGS:\n{{agents}}";
+		$out      = Agent_Runner::render_prompt(
+			$template,
+			array(
+				'snapshot' => array( 'a' => 1 ),
+				'agents'   => array( array( 'id' => 'ag-seo', 'lastOutput' => 'clicks dropping' ) ),
+			)
+		);
+
+		$this->assertStringContainsString( '"a":1', $out );
+		$this->assertStringContainsString( '"id":"ag-seo"', $out );
+		$this->assertStringContainsString( 'clicks dropping', $out );
+		$this->assertStringNotContainsString( '{{agents}}', $out );
+	}
+
+	public function test_render_prompt_leaves_agents_placeholder_literal_when_absent() {
+		$out = Agent_Runner::render_prompt( "FINDINGS:\n{{agents}}", array( 'snapshot' => array( 'x' => 1 ) ) );
+		$this->assertStringContainsString( '{{agents}}', $out );
+	}
+
 	public function test_render_prompt_leaves_absent_placeholders_literal() {
 		$template = "SNAPSHOT:\n{{snapshot}}\nLEADS:\n{{leads}}\nKNOWLEDGE:\n{{knowledge}}";
 		$out      = Agent_Runner::render_prompt( $template, array( 'snapshot' => array( 'a' => 1 ) ) );

@@ -275,9 +275,9 @@ class Agent_Store {
 				'confidence'     => 0.0,
 				'reviewRequired' => false,
 				'promptTemplate' =>
-					"You are the weekly reporter. Summarize the week in 5 bullet points: revenue, top movers, misses, biggest risk, top action.\n\n"
+					"You are the weekly reporter. Given the 30-day snapshot AND the latest finding from each department agent below, write a 5-bullet weekly summary: revenue, top movers, misses, biggest risk, top action. Ground your bullets in what the department agents already found rather than re-deriving from raw numbers where they agree.\n\n"
 					. "SNAPSHOT:\n{{snapshot}}\n\n"
-					. "KNOWLEDGE:\n{{knowledge}}",
+					. "DEPARTMENT AGENT FINDINGS:\n{{agents}}",
 			),
 			'ag-email' => array(
 				'id'             => 'ag-email',

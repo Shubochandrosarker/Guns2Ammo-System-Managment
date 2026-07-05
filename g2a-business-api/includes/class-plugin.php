@@ -25,6 +25,12 @@ class Plugin {
 		\WordPressistic\G2ABA\Leads\Leads_Installer::maybe_install();
 		\WordPressistic\G2ABA\Leads\Lead_Ingestion::register();
 
+		// Same idea, one option comparison: only re-seeds automations +
+		// agents (and re-syncs cron) when their defs version changed, so
+		// an already-activated install picks up new/changed automations
+		// and agent behaviours without needing a reactivation.
+		\WordPressistic\G2ABA\Automation\Automation_Store::maybe_reseed();
+
 		// Cron hooks must be registered on every request (not just admin), so
 		// that WP-Cron can invoke them when a scheduled event fires.
 		\WordPressistic\G2ABA\AI\Insight_Generator::register_cron();
@@ -40,6 +46,8 @@ class Plugin {
 		\WordPressistic\G2ABA\Automation\Handlers\Abandoned_Inquiry_Handler::register();
 		\WordPressistic\G2ABA\Automation\Handlers\Ladies_Upsell_Handler::register();
 		\WordPressistic\G2ABA\Automation\Handlers\Churn_Risk_Handler::register();
+		\WordPressistic\G2ABA\Automation\Handlers\Agent_Hourly_Refresh_Handler::register();
+		\WordPressistic\G2ABA\Automation\Handlers\Agent_Daily_Refresh_Handler::register();
 
 		// BridGistic executor subscribes to the approval hook.
 		\WordPressistic\G2ABA\BridGistic\Executor::register();

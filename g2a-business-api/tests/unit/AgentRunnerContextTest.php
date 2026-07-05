@@ -3,6 +3,7 @@ namespace WordPressistic\G2ABA\Tests\Unit;
 
 use PHPUnit\Framework\TestCase;
 use WordPressistic\G2ABA\Agents\Agent_Runner;
+use WordPressistic\G2ABA\Agents\Agent_Store;
 use WordPressistic\G2ABA\Leads\Leads_Repository;
 
 /**
@@ -108,6 +109,51 @@ class AgentRunnerContextTest extends TestCase {
 
 		foreach ( array( 'overview', 'bookings', 'memberships', 'store', 'seo' ) as $key ) {
 			$this->assertArrayHasKey( $key, $context['snapshot'] );
+		}
+	}
+
+	public function test_context_for_reports_also_includes_agent_findings() {
+		Agent_Store::seed_defaults();
+		( new Agent_Store() )->record_run( 'ag-seo', 'CCW class page is bleeding traffic', 0.86 );
+
+		$context = Agent_Runner::context_for( 'reports' );
+
+		$this->assertArrayHasKey( 'agents', $context );
+		$this->assertIsArray( $context['agents'] );
+
+		$ids = array_column( $context['agents'], 'id' );
+		$this->assertContains( 'ag-seo', $ids );
+		$this->assertNotContains( 'ag-reports', $ids, 'The reporter must not cite its own prior output.' );
+
+		$seo = $context['agents'][ array_search( 'ag-seo', $ids, true ) ];
+		$this->assertSame( 'CCW class page is bleeding traffic', $seo['lastOutput'] );
+		$this->assertSame( 0.86, $seo['confidence'] );
+		$this->assertArrayHasKey( 'name', $seo );
+		$this->assertArrayHasKey( 'department', $seo );
+		$this->assertArrayHasKey( 'lastRun', $seo );
+		$this->assertArrayNotHasKey( 'promptTemplate', $seo, 'Prompt templates must never leak into the narration context.' );
+	}
+
+	public function test_context_for_analyst_has_no_agents_key() {
+		$context = Agent_Runner::context_for( 'analyst' );
+		$this->assertArrayNotHasKey( 'agents', $context );
+	}
+
+	public function test_agent_findings_excludes_ag_reports_and_strips_internal_fields() {
+		Agent_Store::seed_defaults();
+
+		$findings = Agent_Runner::agent_findings();
+		$ids      = array_column( $findings, 'id' );
+
+		$this->assertNotContains( 'ag-reports', $ids );
+		$this->assertContains( 'ag-seo', $ids );
+		$this->assertCount( 7, $findings, '8 default agents minus ag-reports itself.' );
+
+		foreach ( $findings as $entry ) {
+			$this->assertSame(
+				array( 'id', 'name', 'department', 'lastOutput', 'confidence', 'lastRun' ),
+				array_keys( $entry )
+			);
 		}
 	}
 

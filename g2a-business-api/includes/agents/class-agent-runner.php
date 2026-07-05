@@ -123,15 +123,15 @@ class Agent_Runner {
 	}
 
 	/**
-	 * Substitute `{{snapshot}}`, `{{leads}}`, `{{knowledge}}`, and `{{lead}}`
-	 * from the given context. A key that is absent from $context leaves its
-	 * placeholder literally in place — harmless, ignored by the model — so
-	 * every department can share one template-rendering call regardless of
-	 * which slices of context it actually has.
+	 * Substitute `{{snapshot}}`, `{{leads}}`, `{{knowledge}}`, `{{lead}}`, and
+	 * `{{agents}}` from the given context. A key that is absent from $context
+	 * leaves its placeholder literally in place — harmless, ignored by the
+	 * model — so every department can share one template-rendering call
+	 * regardless of which slices of context it actually has.
 	 *
 	 * @internal Exposed for tests.
 	 *
-	 * @param array{snapshot?:mixed, leads?:mixed, knowledge?:mixed, lead?:mixed} $context
+	 * @param array{snapshot?:mixed, leads?:mixed, knowledge?:mixed, lead?:mixed, agents?:mixed} $context
 	 */
 	public static function render_prompt( string $template, array $context = array() ): string {
 		$placeholders = array(
@@ -139,6 +139,7 @@ class Agent_Runner {
 			'leads'     => '{{leads}}',
 			'knowledge' => '{{knowledge}}',
 			'lead'      => '{{lead}}',
+			'agents'    => '{{agents}}',
 		);
 
 		foreach ( $placeholders as $key => $placeholder ) {
@@ -224,8 +225,13 @@ class Agent_Runner {
 			case 'sales':
 				return self::sales_context();
 
-			case 'analyst':
 			case 'reports':
+				return array(
+					'snapshot' => self::full_snapshot( $range ),
+					'agents'   => self::agent_findings(),
+				);
+
+			case 'analyst':
 			default:
 				return array( 'snapshot' => self::full_snapshot( $range ) );
 		}
@@ -233,8 +239,9 @@ class Agent_Runner {
 
 	/**
 	 * The full cross-cutting snapshot — unchanged shape from before this
-	 * phase. Still used by `analyst` (its whole point) and `reports`
-	 * (Phase C will change its behaviour, not its data).
+	 * phase. Still used by `analyst` (its whole point) and `reports`, which
+	 * additionally gets an `agents` context key alongside this snapshot (see
+	 * `agent_findings()`).
 	 */
 	private static function full_snapshot( Range $range ): array {
 		return array(
@@ -245,6 +252,38 @@ class Agent_Runner {
 			'store'       => self::safe_call( static fn() => ( new Store_Provider() )->analytics( $range ) ),
 			'seo'         => self::safe_call( static fn() => ( new SEO_Provider() )->analytics( $range ) ),
 		);
+	}
+
+	/**
+	 * The `{{agents}}` context for the `reports` department — the latest
+	 * finding from every OTHER department agent (ag-reports itself is
+	 * excluded; it wouldn't make sense for the reporter to cite its own
+	 * prior output), shaped down to just what a narration prompt needs.
+	 * `promptTemplate` and any other internal field never leaves this
+	 * method — only the fields a human reading the weekly report would
+	 * actually care about.
+	 *
+	 * @internal Exposed for tests.
+	 *
+	 * @return array<int, array{id:string, name:string, department:string, lastOutput:string, confidence:float, lastRun:?string}>
+	 */
+	public static function agent_findings(): array {
+		$out = array();
+		foreach ( ( new Agent_Store() )->all() as $agent ) {
+			$id = (string) ( $agent['id'] ?? '' );
+			if ( 'ag-reports' === $id ) {
+				continue;
+			}
+			$out[] = array(
+				'id'         => $id,
+				'name'       => (string) ( $agent['name'] ?? '' ),
+				'department' => (string) ( $agent['department'] ?? '' ),
+				'lastOutput' => (string) ( $agent['lastOutput'] ?? '' ),
+				'confidence' => (float) ( $agent['confidence'] ?? 0.0 ),
+				'lastRun'    => $agent['lastRun'] ?? null,
+			);
+		}
+		return $out;
 	}
 
 	/**
