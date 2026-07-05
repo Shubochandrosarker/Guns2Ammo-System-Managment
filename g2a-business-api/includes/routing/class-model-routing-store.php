@@ -31,6 +31,7 @@ class Model_Routing_Store {
 		'email_drafts',
 		'daily_summaries',
 		'private_inventory',
+		'sales_pipeline',
 	);
 
 	/**
@@ -48,6 +49,7 @@ class Model_Routing_Store {
 			'email_drafts'      => 'Email drafts',
 			'daily_summaries'   => 'Cheap daily summaries',
 			'private_inventory' => 'Private inventory',
+			'sales_pipeline'    => 'Sales pipeline suggestions',
 		);
 	}
 
