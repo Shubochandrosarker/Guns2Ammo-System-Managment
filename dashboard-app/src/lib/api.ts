@@ -15,6 +15,9 @@ import type {
   BrainQueryResult,
   BrainStats,
   BusinessGap,
+  ContentListParams,
+  ContentPage,
+  ContentResourceType,
   EmailOverview,
   InsightisticAnalytics,
   IntegrationsStatus,
@@ -24,12 +27,15 @@ import type {
   LeadStatus,
   MembershipAnalytics,
   ModelConnection,
+  NamespacesStatus,
   Range,
   RevenueOverview,
   SeoAnalytics,
   ShooterInsights,
+  SiteHealthSummary,
   StoreAnalytics,
   SystemHealthCheck,
+  WpContentItem,
 } from '@/types/analytics'
 
 const AUTH_KEY = 'g2a.auth.token'
@@ -71,7 +77,7 @@ class ApiError extends Error {
   }
 }
 
-async function http<T>(path: string, init?: RequestInit): Promise<T> {
+async function httpRaw(path: string, init?: RequestInit): Promise<Response> {
   const base = env.apiBase.replace(/\/$/, '')
   const url = `${base}/wp-json/g2a/v1${path}`
   const session = readSession()
@@ -91,7 +97,64 @@ async function http<T>(path: string, init?: RequestInit): Promise<T> {
     const text = await res.text().catch(() => '')
     throw new ApiError(res.status, text || res.statusText)
   }
+  return res
+}
+
+async function http<T>(path: string, init?: RequestInit): Promise<T> {
+  const res = await httpRaw(path, init)
   return (await res.json()) as T
+}
+
+// The g2a-business-api /content/* routes proxy wp/v2 in-process and relay
+// its X-WP-Total / X-WP-TotalPages pagination headers — read those off the
+// raw Response since the plain `http()` helper only returns the JSON body.
+async function httpContentList(path: string): Promise<ContentPage> {
+  const res = await httpRaw(path)
+  const items = (await res.json()) as WpContentItem[]
+  const total = Number(res.headers.get('X-WP-Total'))
+  const totalPages = Number(res.headers.get('X-WP-TotalPages'))
+  return {
+    items,
+    total: Number.isFinite(total) && total >= 0 ? total : items.length,
+    totalPages: Number.isFinite(totalPages) && totalPages >= 0 ? totalPages : 1,
+  }
+}
+
+function contentQueryString(params: ContentListParams): string {
+  const qs = new URLSearchParams()
+  if (params.perPage) qs.set('per_page', String(params.perPage))
+  if (params.page) qs.set('page', String(params.page))
+  if (params.search) qs.set('search', params.search)
+  if (params.status) qs.set('status', params.status)
+  const suffix = qs.toString()
+  return suffix ? `?${suffix}` : ''
+}
+
+function mockContentPage(items: WpContentItem[], params: ContentListParams): ContentPage {
+  let filtered = items
+  if (params.status) filtered = filtered.filter(i => i.status === params.status)
+  if (params.search) {
+    const q = params.search.toLowerCase()
+    filtered = filtered.filter(i =>
+      (i.title?.rendered ?? i.name ?? '').toLowerCase().includes(q),
+    )
+  }
+  const total = filtered.length
+  const perPage = params.perPage || 10
+  const page = params.page || 1
+  const start = (page - 1) * perPage
+  return {
+    items: filtered.slice(start, start + perPage),
+    total,
+    totalPages: Math.max(1, Math.ceil(total / perPage)),
+  }
+}
+
+function contentResource(type: ContentResourceType, mockItems: WpContentItem[]) {
+  return (params: ContentListParams = {}): Promise<ContentPage> =>
+    env.useMocks
+      ? Promise.resolve(mockContentPage(mockItems, params))
+      : httpContentList(`/content/${type}${contentQueryString(params)}`)
 }
 
 // ---------------------------------------------------------------------------
@@ -279,11 +342,29 @@ export const api = {
     },
   },
 
+  content: {
+    posts: contentResource('posts', mock.contentPosts),
+    pages: contentResource('pages', mock.contentPages),
+    media: contentResource('media', mock.contentMedia),
+    categories: contentResource('categories', mock.contentCategories),
+    tags: contentResource('tags', mock.contentTags),
+  },
+
   system: {
     integrations(): Promise<IntegrationsStatus> {
       return env.useMocks
         ? Promise.resolve(mock.integrations)
         : http<IntegrationsStatus>('/system/integrations')
+    },
+    namespaces(): Promise<NamespacesStatus> {
+      return env.useMocks
+        ? Promise.resolve(mock.namespacesStatus)
+        : http<NamespacesStatus>('/system/namespaces')
+    },
+    siteHealth(): Promise<SiteHealthSummary> {
+      return env.useMocks
+        ? Promise.resolve(mock.siteHealthSummary)
+        : http<SiteHealthSummary>('/system/site-health')
     },
     async rotateKeys(): Promise<SystemActionResult> {
       if (env.useMocks) throw new Error('rotateKeys is unavailable in mock mode')

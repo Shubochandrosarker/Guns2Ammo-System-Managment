@@ -1,50 +1,54 @@
 import { NavLink, useLocation } from 'react-router-dom'
 
+// Dashboard Home is a single ungrouped top link (index page). Everything
+// else is grouped below — regrouping labels only, no route paths changed.
+const TOP_LINK = { to: '/', label: 'Dashboard Home', icon: '⌂' } as const
+
 // Group -> items. `label` is the *frontend* naming the user asked for.
 const NAV = [
   {
-    group: 'Overview',
+    group: 'Website',
     items: [
-      { to: '/',                     label: 'Dashboard Home',        icon: '⌂' },
-      { to: '/business-analysis',    label: 'Business Analysis',     icon: '≈' },
-      { to: '/insightistic',         label: 'Insightistic Analytics',icon: '◇' },
+      { to: '/website-content',      label: 'Website Content',       icon: '⌗' },
     ],
   },
   {
-    group: 'Revenue',
+    group: 'Operations',
     items: [
       { to: '/booking-revenue',      label: 'Booking Revenue',       icon: '◉' },
       { to: '/membership-revenue',   label: 'Membership Revenue',    icon: '✦' },
-      { to: '/woo-store-analytics',  label: 'Woo Store Analytics',   icon: '$' },
+      { to: '/leads',                label: 'Leads',                 icon: '☍' },
+      { to: '/email-management',     label: 'Email Management',      icon: '✉' },
+      { to: '/ai-insights',          label: 'AI Insights',           icon: '✨' },
+      { to: '/ai-agents',            label: 'AI Agents',             icon: '⌬' },
+      { to: '/bridgistic',           label: 'BridGistic',            icon: '⇌' },
+      { to: '/ops-queue',            label: 'Ops Queue',             icon: '✓' },
+      { to: '/tasks',                label: 'Tasks',                 icon: '✎' },
     ],
   },
   {
-    group: 'Growth',
+    group: 'Commerce',
+    items: [
+      { to: '/woo-store-analytics',  label: 'Woo Store Analytics',   icon: '$' },
+      { to: '/business-analysis',    label: 'Business Analysis',     icon: '≈' },
+    ],
+  },
+  {
+    group: 'SEO',
     items: [
       { to: '/seo-growth',           label: 'SEO Growth',            icon: '↗' },
+      { to: '/insightistic',         label: 'Insightistic Analytics',icon: '◇' },
       { to: '/shooter-insights',     label: 'Shooter Insights',      icon: '◎' },
       { to: '/business-gaps',        label: 'Business Gaps',         icon: '⚠' },
     ],
   },
   {
-    group: 'AI Operations',
+    group: 'Technical Health',
     items: [
-      { to: '/ai-insights',          label: 'AI Insights',           icon: '✨' },
-      { to: '/automation-center',    label: 'Automation Center',     icon: '⚙' },
-      { to: '/ai-agents',            label: 'AI Agents',             icon: '⌬' },
-      { to: '/leads',                label: 'Leads',                 icon: '☍' },
-      { to: '/email-management',     label: 'Email Management',      icon: '✉' },
-      { to: '/bridgistic',           label: 'BridGistic',            icon: '⇌' },
-      { to: '/ai-models',            label: 'AI Models & RAGs',      icon: '⛁' },
-    ],
-  },
-  {
-    group: 'System',
-    items: [
-      { to: '/reports',              label: 'Reports',               icon: '☰' },
-      { to: '/tasks',                label: 'Tasks',                 icon: '✎' },
-      { to: '/ops-queue',            label: 'Ops Queue',             icon: '✓' },
       { to: '/system-health',        label: 'System Health',         icon: '♥' },
+      { to: '/reports',              label: 'Reports',               icon: '☰' },
+      { to: '/automation-center',    label: 'Automation Center',     icon: '⚙' },
+      { to: '/ai-models',            label: 'AI Models & RAGs',      icon: '⛁' },
       { to: '/settings',             label: 'Settings',              icon: '⚙' },
     ],
   },
@@ -85,6 +89,29 @@ export function Sidebar({ onNavigate }: Props) {
       </div>
 
       <nav className="flex-1 overflow-y-auto px-3 py-4 space-y-6 text-sm">
+        <ul className="space-y-0.5">
+          <li>
+            <NavLink
+              to={TOP_LINK.to}
+              end
+              onClick={onNavigate}
+              className="sidebar-link group flex items-center gap-3 rounded-lg px-2.5 py-2 transition-colors"
+              style={{
+                backgroundColor: location.pathname === '/' ? 'var(--sidebar-active)' : 'transparent',
+                color: location.pathname === '/' ? '#ffffff' : 'var(--sidebar-fg)',
+              }}
+            >
+              <span
+                className="w-5 text-center"
+                style={{ color: location.pathname === '/' ? 'var(--brand-strong)' : 'var(--sidebar-fg-muted)' }}
+              >
+                {TOP_LINK.icon}
+              </span>
+              <span className="truncate">{TOP_LINK.label}</span>
+            </NavLink>
+          </li>
+        </ul>
+
         {NAV.map(section => (
           <div key={section.group}>
             <div
@@ -95,14 +122,11 @@ export function Sidebar({ onNavigate }: Props) {
             </div>
             <ul className="space-y-0.5">
               {section.items.map(item => {
-                const isActive = item.to === '/'
-                  ? location.pathname === '/'
-                  : location.pathname.startsWith(item.to)
+                const isActive = location.pathname.startsWith(item.to)
                 return (
                   <li key={item.to}>
                     <NavLink
                       to={item.to}
-                      end={item.to === '/'}
                       onClick={onNavigate}
                       className="sidebar-link group flex items-center gap-3 rounded-lg px-2.5 py-2 transition-colors"
                       style={{

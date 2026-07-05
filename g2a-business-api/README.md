@@ -62,6 +62,35 @@ All other routes require `g2a_dashboard` (read) or `g2a_dashboard_admin`
 | GET    | `/audit-log?limit=100`                      | read   |
 | GET    | `/agents/{id}/prompt`                       | admin  |
 | POST   | `/public/opt-out`                           | public |
+| GET    | `/system/namespaces`                        | read   |
+| GET    | `/system/site-health`                       | read   |
+| GET    | `/content/posts?per_page=&page=&search=&status=` | read |
+| GET    | `/content/pages?per_page=&page=&search=&status=` | read |
+| GET    | `/content/media?per_page=&page=&search=`    | read   |
+| GET    | `/content/categories?per_page=&page=&search=` | read |
+| GET    | `/content/tags?per_page=&page=&search=`     | read   |
+
+## System discovery & website content
+
+- **`GET /system/namespaces`** — calls WP core's own `rest_get_server()->get_namespaces()`
+  in-process (no HTTP round-trip) and returns every REST namespace actually
+  registered on the live install, plus a `detected` object
+  (`rankMath`/`redirection`/`elementor`/`wooCommerce` booleans computed from
+  that real list). Nothing is hardcoded — a plugin only shows up as
+  "detected" if its namespace is genuinely registered.
+- **`GET /content/{posts|pages|media|categories|tags}`** — a thin in-process
+  proxy onto WP core's own `wp/v2` endpoints via `rest_do_request()`, so the
+  dashboard reads website content through the same `g2a/v1` auth/CORS
+  surface as every other route instead of needing a second cross-origin
+  story against `wp/v2`. Forwards `per_page`/`page`/`search` (and `status`
+  for posts/pages) and relays `X-WP-Total`/`X-WP-TotalPages` for pagination.
+- **`GET /system/site-health`** — prefers WP core's own Site Health "direct"
+  tests (background updates, loopback requests, HTTPS status, auth header),
+  run in-process via `rest_do_request('/wp-site-health/v1/tests/...')`.
+  Degrades to a constants-only summary (WP/PHP version, active plugin
+  count, debug flags, disk-free space) — flagged with `degraded: true` —
+  whenever Site Health internals aren't available; this endpoint never
+  fatals.
 
 ## Operational review screens
 

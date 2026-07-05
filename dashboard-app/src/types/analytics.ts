@@ -387,3 +387,75 @@ export type BrainIngestData =
 export type BrainIngestResult =
   | { ok: true; results: BrainIngestData }
   | { ok: false; results: []; reason: string }
+
+// GET /system/namespaces — dynamic REST-namespace discovery. `namespaces`
+// is the raw, real list WordPress core has registered (rest_get_server()
+// ->get_namespaces()); `detected` is computed from that same list, never
+// hardcoded, so third-party plugin cards only render when actually present.
+export interface NamespacesStatus {
+  namespaces: string[]
+  detected: {
+    rankMath: boolean
+    redirection: boolean
+    elementor: boolean
+    wooCommerce: boolean
+  }
+}
+
+// GET /system/site-health — Site_Health_Provider::summary()'s shape.
+// `degraded: true` means core Site Health internals weren't reachable and
+// this is the constants-only fallback (still real data, just a smaller set).
+export interface SiteHealthSummary {
+  wpVersion: string
+  phpVersion: string
+  activePluginCount: number
+  debugMode: boolean
+  displayErrors: boolean
+  diskFreeBytes: number | null
+  criticalIssues: number
+  recommendedImprovements: number
+  testsRun: string[]
+  degraded: boolean
+}
+
+// GET /content/{posts|pages|media|categories|tags} — thin passthrough onto
+// wp/v2, so field names below mirror wp/v2's own response shape (only the
+// subset the Website Content page actually renders).
+export interface WpContentRendered {
+  rendered: string
+}
+
+export interface WpMediaSize {
+  source_url: string
+  width?: number
+  height?: number
+}
+
+export interface WpContentItem {
+  id: number
+  date: ISODate
+  status?: string
+  link: string
+  title?: WpContentRendered
+  name?: string // categories/tags use `name`, not `title`.
+  slug?: string
+  count?: number // categories/tags term post-count.
+  media_type?: string
+  source_url?: string
+  media_details?: { sizes?: Record<string, WpMediaSize> }
+}
+
+export interface ContentListParams {
+  perPage?: number
+  page?: number
+  search?: string
+  status?: string
+}
+
+export type ContentResourceType = 'posts' | 'pages' | 'media' | 'categories' | 'tags'
+
+export interface ContentPage {
+  items: WpContentItem[]
+  total: number
+  totalPages: number
+}

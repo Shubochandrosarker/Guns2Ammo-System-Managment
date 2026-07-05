@@ -16,10 +16,13 @@ import type {
   LeadStats,
   MembershipAnalytics,
   ModelConnection,
+  NamespacesStatus,
   RevenueOverview,
   SeoAnalytics,
+  SiteHealthSummary,
   StoreAnalytics,
   SystemHealthCheck,
+  WpContentItem,
 } from '@/types/analytics'
 
 const day = (n: number) => {
@@ -557,6 +560,84 @@ export const brainStats: BrainStats = {
     ],
   },
 }
+
+// GET /system/namespaces — the raw, real namespace list plus computed
+// `detected` flags. Mock mode pretends Rank Math is installed (so the
+// System Health page can be screenshotted with a populated card) but
+// Redirection/Elementor are not — demonstrating the "omit when absent"
+// behaviour the real endpoint drives.
+export const namespacesStatus: NamespacesStatus = {
+  namespaces: [
+    'wp/v2',
+    'g2a/v1',
+    'g2a-pos/v1',
+    'g2a-booking/v1',
+    'memberistic/v1',
+    'wpistic-ffl/v1',
+    'formistic/v1',
+    'messageistic/v1',
+    'rankmath/v1',
+    'wp-site-health/v1',
+    'oembed/1.0',
+  ],
+  detected: {
+    rankMath: true,
+    redirection: false,
+    elementor: false,
+    wooCommerce: false,
+  },
+}
+
+// GET /system/site-health — a healthy-looking demo summary.
+export const siteHealthSummary: SiteHealthSummary = {
+  wpVersion: '6.7.1',
+  phpVersion: '8.3.14',
+  activePluginCount: 14,
+  debugMode: false,
+  displayErrors: false,
+  diskFreeBytes: 48_500_000_000,
+  criticalIssues: 0,
+  recommendedImprovements: 1,
+  testsRun: ['background-updates', 'loopback-requests', 'https-status', 'authorization-header'],
+  degraded: false,
+}
+
+// GET /content/{posts|pages|media|categories|tags} — field names mirror
+// wp/v2's own response shape (title.rendered, name for taxonomy terms,
+// media_details.sizes for thumbnails), not a guessed camelCase shape.
+export const contentPosts: WpContentItem[] = [
+  { id: 301, date: '2026-07-01T09:00:00', status: 'publish', link: 'https://guns2ammo.com/blog/summer-ccw-class-schedule/', title: { rendered: 'Summer CCW Class Schedule Is Live' } },
+  { id: 300, date: '2026-06-24T10:15:00', status: 'publish', link: 'https://guns2ammo.com/blog/az-ccw-guide/', title: { rendered: 'The Complete Arizona CCW Guide' } },
+  { id: 299, date: '2026-06-18T08:30:00', status: 'draft',   link: 'https://guns2ammo.com/?p=299', title: { rendered: 'Ladies Tuesday: What To Expect Your First Night' } },
+  { id: 298, date: '2026-06-10T14:00:00', status: 'publish', link: 'https://guns2ammo.com/blog/first-time-shooters/', title: { rendered: 'A Beginner’s Guide To Your First Range Visit' } },
+  { id: 297, date: '2026-05-29T11:45:00', status: 'publish', link: 'https://guns2ammo.com/blog/ammo-restock-may/', title: { rendered: 'May Ammo Restock: What Just Came In' } },
+]
+
+export const contentPages: WpContentItem[] = [
+  { id: 12, date: '2026-04-02T09:00:00', status: 'publish', link: 'https://guns2ammo.com/range/', title: { rendered: 'Range' } },
+  { id: 11, date: '2026-04-02T09:00:00', status: 'publish', link: 'https://guns2ammo.com/ccw-class/', title: { rendered: 'CCW Class' } },
+  { id: 10, date: '2026-04-02T09:00:00', status: 'publish', link: 'https://guns2ammo.com/memberships/', title: { rendered: 'Memberships' } },
+  { id: 9,  date: '2026-03-14T09:00:00', status: 'publish', link: 'https://guns2ammo.com/ladies-tuesday/', title: { rendered: 'Ladies Tuesday' } },
+  { id: 8,  date: '2026-02-01T09:00:00', status: 'draft',   link: 'https://guns2ammo.com/?page_id=8', title: { rendered: 'Corporate & Private Events (new)' } },
+]
+
+export const contentMedia: WpContentItem[] = [
+  { id: 512, date: '2026-07-01T09:05:00', link: 'https://guns2ammo.com/wp-content/uploads/2026/07/ccw-class-hero.jpg', media_type: 'image', source_url: 'https://guns2ammo.com/wp-content/uploads/2026/07/ccw-class-hero.jpg', media_details: { sizes: { thumbnail: { source_url: 'https://guns2ammo.com/wp-content/uploads/2026/07/ccw-class-hero-150x150.jpg', width: 150, height: 150 } } } },
+  { id: 498, date: '2026-06-24T10:20:00', link: 'https://guns2ammo.com/wp-content/uploads/2026/06/az-ccw-guide-cover.jpg', media_type: 'image', source_url: 'https://guns2ammo.com/wp-content/uploads/2026/06/az-ccw-guide-cover.jpg', media_details: { sizes: { thumbnail: { source_url: 'https://guns2ammo.com/wp-content/uploads/2026/06/az-ccw-guide-cover-150x150.jpg', width: 150, height: 150 } } } },
+  { id: 455, date: '2026-05-29T11:50:00', link: 'https://guns2ammo.com/wp-content/uploads/2026/05/ammo-restock.jpg', media_type: 'image', source_url: 'https://guns2ammo.com/wp-content/uploads/2026/05/ammo-restock.jpg', media_details: { sizes: {} } },
+]
+
+export const contentCategories: WpContentItem[] = [
+  { id: 2, date: '', link: 'https://guns2ammo.com/category/training/', name: 'Training', slug: 'training', count: 18 },
+  { id: 3, date: '', link: 'https://guns2ammo.com/category/range-news/', name: 'Range News', slug: 'range-news', count: 24 },
+  { id: 4, date: '', link: 'https://guns2ammo.com/category/products/', name: 'Products', slug: 'products', count: 9 },
+]
+
+export const contentTags: WpContentItem[] = [
+  { id: 21, date: '', link: 'https://guns2ammo.com/tag/ccw/', name: 'CCW', slug: 'ccw', count: 12 },
+  { id: 22, date: '', link: 'https://guns2ammo.com/tag/ladies-tuesday/', name: 'Ladies Tuesday', slug: 'ladies-tuesday', count: 5 },
+  { id: 23, date: '', link: 'https://guns2ammo.com/tag/ammo/', name: 'Ammo', slug: 'ammo', count: 8 },
+]
 
 // GET /brain/query — hit shape matches AiBrainRepository::search()/
 // search_text() (id/document_id/text_content/source_type/source_label/

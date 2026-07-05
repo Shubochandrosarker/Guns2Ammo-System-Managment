@@ -24,6 +24,7 @@ import { SystemHealth } from '@/pages/SystemHealth'
 import { Settings } from '@/pages/Settings'
 import { OpsQueue } from '@/pages/OpsQueue'
 import { Tasks } from '@/pages/Tasks'
+import { WebsiteContent } from '@/pages/WebsiteContent'
 
 export function App() {
   const [session, setSession] = useState<Session | null>(() => readSession())
@@ -65,6 +66,7 @@ export function App() {
         {session ? (
           <Route element={<AppLayout session={session} onSessionChange={setSession} />}>
             <Route index element={<DashboardHome />} />
+            <Route path="website-content"      element={<WebsiteContent />} />
             <Route path="business-analysis"    element={<BusinessAnalysis />} />
             <Route path="insightistic"         element={<InsightisticAnalytics />} />
             <Route path="booking-revenue"      element={<BookingRevenue />} />
