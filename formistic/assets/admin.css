@@ -1,0 +1,471 @@
+/* ======================================================================
+   Formistic - admin UI
+   Wordpressistic branding
+   ====================================================================== */
+
+:root {
+	--wpistic-formistic-brand:        #00C857;
+	--wpistic-formistic-brand-dark:   #0F2044;
+	--wpistic-formistic-brand-soft:   #E8F9EF;
+	--wpistic-formistic-ink:          #0F2044;
+	--wpistic-formistic-muted:        #6B7088;
+	--wpistic-formistic-line:         #E4E5EE;
+	--wpistic-formistic-bg:           #F6F7FB;
+	--wpistic-formistic-ok:           #1E9E6A;
+	--wpistic-formistic-warn:         #D9822B;
+	--wpistic-formistic-danger:       #D6453D;
+	--wpistic-formistic-radius:       10px;
+}
+
+/* ---- Layout ---- */
+.wpistic-formistic-wrap { max-width: 1180px; margin: 20px 20px 60px 0; }
+.wpistic-formistic-wrap * { box-sizing: border-box; }
+
+/* ---- Brand bar ---- */
+.wpistic-formistic-brandbar {
+	display: flex; align-items: center; gap: 20px;
+	background: linear-gradient(120deg, var(--wpistic-formistic-brand-dark), var(--wpistic-formistic-brand));
+	color: #fff; padding: 22px 26px; border-radius: var(--wpistic-formistic-radius);
+	box-shadow: 0 8px 26px rgba(15,32,68,0.22);
+}
+.wpistic-formistic-logo { display: flex; align-items: center; gap: 11px; }
+.wpistic-formistic-logo__mark {
+	width: 40px; height: 40px; border-radius: 9px;
+	background: var(--wpistic-formistic-brand); color: var(--wpistic-formistic-brand-dark);
+	display: grid; place-items: center;
+	font-weight: 900; font-size: 23px;
+}
+.wpistic-formistic-logo__text { display: flex; flex-direction: column; line-height: 1.05; }
+.wpistic-formistic-logo__text strong { font-size: 19px; font-weight: 800; letter-spacing: .2px; }
+.wpistic-formistic-logo__text small { margin-top: 5px; font-size: 10px; letter-spacing: .7px; text-transform: uppercase; opacity: .76; }
+.wpistic-formistic-brandbar__title { border-left: 1px solid rgba(255,255,255,.25); padding-left: 20px; }
+.wpistic-formistic-brandbar__title h1 { margin: 0; color: #fff; font-size: 21px; font-weight: 700; padding: 0; }
+.wpistic-formistic-brandbar__title p { margin: 3px 0 0; font-size: 13px; opacity: .82; }
+
+/* ---- Stat cards ---- */
+.wpistic-formistic-stats { display: grid; grid-template-columns: repeat(4,1fr); gap: 14px; margin: 18px 0; }
+.wpistic-formistic-stat {
+	background: #fff; border: 1px solid var(--wpistic-formistic-line); border-radius: var(--wpistic-formistic-radius);
+	padding: 16px 18px; text-decoration: none; display: flex; flex-direction: column; gap: 4px;
+	transition: transform .15s ease, box-shadow .15s ease, border-color .15s ease;
+}
+.wpistic-formistic-stat:hover { transform: translateY(-2px); box-shadow: 0 6px 18px rgba(31,34,51,.08); }
+.wpistic-formistic-stat.is-active { border-color: var(--wpistic-formistic-brand); box-shadow: 0 0 0 1px var(--wpistic-formistic-brand) inset; }
+.wpistic-formistic-stat__num { font-size: 28px; font-weight: 800; color: var(--wpistic-formistic-ink); line-height: 1; }
+.wpistic-formistic-stat__label { font-size: 12px; color: var(--wpistic-formistic-muted); text-transform: uppercase; letter-spacing: .6px; }
+.wpistic-formistic-stat--new .wpistic-formistic-stat__num   { color: var(--wpistic-formistic-brand); }
+.wpistic-formistic-stat--replied .wpistic-formistic-stat__num { color: var(--wpistic-formistic-ok); }
+
+/* ---- Toolbar ---- */
+.wpistic-formistic-toolbar { display: flex; gap: 8px; align-items: center; margin: 14px 0; flex-wrap: wrap; }
+.wpistic-formistic-toolbar input[type=search],
+.wpistic-formistic-toolbar select {
+	height: 36px; border: 1px solid var(--wpistic-formistic-line); border-radius: 7px; padding: 0 10px;
+	background: #fff; min-width: 180px;
+}
+.wpistic-formistic-toolbar input[type=search] { min-width: 280px; }
+.wpistic-formistic-clear { color: var(--wpistic-formistic-muted); text-decoration: none; font-size: 13px; }
+.wpistic-formistic-clear:hover { color: var(--wpistic-formistic-danger); }
+
+/* ---- Panel + table ---- */
+.wpistic-formistic-panel {
+	background: #fff; border: 1px solid var(--wpistic-formistic-line);
+	border-radius: var(--wpistic-formistic-radius); overflow: hidden;
+}
+.wpistic-formistic-panel--pad { padding: 8px 24px 24px; }
+.wpistic-formistic-table { width: 100%; border-collapse: collapse; }
+.wpistic-formistic-table thead th {
+	text-align: left; font-size: 11px; letter-spacing: .7px; text-transform: uppercase;
+	color: var(--wpistic-formistic-muted); padding: 13px 16px; border-bottom: 1px solid var(--wpistic-formistic-line);
+	background: var(--wpistic-formistic-bg);
+}
+.wpistic-formistic-table td { padding: 14px 16px; border-bottom: 1px solid var(--wpistic-formistic-line); vertical-align: middle; font-size: 13px; }
+.wpistic-formistic-table tr:last-child td { border-bottom: 0; }
+.wpistic-formistic-row:hover { background: #FAFAFE; }
+.wpistic-formistic-row--new { background: var(--wpistic-formistic-brand-soft); }
+.wpistic-formistic-row--new:hover { background: #E3E1F8; }
+.wpistic-formistic-row--new .wpistic-formistic-from-name::before {
+	content: ""; display: inline-block; width: 7px; height: 7px; border-radius: 50%;
+	background: var(--wpistic-formistic-brand); margin-right: 7px; vertical-align: middle;
+}
+.wpistic-formistic-from-name { display: block; color: var(--wpistic-formistic-ink); }
+.wpistic-formistic-from-email { display: block; color: var(--wpistic-formistic-muted); font-size: 12px; margin-top: 2px; }
+.wpistic-formistic-col-preview { color: var(--wpistic-formistic-muted); max-width: 320px; }
+.wpistic-formistic-col-date { white-space: nowrap; color: var(--wpistic-formistic-muted); font-size: 12px; }
+.wpistic-formistic-col-actions { white-space: nowrap; text-align: right; }
+
+.wpistic-formistic-formtag {
+	display: inline-block; background: var(--wpistic-formistic-brand-soft); color: var(--wpistic-formistic-brand-dark);
+	font-size: 11px; font-weight: 600; padding: 4px 9px; border-radius: 999px;
+}
+
+/* ---- Status pills ---- */
+.wpistic-formistic-pill { display: inline-block; font-size: 11px; font-weight: 600; padding: 3px 10px; border-radius: 999px; }
+.wpistic-formistic-pill--new     { background: #EAE8FB; color: var(--wpistic-formistic-brand-dark); }
+.wpistic-formistic-pill--read    { background: #EEF0F4; color: var(--wpistic-formistic-muted); }
+.wpistic-formistic-pill--replied { background: #E2F4EC; color: var(--wpistic-formistic-ok); }
+
+/* ---- Buttons ---- */
+.wpistic-formistic-btn {
+	border: 1px solid var(--wpistic-formistic-line); background: #fff; color: var(--wpistic-formistic-ink);
+	font-size: 12px; font-weight: 600; padding: 6px 12px; border-radius: 7px; cursor: pointer;
+	transition: background .12s ease, border-color .12s ease, color .12s ease;
+}
+.wpistic-formistic-btn:hover { border-color: var(--wpistic-formistic-brand); color: var(--wpistic-formistic-brand); }
+.wpistic-formistic-btn:disabled { opacity: .4; cursor: not-allowed; }
+.wpistic-formistic-btn--view:hover { background: var(--wpistic-formistic-brand-soft); }
+.wpistic-formistic-btn--reply { background: var(--wpistic-formistic-brand); border-color: var(--wpistic-formistic-brand); color: #fff; }
+.wpistic-formistic-btn--reply:hover:not(:disabled) { background: var(--wpistic-formistic-brand-dark); border-color: var(--wpistic-formistic-brand-dark); color: #fff; }
+.wpistic-formistic-btn--del { padding: 6px 8px; }
+.wpistic-formistic-btn--del:hover { border-color: var(--wpistic-formistic-danger); color: var(--wpistic-formistic-danger); }
+.wpistic-formistic-btn--del .dashicons { font-size: 16px; width: 16px; height: 16px; }
+.wpistic-formistic-btn--primary { background: var(--wpistic-formistic-brand); border-color: var(--wpistic-formistic-brand); color: #fff; padding: 9px 18px; }
+.wpistic-formistic-btn--primary:hover:not(:disabled) { background: var(--wpistic-formistic-brand-dark); border-color: var(--wpistic-formistic-brand-dark); color: #fff; }
+.wpistic-formistic-btn--ghost { padding: 9px 18px; }
+
+/* ---- Empty state ---- */
+.wpistic-formistic-empty td { padding: 0; }
+.wpistic-formistic-empty__in { text-align: center; padding: 56px 20px; color: var(--wpistic-formistic-muted); }
+.wpistic-formistic-empty__in .dashicons { font-size: 42px; width: 42px; height: 42px; color: var(--wpistic-formistic-brand); opacity: .5; }
+.wpistic-formistic-empty__in p { font-size: 14px; margin: 10px auto 0; max-width: 420px; }
+
+/* ---- Pagination ---- */
+.wpistic-formistic-pagination { display: flex; gap: 6px; margin: 16px 0; }
+.wpistic-formistic-page {
+	min-width: 32px; height: 32px; display: grid; place-items: center;
+	border: 1px solid var(--wpistic-formistic-line); border-radius: 7px; background: #fff;
+	text-decoration: none; color: var(--wpistic-formistic-ink); font-size: 13px;
+}
+.wpistic-formistic-page:hover { border-color: var(--wpistic-formistic-brand); color: var(--wpistic-formistic-brand); }
+.wpistic-formistic-page.is-current { background: var(--wpistic-formistic-brand); border-color: var(--wpistic-formistic-brand); color: #fff; }
+
+/* ---- Modal ---- */
+.wpistic-formistic-modal { position: fixed; inset: 0; z-index: 100000; }
+.wpistic-formistic-modal[hidden] { display: none; }
+.wpistic-formistic-modal__backdrop {
+	position: absolute; inset: 0; background: rgba(20,22,38,.55);
+	backdrop-filter: blur(2px); animation: wpistic-formistic-fade .18s ease;
+}
+.wpistic-formistic-modal__box {
+	position: relative; margin: 4vh auto 0; width: 92%; max-width: 620px;
+	background: #fff; border-radius: 14px; overflow: hidden;
+	box-shadow: 0 24px 70px rgba(15,16,30,.4);
+	animation: wpistic-formistic-pop .22s cubic-bezier(.2,.9,.3,1.2);
+	max-height: 92vh; display: flex; flex-direction: column;
+}
+.wpistic-formistic-modal__box--reply { max-width: 560px; }
+@keyframes wpistic-formistic-fade { from { opacity: 0; } to { opacity: 1; } }
+@keyframes wpistic-formistic-pop { from { opacity: 0; transform: translateY(16px) scale(.97); } to { opacity: 1; transform: none; } }
+.wpistic-formistic-modal__head {
+	display: flex; align-items: center; justify-content: space-between;
+	padding: 16px 22px; border-bottom: 1px solid var(--wpistic-formistic-line);
+	background: linear-gradient(120deg, var(--wpistic-formistic-brand-dark), var(--wpistic-formistic-brand));
+}
+.wpistic-formistic-modal__head h2 { margin: 0; font-size: 16px; color: #fff; }
+.wpistic-formistic-modal__x {
+	background: rgba(255,255,255,.18); border: 0; color: #fff; cursor: pointer;
+	width: 30px; height: 30px; border-radius: 7px; font-size: 20px; line-height: 1;
+}
+.wpistic-formistic-modal__x:hover { background: rgba(255,255,255,.32); }
+.wpistic-formistic-modal__body { padding: 22px; overflow-y: auto; }
+.wpistic-formistic-modal__foot {
+	display: flex; justify-content: flex-end; gap: 10px;
+	padding: 14px 22px; border-top: 1px solid var(--wpistic-formistic-line); background: var(--wpistic-formistic-bg);
+}
+.wpistic-formistic-loading { text-align: center; color: var(--wpistic-formistic-muted); padding: 30px; }
+
+/* ---- Submission detail ---- */
+.wpistic-formistic-detail__meta { display: flex; align-items: center; gap: 12px; margin-bottom: 14px; }
+.wpistic-formistic-detail__date { color: var(--wpistic-formistic-muted); font-size: 12px; }
+.wpistic-formistic-detail__table { width: 100%; border-collapse: collapse; margin-bottom: 4px; }
+.wpistic-formistic-detail__table th {
+	text-align: left; width: 150px; padding: 9px 12px 9px 0; vertical-align: top;
+	color: var(--wpistic-formistic-muted); font-size: 12px; text-transform: uppercase; letter-spacing: .5px; font-weight: 600;
+}
+.wpistic-formistic-detail__table td { padding: 9px 0; border-bottom: 1px solid var(--wpistic-formistic-line); font-size: 13px; color: var(--wpistic-formistic-ink); }
+.wpistic-formistic-detail__message { margin-top: 18px; }
+.wpistic-formistic-detail__message h3,
+.wpistic-formistic-detail__replies h3 { font-size: 13px; text-transform: uppercase; letter-spacing: .6px; color: var(--wpistic-formistic-muted); margin: 0 0 8px; }
+.wpistic-formistic-detail__msgbody {
+	background: var(--wpistic-formistic-bg); border: 1px solid var(--wpistic-formistic-line); border-radius: 8px;
+	padding: 14px; font-size: 13px; line-height: 1.6; color: var(--wpistic-formistic-ink);
+}
+.wpistic-formistic-detail__replies { margin-top: 20px; }
+.wpistic-formistic-reply-item { border: 1px solid var(--wpistic-formistic-line); border-left: 3px solid var(--wpistic-formistic-ok); border-radius: 8px; padding: 12px 14px; margin-bottom: 10px; }
+.wpistic-formistic-reply-item__head { display: flex; justify-content: space-between; gap: 10px; margin-bottom: 6px; }
+.wpistic-formistic-reply-item__head strong { font-size: 13px; color: var(--wpistic-formistic-ink); }
+.wpistic-formistic-reply-item__head span { font-size: 11px; color: var(--wpistic-formistic-muted); }
+.wpistic-formistic-reply-item__body { font-size: 13px; line-height: 1.55; color: var(--wpistic-formistic-muted); }
+
+/* ---- Fields (reply form) ---- */
+.wpistic-formistic-field { display: block; margin-bottom: 14px; }
+.wpistic-formistic-field > span {
+	display: block; font-size: 12px; font-weight: 600; color: var(--wpistic-formistic-muted);
+	text-transform: uppercase; letter-spacing: .5px; margin-bottom: 5px;
+}
+.wpistic-formistic-field input,
+.wpistic-formistic-field textarea {
+	width: 100%; border: 1px solid var(--wpistic-formistic-line); border-radius: 8px;
+	padding: 9px 11px; font-size: 13px; background: #fff;
+}
+.wpistic-formistic-field input:focus,
+.wpistic-formistic-field textarea:focus { border-color: var(--wpistic-formistic-brand); outline: none; box-shadow: 0 0 0 3px var(--wpistic-formistic-brand-soft); }
+.wpistic-formistic-field input[readonly] { background: var(--wpistic-formistic-bg); color: var(--wpistic-formistic-muted); }
+
+.wpistic-formistic-reply-status { padding: 9px 12px; border-radius: 8px; font-size: 13px; }
+.wpistic-formistic-reply-status--ok  { background: #E2F4EC; color: var(--wpistic-formistic-ok); }
+.wpistic-formistic-reply-status--err { background: #FBE6E5; color: var(--wpistic-formistic-danger); }
+
+/* ---- Settings tabs ---- */
+.wpistic-formistic-tabs {
+	display: flex; gap: 4px; margin: 18px 0 0; border-bottom: 1px solid var(--wpistic-formistic-line);
+}
+.wpistic-formistic-tab {
+	display: inline-block; padding: 10px 18px; font-size: 13px; font-weight: 600;
+	color: var(--wpistic-formistic-muted); text-decoration: none; border: 1px solid transparent;
+	border-bottom: 0; border-top-left-radius: 8px; border-top-right-radius: 8px;
+	margin-bottom: -1px; transition: color .12s ease, background .12s ease;
+}
+.wpistic-formistic-tab:hover { color: var(--wpistic-formistic-brand); }
+.wpistic-formistic-tab.is-active {
+	background: #fff; border-color: var(--wpistic-formistic-line); color: var(--wpistic-formistic-brand);
+}
+.wpistic-formistic-panel--pad .form-table h2 {
+	margin-top: 24px; font-size: 14px; text-transform: uppercase; letter-spacing: .6px;
+	color: var(--wpistic-formistic-brand-dark); border-bottom: 1px solid var(--wpistic-formistic-line);
+	padding-bottom: 6px;
+}
+.wpistic-formistic-panel--pad h2:first-child { margin-top: 8px; }
+
+/* ---- Bulk bar ---- */
+.wpistic-formistic-bulkbar {
+	display: flex; align-items: center; justify-content: space-between; gap: 12px;
+	margin: 0 0 12px; padding: 10px 12px; background: #fff; border: 1px solid var(--wpistic-formistic-line);
+	border-radius: var(--wpistic-formistic-radius); flex-wrap: wrap;
+}
+.wpistic-formistic-bulkbar__left, .wpistic-formistic-bulkbar__right { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.wpistic-formistic-bulkbar__action {
+	height: 32px; border: 1px solid var(--wpistic-formistic-line); border-radius: 6px; padding: 0 8px;
+	background: #fff; min-width: 200px;
+}
+.wpistic-formistic-bulkbar__label { font-size: 12px; color: var(--wpistic-formistic-muted); text-transform: uppercase; letter-spacing: .5px; font-weight: 600; }
+.wpistic-formistic-col-check { width: 26px; }
+.wpistic-formistic-col-check input[type=checkbox] { margin: 0; }
+
+/* ---- Attachments in detail ---- */
+.wpistic-formistic-detail__attachments { margin-top: 20px; }
+.wpistic-formistic-attachments { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.wpistic-formistic-attachment {
+	display: flex; align-items: center; justify-content: space-between; gap: 12px;
+	background: var(--wpistic-formistic-bg); border: 1px solid var(--wpistic-formistic-line); border-radius: 8px;
+	padding: 9px 12px;
+}
+.wpistic-formistic-attachment__link {
+	display: inline-flex; align-items: center; gap: 8px; color: var(--wpistic-formistic-brand-dark);
+	text-decoration: none; font-size: 13px; font-weight: 600; min-width: 0;
+}
+.wpistic-formistic-attachment__link:hover { color: var(--wpistic-formistic-brand); }
+.wpistic-formistic-attachment__link .dashicons { font-size: 16px; width: 16px; height: 16px; }
+.wpistic-formistic-attachment__name { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 280px; }
+.wpistic-formistic-attachment__meta { font-size: 11px; color: var(--wpistic-formistic-muted); white-space: nowrap; }
+
+/* ---- Form builder (Edit Form screen metaboxes) ---- */
+.wpistic-formistic-fields-editor__rows { display: flex; flex-direction: column; gap: 10px; }
+.wpistic-formistic-field-row {
+	border: 1px solid var(--wpistic-formistic-line); border-radius: 8px; background: #fff;
+	padding: 12px; transition: border-color .15s ease;
+}
+.wpistic-formistic-field-row:hover { border-color: var(--wpistic-formistic-brand); }
+.wpistic-formistic-field-row__main {
+	display: grid; grid-template-columns: 2fr 1.2fr auto auto; gap: 12px; align-items: end;
+}
+.wpistic-formistic-field-row__main label > span { display: block; font-size: 11px; text-transform: uppercase; letter-spacing: .5px; color: var(--wpistic-formistic-muted); margin-bottom: 4px; font-weight: 600; }
+.wpistic-formistic-field-row__main input[type=text], .wpistic-formistic-field-row__main select { width: 100%; }
+.wpistic-formistic-field-row__required { display: flex; align-items: center; gap: 6px; padding-bottom: 4px; }
+.wpistic-formistic-field-row__required span { font-size: 12px; color: var(--wpistic-formistic-ink); }
+.wpistic-formistic-field-row__remove {
+	color: var(--wpistic-formistic-danger); font-size: 22px; line-height: 1; text-decoration: none; padding: 0 6px;
+	border: 0; background: transparent; cursor: pointer;
+}
+.wpistic-formistic-field-row__remove:hover { opacity: .8; }
+.wpistic-formistic-field-row__extra {
+	display: grid; grid-template-columns: 1fr 2fr; gap: 12px; margin-top: 10px;
+	padding-top: 10px; border-top: 1px dashed var(--wpistic-formistic-line);
+}
+.wpistic-formistic-field-row__extra label > span { display: block; font-size: 11px; text-transform: uppercase; letter-spacing: .5px; color: var(--wpistic-formistic-muted); margin-bottom: 4px; font-weight: 600; }
+.wpistic-formistic-field-row__extra input, .wpistic-formistic-field-row__extra textarea { width: 100%; }
+
+/* ---- Reply composer tools ---- */
+.wpistic-formistic-reply-tools {
+	display: flex; gap: 8px; align-items: center; flex-wrap: wrap;
+	margin: 0 0 12px; padding: 8px 10px; background: var(--wpistic-formistic-bg);
+	border: 1px solid var(--wpistic-formistic-line); border-radius: 7px;
+}
+.wpistic-formistic-reply-tools__select { height: 30px; border: 1px solid var(--wpistic-formistic-line); border-radius: 6px; min-width: 200px; background: #fff; }
+.wpistic-formistic-reply-tools__html { margin-left: auto; display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--wpistic-formistic-muted); }
+.wpistic-formistic-reply-extras { display: grid; gap: 10px; margin-bottom: 14px; }
+.wpistic-formistic-note-form { display:grid; gap:8px; margin-bottom:10px; }
+.wpistic-formistic-note-form textarea,.wpistic-formistic-note-form input { width:100%; border:1px solid var(--wpistic-formistic-line); border-radius:8px; padding:8px 10px; }
+
+/* ---- Analytics ---- */
+.wpistic-formistic-kpis { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin: 18px 0; }
+.wpistic-formistic-kpi {
+	background: #fff; border: 1px solid var(--wpistic-formistic-line); border-radius: var(--wpistic-formistic-radius);
+	padding: 16px 18px; display: flex; flex-direction: column; gap: 4px;
+}
+.wpistic-formistic-kpi__label { font-size: 11px; color: var(--wpistic-formistic-muted); text-transform: uppercase; letter-spacing: .6px; font-weight: 600; }
+.wpistic-formistic-kpi__value { font-size: 26px; font-weight: 800; color: var(--wpistic-formistic-ink); line-height: 1.1; }
+.wpistic-formistic-kpi__sub { font-size: 11px; color: var(--wpistic-formistic-muted); }
+.wpistic-formistic-chart { width: 100%; height: auto; max-height: 240px; display: block; }
+.wpistic-formistic-topforms { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
+.wpistic-formistic-topforms__row { display: grid; grid-template-columns: 180px 1fr 50px; gap: 14px; align-items: center; }
+.wpistic-formistic-topforms__name { font-size: 13px; color: var(--wpistic-formistic-ink); font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.wpistic-formistic-topforms__bar { background: var(--wpistic-formistic-bg); border-radius: 999px; height: 10px; position: relative; overflow: hidden; }
+.wpistic-formistic-topforms__fill { display: block; height: 100%; background: linear-gradient(90deg, var(--wpistic-formistic-brand), var(--wpistic-formistic-brand-dark)); border-radius: 999px; }
+.wpistic-formistic-topforms__num { font-size: 13px; color: var(--wpistic-formistic-muted); font-variant-numeric: tabular-nums; text-align: right; }
+
+/* ---- Responsive ---- */
+@media (max-width: 782px) {
+	.wpistic-formistic-stats { grid-template-columns: 1fr 1fr; }
+	.wpistic-formistic-brandbar { flex-direction: column; align-items: flex-start; gap: 12px; }
+	.wpistic-formistic-brandbar__title { border-left: 0; padding-left: 0; }
+	.wpistic-formistic-col-preview, .wpistic-formistic-col-date { display: none; }
+	.wpistic-formistic-toolbar input[type=search] { min-width: 100%; }
+	.wpistic-formistic-kpis { grid-template-columns: 1fr 1fr; }
+	.wpistic-formistic-field-row__main { grid-template-columns: 1fr; }
+	.wpistic-formistic-field-row__extra { grid-template-columns: 1fr; }
+}
+
+/* ============================================================
+ * Addons screen — card grid + toggle switch
+ * ============================================================ */
+.wpistic-formistic-addons-grid {
+	display: grid;
+	grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+	gap: 18px;
+	margin-top: 18px;
+}
+.wpistic-formistic-addon-card {
+	display: flex;
+	gap: 14px;
+	background: #fff;
+	border: 1px solid #e2e4e9;
+	border-radius: 12px;
+	padding: 18px;
+	box-shadow: 0 1px 2px rgba(0,0,0,.04);
+	transition: border-color .15s, box-shadow .15s;
+}
+.wpistic-formistic-addon-card.is-active {
+	border-color: #2563eb;
+	box-shadow: 0 4px 16px rgba(37,99,235,.10);
+}
+.wpistic-formistic-addon-card__icon {
+	flex: 0 0 46px;
+	height: 46px;
+	border-radius: 10px;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	background: #eef2ff;
+	color: #2563eb;
+}
+.wpistic-formistic-addon-card__icon .dashicons { font-size: 24px; width: 24px; height: 24px; }
+.wpistic-formistic-addon-card__body { flex: 1; }
+.wpistic-formistic-addon-card__head {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 10px;
+}
+.wpistic-formistic-addon-card__head h3 { margin: 0; font-size: 15px; }
+.wpistic-formistic-addon-card p { margin: 6px 0 10px; color: #50575e; font-size: 13px; }
+.wpistic-formistic-addon-card__status {
+	display: inline-block;
+	font-size: 11px;
+	font-weight: 600;
+	text-transform: uppercase;
+	letter-spacing: .04em;
+	color: #6b7280;
+}
+.wpistic-formistic-addon-card.is-active .wpistic-formistic-addon-card__status { color: #2563eb; }
+
+/* Toggle switch */
+.wpistic-formistic-switch { position: relative; display: inline-block; cursor: pointer; }
+.wpistic-formistic-switch input { position: absolute; opacity: 0; width: 0; height: 0; }
+.wpistic-formistic-switch__track {
+	display: block;
+	width: 42px;
+	height: 24px;
+	border-radius: 999px;
+	background: #cbd2da;
+	transition: background .15s;
+}
+.wpistic-formistic-switch__thumb {
+	position: absolute;
+	top: 3px; left: 3px;
+	width: 18px; height: 18px;
+	border-radius: 50%;
+	background: #fff;
+	box-shadow: 0 1px 2px rgba(0,0,0,.25);
+	transition: transform .15s;
+}
+.wpistic-formistic-switch input:checked + .wpistic-formistic-switch__track { background: #2563eb; }
+.wpistic-formistic-switch input:checked + .wpistic-formistic-switch__track .wpistic-formistic-switch__thumb { transform: translateX(18px); }
+.wpistic-formistic-switch input:disabled + .wpistic-formistic-switch__track { opacity: .6; }
+
+/* ============================================================
+ * Form builder — two-pane editor + live preview
+ * ============================================================ */
+.wpistic-formistic-builder { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+@media (max-width: 1100px) { .wpistic-formistic-builder { grid-template-columns: 1fr; } }
+.wpistic-formistic-field-row__drag {
+	cursor: grab;
+	color: #9aa2ad;
+	font-size: 16px;
+	line-height: 1;
+	padding: 4px 2px;
+	user-select: none;
+}
+.wpistic-formistic-field-row.is-dragging { opacity: .5; }
+.wpistic-formistic-builder__preview-label {
+	font-size: 11px;
+	font-weight: 600;
+	text-transform: uppercase;
+	letter-spacing: .05em;
+	color: #6b7280;
+	margin-bottom: 8px;
+}
+.wpistic-formistic-preview {
+	position: sticky;
+	top: 40px;
+	background: #f6f7f9;
+	border: 1px solid #e2e4e9;
+	border-radius: 12px;
+	padding: 20px;
+}
+.wpf-pv-form { max-width: 100%; margin: 0 auto; }
+.wpf-pv-title { margin: 0 0 14px; font-size: 18px; }
+.wpf-pv-field { display: flex; flex-direction: column; gap: 5px; margin-bottom: var(--wpf-gap, 16px); }
+.wpf-pv-form--two { display: grid; grid-template-columns: 1fr 1fr; gap: 0 16px; }
+.wpf-pv-form--two .wpf-pv-title,
+.wpf-pv-form--two .wpf-pv-submit { grid-column: 1 / -1; }
+.wpf-pv-label { font-size: 13px; font-weight: 600; color: #1f2329; }
+.wpf-pv-field input, .wpf-pv-field textarea, .wpf-pv-field select {
+	width: 100%;
+	padding: 9px 11px;
+	border: 1px solid #cbd2da;
+	border-radius: var(--wpf-radius, 10px);
+	background: #fff;
+	box-sizing: border-box;
+}
+.wpf-pv-opts { display: flex; flex-direction: column; gap: 4px; font-size: 13px; }
+.wpf-pv-consent { font-size: 13px; display: flex; gap: 6px; align-items: center; }
+.wpf-pv-submit {
+	border: 0;
+	border-radius: var(--wpf-radius, 10px);
+	background: var(--wpf-accent, #2563eb);
+	color: var(--wpf-btn-text, #fff);
+	padding: 11px 20px;
+	font-weight: 600;
+	cursor: pointer;
+}
