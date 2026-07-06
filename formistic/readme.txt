@@ -4,7 +4,7 @@ Tags: contact form, form builder, wordpress, submissions, inbox, ai, spam protec
 Requires at least: 6.2
 Tested up to: 6.9
 Requires PHP: 7.4
-Stable tag: 2.0.5
+Stable tag: 2.0.6
 License: GPL-2.0+
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -105,6 +105,11 @@ This plugin can connect to third-party services when enabled by the site adminis
 * Terms/Privacy: Depends on selected provider.
 
 == Changelog ==
+
+= 2.0.6 =
+* Fix: on sites behind Cloudflare (or another reverse proxy), the per-IP submission rate limit and the newsletter throttle could resolve every visitor to the proxy's shared edge IP, silently blocking most real submissions after the first few. Cloudflare's published IP ranges are now fill-only seeded into the trusted-proxy list (Settings → Spam tab) on activation and via the "Seed Guns 2 Ammo defaults" button, and the newsletter throttle now honors the same trusted-proxy list the contact-form rate limit already used.
+* Fix: the legacy admin-post.php capture path (used only as a fallback for stale-cached forms) no longer drops the "Course" field from theme reservation forms.
+* Change: the plugin now boots on `init` (priority 5) instead of `plugins_loaded`, avoiding a WordPress 6.7+ "translation loaded too early" notice.
 
 = 2.0.5 =
 * Fix: the Inbox action buttons (View, Reply, Delete, notes, bulk actions) did nothing on sites where a JavaScript optimizer / deferral plugin broke the external admin script. The admin script is now printed inline (after its localized data), so the dashboard controls always work.
