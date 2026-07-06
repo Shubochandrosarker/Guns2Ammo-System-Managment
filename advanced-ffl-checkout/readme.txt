@@ -4,7 +4,7 @@ Tags: FFL, firearms, WooCommerce, dealer, checkout, ATF, transfer, NICS, guns2am
 Requires at least: 6.4
 Tested up to: 6.7
 Requires PHP: 8.1
-Stable tag: 1.8.0
+Stable tag: 1.9.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -127,6 +127,16 @@ Deactivation preserves all data. Data is only removed on plugin deletion IF you 
 Yes. The plugin is fully self-contained. The dashboard integration is optional.
 
 == Changelog ==
+
+= 1.9.0 — G2A Edition (FFL Compliance Verification Hub — Phase A) =
+* NEW: **FFL Compliance Verification Hub** (Advanced FFL → 🛡️ Verification Hub) — built in response to ATF withdrawing the "Licensee eZ Check Verification for Transfers" direct final rule on 2026-07-06. Certified-copy collection stays the required default; this hub organizes that workflow instead of assuming eZ Check can replace it.
+* NEW: **Verification Policy Mode** setting — Certified Copy Required (default), Certified Copy + eZ Check Log (recommended enhanced mode), or Custom. There is deliberately no "eZ Check Alternative Allowed" mode while the ATF rule remains withdrawn.
+* NEW: **Certified-copy upload + expiration tracking**, scoped per dealer. Files are stored under a private, non-media-library path (`wp-content/uploads/wpistic-ffl-private/`) with a best-effort `.htaccess` deny rule, and are only ever served through a capability-gated view endpoint that logs every view to the Activity Log — never a public URL.
+* NEW: **Manual FFL eZ Check log** — staff record what `fflezcheck.atf.gov` returned (name, trade name, address, expiration, outcome) as supporting evidence. There is intentionally no code path that queries ATF's eZ Check tool automatically: ATF publishes no API for it, and automating its public web form would mean scraping a federal compliance tool outside any documented terms.
+* NEW: **ATF-sync validity check** — a genuinely automatable check that runs against data this plugin already owns (the monthly-synced `dealers` row: active flag, license expiration, and how stale the last sync is), with zero new external calls.
+* NEW: **Manager review queue** surfaces any dealer with an expired/inactive ATF record, a missing or expired certified copy, or a flagged eZ Check mismatch. Nothing here auto-approves a transfer — every check produces a recommendation for a logged staff decision, matching the plugin's existing compliance philosophy (`Compliance::validate_dealer_for_buyer()` already follows the same never-auto-block-or-approve rule).
+* SCOPE: the hub only tracks dealers this store has actually shipped an FFL transfer to, not the full ~80,000-row ATF dealer universe already held in the `dealers` table.
+* SCHEMA: bumped to 1.4.0 — adds `wp_wpistic_ffl_ffl_verification_documents` and `wp_wpistic_ffl_ffl_verifications`. Upgrade is automatic via dbDelta on plugin load. Uninstall (with "Delete Data on Uninstall" enabled) now also removes the private upload directory, not just the database rows.
 
 = 1.8.0 — G2A Edition (Form 4473 signature capture) =
 * NEW: **On-screen signature capture for the Form 4473 worksheet** — the buyer and dealer can now sign directly on the draft worksheet with a mouse/touch/pen signature pad instead of leaving a blank line to fill in by hand. Signed image is embedded into the same printable page, so "Print / Save as PDF" already includes it — no PDF library was added.

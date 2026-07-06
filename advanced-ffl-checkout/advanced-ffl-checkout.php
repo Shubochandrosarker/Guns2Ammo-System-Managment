@@ -3,7 +3,7 @@
  * Plugin Name:       Advanced FFL Checkout Solutions — G2A Edition
  * Plugin URI:        https://wordpressistic.com/products/advanced-ffl-checkout
  * Description:       Federal Firearms License (FFL) dealer management, WooCommerce checkout integration, transfer tracking and one-click dealer confirmation portal — customized for the Guns2Ammo system (HPOS-safe order meta, brass/graphite branding, customer "My FFL Transfers" tab, NICS 3-day automation, SMS via Verifyistic, WC order ↔ transfer status bridge).
- * Version:           1.8.0
+ * Version:           1.9.0
  * Requires at least: 6.4
  * Requires PHP:      8.1
  * Author:            Wordpressistic
@@ -29,7 +29,7 @@ if ( version_compare( PHP_VERSION, '8.1', '<' ) ) {
 }
 
 // ── Constants ─────────────────────────────────────────────────────────────────
-define( 'WPISTIC_FFL_VERSION',   '1.8.0' );
+define( 'WPISTIC_FFL_VERSION',   '1.9.0' );
 define( 'WPISTIC_FFL_FILE',      __FILE__ );
 define( 'WPISTIC_FFL_PATH',      plugin_dir_path( __FILE__ ) );
 define( 'WPISTIC_FFL_URL',       plugin_dir_url( __FILE__ ) );
@@ -345,6 +345,11 @@ add_action( 'plugins_loaded', function (): void {
 
 	// G2A: 50-state law engine top-up — ensures every state has a baseline rule.
 	new \WpisticFFL\G2A_State_Laws();
+
+	// G2A: FFL Compliance Verification Hub — certified-copy tracking, manual
+	// eZ Check logging, and an ATF-sync validity check for dealers this
+	// store has actually shipped to.
+	new \WpisticFFL\G2A_Ffl_Verification();
 
 }, 20 );
 

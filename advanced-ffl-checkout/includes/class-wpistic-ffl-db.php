@@ -13,7 +13,7 @@ defined( 'ABSPATH' ) || exit;
 class DB {
 
 	/** Current schema version */
-	const SCHEMA_VERSION = '1.3.0';
+	const SCHEMA_VERSION = '1.4.0';
 
 	/**
 	 * Install or upgrade all plugin tables.
@@ -229,6 +229,61 @@ CREATE TABLE {$p}signatures (
 ) $charset;
 " );
 
+		// ── 9. FFL Compliance Verification Hub (v1.9.0) ────────────────────────
+		// Certified-copy files never live in a public media URL — file_path is
+		// a path under wp-content/uploads/wpistic-ffl-private/, served only
+		// through the capability-gated view/download endpoint.
+		dbDelta( "
+CREATE TABLE {$p}ffl_verification_documents (
+  id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  dealer_id BIGINT UNSIGNED NOT NULL,
+  transfer_id BIGINT UNSIGNED DEFAULT NULL,
+  document_type VARCHAR(80) NOT NULL DEFAULT 'certified_copy',
+  file_path VARCHAR(255) NOT NULL DEFAULT '',
+  file_name VARCHAR(255) NOT NULL DEFAULT '',
+  mime_type VARCHAR(100) NOT NULL DEFAULT '',
+  uploaded_by BIGINT UNSIGNED DEFAULT NULL,
+  received_method VARCHAR(80) NOT NULL DEFAULT 'staff_upload',
+  expires_at DATE DEFAULT NULL,
+  status VARCHAR(50) NOT NULL DEFAULT 'active',
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY  (id),
+  KEY idx_dealer (dealer_id),
+  KEY idx_transfer (transfer_id),
+  KEY idx_status (status),
+  KEY idx_expires (expires_at)
+) $charset;
+" );
+
+		// Verification checks: an address/expiration match run against our own
+		// ATF-synced `dealers` row, or a manually-logged FFL eZ Check result.
+		// Append-only — a re-run adds a new row, same audit philosophy as
+		// `signatures` and `events`.
+		dbDelta( "
+CREATE TABLE {$p}ffl_verifications (
+  id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  dealer_id BIGINT UNSIGNED NOT NULL,
+  transfer_id BIGINT UNSIGNED DEFAULT NULL,
+  method VARCHAR(40) NOT NULL DEFAULT 'address_match',
+  result_status VARCHAR(40) NOT NULL DEFAULT 'manual_review_required',
+  checked_ffl_number VARCHAR(50) NOT NULL DEFAULT '',
+  result_legal_name VARCHAR(255) NOT NULL DEFAULT '',
+  result_trade_name VARCHAR(255) NOT NULL DEFAULT '',
+  result_premises_address TEXT DEFAULT NULL,
+  result_expiration_date DATE DEFAULT NULL,
+  address_match TINYINT(1) DEFAULT NULL,
+  expiration_valid TINYINT(1) DEFAULT NULL,
+  notes TEXT DEFAULT NULL,
+  verified_by BIGINT UNSIGNED DEFAULT NULL,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY  (id),
+  KEY idx_dealer (dealer_id),
+  KEY idx_transfer (transfer_id),
+  KEY idx_method (method),
+  KEY idx_status (result_status)
+) $charset;
+" );
+
 		// Seed state compliance rules if empty
 		self::seed_state_rules();
 
@@ -286,13 +341,32 @@ CREATE TABLE {$p}signatures (
 		global $wpdb;
 		$p = $wpdb->prefix . WPISTIC_FFL_DB_PREFIX;
 
-		$tables = [ 'signatures', 'analytics_events', 'dealer_tokens', 'events', 'transfers', 'dealers', 'zip_coords', 'state_rules' ];
+		$tables = [ 'ffl_verifications', 'ffl_verification_documents', 'signatures', 'analytics_events', 'dealer_tokens', 'events', 'transfers', 'dealers', 'zip_coords', 'state_rules' ];
 		foreach ( $tables as $table ) {
 			$wpdb->query( "DROP TABLE IF EXISTS {$p}{$table}" ); // phpcs:ignore WordPress.DB.PreparedSQL
 		}
 
 		// Remove all plugin options
 		$wpdb->query( "DELETE FROM {$wpdb->options} WHERE option_name LIKE 'wpistic_ffl_%'" ); // phpcs:ignore
+
+		// Certified FFL copies live on disk, not in the DB — remove them too
+		// so a deleted plugin doesn't leave dealer license documents behind.
+		self::delete_private_uploads();
+	}
+
+	private static function delete_private_uploads(): void {
+		$dir = trailingslashit( wp_upload_dir()['basedir'] ) . 'wpistic-ffl-private/';
+		if ( ! is_dir( $dir ) ) {
+			return;
+		}
+		$items = new \RecursiveIteratorIterator(
+			new \RecursiveDirectoryIterator( $dir, \FilesystemIterator::SKIP_DOTS ),
+			\RecursiveIteratorIterator::CHILD_FIRST
+		);
+		foreach ( $items as $item ) {
+			$item->isDir() ? @rmdir( $item->getPathname() ) : @unlink( $item->getPathname() ); // phpcs:ignore WordPress.PHP.NoSilencedErrors
+		}
+		@rmdir( $dir ); // phpcs:ignore WordPress.PHP.NoSilencedErrors
 	}
 
 	/**
