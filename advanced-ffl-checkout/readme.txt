@@ -4,7 +4,7 @@ Tags: FFL, firearms, WooCommerce, dealer, checkout, ATF, transfer, NICS, guns2am
 Requires at least: 6.4
 Tested up to: 6.7
 Requires PHP: 8.1
-Stable tag: 1.7.6
+Stable tag: 1.8.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -127,6 +127,12 @@ Deactivation preserves all data. Data is only removed on plugin deletion IF you 
 Yes. The plugin is fully self-contained. The dashboard integration is optional.
 
 == Changelog ==
+
+= 1.8.0 — G2A Edition (Form 4473 signature capture) =
+* NEW: **On-screen signature capture for the Form 4473 worksheet** — the buyer and dealer can now sign directly on the draft worksheet with a mouse/touch/pen signature pad instead of leaving a blank line to fill in by hand. Signed image is embedded into the same printable page, so "Print / Save as PDF" already includes it — no PDF library was added.
+* NEW: Signature captures are stored append-only in a new `signatures` table (same audit philosophy as the `events` log) — re-signing adds a new row rather than overwriting the prior capture, so the signing history is never lost. Every capture also writes a `signature_captured` row to the existing Activity Log.
+* SECURITY: Signature save endpoint is nonce + `manage_woocommerce`-gated, validates the upload is structurally a real PNG (`getimagesizefromstring`), and caps payload size before it ever reaches the database.
+* SCHEMA: bumped to 1.3.0 — adds `wp_wpistic_ffl_signatures`. Upgrade is automatic via dbDelta on plugin load.
 
 = 1.7.5 — G2A Edition (Theme transfer-form bridge fix + hardening) =
 * Fix: the theme "Firearms Transfer Request" form posts g2a_subject="Firearms Transfer Request", but the bridge only matched the exact string "ffl transfer request", so the FFL transfer record was never created from the website form. Now matches any subject containing "transfer request" (or an explicit form_type).

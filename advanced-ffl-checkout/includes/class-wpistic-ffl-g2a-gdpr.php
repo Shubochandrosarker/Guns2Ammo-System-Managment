@@ -115,6 +115,19 @@ class G2A_Gdpr {
 				],
 				[ 'id' => (int) $r->id ]
 			);
+			// v1.8.0 — redact the buyer's name on any captured 4473 signature
+			// too. The signature image itself is retained (same rationale as
+			// the transfer row: kept for ATF compliance), only the printed
+			// name label is anonymized.
+			$wpdb->update( // phpcs:ignore WordPress.DB
+				DB::table( 'signatures' ),
+				[ 'signer_name' => 'REDACTED' ],
+				[
+					'transfer_id' => (int) $r->id,
+					'role'        => 'buyer',
+				]
+			);
+
 			$wpdb->insert( DB::table( 'events' ), [ // phpcs:ignore WordPress.DB
 				'transfer_id' => (int) $r->id,
 				'event_type'  => 'gdpr_anonymized',

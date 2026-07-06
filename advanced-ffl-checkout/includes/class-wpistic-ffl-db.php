@@ -13,7 +13,7 @@ defined( 'ABSPATH' ) || exit;
 class DB {
 
 	/** Current schema version */
-	const SCHEMA_VERSION = '1.2.0';
+	const SCHEMA_VERSION = '1.3.0';
 
 	/**
 	 * Install or upgrade all plugin tables.
@@ -209,6 +209,26 @@ CREATE TABLE {$p}analytics_events (
 ) $charset;
 " );
 
+		// ── 8. Form 4473 worksheet signatures (v1.8.0) ─────────────────────────
+		// Append-only, same audit philosophy as `events`: a re-signed row adds
+		// a new record rather than overwriting the prior capture, so the trail
+		// of who signed what, and when, is never lost.
+		dbDelta( "
+CREATE TABLE {$p}signatures (
+  id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  transfer_id BIGINT UNSIGNED NOT NULL,
+  role VARCHAR(20) NOT NULL DEFAULT 'buyer',
+  signer_name VARCHAR(200) NOT NULL DEFAULT '',
+  signature_data LONGTEXT NOT NULL,
+  signed_by BIGINT UNSIGNED DEFAULT NULL,
+  signed_ip VARBINARY(16) DEFAULT NULL,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY  (id),
+  KEY idx_transfer_role (transfer_id, role),
+  KEY idx_created (created_at)
+) $charset;
+" );
+
 		// Seed state compliance rules if empty
 		self::seed_state_rules();
 
@@ -266,7 +286,7 @@ CREATE TABLE {$p}analytics_events (
 		global $wpdb;
 		$p = $wpdb->prefix . WPISTIC_FFL_DB_PREFIX;
 
-		$tables = [ 'analytics_events', 'dealer_tokens', 'events', 'transfers', 'dealers', 'zip_coords', 'state_rules' ];
+		$tables = [ 'signatures', 'analytics_events', 'dealer_tokens', 'events', 'transfers', 'dealers', 'zip_coords', 'state_rules' ];
 		foreach ( $tables as $table ) {
 			$wpdb->query( "DROP TABLE IF EXISTS {$p}{$table}" ); // phpcs:ignore WordPress.DB.PreparedSQL
 		}
