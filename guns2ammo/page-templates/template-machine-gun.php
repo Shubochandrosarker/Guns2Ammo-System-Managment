@@ -166,7 +166,7 @@ function g2a_render_mg_card( $row, $tag_index = 0 ) {
         <li>No class requirement</li>
         <li>Eye, ear &amp; targets included</li>
       </ul>
-      <a class="btn btn-brass" style="width:100%;">Book Basic </a>
+      <a class="btn btn-brass" style="width:100%;" href="#reserve" data-g2a-package="Basic Package ($249)">Book Basic </a>
     </article>
 
     <article class="tier popular">
@@ -183,7 +183,7 @@ function g2a_render_mg_card( $row, $tag_index = 0 ) {
         <li>Photo &amp; video pack</li>
         <li>Logo G2A patch</li>
       </ul>
-      <a class="btn btn-ember" style="width:100%;">Book Premium </a>
+      <a class="btn btn-ember" style="width:100%;" href="#reserve" data-g2a-package="Premium Package ($449) - Most Popular">Book Premium </a>
     </article>
 
     <article class="tier">
@@ -200,7 +200,7 @@ function g2a_render_mg_card( $row, $tag_index = 0 ) {
         <li>Hat, patch &amp; certificate</li>
         <li>One return-visit lane pass</li>
       </ul>
-      <a class="btn btn-brass" style="width:100%;">Book Elite </a>
+      <a class="btn btn-brass" style="width:100%;" href="#reserve" data-g2a-package="Elite Package ($749)">Book Elite </a>
     </article>
   </div>
 </section>
@@ -213,6 +213,20 @@ function g2a_render_mg_card( $row, $tag_index = 0 ) {
     <p style="color: var(--color-fog); font-size:15px; line-height:1.85; margin-top:14px;">Pick a single platform or shoot all three  the <a href="<?php echo esc_url( home_url( '/machine-gun/mp5/' ) ); ?>" style="color:var(--color-brass-bright);">MP5</a> is the smoothest first machine gun, the <a href="<?php echo esc_url( home_url( '/machine-gun/m16/' ) ); ?>" style="color:var(--color-brass-bright);">M16</a> is the modern service rifle, and the <a href="<?php echo esc_url( home_url( '/machine-gun/ak-47/' ) ); ?>" style="color:var(--color-brass-bright);">AK-47</a> delivers the hardest-hitting full-auto punch. Shooters must be 18+ (or accompanied by a parent), sober, and able to follow RSO direction  that is the whole list.</p>
   </div>
 </section>
+
+<?php
+get_template_part( 'template-parts/reservation-form', null, [
+	'subject'  => 'Machine Gun Experience',
+	'heading'  => 'BOOK YOUR EXPERIENCE',
+	'intro'    => 'Pick your package, then send your details - Signature Experiences book 4-6 weeks out, so reserve early.',
+	'cta'      => 'Request This Experience',
+	'packages' => [
+		'Basic Package ($249)',
+		'Premium Package ($449) - Most Popular',
+		'Elite Package ($749)',
+	],
+] );
+?>
 
 <section class="bonus">
   <div class="c">

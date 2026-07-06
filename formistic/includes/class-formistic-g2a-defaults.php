@@ -68,6 +68,7 @@ class Wpistic_Formistic_G2A_Defaults {
 			'wpistic_formistic_ai_faq_text'         => self::default_faq_text(),
 			'wpistic_formistic_ai_kb_text'          => self::default_kb_text(),
 			'wpistic_formistic_ai_auto_reply_rules' => self::default_auto_reply_rules(),
+			'wpistic_formistic_trusted_proxies'     => self::default_trusted_proxies(),
 		];
 
 		foreach ( $targets as $option => $value ) {
@@ -178,6 +179,32 @@ STORE SERVICES:
 
 TONE FOR REPLIES: warm, professional, safety-first. Always include the phone number (602) 715-2677 for anything that needs scheduling or legal specifics. Never give legal advice beyond pointing to A.R.S. §13-3112 and the CCW course.
 TEXT;
+	}
+
+	/**
+	 * Cloudflare's published edge-node IP ranges (IPv4 + IPv6), comma-separated
+	 * to match the format wpistic_formistic_trusted_proxies expects.
+	 *
+	 * The Guns 2 Ammo site sits behind Cloudflare, so PHP normally sees
+	 * Cloudflare's edge IP as the visitor. Without this allowlist filled in,
+	 * Wpistic_Formistic_Spam::client_ip() falls back to that shared edge IP for
+	 * every visitor, so the per-IP submission rate limit (3/hour by default)
+	 * silently blocks nearly all real visitors after the first few — forms
+	 * still show their success redirect (the theme's own wp_mail already
+	 * fired), but nothing after the cap lands in the Formistic inbox. Re-verify
+	 * against https://www.cloudflare.com/ips/ if Cloudflare ever changes these.
+	 *
+	 * @return string
+	 */
+	public static function default_trusted_proxies() {
+		return implode( ', ', [
+			'173.245.48.0/20', '103.21.244.0/22', '103.22.200.0/22', '103.31.4.0/22',
+			'141.101.64.0/18', '108.162.192.0/18', '190.93.240.0/20', '188.114.96.0/20',
+			'197.234.240.0/22', '198.41.128.0/17', '162.158.0.0/15', '104.16.0.0/13',
+			'104.24.0.0/14', '172.64.0.0/13', '131.0.72.0/22',
+			'2400:cb00::/32', '2606:4700::/32', '2803:f800::/32', '2405:b500::/32',
+			'2405:8100::/32', '2a06:98c0::/29', '2c0f:f248::/32',
+		] );
 	}
 
 	/**

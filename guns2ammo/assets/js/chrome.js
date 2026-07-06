@@ -476,5 +476,36 @@
       };
       tick(); setInterval(tick, 1000);
     });
+
+    /* ===== Reservation package pre-select (e.g. Machine Gun tiers) =====
+     * Buttons with [data-g2a-package] jump to the shared reservation form
+     * (#reserve) via their normal href; this just pre-selects that form's
+     * Package field so the captured request records which tier the visitor
+     * clicked, without needing a dedicated form per tier. */
+    document.addEventListener('click', function (e) {
+      var trigger = e.target.closest('[data-g2a-package]');
+      if (!trigger) return;
+      var sel = document.getElementById('rf-package');
+      if (sel) sel.value = trigger.getAttribute('data-g2a-package');
+    });
+
+    /* ===== FFL shipping quote calculator =====
+     * Keeps the visible + submitted "Estimated Total" (FFL Services page) in
+     * sync with the selected service tier — price lives on each
+     * <option data-price>, read fresh on change so it can never go stale. */
+    var shipService    = document.getElementById('g2a-ship-service');
+    var shipTotal      = document.getElementById('g2a-ship-total');
+    var shipTotalInput = document.getElementById('g2a-ship-total-input');
+    if (shipService && shipTotal && shipTotalInput) {
+      var syncShipTotal = function () {
+        var opt   = shipService.options[shipService.selectedIndex];
+        var price = opt ? parseFloat(opt.getAttribute('data-price')) : NaN;
+        var text  = '$' + (isNaN(price) ? '0.00' : price.toFixed(2));
+        shipTotal.textContent = text;
+        shipTotalInput.value = text;
+      };
+      shipService.addEventListener('change', syncShipTotal);
+      syncShipTotal();
+    }
   });
 })();

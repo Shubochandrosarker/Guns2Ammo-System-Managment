@@ -196,19 +196,36 @@ get_header();
         </svg>
       </div>
 
-      <div class="quote">
+      <div class="quote" id="request">
         <h3>Quick Shipping Quote</h3>
-        <label class="form-label">Item Type</label>
-        <select class="field"><option>Handgun</option><option>Long Gun (Rifle/Shotgun)</option><option>Receiver Only</option></select>
-        <label class="form-label">Destination State</label>
-        <select class="field"><option>Texas</option><option>California</option><option>Florida</option><option>New York</option><option>Other</option></select>
-        <label class="form-label">Service</label>
-        <select class="field"><option>Ground (35 days)  $45</option><option>Express (Next Day)  $95</option></select>
-        <div style="background: var(--color-gunmetal); padding: 14px 18px; margin-top: 14px; display:flex; justify-content: space-between; align-items: center;">
-          <span style="font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.2em; color: var(--color-silver); text-transform: uppercase;">Estimated Total</span>
-          <span style="font-family: var(--font-display); font-size: 28px; color: var(--color-brass-bright);">$45.00</span>
-        </div>
-        <a class="btn btn-brass" style="width: 100%; margin-top: 16px;" href="/contact/">Schedule Drop-Off </a>
+        <?php if ( isset( $_GET['g2a_sent'] ) ) : ?>
+          <div class="alert success" style="margin-top:14px;">
+            <span class="ic"></span>
+            <div><div class="h">Request Received</div>Thanks - our FFL team will confirm your drop-off window by email or phone shortly. For anything urgent, call (602)&nbsp;715-2677.</div>
+          </div>
+        <?php else : ?>
+        <form method="post" action="<?php echo esc_url( g2a_form_action_url() ); ?>">
+          <input type="hidden" name="action" value="g2a_request">
+          <input type="hidden" name="g2a_subject" value="Firearm Shipping Quote">
+          <?php wp_nonce_field( 'g2a_request', 'g2a_nonce' ); ?>
+          <div style="position:absolute;left:-9999px;width:1px;height:1px;overflow:hidden;" aria-hidden="true"><label>Leave empty<input type="text" name="g2a_hp" tabindex="-1" autocomplete="off"></label></div>
+          <label class="form-label">Item Type</label>
+          <select class="field" name="g2a_f_item_type"><option>Handgun</option><option>Long Gun (Rifle/Shotgun)</option><option>Receiver Only</option></select>
+          <label class="form-label">Destination State</label>
+          <select class="field" name="g2a_f_destination_state"><option>Texas</option><option>California</option><option>Florida</option><option>New York</option><option>Other</option></select>
+          <label class="form-label">Service</label>
+          <select class="field" id="g2a-ship-service" name="g2a_f_service">
+            <option data-price="45">Ground (3-5 days) - $45</option>
+            <option data-price="95">Express (Next Day) - $95</option>
+          </select>
+          <div style="background: var(--color-gunmetal); padding: 14px 18px; margin-top: 14px; display:flex; justify-content: space-between; align-items: center;">
+            <span style="font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.2em; color: var(--color-silver); text-transform: uppercase;">Estimated Total</span>
+            <span style="font-family: var(--font-display); font-size: 28px; color: var(--color-brass-bright);" id="g2a-ship-total">$45.00</span>
+          </div>
+          <input type="hidden" name="g2a_f_estimated_total" id="g2a-ship-total-input" value="$45.00">
+          <button type="submit" class="btn btn-brass" style="width: 100%; margin-top: 16px;">Schedule Drop-Off </button>
+        </form>
+        <?php endif; ?>
       </div>
     </div>
   </div>
