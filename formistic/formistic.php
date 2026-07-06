@@ -4,7 +4,7 @@
  * Plugin Name:       Formistic — Smart Contact Forms for WordPress Leads
  * Plugin URI:        https://www.wordpressistic.com/marketplace/plugins/formistic/
  * Description:       Formistic centralizes form capture, lead inbox management, replies, analytics, automation, and AI-assisted workflows in WordPress.
- * Version:           2.0.5
+ * Version:           2.0.6
  * Requires at least: 6.2
  * Requires PHP:      7.4
  * Author:            Wordpressistic Organization
@@ -31,7 +31,7 @@ if (! defined('ABSPATH')) {
  * WPISTIC_FORMISTIC_URL        — URL to plugin directory (trailing slash).
  * WPISTIC_FORMISTIC_BASENAME   — Plugin basename (folder/file.php) for hooks.
  */
-define('WPISTIC_FORMISTIC_VERSION', '2.0.5');
+define('WPISTIC_FORMISTIC_VERSION', '2.0.6');
 define('WPISTIC_FORMISTIC_DB_VERSION', '1.3.0');
 define('WPISTIC_FORMISTIC_FILE', __FILE__);
 define('WPISTIC_FORMISTIC_PATH', plugin_dir_path(__FILE__));
@@ -75,7 +75,7 @@ register_activation_hook(__FILE__, function () {
 /* Deactivation — unschedule the cron (options + data persist). */
 register_deactivation_hook(__FILE__, ['Wpistic_Formistic_Gdpr', 'unschedule']);
 
-/* Boot the plugin once all plugins are loaded. */
-add_action('plugins_loaded', function () {
+/* Boot on init so WordPress 6.7+ translations are not loaded too early. */
+add_action('init', function () {
 	Wpistic_Formistic_Plugin::instance()->boot();
-});
+}, 5);

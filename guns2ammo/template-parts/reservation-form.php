@@ -4,21 +4,30 @@
  *
  * Usage:
  *   get_template_part( 'template-parts/reservation-form', null, [
- *       'subject' => 'Basic Handgun Course',
- *       'heading' => 'RESERVE YOUR SEAT',
- *       'intro'   => 'Tell us when you want to train',
- *       'cta'     => 'Request This Reservation',
+ *       'subject'  => 'Basic Handgun Course',
+ *       'heading'  => 'RESERVE YOUR SEAT',
+ *       'intro'    => 'Tell us when you want to train',
+ *       'cta'      => 'Request This Reservation',
+ *       'packages' => [ 'Basic Package ($249)', 'Premium Package ($449)' ], // optional
  *   ] );
+ *
+ * `packages`, when passed, renders a "Package" select (posted as g2a_course,
+ * the same field g2a_handle_reservation() already reads server-side) so one
+ * shared form can offer a few tiers instead of every tier needing its own
+ * page. Buttons elsewhere on the page can pre-select an option by pointing
+ * href="#reserve" and adding data-g2a-package="<exact option text>" — see
+ * assets/js/chrome.js.
  *
  * @package guns2ammo
  */
 if ( ! defined( 'ABSPATH' ) ) exit;
 
-$rf_subject = $args['subject'] ?? 'Reservation Request';
-$rf_heading = $args['heading'] ?? 'RESERVE YOUR SEAT';
-$rf_intro   = $args['intro'] ?? 'Send your details and our team will confirm availability by phone or email  usually within one business day.';
-$rf_cta     = $args['cta'] ?? 'Request Reservation';
-$rf_sent    = isset( $_GET['g2a_sent'] );
+$rf_subject  = $args['subject'] ?? 'Reservation Request';
+$rf_heading  = $args['heading'] ?? 'RESERVE YOUR SEAT';
+$rf_intro    = $args['intro'] ?? 'Send your details and our team will confirm availability by phone or email  usually within one business day.';
+$rf_cta      = $args['cta'] ?? 'Request Reservation';
+$rf_packages = ! empty( $args['packages'] ) && is_array( $args['packages'] ) ? array_values( array_filter( $args['packages'] ) ) : [];
+$rf_sent     = isset( $_GET['g2a_sent'] );
 ?>
 <section class="g2a-resv" id="reserve">
   <style>
@@ -48,6 +57,16 @@ $rf_sent    = isset( $_GET['g2a_sent'] );
         <?php wp_nonce_field( 'g2a_reservation', 'g2a_nonce' ); ?>
         <div class="rf-hp" aria-hidden="true"><label>Leave this empty<input type="text" name="g2a_hp" tabindex="-1" autocomplete="off"></label></div>
         <div class="rf-grid">
+          <?php if ( $rf_packages ) : ?>
+          <div class="rf-full">
+            <label class="form-label" for="rf-package">Package</label>
+            <select class="field" id="rf-package" name="g2a_course">
+              <?php foreach ( $rf_packages as $pkg ) : ?>
+                <option><?php echo esc_html( $pkg ); ?></option>
+              <?php endforeach; ?>
+            </select>
+          </div>
+          <?php endif; ?>
           <div>
             <label class="form-label" for="rf-name">Full Name</label>
             <input class="field" id="rf-name" name="g2a_name" required placeholder="Joseph Hartwell">

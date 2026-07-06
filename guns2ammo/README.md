@@ -107,11 +107,17 @@ before launch (a note on each page says so).
 
 ### Reservation forms
 
-Course, Private Instruction and Arsenal pages render a reservation form
-(`template-parts/reservation-form.php`). On submit it posts to
-`admin-post.php` and emails the address in **Customizer  Business Info 
-Email** (falling back to the WordPress admin email). A honeypot field blocks
-basic spam; no plugin required.
+Course, Private Instruction, Arsenal, Ladies Tuesday and Machine Gun pages
+render a reservation form (`template-parts/reservation-form.php`; pass a
+`packages` array to offer a tier picker, as the Machine Gun page does). On
+submit it posts to the front end (`g2a_form_action_url()`, handled on
+`template_redirect` — see `g2a_route_frontend_form()` in `functions.php`, not
+`admin-post.php`, since WAFs/security plugins commonly block `/wp-admin/`
+requests for logged-out visitors) and emails the address in **Customizer 
+Business Info  Email** (falling back to the WordPress admin email). A
+honeypot field blocks basic spam. Every submission is also mirrored into the
+Formistic plugin's inbox when it's active (`g2a_capture_to_formistic()`), so
+neither plugin is required for the form itself to work.
 
 ## Plugin integration (Memberistic + G2A Booking Engine)
 

@@ -401,6 +401,7 @@ class Wpistic_Formistic_Capture {
 			'g2a_name'       => __( 'Name', 'formistic' ),
 			'g2a_email'      => __( 'Email', 'formistic' ),
 			'g2a_phone'      => __( 'Phone', 'formistic' ),
+			'g2a_course'     => __( 'Course', 'formistic' ),
 			'g2a_date'       => __( 'Preferred Date', 'formistic' ),
 			'g2a_count'      => __( 'Participants', 'formistic' ),
 			'g2a_experience' => __( 'Experience Level', 'formistic' ),

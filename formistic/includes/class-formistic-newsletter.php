@@ -200,7 +200,11 @@ class Wpistic_Formistic_Newsletter {
 			];
 		}
 
-		// Per-IP throttle — stops a single visitor from flooding the form.
+		// Per-IP throttle — stops a single visitor from flooding the form. Uses
+		// the same trusted-proxy-aware IP resolution as the contact-form spam
+		// gate (Wpistic_Formistic_Spam::client_ip()); otherwise every visitor
+		// behind Cloudflare would collapse onto the shared edge IP and take
+		// turns tripping each other's 60-second throttle.
 		$ip  = self::client_ip();
 		$key = 'wpistic_formistic_nl_' . md5( $ip );
 		if ( get_transient( $key ) ) {
@@ -316,6 +320,9 @@ class Wpistic_Formistic_Newsletter {
 	}
 
 	private static function client_ip() {
+		if ( class_exists( 'Wpistic_Formistic_Spam' ) ) {
+			return substr( Wpistic_Formistic_Spam::client_ip(), 0, 64 );
+		}
 		$ip = isset( $_SERVER['REMOTE_ADDR'] ) ? sanitize_text_field( wp_unslash( $_SERVER['REMOTE_ADDR'] ) ) : '';
 		return substr( $ip, 0, 64 );
 	}

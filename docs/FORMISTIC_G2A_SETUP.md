@@ -99,13 +99,23 @@ once edited, re-seeding won't touch your version.
 
 The site sits behind Cloudflare, so PHP sees Cloudflare's IP as the visitor.
 For rate-limiting and IP blocklists to work per *visitor* (not per Cloudflare
-edge node):
+edge node), Formistic needs Cloudflare's IP ranges in its trusted-proxy list.
 
-**Formistic → Settings → Spam tab → Trusted proxies** — paste Cloudflare's IP
-ranges (comma-separated) from https://www.cloudflare.com/ips/. With the peer
-matched as a trusted proxy, Formistic honors `CF-Connecting-IP` /
-`X-Forwarded-For`. Leave the field empty only if the site is ever moved off
-Cloudflare.
+Since v2.0.6 this is filled in **automatically** — the "Seed Guns 2 Ammo
+defaults" step (step 5) also fill-only seeds **Formistic → Settings → Spam
+tab → Trusted proxies** with Cloudflare's published ranges, so this normally
+needs no manual action. Skipping it is exactly what causes the classic
+symptom "the form redirects to a success page but nothing shows up in the
+inbox" — every visitor collapses onto Cloudflare's shared edge IP, and the
+default 3-submissions-per-hour limit blocks almost everyone after the first
+few.
+
+Verify it's populated: **Formistic → Settings → Spam tab → Trusted proxy
+list** should already show a long comma-separated list. If it's empty (e.g.
+you installed before v2.0.6 and never clicked "Seed Guns 2 Ammo defaults"),
+paste Cloudflare's ranges from https://www.cloudflare.com/ips/ yourself, or
+click that seed button again. Leave the field empty only if the site is ever
+moved off Cloudflare.
 
 ## 7. Privacy: leave the wp_mail catch-all OFF
 
