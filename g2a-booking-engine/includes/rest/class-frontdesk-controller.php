@@ -85,8 +85,23 @@ final class G2AB_REST_Frontdesk_Controller {
 	 * Permissions
 	 * ------------------------------------------------------------------- */
 
+	/**
+	 * The nonce arrives in the X-WP-Nonce header on fetch() calls, but the
+	 * receipt opens in a NEW BROWSER TAB (window.open) which cannot send
+	 * custom headers — there it rides as the standard `_wpnonce` query
+	 * param. Accept both, exactly like WP core's REST cookie auth does;
+	 * header-only checking made every "Print receipt" click die with a 403.
+	 */
+	private function request_nonce( WP_REST_Request $request ) {
+		$nonce = (string) $request->get_header( 'X-WP-Nonce' );
+		if ( '' === $nonce ) {
+			$nonce = (string) $request->get_param( '_wpnonce' );
+		}
+		return $nonce;
+	}
+
 	public function permission_read( WP_REST_Request $request ) {
-		$nonce = $request->get_header( 'X-WP-Nonce' );
+		$nonce = $this->request_nonce( $request );
 		if ( ! $nonce || ! wp_verify_nonce( $nonce, 'wp_rest' ) ) {
 			return new WP_Error( 'g2ab_invalid_nonce', __( 'Invalid or missing nonce.', 'g2a-booking' ), array( 'status' => 403 ) );
 		}
@@ -97,7 +112,7 @@ final class G2AB_REST_Frontdesk_Controller {
 	}
 
 	public function permission_write( WP_REST_Request $request ) {
-		$nonce = $request->get_header( 'X-WP-Nonce' );
+		$nonce = $this->request_nonce( $request );
 		if ( ! $nonce || ! wp_verify_nonce( $nonce, 'wp_rest' ) ) {
 			return new WP_Error( 'g2ab_invalid_nonce', __( 'Invalid or missing nonce.', 'g2a-booking' ), array( 'status' => 403 ) );
 		}
@@ -211,6 +226,15 @@ final class G2AB_REST_Frontdesk_Controller {
 		return rest_ensure_response( array( 'success' => true, 'data' => $payload ) );
 	}
 
+	/**
+	 * Branded, print-ready HTML receipt, opened in its own tab.
+	 *
+	 * Emitted RAW (echo + exit) on purpose: returning the markup through
+	 * WP_REST_Response would run it through the REST server's JSON encoder
+	 * — the tab would render one giant quoted string instead of a page,
+	 * which is exactly the bug this replaces. The print dialog opens
+	 * automatically once the page (logo included) finishes loading.
+	 */
 	public function receipt( WP_REST_Request $request ) {
 		global $wpdb;
 		$booking_id = (int) $request['booking_id'];
@@ -237,55 +261,104 @@ final class G2AB_REST_Frontdesk_Controller {
 		$biz_addr  = get_option( 'g2ab_business_address', '' );
 		$currency  = $row->currency ?: get_option( 'g2ab_currency', 'USD' );
 		$dt_format = get_option( 'date_format' ) . ' \a\t ' . get_option( 'time_format' );
+		$balance   = max( 0, (float) $row->total_amount - (float) $row->paid_amount );
 
-		ob_start();
+		// Brand logo: theme custom logo first, then a filter for overrides.
+		$logo_url = '';
+		if ( function_exists( 'get_theme_mod' ) ) {
+			$logo_id = (int) get_theme_mod( 'custom_logo' );
+			if ( $logo_id ) {
+				$logo_url = (string) wp_get_attachment_image_url( $logo_id, 'medium' );
+			}
+		}
+		/** Override the receipt logo (e.g. a print-optimized black version). */
+		$logo_url = (string) apply_filters( 'g2ab_receipt_logo_url', $logo_url );
+		/** Override the receipt footer line. */
+		$footer   = (string) apply_filters( 'g2ab_receipt_footer_text', __( 'Thank you — shoot smart, carry safe.', 'g2a-booking' ) );
+		$site     = wp_parse_url( home_url(), PHP_URL_HOST );
+
+		nocache_headers();
+		header( 'Content-Type: text/html; charset=utf-8' );
 		?>
 <!doctype html>
-<html><head><meta charset="utf-8"><title>Receipt — <?php echo esc_html( $row->uuid ); ?></title>
+<html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Receipt — <?php echo esc_html( substr( (string) $row->uuid, 0, 8 ) ); ?></title>
 <style>
-body{font-family:'Courier New',monospace;font-size:14px;color:#000;background:#fff;margin:0;padding:20px;}
-.receipt{max-width:380px;margin:0 auto;}
-.center{text-align:center;}
-.line{border-top:1px dashed #000;margin:10px 0;}
-.row{display:flex;justify-content:space-between;margin:4px 0;}
-.muted{color:#555;font-size:12px;}
-h1{font-size:18px;margin:0 0 4px;text-transform:uppercase;letter-spacing:.06em;}
-.btn{display:inline-block;padding:8px 14px;background:#0F2044;color:#fff;text-decoration:none;border-radius:4px;}
-@media print{.no-print{display:none;}}
+*{box-sizing:border-box;}
+body{font-family:-apple-system,'Segoe UI',Arial,sans-serif;font-size:14px;color:#141317;background:#f2f0eb;margin:0;padding:24px 12px;}
+.receipt{max-width:380px;margin:0 auto;background:#fff;border:1px solid #d8d4cb;}
+.brand{background:#141317;color:#fff;text-align:center;padding:20px 16px 16px;}
+.brand img{max-width:150px;max-height:64px;display:block;margin:0 auto 8px;}
+.brand h1{font-size:20px;margin:0;text-transform:uppercase;letter-spacing:.14em;font-weight:800;}
+.brand .tag{color:#C9A84C;font-size:10px;letter-spacing:.24em;text-transform:uppercase;margin-top:4px;}
+.brand .muted{color:#b9b7bf;font-size:11px;margin-top:6px;line-height:1.5;}
+.body{padding:16px;}
+.rule{border-top:2px solid #C9A84C;margin:12px 0;}
+.dash{border-top:1px dashed #9a968c;margin:10px 0;}
+.row{display:flex;justify-content:space-between;gap:12px;margin:5px 0;}
+.row .l{color:#5d5b64;}
+.mono{font-family:'Courier New',monospace;}
+.total{font-size:17px;font-weight:800;}
+.paid-pill{display:inline-block;border:2px solid #141317;padding:3px 12px;font-weight:800;letter-spacing:.18em;text-transform:uppercase;font-size:11px;margin-top:6px;}
+.foot{text-align:center;color:#5d5b64;font-size:11px;padding:0 16px 18px;line-height:1.6;}
+.foot .thanks{color:#141317;font-weight:700;font-size:12px;letter-spacing:.06em;text-transform:uppercase;margin-bottom:4px;}
+.actions{text-align:center;margin:20px auto;max-width:380px;}
+.btn{display:inline-block;padding:10px 22px;background:#141317;color:#fff;text-decoration:none;border:none;border-radius:3px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;font-size:12px;cursor:pointer;}
+.btn--ghost{background:transparent;color:#141317;border:1px solid #141317;margin-left:8px;}
+@media print{
+  body{background:#fff;padding:0;}
+  .receipt{border:none;max-width:none;}
+  .brand{-webkit-print-color-adjust:exact;print-color-adjust:exact;}
+  .actions{display:none;}
+  @page{margin:6mm;}
+}
 </style>
 </head><body>
 <div class="receipt">
-  <div class="center">
+  <div class="brand">
+    <?php if ( $logo_url ) : ?><img src="<?php echo esc_url( $logo_url ); ?>" alt="<?php echo esc_attr( $biz_name ); ?>"><?php endif; ?>
     <h1><?php echo esc_html( $biz_name ); ?></h1>
-    <?php if ( $biz_addr )  : ?><div class="muted"><?php echo esc_html( $biz_addr ); ?></div><?php endif; ?>
-    <?php if ( $biz_phone ) : ?><div class="muted"><?php echo esc_html( $biz_phone ); ?></div><?php endif; ?>
+    <div class="tag"><?php esc_html_e( 'Indoor Range · FFL · Training', 'g2a-booking' ); ?></div>
+    <div class="muted">
+      <?php if ( $biz_addr )  : ?><?php echo esc_html( $biz_addr ); ?><br><?php endif; ?>
+      <?php if ( $biz_phone ) : ?><?php echo esc_html( $biz_phone ); ?> · <?php endif; ?><?php echo esc_html( $site ); ?>
+    </div>
   </div>
-  <div class="line"></div>
-  <div class="row"><span>Receipt</span><span><?php echo esc_html( substr( $row->uuid, 0, 8 ) ); ?></span></div>
-  <div class="row"><span>Date</span><span><?php echo esc_html( date_i18n( $dt_format ) ); ?></span></div>
-  <div class="row"><span>Customer</span><span><?php echo esc_html( $row->customer_name ); ?></span></div>
-  <?php if ( $row->customer_phone ) : ?><div class="row"><span>Phone</span><span><?php echo esc_html( $row->customer_phone ); ?></span></div><?php endif; ?>
-  <div class="line"></div>
-  <div class="row"><span><?php echo esc_html( $row->booking_type_name ?: 'Booking' ); ?></span><span>$<?php echo esc_html( number_format( (float) $row->total_amount, 2 ) ); ?></span></div>
-  <div class="row muted"><span><?php echo esc_html( $row->resource_name ); ?></span><span>x<?php echo (int) $row->party_size; ?></span></div>
-  <div class="row muted"><span><?php echo esc_html( date_i18n( $dt_format, strtotime( (string) $row->start_at ) ) ); ?></span><span><?php echo (int) $row->duration_min; ?>m</span></div>
-  <div class="line"></div>
-  <div class="row"><strong>Total</strong><strong>$<?php echo esc_html( number_format( (float) $row->total_amount, 2 ) ); ?> <?php echo esc_html( $currency ); ?></strong></div>
-  <div class="row"><span>Paid</span><span>$<?php echo esc_html( number_format( (float) $row->paid_amount, 2 ) ); ?></span></div>
-  <div class="row"><strong>Balance</strong><strong>$<?php echo esc_html( number_format( max( 0, (float) $row->total_amount - (float) $row->paid_amount ), 2 ) ); ?></strong></div>
-  <div class="line"></div>
-  <div class="center muted">Thank you, stay safe out there.</div>
+  <div class="body">
+    <div class="row"><span class="l"><?php esc_html_e( 'Receipt', 'g2a-booking' ); ?></span><span class="mono">#<?php echo esc_html( strtoupper( substr( (string) $row->uuid, 0, 8 ) ) ); ?></span></div>
+    <div class="row"><span class="l"><?php esc_html_e( 'Issued', 'g2a-booking' ); ?></span><span><?php echo esc_html( date_i18n( $dt_format ) ); ?></span></div>
+    <div class="row"><span class="l"><?php esc_html_e( 'Customer', 'g2a-booking' ); ?></span><span><?php echo esc_html( $row->customer_name ); ?></span></div>
+    <?php if ( $row->customer_phone ) : ?><div class="row"><span class="l"><?php esc_html_e( 'Phone', 'g2a-booking' ); ?></span><span class="mono"><?php echo esc_html( $row->customer_phone ); ?></span></div><?php endif; ?>
+    <div class="rule"></div>
+    <div class="row"><strong><?php echo esc_html( $row->booking_type_name ?: __( 'Booking', 'g2a-booking' ) ); ?></strong><strong class="mono">$<?php echo esc_html( number_format( (float) $row->total_amount, 2 ) ); ?></strong></div>
+    <?php if ( $row->resource_name ) : ?><div class="row"><span class="l"><?php echo esc_html( $row->resource_name ); ?></span><span class="l">×<?php echo (int) $row->party_size; ?></span></div><?php endif; ?>
+    <div class="row"><span class="l"><?php echo esc_html( date_i18n( $dt_format, strtotime( (string) $row->start_at ) ) ); ?></span><span class="l"><?php echo (int) $row->duration_min; ?> <?php esc_html_e( 'min', 'g2a-booking' ); ?></span></div>
+    <div class="dash"></div>
+    <div class="row total"><span><?php esc_html_e( 'Total', 'g2a-booking' ); ?></span><span class="mono">$<?php echo esc_html( number_format( (float) $row->total_amount, 2 ) ); ?> <?php echo esc_html( $currency ); ?></span></div>
+    <div class="row"><span class="l"><?php esc_html_e( 'Paid', 'g2a-booking' ); ?></span><span class="mono">$<?php echo esc_html( number_format( (float) $row->paid_amount, 2 ) ); ?></span></div>
+    <div class="row"><span class="l"><?php esc_html_e( 'Balance due', 'g2a-booking' ); ?></span><span class="mono">$<?php echo esc_html( number_format( $balance, 2 ) ); ?></span></div>
+    <?php if ( $balance <= 0 && (float) $row->total_amount > 0 ) : ?>
+      <div style="text-align:center;"><span class="paid-pill"><?php esc_html_e( 'Paid in full', 'g2a-booking' ); ?></span></div>
+    <?php endif; ?>
+  </div>
+  <div class="foot">
+    <div class="thanks"><?php echo esc_html( $footer ); ?></div>
+    <?php esc_html_e( 'Booking ref:', 'g2a-booking' ); ?> <span class="mono"><?php echo esc_html( (string) $row->uuid ); ?></span>
+  </div>
 </div>
-<div class="center no-print" style="margin-top:24px;">
-  <a class="btn" href="javascript:window.print()">Print</a>
+<div class="actions">
+  <button class="btn" onclick="window.print()"><?php esc_html_e( 'Print', 'g2a-booking' ); ?></button>
+  <button class="btn btn--ghost" onclick="window.close()"><?php esc_html_e( 'Close', 'g2a-booking' ); ?></button>
 </div>
-<script>setTimeout(function(){window.focus();},100);</script>
+<script>
+/* Pop the print dialog automatically once everything (logo included) has
+   loaded. The page stays open afterwards so staff can reprint or close. */
+window.addEventListener('load', function () {
+  setTimeout(function () { window.focus(); window.print(); }, 250);
+});
+</script>
 </body></html>
 		<?php
-		$html = ob_get_clean();
-		$response = new WP_REST_Response( $html );
-		$response->header( 'Content-Type', 'text/html; charset=utf-8' );
-		return $response;
+		exit;
 	}
 
 	/* ---------------------------------------------------------------------

@@ -4,7 +4,7 @@ Tags: booking, reservation, scheduling, appointments, shooting range, firearms, 
 Requires at least: 6.2
 Tested up to: 6.5
 Requires PHP: 8.0
-Stable tag: 1.9.9.2
+Stable tag: 1.9.9.3
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -206,6 +206,12 @@ Yes. REST API at `/wp-json/g2a-booking/v1/` covers bookings, forms, calendar, fr
 7. Migration wizard — dry-run preview before live import.
 
 == Changelog ==
+
+= 1.9.9.3 =
+* FIX: "Print receipt" on the staff front desk was dead — the receipt tab's nonce rides in the `_wpnonce` query param (a new tab can't send the X-WP-Nonce header), but the permission check was header-only, so every click got a 403. Both locations are accepted now.
+* FIX: the receipt endpoint returned its HTML through the REST JSON serializer, so even an authorized request rendered as one quoted string instead of a page. The receipt is now emitted as a raw HTML document.
+* NEW: branded receipt — dark brand header with the site logo, brass rules, PAID IN FULL stamp, booking reference, thermal-friendly print CSS — and the print dialog opens automatically when the receipt loads (Print / Close buttons stay for reprints).
+* NEW: `g2ab_receipt_logo_url` and `g2ab_receipt_footer_text` filters.
 
 = 1.9.9.1 =
 **Premium polish: clean typography, reorganised dashboard, and a brand-new Shooters CRM.**
