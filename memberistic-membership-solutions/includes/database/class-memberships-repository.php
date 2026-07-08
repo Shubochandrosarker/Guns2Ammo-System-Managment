@@ -532,7 +532,21 @@ final class Memberships_Repository {
 			}
 		}
 
-		return self::update( $id, $update );
+		$ok = self::update( $id, $update );
+
+		if ( $ok ) {
+			/**
+			 * Fires after a membership's status is changed through the
+			 * canonical path. Integrations (coreSTORE bridge, role sync,
+			 * marketing) key off this instead of polling.
+			 *
+			 * @param int    $id     Membership id.
+			 * @param string $status New status.
+			 */
+			do_action( 'memberistic_membership_status_changed', (int) $id, $status );
+		}
+
+		return $ok;
 	}
 
 	/**

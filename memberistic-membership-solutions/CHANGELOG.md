@@ -2,6 +2,14 @@
 
 All notable changes are tracked here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## 1.10.0 — coreSTORE bridge, WooCommerce member discounts, dashboard Shop tab
+
+### Added
+- **coreSTORE (Coreware) POS bridge.** New integration — fully independent from the G2A POS Bridge — that pushes membership state into the shop's hosted coreSTORE over its REST API (`x-api-key`): per-plan price-tier mapping (coreSTORE's tier pricing then applies member discounts at the register automatically), optional custom fields for plan/status/expiry on the cashier's customer screen, live push on activation/renewal/lapse, daily reconciliation cron, Test Connection + Sync Now buttons, and a capped sync log. Credential-ready: configure URL/key on Integrations whenever the store issues them.
+- **Automatic WooCommerce member discounts.** Each plan carries its own discount %, category include/exclude rules, and a skip-sale-items switch (Integrations screen). Active members get a labeled negative fee at cart/checkout ("Member discount — Patriot (10%)"), orders are stamped with the saving (`_memberistic_member_discount`), and product pages show the member price. Membership products are never discounted.
+- **Shop tab on the member dashboard.** The `/account/` dashboard now includes the member's WooCommerce world: order count / total spent / lifetime member savings, recent orders with per-order savings and view links, downloads, billing & shipping addresses with edit links, and payment-methods / account-details links — no separate my-account visit needed.
+- **`memberistic_membership_status_changed` action** fires from the canonical `change_status()` path so integrations react to lapses/cancellations without polling.
+
 ## 1.9.9.5 — Post-login cache-buster
 
 ### Fixed

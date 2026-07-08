@@ -56,8 +56,11 @@ final class Plugin {
 			'includes/integrations/class-integrations-registry.php',
 			'includes/integrations/class-booking-engine.php',
 			'includes/integrations/class-woocommerce-bridge.php',
+			'includes/integrations/class-woocommerce-discounts.php',
 			'includes/integrations/class-verifyistic-bridge.php',
 			'includes/integrations/class-pos-bridge.php',
+			'includes/integrations/class-corestore-client.php',
+			'includes/integrations/class-corestore-bridge.php',
 			'includes/payments/class-stripe-service.php',
 			'includes/admin/class-admin-menu.php',
 			'includes/admin/class-dashboard-page.php',
@@ -149,9 +152,18 @@ final class Plugin {
 		// POS Bridge: feeds live Memberistic status into the G2A POS counter
 		// screens (gated by its Integrations toggle + plugin presence).
 		add_action( 'init', array( Integrations\POS_Bridge::class, 'register' ) );
+		// coreSTORE (Coreware) bridge: pushes membership state to the client's
+		// hosted coreSTORE POS. Independent from POS_Bridge above; gates
+		// itself on its own Integrations toggle.
+		add_action( 'init', array( Integrations\CoreStore_Bridge::class, 'register' ) );
+		// Per-plan WooCommerce member discounts (gates itself on the Woo
+		// toggle + the woo_member_discounts_enabled sub-option).
+		add_action( 'init', array( Integrations\WooCommerce_Discounts::class, 'register' ) );
 		add_action( 'init', array( Scheduler::class, 'register' ) );
 		// Save handler for the Integrations page toggles.
 		add_action( 'admin_post_memberistic_save_integrations', array( Admin\Admin_Menu::class, 'save_integrations' ) );
+		add_action( 'admin_post_memberistic_corestore_test', array( Admin\Admin_Menu::class, 'corestore_test' ) );
+		add_action( 'admin_post_memberistic_corestore_sync', array( Admin\Admin_Menu::class, 'corestore_sync' ) );
 		// Register Verification before `init` fires so its priority-5 init
 		// hook actually lands in the queue before WP processes priority 5.
 		Utilities\Verification::register();
