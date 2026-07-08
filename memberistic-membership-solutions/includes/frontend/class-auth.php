@@ -225,7 +225,14 @@ final class Auth {
 		}
 
 		wp_set_current_user( $user->ID );
-		self::redirect( self::redirect_target() );
+
+		// Land on the account page with a unique query arg. A CDN/page cache
+		// that still holds a LOGGED-OUT copy of /account/ would otherwise
+		// serve the login form right back to the freshly signed-in member —
+		// the classic "the Sign In button doesn't work" report. The unique
+		// URL forces a cache miss, so the first post-login view is always
+		// rendered fresh with the member's cookies.
+		self::redirect( add_query_arg( 'mlogin', (string) time(), self::redirect_target() ) );
 	}
 
 	/**

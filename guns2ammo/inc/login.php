@@ -147,8 +147,11 @@ function g2a_login_redirect_filter( $redirect_to, $requested_redirect_to, $user 
 	if ( user_can( $user, 'edit_posts' ) ) {
 		return $redirect_to;
 	}
-	// Members + everyone else: branded dashboard.
-	return home_url( '/account/' );
+	// Members + everyone else: branded dashboard. The unique query arg
+	// defeats any stale edge/page cache of /account/ — a cached logged-out
+	// copy of that page IS the login form again, which reads as "the login
+	// button does nothing" even though the sign-in itself succeeded.
+	return add_query_arg( 'mlogin', (string) time(), home_url( '/account/' ) );
 }
 
 /* ============================================================
@@ -307,4 +310,98 @@ function g2a_login_record_failure() {
 add_action( 'wp_login', 'g2a_login_clear_failures' );
 function g2a_login_clear_failures() {
 	delete_transient( 'g2a_login_fails_' . md5( g2a_login_client_ip() ) );
+}
+
+/* ============================================================
+ * 8. Login health-check / deploy-verification endpoint.
+ *
+ *    Hit  https://your-site.com/?g2a_login_check=1  while signed in
+ *    as an administrator (use /g2a-admin-login/ if needed). Reports
+ *    everything the member sign-in flow depends on:
+ *      - theme + Memberistic versions actually executing
+ *      - whether the Memberistic branded auth handler (Frontend\Auth,
+ *        1.9.9.x line) is loaded — old 1.4x builds don't have it
+ *      - the /login/ and /account/ pages + their assigned templates
+ *      - the brute-force fail counter for the requesting IP
+ *    plus a plain-English verdict of what to fix.
+ * ============================================================ */
+add_action( 'init', 'g2a_login_check_endpoint' );
+function g2a_login_check_endpoint() {
+	if ( empty( $_GET['g2a_login_check'] ) ) {
+		return;
+	}
+	if ( ! current_user_can( 'manage_options' ) ) {
+		status_header( 403 );
+		wp_send_json( array( 'error' => 'forbidden — sign in as an administrator first (via /g2a-admin-login/), then reload this URL' ), 403 );
+	}
+	nocache_headers();
+
+	$theme        = wp_get_theme( get_template() );
+	$auth_class   = class_exists( '\\WordPressistic\\Memberistic\\Frontend\\Auth' );
+	$memberistic  = defined( 'MEMBERISTIC_VERSION' ) ? MEMBERISTIC_VERSION : '';
+	$login_page   = get_page_by_path( 'login' );
+	$account_page = get_page_by_path( 'account' );
+	$tpl          = static function ( $page ) {
+		return $page ? (string) get_post_meta( $page->ID, '_wp_page_template', true ) : '';
+	};
+	$fails     = (int) get_transient( 'g2a_login_fails_' . md5( g2a_login_client_ip() ) );
+	$fail_max  = (int) apply_filters( 'g2a_login_max_failures', 20 );
+
+	$verdict = array();
+	if ( '' === $memberistic ) {
+		$verdict[] = 'PROBLEM: Memberistic is not active — /login/ renders a placeholder instead of the sign-in form. Activate (or re-upload) the Memberistic plugin.';
+	} elseif ( ! $auth_class ) {
+		$verdict[] = 'PROBLEM: an OLD Memberistic build (' . $memberistic . ') is running — it pre-dates the branded login handler, so the /login/ form is degraded. Upload the memberistic-membership-solutions 1.9.9.x zip from releases/. Do NOT use the 1.45.0 / 1.46.0 zips.';
+	}
+	if ( ! $login_page ) {
+		$verdict[] = 'PROBLEM: no page with slug "login" exists. Re-activate the theme (Appearance → Themes) to auto-create it, or create the page and assign the "Login" template.';
+	} elseif ( 'page-templates/template-login.php' !== $tpl( $login_page ) ) {
+		$verdict[] = 'PROBLEM: the /login/ page is not using the "Login" template (currently: "' . $tpl( $login_page ) . '"). Edit the page and set Template = Login.';
+	}
+	if ( $account_page && 'page-templates/template-account.php' !== $tpl( $account_page ) ) {
+		$verdict[] = 'WARNING: the /account/ page is not using the "Account" template (currently: "' . $tpl( $account_page ) . '").';
+	}
+	if ( $fails >= $fail_max ) {
+		$verdict[] = 'PROBLEM: this IP has hit the failed-login throttle (' . $fails . '/' . $fail_max . '). Sign-in POSTs get a 429 for up to 15 minutes.';
+	}
+	if ( empty( $verdict ) ) {
+		$verdict[] = 'OK — all login plumbing is in place. If sign-in still bounces back to the form, it is almost certainly a stale CDN/page cache: purge ALL of the Cloudflare cache (and any caching plugin), then retest in a private/incognito window.';
+	}
+
+	wp_send_json( array(
+		'theme_version'            => $theme ? (string) $theme->get( 'Version' ) : '',
+		'memberistic_version'      => $memberistic ?: 'NOT ACTIVE',
+		'memberistic_auth_handler' => $auth_class,
+		'login_form_posts_to'      => $auth_class ? '/login/ (Memberistic Frontend\\Auth — correct)' : 'wp-login.php (legacy fallback)',
+		'login_page'               => $login_page ? array( 'id' => $login_page->ID, 'template' => $tpl( $login_page ) ) : null,
+		'account_page'             => $account_page ? array( 'id' => $account_page->ID, 'template' => $tpl( $account_page ) ) : null,
+		'login_shortcode'          => shortcode_exists( 'memberistic_login' ),
+		'your_ip_failed_attempts'  => $fails . '/' . $fail_max,
+		'verdict'                  => $verdict,
+	) );
+}
+
+/* ============================================================
+ * 9. Downgrade detector. If a Memberistic build WITHOUT the branded
+ *    auth handler ever lands on the site again (e.g. an old zip from
+ *    releases/ gets uploaded), warn loudly in wp-admin instead of
+ *    silently breaking member sign-in.
+ * ============================================================ */
+add_action( 'admin_notices', 'g2a_login_notice_memberistic_downgrade' );
+function g2a_login_notice_memberistic_downgrade() {
+	if ( ! current_user_can( 'activate_plugins' ) ) {
+		return;
+	}
+	if ( ! defined( 'MEMBERISTIC_VERSION' ) || class_exists( '\\WordPressistic\\Memberistic\\Frontend\\Auth' ) ) {
+		return;
+	}
+	printf(
+		'<div class="notice notice-error"><p><strong>%s</strong> %s</p></div>',
+		esc_html__( 'Member login is degraded:', 'guns2ammo' ),
+		esc_html( sprintf(
+			/* translators: %s: installed Memberistic version */
+			__( 'the installed Memberistic build (%s) pre-dates the branded login handler, so members cannot reliably sign in at /login/. Upload the memberistic-membership-solutions 1.9.9.x zip — do not use the old 1.45/1.46 zips.', 'guns2ammo' ),
+			MEMBERISTIC_VERSION
+		) )
+	);
 }

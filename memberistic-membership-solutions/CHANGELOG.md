@@ -2,6 +2,11 @@
 
 All notable changes are tracked here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## 1.9.9.5 — Post-login cache-buster
+
+### Fixed
+- **Sign-in could still appear dead behind an aggressive page cache/CDN.** After a successful login, `Auth` now redirects to the account page with a unique `mlogin` query arg, forcing a cache miss so a stale *logged-out* copy of `/account/` (which is the login form again) can never be served back to the freshly signed-in member. Pair with a one-time full CDN cache purge after deploying.
+
 ## 1.9.9.4 — Sign-out
 
 ### Fixed
