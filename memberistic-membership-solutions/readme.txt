@@ -4,7 +4,7 @@ Tags: membership, operations, staff dashboard, stripe, woocommerce, rest api
 Requires at least: 6.0
 Requires PHP: 8.0
 Tested up to: 6.7
-Stable tag: 1.9.9.4
+Stable tag: 1.9.9.5
 License: GPLv2 or later
 
 A modern membership operations engine for service businesses. Co-developed by WordPressistic and launch partner Guns 2 Ammo (https://guns2ammo.com).
@@ -69,6 +69,9 @@ Set Settings > Advanced > "Delete data on uninstall" to Yes before removing the 
 == Changelog ==
 
 See CHANGELOG.md for the full history.
+
+= 1.9.9.5 =
+* Fix: post-login redirect now carries a unique cache-busting query arg so a stale CDN/page-cache copy of the account page can never be served to a freshly signed-in member. Purge the site/CDN cache once after updating.
 
 = 1.9.9.4 =
 **Sign Out now actually signs members out.**

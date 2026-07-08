@@ -188,7 +188,7 @@ html[data-theme="light"] .hero-media .b-pill {
   --space-3xl: 120px;
 
   /* Type */
-  --font-display: 'Bebas Neue', 'Arial Narrow', sans-serif;
+  --font-display: 'Bebas Neue', 'Bebas Neue Fallback', 'Arial Narrow', sans-serif;
   --font-condensed: 'Barlow Condensed', 'Arial Narrow', sans-serif;
   --font-ui: 'Barlow', system-ui, sans-serif;
   --font-body: 'DM Sans', system-ui, sans-serif;
@@ -629,8 +629,8 @@ html[data-theme="light"] .foot-map { border-color: var(--color-hairline); }
 .tweaks-toggle svg { width:20px; height:20px; }
 
 /* MODAL / QUICK VIEW */
-.qv-backdrop { position:fixed; inset:0; z-index:400; background: rgba(0,0,0,0.7); backdrop-filter: blur(8px); opacity:0; pointer-events:none; transition: opacity 240ms var(--ease-std); display:grid; place-items:center; padding:24px; }
-.qv-backdrop.open { opacity:1; pointer-events:auto; }
+.qv-backdrop { position:fixed; inset:0; z-index:400; background: rgba(0,0,0,0.7); backdrop-filter: blur(8px); opacity:0; pointer-events:none; visibility:hidden; transition: opacity 240ms var(--ease-std), visibility 0s linear 240ms; display:grid; place-items:center; padding:24px; }
+.qv-backdrop.open { opacity:1; pointer-events:auto; visibility:visible; transition: opacity 240ms var(--ease-std), visibility 0s; }
 .qv-modal { width:100%; max-width:920px; background: var(--color-gunmetal); border:1px solid var(--color-hairline-bright); display:grid; grid-template-columns: 1fr 1fr; transform: scale(0.94) translateY(12px); transition: transform 280ms var(--ease-out); max-height: 90vh; overflow:auto; }
 .qv-backdrop.open .qv-modal { transform: scale(1) translateY(0); }
 @media (max-width:780px){ .qv-modal { grid-template-columns:1fr; } }

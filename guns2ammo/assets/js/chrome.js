@@ -393,8 +393,38 @@
     var qv = document.getElementById('g2a-qv');
     if (qv) {
       var qvClose = document.getElementById('g2a-qv-close');
-      qvClose && qvClose.addEventListener('click', function () { qv.classList.remove('open'); });
-      qv.addEventListener('click', function (e) { if (e.target === qv) qv.classList.remove('open'); });
+      var qvLastFocus = null;
+      // The dialog ships aria-hidden + inert (closed). Both must be lifted
+      // while open and restored on close, or the a11y tree is malformed:
+      // aria-hidden content must never contain focusable elements.
+      var qvOpen = function () {
+        qvLastFocus = document.activeElement;
+        qv.removeAttribute('aria-hidden');
+        qv.removeAttribute('inert');
+        qv.classList.add('open');
+        if (qvClose) qvClose.focus();
+      };
+      var qvDismiss = function () {
+        if (!qv.classList.contains('open')) return;
+        qv.classList.remove('open');
+        qv.setAttribute('aria-hidden', 'true');
+        qv.setAttribute('inert', '');
+        if (qvLastFocus && document.contains(qvLastFocus)) qvLastFocus.focus();
+        qvLastFocus = null;
+      };
+      qvClose && qvClose.addEventListener('click', qvDismiss);
+      qv.addEventListener('click', function (e) { if (e.target === qv) qvDismiss(); });
+      document.addEventListener('keydown', function (e) {
+        if (e.key === 'Escape') qvDismiss();
+        // Minimal focus trap while open (mirrors the drawer's).
+        if (e.key === 'Tab' && qv.classList.contains('open')) {
+          var f = qv.querySelectorAll('a[href], button:not([disabled]), [tabindex]:not([tabindex="-1"])');
+          if (!f.length) return;
+          var first = f[0], last = f[f.length - 1];
+          if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+          else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+        }
+      });
       document.body.addEventListener('click', function (e) {
         var trigger = e.target.closest('[data-quickview]');
         if (!trigger) return;
@@ -429,7 +459,7 @@
           if (detail) {
             detail.setAttribute('href', data.detail_url || '#');
           }
-          qv.classList.add('open');
+          qvOpen();
         } catch (err) {}
       });
     }
