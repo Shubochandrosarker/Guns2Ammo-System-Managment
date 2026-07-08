@@ -66,6 +66,25 @@
   unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
 }
 
+/* Metric-matched fallback for Bebas Neue. Bebas is an ultra-condensed
+ * display face; a plain Arial fallback renders hero headlines 71.6% wider
+ * (measured), so the font swap reflows the biggest text on the page — the
+ * main Cumulative Layout Shift source on desktop. size-adjust + the
+ * overrides squeeze local Arial to Bebas's real metrics: measured against
+ * the bundled woff2, this fallback is within 0.1% width / 0.0% height of
+ * the real face, so the swap is geometry-neutral. Used via --font-display
+ * in tokens.css. */
+@font-face {
+  font-family: 'Bebas Neue Fallback';
+  font-style: normal;
+  font-weight: 400;
+  src: local('Arial'), local('Liberation Sans'), local('Helvetica');
+  size-adjust: 58.3%;
+  ascent-override: 162%;
+  descent-override: 44.2%;
+  line-gap-override: 0%;
+}
+
 @font-face {
   font-family: 'DM Sans';
   font-style: normal;

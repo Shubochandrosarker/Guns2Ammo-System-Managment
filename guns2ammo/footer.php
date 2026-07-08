@@ -173,8 +173,13 @@ $founded   = (int) $biz['founded_year'];
 	</div>
 </footer>
 
-<!-- Quick-view modal (mounted once, populated by chrome.js) -->
-<div class="qv-backdrop" id="g2a-qv" role="dialog" aria-modal="true" aria-hidden="true">
+<!-- Quick-view modal (mounted once, populated by chrome.js).
+     Closed state must carry BOTH aria-hidden and inert: aria-hidden alone on
+     a container with focusable children (Add To Cart / View Full Details) is
+     an accessibility-tree violation — keyboard users could tab into an
+     invisible dialog. inert also removes the subtree from the tab order.
+     chrome.js lifts both attributes while the dialog is open. -->
+<div class="qv-backdrop" id="g2a-qv" role="dialog" aria-modal="true" aria-label="Product quick view" aria-hidden="true" inert>
 	<div class="qv-modal">
 		<div class="qv-image" id="g2a-qv-img" data-pl="PRODUCT IMAGE PLACEHOLDER"></div>
 		<div class="qv-body">

@@ -50,9 +50,14 @@ $g2a_uri = G2A_URI;
 <link rel="preconnect" href="https://api.qrserver.com" crossorigin>
 <link rel="dns-prefetch" href="//api.qrserver.com">
 
-<?php /* Preload the two most-rendered fonts (body + display).
-       Both are referenced in tokens.css via @font-face, so the
-       browser would otherwise discover them ~80-150ms later. */ ?>
+<?php /* Preload the three most-rendered fonts (body + condensed + the
+       Bebas Neue display face). All are referenced in fonts.css via
+       @font-face, so the browser would otherwise discover them
+       ~80-150ms later. Bebas Neue matters most for CLS: it draws every
+       hero headline, and a late swap from the fallback reflows the
+       largest text on the page. */ ?>
+<link rel="preload" as="font" type="font/woff2"
+      href="<?php echo esc_url( $g2a_uri . '/assets/fonts/v16-JTUSjIg69CK48gW7PXoo9Wlhyw.woff2' ); ?>" crossorigin>
 <link rel="preload" as="font" type="font/woff2"
       href="<?php echo esc_url( $g2a_uri . '/assets/fonts/v17-rP2Yp2ywxg089UriI5-g4vlH9VoD8Cmcqbu0-K4.woff2' ); ?>" crossorigin>
 <link rel="preload" as="font" type="font/woff2"
