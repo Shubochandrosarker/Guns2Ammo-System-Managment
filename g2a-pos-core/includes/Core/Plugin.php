@@ -211,8 +211,18 @@ final class Plugin {
 				continue;
 			}
 			try {
-				$provider->syncInventory( (int) $w['id'] );
-				$repo->markSyncedNow( (int) $w['id'] );
+				// syncInventory() reports failures via ['ok' => false] rather
+				// than throwing — only stamp last_sync_at on a real success,
+				// otherwise a down account looks freshly synced forever.
+				$result = $provider->syncInventory( (int) $w['id'] );
+				if ( ! empty( $result['ok'] ) ) {
+					$repo->markSyncedNow( (int) $w['id'] );
+				} else {
+					Logger::error( 'Wholesaler cron sync failed', array(
+						'wholesaler_id' => (int) $w['id'],
+						'error'         => (string) ( $result['error'] ?? 'unknown' ),
+					) );
+				}
 			} catch ( \Throwable $e ) {
 				Logger::exception( 'Wholesaler sync failed', $e, array( 'wholesaler_id' => (int) $w['id'] ) );
 			}
