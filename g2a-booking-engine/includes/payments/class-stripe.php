@@ -52,6 +52,15 @@ final class G2AB_Gateway_Stripe {
 		$success = add_query_arg( array( 'g2ab_paid' => $booking->uuid ), home_url( '/' ) );
 		$cancel  = add_query_arg( array( 'g2ab_cancel' => $booking->uuid ), home_url( '/' ) );
 
+		// The confirm-payment REST fallback refuses to act without the
+		// confirm_token issued at booking creation, so the return page must
+		// carry it. The customer already holds this token (it's in the
+		// create-booking response), so the URL adds no new exposure.
+		$meta = json_decode( (string) ( $booking->metadata ?? '' ), true );
+		if ( ! empty( $meta['confirm_token'] ) ) {
+			$success = add_query_arg( array( 'g2ab_token' => rawurlencode( (string) $meta['confirm_token'] ) ), $success );
+		}
+
 		$body = array(
 			'mode' => 'payment',
 			'payment_method_types[]' => 'card',

@@ -10,24 +10,51 @@ permissions:
   contents: read
 
 jobs:
-  build:
-
+  lint:
+    name: PHP syntax lint (all plugins)
     runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
 
+    - name: Set up PHP
+      uses: shivammathur/setup-php@v2
+      with:
+        php-version: '8.2'
+
+    - name: php -l every plugin/theme file
+      run: |
+        ERRS=0
+        while IFS= read -r f; do
+          out=$(php -l "$f" 2>&1) || { echo "$out"; ERRS=1; }
+        done < <(find . -name '*.php' -not -path './.git/*' -not -path '*/vendor/*' -not -path '*/node_modules/*')
+        exit $ERRS
+
+  composer:
+    name: Validate composer projects
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        # This repo is a monorepo of WordPress plugins; only these
+        # subprojects carry a composer.json (there is none at the root).
+        project: [ g2a-business-api, g2a-pos-core, messageistic ]
+    defaults:
+      run:
+        working-directory: ${{ matrix.project }}
     steps:
     - uses: actions/checkout@v4
 
     - name: Validate composer.json and composer.lock
-      run: composer validate --strict
+      run: composer validate --strict --no-check-publish
 
     - name: Cache Composer packages
       id: composer-cache
       uses: actions/cache@v3
       with:
-        path: vendor
-        key: ${{ runner.os }}-php-${{ hashFiles('**/composer.lock') }}
+        path: ${{ matrix.project }}/vendor
+        key: ${{ runner.os }}-php-${{ matrix.project }}-${{ hashFiles(format('{0}/composer.lock', matrix.project)) }}
         restore-keys: |
-          ${{ runner.os }}-php-
+          ${{ runner.os }}-php-${{ matrix.project }}-
 
     - name: Install dependencies
       run: composer install --prefer-dist --no-progress

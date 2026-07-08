@@ -34,6 +34,7 @@
 	function checkBookingStatus(uuid) {
 		var url = window.G2AB_DATA.rest_url + 'bookings/' + encodeURIComponent(uuid) + '/status';
 		var sessionId = qs('session_id');
+		var confirmToken = qs('g2ab_token');
 		return fetch(url, { headers: { 'X-WP-Nonce': window.G2AB_DATA.nonce || '' } })
 			.then(function (r) { return r.json(); })
 			.then(function (json) {
@@ -42,11 +43,14 @@
 					return data;
 				}
 				if (!sessionId) return data;
-				// Fallback: ask the server to confirm via gateway API.
+				// Fallback: ask the server to confirm via gateway API. The
+				// confirm_token from the return URL is required — without it
+				// the endpoint refuses with 403 and the booking stays unpaid
+				// until the webhook lands (if it ever does).
 				return fetch(window.G2AB_DATA.rest_url + 'bookings/' + encodeURIComponent(uuid) + '/confirm-payment', {
 					method: 'POST',
 					headers: { 'Content-Type': 'application/json', 'X-WP-Nonce': window.G2AB_DATA.nonce || '' },
-					body: JSON.stringify({ session_id: sessionId })
+					body: JSON.stringify({ session_id: sessionId, confirm_token: confirmToken || '' })
 				})
 					.then(function (r) { return r.json(); })
 					.then(function (j) { return j && j.data ? j.data : data; });

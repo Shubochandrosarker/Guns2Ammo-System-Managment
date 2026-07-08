@@ -30,6 +30,41 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 
 /* ============================================================
+ * 0. Never let the login/account surfaces be cached.
+ *
+ *    Memberistic's own cache exclusion (Auth::prevent_login_cache)
+ *    only recognises pages whose post_content carries the
+ *    [memberistic_login]/[memberistic_account] shortcode or whose ID
+ *    is set in memberistic_settings. This theme renders those
+ *    shortcodes from PAGE TEMPLATES onto pages with empty content,
+ *    so unless the settings happen to be filled in, /login/ and
+ *    /account/ ship with cacheable headers. A CDN/page cache then
+ *    serves the logged-out version of /account/ (which is the login
+ *    form again) to freshly signed-in members — login appears broken
+ *    for customers while admins, whose logged-in cookie bypasses
+ *    cache, see no problem.
+ *
+ *    Send no-cache headers whenever one of these templates renders,
+ *    regardless of plugin settings. (Edge rules must still be
+ *    verified at Cloudflare if a cache-everything rule is active.)
+ * ============================================================ */
+add_action( 'template_redirect', 'g2a_login_prevent_cache', 8 );
+function g2a_login_prevent_cache() {
+	if ( is_admin() ) {
+		return;
+	}
+	if ( ! is_page_template( array( 'page-templates/template-login.php', 'page-templates/template-account.php' ) ) ) {
+		return;
+	}
+	nocache_headers();
+	foreach ( array( 'DONOTCACHEPAGE', 'DONOTCACHEOBJECT', 'DONOTCACHEDB' ) as $flag ) {
+		if ( ! defined( $flag ) ) {
+			define( $flag, true );
+		}
+	}
+}
+
+/* ============================================================
  * 1. Auto-create the public login pages on theme switch.
  *    Idempotent — re-runs are safe.
  * ============================================================ */
