@@ -45,7 +45,21 @@ require_once G2A_POS_CORE_PATH . 'includes/Core/Autoloader.php';
 G2A\POS\Core\Autoloader::register();
 
 if ( is_readable( G2A_POS_CORE_PATH . 'vendor/autoload.php' ) ) {
-	require_once G2A_POS_CORE_PATH . 'vendor/autoload.php';
+	// Belt and braces: a vendor/ whose composer autoloader references
+	// packages that are not on disk (exactly what shipped between the
+	// dev-deps removal and 3.1.5 — autoload_static.php still listed
+	// mockery's files-autoload entries) turns require into an instant
+	// fatal on EVERY request: the whole site goes down the moment the
+	// plugin is active. Catch it, warn loudly, and run degraded (PDF
+	// generation reports the missing engine on use) instead of dying.
+	try {
+		require_once G2A_POS_CORE_PATH . 'vendor/autoload.php';
+	} catch ( \Throwable $vendor_error ) {
+		g2a_pos_core_admin_notice(
+			'Bundled libraries failed to load (' . $vendor_error->getMessage() . '). '
+			. 'PDF generation is disabled until a clean build is installed — re-run `composer install --no-dev` and re-zip.'
+		);
+	}
 }
 
 register_activation_hook(

@@ -43,9 +43,6 @@ final class WebsiteKnowledgeSeeder {
 	/** @var int Unix deadline for the current budgeted seeding run (0 = none). */
 	private static $deadline = 0;
 
-	/** @var bool Set when a budgeted run stopped early and must resume. */
-	private static $timed_out = false;
-
 	public static function boot(): void {
 		add_action( self::CRON_HOOK, array( self::class, 'cron_refresh' ) );
 		add_action( self::SEED_EVENT, array( self::class, 'maybe_seed' ) );
@@ -77,15 +74,18 @@ final class WebsiteKnowledgeSeeder {
 		if ( self::is_seeded() ) {
 			return;
 		}
-		self::$deadline  = time() + max( 5, (int) apply_filters( 'g2a_pos_brain_seed_time_budget', 20 ) );
-		self::$timed_out = false;
+		self::$deadline = time() + max( 5, (int) apply_filters( 'g2a_pos_brain_seed_time_budget', 20 ) );
 		try {
 			self::seed_curated_pack();
 			self::seed_default_pack();
-			if ( ! self::$timed_out ) {
+			if ( self::out_of_time() ) {
+				// Budget elapsed mid-pack — resume from cron. Progress is
+				// kept: content-hash upserts skip already-finished docs.
+				if ( ! wp_next_scheduled( self::SEED_EVENT ) ) {
+					wp_schedule_single_event( time() + 2 * MINUTE_IN_SECONDS, self::SEED_EVENT );
+				}
+			} else {
 				update_option( self::OPTION_SEEDED, self::SEED_VERSION, false );
-			} elseif ( ! wp_next_scheduled( self::SEED_EVENT ) ) {
-				wp_schedule_single_event( time() + 2 * MINUTE_IN_SECONDS, self::SEED_EVENT );
 			}
 		} catch ( \Throwable $e ) {
 			Logger::exception( 'Website knowledge seeding failed', $e );
@@ -117,7 +117,6 @@ final class WebsiteKnowledgeSeeder {
 		$touched = array();
 		foreach ( DefaultKnowledgePack::documents() as $doc ) {
 			if ( self::out_of_time() ) {
-				self::$timed_out = true;
 				break;
 			}
 			$r = BrainService::ingest_text(
@@ -275,7 +274,6 @@ final class WebsiteKnowledgeSeeder {
 		$touched = array();
 		foreach ( self::default_pack() as $label => $body ) {
 			if ( self::out_of_time() ) {
-				self::$timed_out = true;
 				break;
 			}
 			$r = BrainService::ingest_text(
