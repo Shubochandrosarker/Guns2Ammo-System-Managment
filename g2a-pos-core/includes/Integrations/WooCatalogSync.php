@@ -100,7 +100,8 @@ final class WooCatalogSync {
 				$stats['barcodes'] += $r['barcode'] ? 1 : 0;
 			}
 			++$page;
-		} while ( count( $products ) === self::BATCH_SIZE );
+			$fetched = count( $products );
+		} while ( $fetched === self::BATCH_SIZE );
 
 		update_option(
 			'g2a_pos_woo_catalog_last_scan',

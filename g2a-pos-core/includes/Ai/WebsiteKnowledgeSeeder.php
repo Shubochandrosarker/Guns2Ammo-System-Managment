@@ -323,7 +323,7 @@ final class WebsiteKnowledgeSeeder {
 				. "FFL transfers: \$35 per firearm. NFA transfers: \$95 suppressor/SBR, \$295 full-auto.\n"
 				. "Machine gun experience packages: \$249 (Basic), \$449 (Premium), \$749 (Elite) — full-auto rentals (MP5 9×19mm, M16 5.56×45mm, AK-47 7.62×39mm) with one-on-one range officer supervision; ammo and targets included.\n"
 				. "Memberships (as published on the storefront): Defender, Patriot, and Guardian tiers. Members get free or discounted lane time, guest passes, rental discounts, and store discounts depending on tier. NOTE: the live 'Guns 2 Ammo — current membership plans' document below reflects the exact plan names and prices configured in Memberistic and takes precedence over this summary.\n"
-				. "Ladies Tuesday: women shoot a free 1-hour lane every Tuesday, with 25% off rentals; no membership required.",
+				. 'Ladies Tuesday: women shoot a free 1-hour lane every Tuesday, with 25% off rentals; no membership required.',
 
 			'Guns 2 Ammo — website pages'    =>
 				"Key pages on {$home}:\n"

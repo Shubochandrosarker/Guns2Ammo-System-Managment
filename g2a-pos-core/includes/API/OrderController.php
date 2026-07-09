@@ -81,7 +81,8 @@ final class OrderController {
 			if ( function_exists( 'flush' ) ) {
 				flush();
 			}
-		} while ( count( $rows ) === $batch );
+			$fetched = count( $rows );
+		} while ( $fetched === $batch );
 
 		fclose( $out ); // phpcs:ignore WordPress.WP.AlternativeFunctions
 		exit;
