@@ -37,21 +37,63 @@ final class WebsiteKnowledgeSeeder {
 	private const TAG_DEFAULT   = 'g2a-website-default';
 	private const TAG_LIVE      = 'g2a-website-live';
 
+	/** Single-shot cron event that runs the pack seeding off the web path. */
+	public const SEED_EVENT = 'g2a_pos_brain_seed_pack';
+
+	/** @var int Unix deadline for the current budgeted seeding run (0 = none). */
+	private static $deadline = 0;
+
 	public static function boot(): void {
 		add_action( self::CRON_HOOK, array( self::class, 'cron_refresh' ) );
+		add_action( self::SEED_EVENT, array( self::class, 'maybe_seed' ) );
 	}
 
-	/** Seed once per SEED_VERSION (activation / upgrade safe). */
+	/** Has the current pack version been fully seeded? */
+	public static function is_seeded(): bool {
+		return get_option( self::OPTION_SEEDED ) === self::SEED_VERSION;
+	}
+
+	/** True when the current budgeted run has used up its time slice. */
+	private static function out_of_time(): bool {
+		return self::$deadline > 0 && time() >= self::$deadline;
+	}
+
+	/**
+	 * Seed once per SEED_VERSION — cron/CLI context only (Plugin schedules
+	 * SEED_EVENT; nothing calls this inline from a web request anymore).
+	 *
+	 * Each run is TIME-BUDGETED: ingest_text() can spend up to the embed
+	 * timeout per chunk against a slow AI endpoint, and an unbounded run
+	 * used to blow past max_execution_time — dying before the seeded flag
+	 * was written, so the next request repeated the hang (the incident that
+	 * took the whole site down under 3.1.5). Now the run stops cleanly at
+	 * the budget, keeps the idempotent progress it made (content-hash
+	 * upserts skip finished docs), and reschedules itself to resume.
+	 */
 	public static function maybe_seed(): void {
-		if ( get_option( self::OPTION_SEEDED ) === self::SEED_VERSION ) {
+		if ( self::is_seeded() ) {
 			return;
 		}
+		self::$deadline = time() + max( 5, (int) apply_filters( 'g2a_pos_brain_seed_time_budget', 20 ) );
 		try {
 			self::seed_curated_pack();
 			self::seed_default_pack();
-			update_option( self::OPTION_SEEDED, self::SEED_VERSION, false );
+			if ( self::out_of_time() ) {
+				// Budget elapsed mid-pack — resume from cron. Progress is
+				// kept: content-hash upserts skip already-finished docs.
+				if ( ! wp_next_scheduled( self::SEED_EVENT ) ) {
+					wp_schedule_single_event( time() + 2 * MINUTE_IN_SECONDS, self::SEED_EVENT );
+				}
+			} else {
+				update_option( self::OPTION_SEEDED, self::SEED_VERSION, false );
+			}
 		} catch ( \Throwable $e ) {
 			Logger::exception( 'Website knowledge seeding failed', $e );
+			if ( ! wp_next_scheduled( self::SEED_EVENT ) ) {
+				wp_schedule_single_event( time() + 10 * MINUTE_IN_SECONDS, self::SEED_EVENT );
+			}
+		} finally {
+			self::$deadline = 0;
 		}
 	}
 
@@ -74,6 +116,9 @@ final class WebsiteKnowledgeSeeder {
 		);
 		$touched = array();
 		foreach ( DefaultKnowledgePack::documents() as $doc ) {
+			if ( self::out_of_time() ) {
+				break;
+			}
 			$r = BrainService::ingest_text(
 				(string) $doc['label'],
 				(string) $doc['body'],
@@ -228,6 +273,9 @@ final class WebsiteKnowledgeSeeder {
 		$count   = 0;
 		$touched = array();
 		foreach ( self::default_pack() as $label => $body ) {
+			if ( self::out_of_time() ) {
+				break;
+			}
 			$r = BrainService::ingest_text(
 				$label,
 				$body,
@@ -260,7 +308,7 @@ final class WebsiteKnowledgeSeeder {
 		$home = function_exists( 'home_url' ) ? rtrim( home_url( '/' ), '/' ) : 'https://guns2ammo.com';
 
 		return array(
-			'Guns 2 Ammo — business facts'   =>
+			'Guns 2 Ammo — business facts'       =>
 				"Guns 2 Ammo is {$biz['city']}'s indoor shooting range, FFL firearm store, and NRA-certified training facility, serving the East Valley since {$biz['founded_year']}.\n"
 				. "Address: {$biz['address']}.\n"
 				. "Phone: {$biz['phone']}. Email: {$biz['email']}.\n"
@@ -275,9 +323,9 @@ final class WebsiteKnowledgeSeeder {
 				. "FFL transfers: \$35 per firearm. NFA transfers: \$95 suppressor/SBR, \$295 full-auto.\n"
 				. "Machine gun experience packages: \$249 (Basic), \$449 (Premium), \$749 (Elite) — full-auto rentals (MP5 9×19mm, M16 5.56×45mm, AK-47 7.62×39mm) with one-on-one range officer supervision; ammo and targets included.\n"
 				. "Memberships (as published on the storefront): Defender, Patriot, and Guardian tiers. Members get free or discounted lane time, guest passes, rental discounts, and store discounts depending on tier. NOTE: the live 'Guns 2 Ammo — current membership plans' document below reflects the exact plan names and prices configured in Memberistic and takes precedence over this summary.\n"
-				. "Ladies Tuesday: women shoot a free 1-hour lane every Tuesday, with 25% off rentals; no membership required.",
+				. 'Ladies Tuesday: women shoot a free 1-hour lane every Tuesday, with 25% off rentals; no membership required.',
 
-			'Guns 2 Ammo — website pages'    =>
+			'Guns 2 Ammo — website pages'        =>
 				"Key pages on {$home}:\n"
 				. "- {$home}/book-a-lane/ — book a shooting lane online\n"
 				. "- {$home}/training/ — classes (CCW, basic handgun, private instruction)\n"
@@ -288,18 +336,18 @@ final class WebsiteKnowledgeSeeder {
 				. "- {$home}/contact/ — contact form, map, and hours\n"
 				. 'Customers asking where to book, sign up, or check transfer status should be pointed at these URLs.',
 
-			'Guns 2 Ammo — range policies'   =>
+			'Guns 2 Ammo — range policies'       =>
 				"Age policy: shooters 8 years and older may shoot when directly supervised by a parent or legal guardian; you must be 18+ to shoot solo and 21+ to rent a handgun alone.\n"
 				. "Safety equipment: eye and ear protection are required on the range at all times (available to rent or buy at the counter).\n"
 				. "Ammunition policy: only factory new ammunition is allowed; no steel-core, tracer, or incendiary rounds. Rental guns must use ammunition purchased at the range.\n"
 				. "All shooters must have a signed waiver on file before entering the range. Waivers can be signed in store or online before arrival.\n"
 				. 'Range safety officers (RSOs) are on duty during all open hours and their instructions must be followed.',
 
-			'G2A POS — how to ring a sale'   =>
+			'G2A POS — how to ring a sale'       =>
 				"To ring a sale in the G2A POS: open Registers and start/resume a register session, then create the order in Sales (or scan items with the barcode scanner). Add the customer from CRM if loyalty points, membership discounts, or store credit should apply. Take payment via the Split Tender screen for cash/card/gift-card combinations. Firearm sales automatically open the compliance flow (4473, NICS check, bound book entry) before the order can complete.\n"
 				. 'Trade-ins: use the Trade-Ins workspace to appraise and accept a used firearm; accepted trade-ins create a used-firearm intake and bound-book acquisition entry, and the credit can be applied to the customer order.',
 
-			'G2A POS — layaway, waivers, lanes' =>
+			'G2A POS — layaway, waivers, lanes'  =>
 				"Layaway: create a layaway from the Layaway workspace with a deposit; the system tracks the balance, sends reminder messages before expiry, and releases inventory when the final payment posts.\n"
 				. "Waivers: the Waivers workspace stores signed range waivers (OtterWaiver imports plus Verifyistic and Memberistic sources). Use the search box to confirm a customer has a waiver on file and the Check-in button to record a range visit.\n"
 				. "Lane reservations: the Lane Reservations workspace shows POS reservations and online bookings from the booking engine for any date. POS reservations are conflict-checked per lane and time window; use Check in / Check out / No-show to manage the day's roster.",
@@ -349,7 +397,7 @@ final class WebsiteKnowledgeSeeder {
 			$counts = wp_count_posts( 'product' );
 			$pub    = isset( $counts->publish ) ? (int) $counts->publish : 0;
 			if ( $pub > 0 ) {
-				$cats = function_exists( 'get_terms' ) ? get_terms(
+				$cats      = function_exists( 'get_terms' ) ? get_terms(
 					array(
 						'taxonomy'   => 'product_cat',
 						'hide_empty' => true,
@@ -404,6 +452,7 @@ final class WebsiteKnowledgeSeeder {
 			array(
 				'post_type'              => $types,
 				'post_status'            => 'publish',
+				// phpcs:ignore WordPress.WP.PostsPerPage.posts_per_page_posts_per_page -- one-shot background seeding pass (cron/CLI), not a user-facing page load; needs the full catalog in one query.
 				'posts_per_page'         => 500,
 				'orderby'                => 'modified',
 				'order'                  => 'DESC',
@@ -467,7 +516,7 @@ final class WebsiteKnowledgeSeeder {
 		$seen    = 0;
 		$batch_n = 0;
 		while ( $seen < $cap ) {
-			$query = new \WP_Query(
+			$query    = new \WP_Query(
 				array(
 					'post_type'              => 'product',
 					'post_status'            => 'publish',

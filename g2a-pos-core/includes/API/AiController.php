@@ -200,12 +200,12 @@ final class AiController {
 
 	/** GET /ai/brain/stats — corpus size, embedded %, per-source breakdown, last refresh. */
 	public static function brain_stats( WP_REST_Request $request ) {
-		$stats            = ( new AiBrainRepository() )->stats();
-		$stats['backend'] = BrainService::backend();
-		$refreshed        = get_option( 'g2a_pos_brain_site_refreshed_at', array() );
+		$stats                    = ( new AiBrainRepository() )->stats();
+		$stats['backend']         = BrainService::backend();
+		$refreshed                = get_option( 'g2a_pos_brain_site_refreshed_at', array() );
 		$stats['last_refresh_at'] = is_array( $refreshed ) ? ( $refreshed['at'] ?? null ) : null;
 		if ( 'cloudflare' === $stats['backend'] ) {
-			$cf                   = \G2A\POS\Ai\CloudflareBrain::stats();
+			$cf                  = \G2A\POS\Ai\CloudflareBrain::stats();
 			$stats['cloudflare'] = $cf;
 		}
 		return $stats;

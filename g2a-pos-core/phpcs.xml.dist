@@ -102,6 +102,7 @@
                 <element value="g2a_pos_manage_ai"/>
                 <element value="g2a_pos_manage_compliance"/>
                 <element value="g2a_pos_manage_crm"/>
+                <element value="g2a_pos_manage_finance"/>
                 <element value="g2a_pos_manage_inventory"/>
                 <element value="g2a_pos_manage_messaging"/>
                 <element value="g2a_pos_manage_nfa"/>
@@ -120,6 +121,8 @@
                 <element value="g2a_pos_view_customer_contact"/>
                 <element value="g2a_pos_view_waiver_sensitive_data"/>
                 <element value="g2a_pos_view_waivers"/>
+                <!-- Third-party: WooCommerce core, checked when the WC integration is active. -->
+                <element value="manage_woocommerce"/>
             </property>
         </properties>
     </rule>

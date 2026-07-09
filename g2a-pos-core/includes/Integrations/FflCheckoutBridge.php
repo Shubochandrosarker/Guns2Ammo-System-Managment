@@ -40,10 +40,10 @@ final class FflCheckoutBridge {
 		if ( ! self::is_active() ) {
 			return array();
 		}
-		$t      = $wpdb->prefix . 'wpistic_ffl_transfers';
-		$d      = $wpdb->prefix . 'wpistic_ffl_dealers';
-		$where  = array( '1=1' );
-		$args   = array();
+		$t     = $wpdb->prefix . 'wpistic_ffl_transfers';
+		$d     = $wpdb->prefix . 'wpistic_ffl_dealers';
+		$where = array( '1=1' );
+		$args  = array();
 		if ( ! empty( $params['q'] ) ) {
 			$like    = '%' . $wpdb->esc_like( (string) $params['q'] ) . '%';
 			$where[] = '(t.customer_name LIKE %s OR t.customer_email LIKE %s OR t.transfer_ref LIKE %s OR t.item_description LIKE %s OR dl.business_name LIKE %s)';

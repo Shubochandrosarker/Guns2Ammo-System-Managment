@@ -372,6 +372,7 @@ final class AiBrainRepository extends Repository {
 			}
 			$args[] = $limit;
 			return $wpdb->get_results(
+				// phpcs:ignore WordPress.DB.PreparedSQLPlaceholders.ReplacementsWrongNumber -- $args is expanded as the placeholder list (wpdb's array-form calling convention); the sniff can't see past the variable to count them.
 				$wpdb->prepare(
 					"SELECT c.id, c.document_id, c.text_content, d.source_type, d.source_label, d.source_uri
                      FROM {$chunks} c JOIN {$docs} d ON d.id = c.document_id
@@ -414,10 +415,62 @@ final class AiBrainRepository extends Repository {
 	 */
 	private static function tokenize( string $query ): array {
 		$stop  = array(
-			'the','and','for','are','you','your','our','with','what','when','where','which','who','how',
-			'does','did','can','could','will','would','from','that','this','have','has','had','was','were',
-			'about','into','out','get','got','any','all','please','tell','show','give','need','want','there',
-			'here','they','them','its','his','her','but','not','than','then','too','use','using','able',
+			'the',
+			'and',
+			'for',
+			'are',
+			'you',
+			'your',
+			'our',
+			'with',
+			'what',
+			'when',
+			'where',
+			'which',
+			'who',
+			'how',
+			'does',
+			'did',
+			'can',
+			'could',
+			'will',
+			'would',
+			'from',
+			'that',
+			'this',
+			'have',
+			'has',
+			'had',
+			'was',
+			'were',
+			'about',
+			'into',
+			'out',
+			'get',
+			'got',
+			'any',
+			'all',
+			'please',
+			'tell',
+			'show',
+			'give',
+			'need',
+			'want',
+			'there',
+			'here',
+			'they',
+			'them',
+			'its',
+			'his',
+			'her',
+			'but',
+			'not',
+			'than',
+			'then',
+			'too',
+			'use',
+			'using',
+			'able',
 		);
 		$words = preg_split( '/[^a-z0-9]+/', strtolower( $query ) ) ?: array();
 		$out   = array();

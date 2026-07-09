@@ -278,8 +278,8 @@ final class TenderService {
 			);
 		}
 		// Reverse the side effect for ledger-touching methods.
-		$amount_cents        = (int) round( (float) $tender['amount'] * 100 );
-		$gift_card_restored  = null;
+		$amount_cents       = (int) round( (float) $tender['amount'] * 100 );
+		$gift_card_restored = null;
 		switch ( $tender['tender_method'] ) {
 			case 'store_credit':
 			case 'tradein_credit':

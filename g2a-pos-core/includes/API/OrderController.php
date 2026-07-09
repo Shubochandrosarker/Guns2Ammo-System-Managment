@@ -49,6 +49,7 @@ final class OrderController {
 		do {
 			$sql_args = array_merge( $args, array( $last_id, $batch ) );
 			$rows     = $wpdb->get_results(
+				// phpcs:ignore WordPress.DB.PreparedSQLPlaceholders.ReplacementsWrongNumber -- $sql_args is expanded as the placeholder list (wpdb's array-form calling convention); the sniff can't see past the variable to count them.
 				$wpdb->prepare(
 					"SELECT * FROM {$t} WHERE " . implode( ' AND ', $where ) . ' AND id < %d ORDER BY id DESC LIMIT %d',
 					$sql_args
@@ -81,7 +82,8 @@ final class OrderController {
 			if ( function_exists( 'flush' ) ) {
 				flush();
 			}
-		} while ( count( $rows ) === $batch );
+			$fetched = count( $rows );
+		} while ( $fetched === $batch );
 
 		fclose( $out ); // phpcs:ignore WordPress.WP.AlternativeFunctions
 		exit;

@@ -299,7 +299,9 @@ final class Gateway {
 					)
 				),
 				'body'    => wp_json_encode( $payload ),
-				'timeout' => 30,
+				// 30s/chunk let one dead endpoint absorb whole cron slots;
+				// 10s still fits every real embedding provider comfortably.
+				'timeout' => (int) apply_filters( 'g2a_pos_embed_timeout', 10 ),
 			)
 		);
 		if ( is_wp_error( $res ) ) {

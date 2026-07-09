@@ -59,3 +59,21 @@ parameters:
 			message: "#^Method G2A\\\\POS\\\\Wholesalers\\\\SportsSouth\\\\SportsSouthCsvImporter\\:\\:classifyItemType\\(\\) never returns null so it can be removed from the return type\\.$#"
 			count: 1
 			path: includes/Wholesalers/SportsSouth/SportsSouthCsvImporter.php
+
+		-
+			# Intentional: seeding runs from a cron event; the try/catch is a
+			# deliberate "a bad knowledge pack or repo write must never kill
+			# the cron worker" guard (and schedules the retry), not a claim
+			# that today's body can throw.
+			message: "#^Dead catch \\- Throwable is never thrown in the try block\\.$#"
+			count: 1
+			path: includes/Ai/WebsiteKnowledgeSeeder.php
+
+		-
+			# Intentional: defensive fallback if wp_timezone()/DateTimeImmutable
+			# ever misbehaves with a malformed timezone (a broken locale/i18n
+			# plugin can do this) — not a claim that today's stub proves it
+			# throws.
+			message: "#^Dead catch \\- Throwable is never thrown in the try block\\.$#"
+			count: 1
+			path: includes/Core/Plugin.php

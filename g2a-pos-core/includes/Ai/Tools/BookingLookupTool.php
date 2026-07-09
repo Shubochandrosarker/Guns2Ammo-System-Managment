@@ -92,9 +92,9 @@ final class BookingLookupTool {
 			$params[] = $now;
 		}
 
-		if ( $where ) {
-			$sql .= ' WHERE ' . implode( ' AND ', $where );
-		}
+		// $where always has at least one clause (the when-branch above is
+		// exhaustive), so this is never empty — no guard needed.
+		$sql     .= ' WHERE ' . implode( ' AND ', $where );
 		$sql     .= " ORDER BY {$order} LIMIT %d";
 		$params[] = $limit;
 
