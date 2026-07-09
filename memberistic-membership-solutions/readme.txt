@@ -4,7 +4,7 @@ Tags: membership, operations, staff dashboard, stripe, woocommerce, rest api
 Requires at least: 6.0
 Requires PHP: 8.0
 Tested up to: 6.7
-Stable tag: 1.9.9.5
+Stable tag: 1.10.0
 License: GPLv2 or later
 
 A modern membership operations engine for service businesses. Co-developed by WordPressistic and launch partner Guns 2 Ammo (https://guns2ammo.com).
@@ -69,6 +69,12 @@ Set Settings > Advanced > "Delete data on uninstall" to Yes before removing the 
 == Changelog ==
 
 See CHANGELOG.md for the full history.
+
+= 1.10.0 =
+* New: coreSTORE (Coreware) POS bridge — membership tier + status pushed to the hosted POS for automatic in-store member discounts. Independent from the G2A POS bridge.
+* New: automatic per-plan WooCommerce member discounts with category rules; savings stamped on orders and shown to members.
+* New: Shop tab on the member account dashboard — orders, downloads, addresses, payment methods, and lifetime member savings in one place.
+* New: memberistic_membership_status_changed action.
 
 = 1.9.9.5 =
 * Fix: post-login redirect now carries a unique cache-busting query arg so a stale CDN/page-cache copy of the account page can never be served to a freshly signed-in member. Purge the site/CDN cache once after updating.

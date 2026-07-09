@@ -174,6 +174,9 @@ $lane_url    = home_url( '/book-a-lane/' );
 				<a href="#billing"   data-tab="billing"><span class="memberistic-acct-ic">▭</span><?php esc_html_e( 'Billing &amp; Payments', 'memberistic' ); ?></a>
 				<a href="#members"   data-tab="members"><span class="memberistic-acct-ic">⚇</span><?php esc_html_e( 'Additional Members', 'memberistic' ); ?></a>
 				<a href="#bookings"  data-tab="bookings"><span class="memberistic-acct-ic">▥</span><?php esc_html_e( 'Booking History', 'memberistic' ); ?></a>
+				<?php if ( class_exists( 'WooCommerce' ) ) : ?>
+					<a href="#shop"  data-tab="shop"><span class="memberistic-acct-ic">▣</span><?php esc_html_e( 'Shop Orders', 'memberistic' ); ?></a>
+				<?php endif; ?>
 				<a href="#card"      data-tab="card"><span class="memberistic-acct-ic">▤</span><?php esc_html_e( 'Digital Member Card', 'memberistic' ); ?></a>
 				<span class="memberistic-acct-navsep"></span>
 				<a href="<?php echo esc_url( wp_logout_url( home_url( '/' ) ) ); ?>" class="memberistic-acct-signout"><span class="memberistic-acct-ic">⤶</span><?php esc_html_e( 'Sign Out', 'memberistic' ); ?></a>
@@ -395,6 +398,117 @@ $lane_url    = home_url( '/book-a-lane/' );
 					<?php endif; ?>
 				</div>
 			</section>
+
+			<?php if ( class_exists( 'WooCommerce' ) ) :
+				// ── SHOP — the member's WooCommerce world, inside the
+				// membership dashboard: orders, downloads, addresses, and
+				// the running "member savings" total. Members never need
+				// to visit the separate /my-account/ page. ──
+				$shop_user_id  = get_current_user_id();
+				$shop_orders   = function_exists( 'wc_get_orders' ) ? wc_get_orders( array( 'customer_id' => $shop_user_id, 'limit' => 10, 'orderby' => 'date', 'order' => 'DESC' ) ) : array();
+				$shop_count    = function_exists( 'wc_get_customer_order_count' ) ? (int) wc_get_customer_order_count( $shop_user_id ) : count( (array) $shop_orders );
+				$shop_spent    = function_exists( 'wc_get_customer_total_spent' ) ? (float) wc_get_customer_total_spent( $shop_user_id ) : 0.0;
+				$shop_saved    = class_exists( '\\WordPressistic\\Memberistic\\Integrations\\WooCommerce_Discounts' )
+					? \WordPressistic\Memberistic\Integrations\WooCommerce_Discounts::total_savings( $shop_user_id ) : 0.0;
+				$shop_downloads = function_exists( 'wc_get_customer_available_downloads' ) ? wc_get_customer_available_downloads( $shop_user_id ) : array();
+				$addr_billing  = function_exists( 'wc_get_account_formatted_address' ) ? wc_get_account_formatted_address( 'billing' ) : '';
+				$addr_shipping = function_exists( 'wc_get_account_formatted_address' ) ? wc_get_account_formatted_address( 'shipping' ) : '';
+				$ep            = static function ( $endpoint ) {
+					return function_exists( 'wc_get_account_endpoint_url' ) ? wc_get_account_endpoint_url( $endpoint ) : '#';
+				};
+			?>
+			<!-- SHOP / WOOCOMMERCE -->
+			<section class="memberistic-acct-view" data-panel="shop">
+				<div class="memberistic-acct-stats">
+					<div class="memberistic-acct-stat"><span><?php esc_html_e( 'Orders', 'memberistic' ); ?></span><strong><?php echo esc_html( number_format_i18n( $shop_count ) ); ?></strong></div>
+					<div class="memberistic-acct-stat"><span><?php esc_html_e( 'Total Spent', 'memberistic' ); ?></span><strong><?php echo wp_kses_post( wc_price( $shop_spent ) ); ?></strong></div>
+					<div class="memberistic-acct-stat"><span><?php esc_html_e( 'Saved As A Member', 'memberistic' ); ?></span><strong style="color:var(--ma-brass2);"><?php echo wp_kses_post( wc_price( $shop_saved ) ); ?></strong></div>
+					<div class="memberistic-acct-stat"><span><?php esc_html_e( 'Downloads', 'memberistic' ); ?></span><strong><?php echo esc_html( number_format_i18n( count( (array) $shop_downloads ) ) ); ?></strong></div>
+				</div>
+
+				<div class="memberistic-acct-block">
+					<h2><?php esc_html_e( 'Recent Orders', 'memberistic' ); ?></h2>
+					<?php if ( empty( $shop_orders ) ) : ?>
+						<p class="memberistic-acct-muted"><?php esc_html_e( 'No orders yet. Member pricing is applied automatically at checkout when you shop signed in.', 'memberistic' ); ?></p>
+						<p><a class="memberistic-acct-cta memberistic-acct-cta--primary" href="<?php echo esc_url( function_exists( 'wc_get_page_permalink' ) ? wc_get_page_permalink( 'shop' ) : home_url( '/shop/' ) ); ?>"><?php esc_html_e( 'Browse The Shop', 'memberistic' ); ?></a></p>
+					<?php else : ?>
+						<div class="memberistic-acct-tablewrap">
+							<table class="memberistic-acct-table">
+								<thead><tr>
+									<th><?php esc_html_e( 'Order', 'memberistic' ); ?></th>
+									<th><?php esc_html_e( 'Date', 'memberistic' ); ?></th>
+									<th><?php esc_html_e( 'Status', 'memberistic' ); ?></th>
+									<th><?php esc_html_e( 'Total', 'memberistic' ); ?></th>
+									<th><?php esc_html_e( 'Member Saving', 'memberistic' ); ?></th>
+									<th></th>
+								</tr></thead>
+								<tbody>
+								<?php foreach ( $shop_orders as $shop_order ) :
+									if ( ! is_object( $shop_order ) ) { continue; }
+									$saving = (float) $shop_order->get_meta( '_memberistic_member_discount' );
+								?>
+									<tr>
+										<td>#<?php echo esc_html( $shop_order->get_order_number() ); ?></td>
+										<td><?php echo esc_html( $shop_order->get_date_created() ? $shop_order->get_date_created()->date_i18n( 'M j, Y' ) : '—' ); ?></td>
+										<td><span class="memberistic-acct-pill"><?php echo esc_html( wc_get_order_status_name( $shop_order->get_status() ) ); ?></span></td>
+										<td><?php echo wp_kses_post( $shop_order->get_formatted_order_total() ); ?></td>
+										<td><?php echo $saving > 0 ? wp_kses_post( wc_price( $saving ) ) : '—'; ?></td>
+										<td><a href="<?php echo esc_url( $shop_order->get_view_order_url() ); ?>"><?php esc_html_e( 'View', 'memberistic' ); ?></a></td>
+									</tr>
+								<?php endforeach; ?>
+								</tbody>
+							</table>
+						</div>
+						<p style="margin-top:10px;"><a href="<?php echo esc_url( $ep( 'orders' ) ); ?>"><?php esc_html_e( 'View all orders →', 'memberistic' ); ?></a></p>
+					<?php endif; ?>
+				</div>
+
+				<?php if ( ! empty( $shop_downloads ) ) : ?>
+					<div class="memberistic-acct-block">
+						<h2><?php esc_html_e( 'Downloads', 'memberistic' ); ?></h2>
+						<div class="memberistic-acct-tablewrap">
+							<table class="memberistic-acct-table">
+								<thead><tr>
+									<th><?php esc_html_e( 'Product', 'memberistic' ); ?></th>
+									<th><?php esc_html_e( 'File', 'memberistic' ); ?></th>
+									<th></th>
+								</tr></thead>
+								<tbody>
+								<?php foreach ( (array) $shop_downloads as $dl ) : ?>
+									<tr>
+										<td><?php echo esc_html( (string) ( $dl['product_name'] ?? '' ) ); ?></td>
+										<td><?php echo esc_html( (string) ( $dl['download_name'] ?? '' ) ); ?></td>
+										<td><a href="<?php echo esc_url( (string) ( $dl['download_url'] ?? '#' ) ); ?>"><?php esc_html_e( 'Download', 'memberistic' ); ?></a></td>
+									</tr>
+								<?php endforeach; ?>
+								</tbody>
+							</table>
+						</div>
+					</div>
+				<?php endif; ?>
+
+				<div class="memberistic-acct-block">
+					<h2><?php esc_html_e( 'Addresses & Account', 'memberistic' ); ?></h2>
+					<div class="memberistic-acct-stats">
+						<div class="memberistic-acct-stat" style="text-align:left;">
+							<span><?php esc_html_e( 'Billing Address', 'memberistic' ); ?></span>
+							<address style="font-style:normal;margin:6px 0;"><?php echo $addr_billing ? wp_kses_post( $addr_billing ) : esc_html__( 'Not set yet.', 'memberistic' ); ?></address>
+							<a href="<?php echo esc_url( $ep( 'edit-address' ) . 'billing/' ); ?>"><?php esc_html_e( 'Edit', 'memberistic' ); ?></a>
+						</div>
+						<div class="memberistic-acct-stat" style="text-align:left;">
+							<span><?php esc_html_e( 'Shipping Address', 'memberistic' ); ?></span>
+							<address style="font-style:normal;margin:6px 0;"><?php echo $addr_shipping ? wp_kses_post( $addr_shipping ) : esc_html__( 'Not set yet.', 'memberistic' ); ?></address>
+							<a href="<?php echo esc_url( $ep( 'edit-address' ) . 'shipping/' ); ?>"><?php esc_html_e( 'Edit', 'memberistic' ); ?></a>
+						</div>
+					</div>
+					<p style="margin-top:12px;">
+						<a href="<?php echo esc_url( $ep( 'payment-methods' ) ); ?>"><?php esc_html_e( 'Payment methods', 'memberistic' ); ?></a>
+						&nbsp;·&nbsp;
+						<a href="<?php echo esc_url( $ep( 'edit-account' ) ); ?>"><?php esc_html_e( 'Account details & password', 'memberistic' ); ?></a>
+					</p>
+				</div>
+			</section>
+			<?php endif; ?>
 
 			<!-- DIGITAL MEMBER CARD -->
 			<section class="memberistic-acct-view" data-panel="card">

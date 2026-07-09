@@ -101,6 +101,15 @@ final class Integrations_Registry {
 				'available' => static function () { return defined( 'G2A_POS_CORE_VERSION' ) || class_exists( '\\G2A\\POS\\Core\\Plugin' ); },
 				'dep_label' => __( 'Install & activate the G2A POS Core plugin to use this.', 'memberistic' ),
 			),
+			'corestore'        => array(
+				'name'      => __( 'coreSTORE (Coreware) POS', 'memberistic' ),
+				'desc'      => __( 'Push membership state into the shop\'s hosted coreSTORE: price tier per plan for automatic in-store member discounts, plan/status/expiry on the cashier\'s customer screen. Independent from the G2A POS Bridge.', 'memberistic' ),
+				'icon'      => 'C',
+				'setting'   => 'integration_corestore_enabled',
+				'default'   => 'no',
+				'available' => static function () { return true; }, // remote API — no local plugin dependency
+				'dep_label' => '',
+			),
 			'sms_reminders'    => array(
 				'name'      => __( 'SMS Notifications (Messageistic)', 'memberistic' ),
 				'desc'      => __( 'Send membership welcome, activation, renewal, and expiry texts through Messageistic — including the local SMS gateway. Booking confirmations ride along when the booking engine is active.', 'memberistic' ),
