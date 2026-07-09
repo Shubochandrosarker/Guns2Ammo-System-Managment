@@ -37,21 +37,63 @@ final class WebsiteKnowledgeSeeder {
 	private const TAG_DEFAULT   = 'g2a-website-default';
 	private const TAG_LIVE      = 'g2a-website-live';
 
+	/** Single-shot cron event that runs the pack seeding off the web path. */
+	public const SEED_EVENT = 'g2a_pos_brain_seed_pack';
+
+	/** @var int Unix deadline for the current budgeted seeding run (0 = none). */
+	private static $deadline = 0;
+
+	/** @var bool Set when a budgeted run stopped early and must resume. */
+	private static $timed_out = false;
+
 	public static function boot(): void {
 		add_action( self::CRON_HOOK, array( self::class, 'cron_refresh' ) );
+		add_action( self::SEED_EVENT, array( self::class, 'maybe_seed' ) );
 	}
 
-	/** Seed once per SEED_VERSION (activation / upgrade safe). */
+	/** Has the current pack version been fully seeded? */
+	public static function is_seeded(): bool {
+		return get_option( self::OPTION_SEEDED ) === self::SEED_VERSION;
+	}
+
+	/** True when the current budgeted run has used up its time slice. */
+	private static function out_of_time(): bool {
+		return self::$deadline > 0 && time() >= self::$deadline;
+	}
+
+	/**
+	 * Seed once per SEED_VERSION — cron/CLI context only (Plugin schedules
+	 * SEED_EVENT; nothing calls this inline from a web request anymore).
+	 *
+	 * Each run is TIME-BUDGETED: ingest_text() can spend up to the embed
+	 * timeout per chunk against a slow AI endpoint, and an unbounded run
+	 * used to blow past max_execution_time — dying before the seeded flag
+	 * was written, so the next request repeated the hang (the incident that
+	 * took the whole site down under 3.1.5). Now the run stops cleanly at
+	 * the budget, keeps the idempotent progress it made (content-hash
+	 * upserts skip finished docs), and reschedules itself to resume.
+	 */
 	public static function maybe_seed(): void {
-		if ( get_option( self::OPTION_SEEDED ) === self::SEED_VERSION ) {
+		if ( self::is_seeded() ) {
 			return;
 		}
+		self::$deadline  = time() + max( 5, (int) apply_filters( 'g2a_pos_brain_seed_time_budget', 20 ) );
+		self::$timed_out = false;
 		try {
 			self::seed_curated_pack();
 			self::seed_default_pack();
-			update_option( self::OPTION_SEEDED, self::SEED_VERSION, false );
+			if ( ! self::$timed_out ) {
+				update_option( self::OPTION_SEEDED, self::SEED_VERSION, false );
+			} elseif ( ! wp_next_scheduled( self::SEED_EVENT ) ) {
+				wp_schedule_single_event( time() + 2 * MINUTE_IN_SECONDS, self::SEED_EVENT );
+			}
 		} catch ( \Throwable $e ) {
 			Logger::exception( 'Website knowledge seeding failed', $e );
+			if ( ! wp_next_scheduled( self::SEED_EVENT ) ) {
+				wp_schedule_single_event( time() + 10 * MINUTE_IN_SECONDS, self::SEED_EVENT );
+			}
+		} finally {
+			self::$deadline = 0;
 		}
 	}
 
@@ -74,6 +116,10 @@ final class WebsiteKnowledgeSeeder {
 		);
 		$touched = array();
 		foreach ( DefaultKnowledgePack::documents() as $doc ) {
+			if ( self::out_of_time() ) {
+				self::$timed_out = true;
+				break;
+			}
 			$r = BrainService::ingest_text(
 				(string) $doc['label'],
 				(string) $doc['body'],
@@ -228,6 +274,10 @@ final class WebsiteKnowledgeSeeder {
 		$count   = 0;
 		$touched = array();
 		foreach ( self::default_pack() as $label => $body ) {
+			if ( self::out_of_time() ) {
+				self::$timed_out = true;
+				break;
+			}
 			$r = BrainService::ingest_text(
 				$label,
 				$body,

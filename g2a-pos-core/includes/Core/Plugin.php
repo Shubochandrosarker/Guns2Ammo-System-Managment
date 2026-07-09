@@ -292,9 +292,16 @@ final class Plugin {
 		// 'minute' interval existed, so several jobs never ran.
 		self::schedule_all_crons();
 
-		// Seed the default website knowledge pack once per pack version
-		// (guarded internally by option g2a_pos_brain_seeded_version).
-		WebsiteKnowledgeSeeder::maybe_seed();
+		// Seed the default website knowledge pack once per pack version —
+		// ASYNC ONLY. Seeding embeds documents over HTTP (tens of seconds
+		// against a slow AI endpoint); running it inline here put that work
+		// inside ordinary visitor requests: the request died on
+		// max_execution_time before the seeded flag was written, so EVERY
+		// following request repeated the hang and the whole site read as
+		// down until the plugin was deleted. Schedule a cron event instead.
+		if ( ! WebsiteKnowledgeSeeder::is_seeded() && ! wp_next_scheduled( WebsiteKnowledgeSeeder::SEED_EVENT ) ) {
+			wp_schedule_single_event( time() + MINUTE_IN_SECONDS, WebsiteKnowledgeSeeder::SEED_EVENT );
+		}
 
 		// One-time migration: move the AI brain refresh from weekly to a nightly
 		// (daily) schedule and kick an immediate full-site crawl. Idempotent via
@@ -343,7 +350,12 @@ final class Plugin {
 		// Populate the brain shortly after install without blocking activation.
 		wp_schedule_single_event( time() + 2 * MINUTE_IN_SECONDS, self::BRAIN_SITE_REFRESH_HOOK );
 
-		WebsiteKnowledgeSeeder::maybe_seed();
+		// Seed the knowledge pack async too — inline seeding here made the
+		// ACTIVATION request itself hang whenever the embedding endpoint
+		// was slow or unreachable.
+		if ( ! WebsiteKnowledgeSeeder::is_seeded() && ! wp_next_scheduled( WebsiteKnowledgeSeeder::SEED_EVENT ) ) {
+			wp_schedule_single_event( time() + MINUTE_IN_SECONDS, WebsiteKnowledgeSeeder::SEED_EVENT );
+		}
 	}
 
 	public static function deactivate(): void {
