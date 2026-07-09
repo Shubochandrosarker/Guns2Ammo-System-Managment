@@ -68,3 +68,12 @@ parameters:
 			message: "#^Dead catch \\- Throwable is never thrown in the try block\\.$#"
 			count: 1
 			path: includes/Ai/WebsiteKnowledgeSeeder.php
+
+		-
+			# Intentional: defensive fallback if wp_timezone()/DateTimeImmutable
+			# ever misbehaves with a malformed timezone (a broken locale/i18n
+			# plugin can do this) — not a claim that today's stub proves it
+			# throws.
+			message: "#^Dead catch \\- Throwable is never thrown in the try block\\.$#"
+			count: 1
+			path: includes/Core/Plugin.php
