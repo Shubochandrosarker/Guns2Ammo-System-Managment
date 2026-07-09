@@ -218,10 +218,13 @@ final class Plugin {
 				if ( ! empty( $result['ok'] ) ) {
 					$repo->markSyncedNow( (int) $w['id'] );
 				} else {
-					Logger::error( 'Wholesaler cron sync failed', array(
-						'wholesaler_id' => (int) $w['id'],
-						'error'         => (string) ( $result['error'] ?? 'unknown' ),
-					) );
+					Logger::error(
+						'Wholesaler cron sync failed',
+						array(
+							'wholesaler_id' => (int) $w['id'],
+							'error'         => (string) ( $result['error'] ?? 'unknown' ),
+						)
+					);
 				}
 			} catch ( \Throwable $e ) {
 				Logger::exception( 'Wholesaler sync failed', $e, array( 'wholesaler_id' => (int) $w['id'] ) );

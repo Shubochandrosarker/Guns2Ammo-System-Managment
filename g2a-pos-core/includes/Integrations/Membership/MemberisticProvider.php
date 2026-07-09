@@ -60,7 +60,7 @@ final class MemberisticProvider implements Provider {
 				"SELECT m.* FROM {$memberships} m
 				 WHERE {$where}
 				 ORDER BY FIELD(m.status, 'active', 'past_due') DESC, m.id DESC
-				 LIMIT 1",
+				 LIMIT 1", // phpcs:ignore WordPress.DB.PreparedSQLPlaceholders.UnfinishedPrepare -- the %d placeholders live in $where, built above from a runtime condition; the sniff only sees the {$where} interpolation, not the literal placeholders inside it.
 				...$args
 			),
 			ARRAY_A

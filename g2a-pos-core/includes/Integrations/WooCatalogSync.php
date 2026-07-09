@@ -227,7 +227,7 @@ final class WooCatalogSync {
 	 * variation-scoped source ref, falling back to the parent's identifiers
 	 * for display, so barcode lookups land on the exact sellable variant.
 	 */
-	private static function sync_variation( $variation, $parent, array $categories ): void {
+	private static function sync_variation( $variation, $parent_product, array $categories ): void {
 		$variation_id = (int) $variation->get_id();
 		if ( $variation_id <= 0 ) {
 			return;
@@ -242,7 +242,7 @@ final class WooCatalogSync {
 			return;
 		}
 
-		$name = (string) $parent->get_name();
+		$name = (string) $parent_product->get_name();
 		if ( method_exists( $variation, 'get_attribute_summary' ) ) {
 			$summary = (string) $variation->get_attribute_summary();
 			if ( $summary !== '' ) {
@@ -257,13 +257,13 @@ final class WooCatalogSync {
 			$upc !== '' ? $upc : null,
 			$sku !== '' ? $sku : null,
 			array(
-				'name'        => $name,
-				'price'       => (float) $variation->get_price(),
-				'stock'       => $variation->get_stock_quantity() !== null ? (float) $variation->get_stock_quantity() : null,
-				'status'      => (string) $variation->get_status(),
-				'categories'  => $categories,
-				'parent_id'   => (int) $parent->get_id(),
-				'variation'   => true,
+				'name'       => $name,
+				'price'      => (float) $variation->get_price(),
+				'stock'      => $variation->get_stock_quantity() !== null ? (float) $variation->get_stock_quantity() : null,
+				'status'     => (string) $variation->get_status(),
+				'categories' => $categories,
+				'parent_id'  => (int) $parent_product->get_id(),
+				'variation'  => true,
 			)
 		);
 

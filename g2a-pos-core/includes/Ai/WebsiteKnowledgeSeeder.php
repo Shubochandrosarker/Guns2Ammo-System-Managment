@@ -308,7 +308,7 @@ final class WebsiteKnowledgeSeeder {
 		$home = function_exists( 'home_url' ) ? rtrim( home_url( '/' ), '/' ) : 'https://guns2ammo.com';
 
 		return array(
-			'Guns 2 Ammo — business facts'   =>
+			'Guns 2 Ammo — business facts'       =>
 				"Guns 2 Ammo is {$biz['city']}'s indoor shooting range, FFL firearm store, and NRA-certified training facility, serving the East Valley since {$biz['founded_year']}.\n"
 				. "Address: {$biz['address']}.\n"
 				. "Phone: {$biz['phone']}. Email: {$biz['email']}.\n"
@@ -325,7 +325,7 @@ final class WebsiteKnowledgeSeeder {
 				. "Memberships (as published on the storefront): Defender, Patriot, and Guardian tiers. Members get free or discounted lane time, guest passes, rental discounts, and store discounts depending on tier. NOTE: the live 'Guns 2 Ammo — current membership plans' document below reflects the exact plan names and prices configured in Memberistic and takes precedence over this summary.\n"
 				. 'Ladies Tuesday: women shoot a free 1-hour lane every Tuesday, with 25% off rentals; no membership required.',
 
-			'Guns 2 Ammo — website pages'    =>
+			'Guns 2 Ammo — website pages'        =>
 				"Key pages on {$home}:\n"
 				. "- {$home}/book-a-lane/ — book a shooting lane online\n"
 				. "- {$home}/training/ — classes (CCW, basic handgun, private instruction)\n"
@@ -336,18 +336,18 @@ final class WebsiteKnowledgeSeeder {
 				. "- {$home}/contact/ — contact form, map, and hours\n"
 				. 'Customers asking where to book, sign up, or check transfer status should be pointed at these URLs.',
 
-			'Guns 2 Ammo — range policies'   =>
+			'Guns 2 Ammo — range policies'       =>
 				"Age policy: shooters 8 years and older may shoot when directly supervised by a parent or legal guardian; you must be 18+ to shoot solo and 21+ to rent a handgun alone.\n"
 				. "Safety equipment: eye and ear protection are required on the range at all times (available to rent or buy at the counter).\n"
 				. "Ammunition policy: only factory new ammunition is allowed; no steel-core, tracer, or incendiary rounds. Rental guns must use ammunition purchased at the range.\n"
 				. "All shooters must have a signed waiver on file before entering the range. Waivers can be signed in store or online before arrival.\n"
 				. 'Range safety officers (RSOs) are on duty during all open hours and their instructions must be followed.',
 
-			'G2A POS — how to ring a sale'   =>
+			'G2A POS — how to ring a sale'       =>
 				"To ring a sale in the G2A POS: open Registers and start/resume a register session, then create the order in Sales (or scan items with the barcode scanner). Add the customer from CRM if loyalty points, membership discounts, or store credit should apply. Take payment via the Split Tender screen for cash/card/gift-card combinations. Firearm sales automatically open the compliance flow (4473, NICS check, bound book entry) before the order can complete.\n"
 				. 'Trade-ins: use the Trade-Ins workspace to appraise and accept a used firearm; accepted trade-ins create a used-firearm intake and bound-book acquisition entry, and the credit can be applied to the customer order.',
 
-			'G2A POS — layaway, waivers, lanes' =>
+			'G2A POS — layaway, waivers, lanes'  =>
 				"Layaway: create a layaway from the Layaway workspace with a deposit; the system tracks the balance, sends reminder messages before expiry, and releases inventory when the final payment posts.\n"
 				. "Waivers: the Waivers workspace stores signed range waivers (OtterWaiver imports plus Verifyistic and Memberistic sources). Use the search box to confirm a customer has a waiver on file and the Check-in button to record a range visit.\n"
 				. "Lane reservations: the Lane Reservations workspace shows POS reservations and online bookings from the booking engine for any date. POS reservations are conflict-checked per lane and time window; use Check in / Check out / No-show to manage the day's roster.",
@@ -397,7 +397,7 @@ final class WebsiteKnowledgeSeeder {
 			$counts = wp_count_posts( 'product' );
 			$pub    = isset( $counts->publish ) ? (int) $counts->publish : 0;
 			if ( $pub > 0 ) {
-				$cats = function_exists( 'get_terms' ) ? get_terms(
+				$cats      = function_exists( 'get_terms' ) ? get_terms(
 					array(
 						'taxonomy'   => 'product_cat',
 						'hide_empty' => true,
@@ -452,6 +452,7 @@ final class WebsiteKnowledgeSeeder {
 			array(
 				'post_type'              => $types,
 				'post_status'            => 'publish',
+				// phpcs:ignore WordPress.WP.PostsPerPage.posts_per_page_posts_per_page -- one-shot background seeding pass (cron/CLI), not a user-facing page load; needs the full catalog in one query.
 				'posts_per_page'         => 500,
 				'orderby'                => 'modified',
 				'order'                  => 'DESC',
@@ -515,7 +516,7 @@ final class WebsiteKnowledgeSeeder {
 		$seen    = 0;
 		$batch_n = 0;
 		while ( $seen < $cap ) {
-			$query = new \WP_Query(
+			$query    = new \WP_Query(
 				array(
 					'post_type'              => 'product',
 					'post_status'            => 'publish',

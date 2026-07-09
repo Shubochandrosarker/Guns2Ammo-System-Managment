@@ -372,6 +372,7 @@ final class AiBrainRepository extends Repository {
 			}
 			$args[] = $limit;
 			return $wpdb->get_results(
+				// phpcs:ignore WordPress.DB.PreparedSQLPlaceholders.ReplacementsWrongNumber -- $args is expanded as the placeholder list (wpdb's array-form calling convention); the sniff can't see past the variable to count them.
 				$wpdb->prepare(
 					"SELECT c.id, c.document_id, c.text_content, d.source_type, d.source_label, d.source_uri
                      FROM {$chunks} c JOIN {$docs} d ON d.id = c.document_id
