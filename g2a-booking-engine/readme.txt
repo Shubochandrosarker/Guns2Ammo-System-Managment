@@ -4,7 +4,7 @@ Tags: booking, reservation, scheduling, appointments, shooting range, firearms, 
 Requires at least: 6.2
 Tested up to: 6.5
 Requires PHP: 8.0
-Stable tag: 1.9.9.3
+Stable tag: 1.9.9.4
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -206,6 +206,15 @@ Yes. REST API at `/wp-json/g2a-booking/v1/` covers bookings, forms, calendar, fr
 7. Migration wizard — dry-run preview before live import.
 
 == Changelog ==
+
+= 1.9.9.4 =
+* FIX: logged-out visitors saw "No times available on this date." for every
+  date and lane. The availability GET was sending the page's X-WP-Nonce —
+  on cached pages that nonce goes stale, and WordPress rejects a
+  present-but-invalid nonce with a 403 before the (public) route even runs.
+  Public GETs no longer carry a nonce, restoring the guard the 1.9.9.1
+  production sync dropped. Logged-in members were unaffected (they bypass
+  the page cache), which is why only guests saw the empty calendar.
 
 = 1.9.9.3 =
 * FIX: "Print receipt" on the staff front desk was dead — the receipt tab's nonce rides in the `_wpnonce` query param (a new tab can't send the X-WP-Nonce header), but the permission check was header-only, so every click got a 403. Both locations are accepted now.

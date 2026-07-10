@@ -4,7 +4,7 @@ Tags: membership, operations, staff dashboard, stripe, woocommerce, rest api
 Requires at least: 6.0
 Requires PHP: 8.0
 Tested up to: 6.7
-Stable tag: 1.10.0
+Stable tag: 1.10.1
 License: GPLv2 or later
 
 A modern membership operations engine for service businesses. Co-developed by WordPressistic and launch partner Guns 2 Ammo (https://guns2ammo.com).
@@ -69,6 +69,10 @@ Set Settings > Advanced > "Delete data on uninstall" to Yes before removing the 
 == Changelog ==
 
 See CHANGELOG.md for the full history.
+
+= 1.10.1 =
+* Fix: cancelling a membership on the site now cancels the member's Stripe subscription too — previously only the local status changed and Stripe kept billing. Covers the members app Cancel action, admin status edits, and the legacy wp-admin members page. Failed cancels are logged to the activity feed instead of failing silently.
+* New: memberistic_stripe_cancel_at_period_end filter to stop billing at period end instead of immediately.
 
 = 1.10.0 =
 * New: coreSTORE (Coreware) POS bridge — membership tier + status pushed to the hosted POS for automatic in-store member discounts. Independent from the G2A POS bridge.

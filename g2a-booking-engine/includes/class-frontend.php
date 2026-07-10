@@ -796,7 +796,12 @@ final class G2AB_Frontend {
 
 			var $ = function(sel, ctx){ return (ctx || root).querySelector(sel); };
 			var $$ = function(sel, ctx){ return Array.prototype.slice.call((ctx || root).querySelectorAll(sel)); };
-			function headers(hasBody){ var h = {}; if (hasBody !== false) h['Content-Type'] = 'application/json'; if (config.nonce) h['X-WP-Nonce'] = config.nonce; return h; }
+			// Public GET endpoints must NOT carry a nonce: booking pages are
+			// served to logged-out visitors from a full-page/edge cache, so the
+			// nonce baked into the HTML goes stale — and core rejects a
+			// present-but-invalid X-WP-Nonce with a 403 before the route's
+			// permission_callback even runs, blanking availability for guests.
+			function headers(hasBody){ var h = {}; if (hasBody !== false) { h['Content-Type'] = 'application/json'; if (config.nonce) h['X-WP-Nonce'] = config.nonce; } return h; }
 			function pad(n){ return n < 10 ? '0'+n : ''+n; }
 			function ymd(d){ return d.getFullYear() + '-' + pad(d.getMonth()+1) + '-' + pad(d.getDate()); }
 

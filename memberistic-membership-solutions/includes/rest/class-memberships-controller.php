@@ -1008,7 +1008,8 @@ final class Memberships_Controller extends REST_Controller {
 		$params = $request->get_json_params();
 		$params = is_array( $params ) ? $params : $request->get_params();
 
-		if ( ! \WordPressistic\Memberistic\Database\Memberships_Repository::get( $id ) ) {
+		$existing = \WordPressistic\Memberistic\Database\Memberships_Repository::get( $id );
+		if ( ! $existing ) {
 			return new \WP_Error( 'memberistic_membership_not_found', __( 'Membership not found.', 'memberistic' ), array( 'status' => 404 ) );
 		}
 
@@ -1067,7 +1068,24 @@ final class Memberships_Controller extends REST_Controller {
 			);
 		}
 
-		\WordPressistic\Memberistic\Database\Memberships_Repository::update( $id, $data );
+		// Route status changes through change_status() so the canonical
+		// memberistic_membership_status_changed hook fires (Stripe cancel
+		// propagation, coreSTORE bridge). A raw update() here used to skip
+		// the hook, so cancelling from the members app never reached Stripe.
+		$new_status = null;
+		if ( array_key_exists( 'status', $data ) ) {
+			$new_status = \WordPressistic\Memberistic\memberistic_validate_status( $data['status'], (string) $existing['status'] );
+			unset( $data['status'] );
+		}
+
+		if ( ! empty( $data ) ) {
+			\WordPressistic\Memberistic\Database\Memberships_Repository::update( $id, $data );
+		}
+
+		if ( null !== $new_status && $new_status !== (string) $existing['status'] ) {
+			\WordPressistic\Memberistic\Database\Memberships_Repository::change_status( $id, $new_status );
+		}
+
 		return rest_ensure_response( \WordPressistic\Memberistic\Database\Memberships_Repository::get_with_summary( $id ) );
 	}
 
@@ -1287,7 +1305,13 @@ final class Memberships_Controller extends REST_Controller {
 			return new \WP_Error( 'memberistic_membership_not_found', __( 'Membership not found.', 'memberistic' ), array( 'status' => 404 ) );
 		}
 
-		\WordPressistic\Memberistic\Database\Memberships_Repository::update( $id, array( 'status' => 'cancelled', 'cancelled_at' => current_time( 'mysql' ) ) );
+		// Stamp cancelled_at first, then flip the status through
+		// change_status() so the memberistic_membership_status_changed hook
+		// fires — that is what propagates the cancel to Stripe (and the
+		// coreSTORE bridge). A raw update() here used to skip the hook,
+		// leaving the Stripe subscription live and billing.
+		\WordPressistic\Memberistic\Database\Memberships_Repository::update( $id, array( 'cancelled_at' => current_time( 'mysql' ) ) );
+		\WordPressistic\Memberistic\Database\Memberships_Repository::change_status( $id, 'cancelled' );
 		\WordPressistic\Memberistic\Database\Activity_Repository::log( array( 'membership_id' => $id, 'activity_type' => 'membership_cancelled', 'title' => __( 'Membership cancelled', 'memberistic' ), 'created_by' => get_current_user_id() ) );
 		\WordPressistic\Memberistic\Emails\Email_Service::send_membership_email( $id, 'membership_cancelled' );
 

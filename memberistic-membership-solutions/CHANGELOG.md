@@ -2,6 +2,15 @@
 
 All notable changes are tracked here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## 1.10.1 — Cancelling on the site now cancels the Stripe subscription
+
+### Fixed
+- **Cancelling a membership in WordPress never cancelled the Stripe subscription, so Stripe kept billing the member.** Every on-site cancel path (the members app's Cancel action, an admin edit setting Status → Cancelled, and the legacy wp-admin members page) only flipped the local DB status. `Stripe_Service` now has a `cancel_subscription()` API call, and a listener on `memberistic_membership_status_changed` cancels the member's Stripe subscription whenever a membership is cancelled on the WordPress side. The call is idempotent ("already cancelled"/"no such subscription" responses are treated as done), skipped while inbound Stripe webhooks are being processed (Stripe told us — no need to tell Stripe back), and a failed cancel is logged to the membership's activity feed and the PHP error log instead of silently leaving billing live.
+- **The admin REST cancel action and edit-screen status changes bypassed the canonical `change_status()` path**, so the `memberistic_membership_status_changed` hook (Stripe propagation, coreSTORE bridge) never fired for them. Both now route status changes through `change_status()`.
+
+### Added
+- `memberistic_stripe_cancel_at_period_end` filter — return `true` to stop billing at the end of the paid period instead of immediately.
+
 ## 1.10.0 — coreSTORE bridge, WooCommerce member discounts, dashboard Shop tab
 
 ### Added

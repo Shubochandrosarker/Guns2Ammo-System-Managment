@@ -18,25 +18,29 @@
 
             this.bindEvents();
             this.showOverlay();
-            // Replace the inline token (which may have come from a cached
-            // HTML response) with a freshly-minted one. Cached pages share a
-            // single token across all visitors, and after the first user
-            // verifies, that shared jti is burned — every other user then
-            // sees "Please take a moment to complete the form…". Fetching
-            // per-visitor sidesteps the cache.
+            // Replace the inline token AND nonce (which may have come from a
+            // cached HTML response) with freshly-minted ones. Cached pages
+            // share a single token across all visitors and freeze the nonce
+            // until it expires — a stale nonce made every submit 403 into
+            // "Network error" with no way in. Fetching per-visitor from the
+            // uncached admin-ajax endpoint sidesteps the cache.
             this.refreshToken();
         },
 
-        // ── Fetch a fresh signed form token ──────────────────────
-        refreshToken: function () {
+        // ── Fetch a fresh signed form token + nonce ──────────────
+        // Deliberately sends no nonce: this endpoint is the recovery
+        // path for a stale nonce, so it must not depend on one.
+        refreshToken: function (done) {
             var self = this;
             $.post(this.data.ajaxUrl, {
-                action: 'verifyistic_token',
-                nonce:  this.data.nonce
+                action: 'verifyistic_token'
             }, function (res) {
-                if (res && res.success && res.data && res.data.token) {
-                    $('#vfy-form-token').val(res.data.token);
+                if (res && res.success && res.data) {
+                    if (res.data.token) { $('#vfy-form-token').val(res.data.token); }
+                    if (res.data.nonce) { self.data.nonce = res.data.nonce; }
                 }
+            }).always(function () {
+                if (typeof done === 'function') { done(); }
             });
         },
 
@@ -123,38 +127,51 @@
             this.setButtonLoading($btn, true);
             $err.removeClass('show');
 
-            var formData = new FormData( $form[0] );
-            formData.append('action',   'verifyistic_verify');
-            formData.append('nonce',    this.data.nonce);
-            formData.append('mode',     mode);
-            formData.append('page_url', window.location.href);
-            // Anti-bot guard fields (shared, live outside the <form>).
-            formData.append('vfy_hp',    $('#vfy-hp').val() || '');
-            formData.append('vfy_token', $('#vfy-form-token').val() || '');
+            var retriedAuth = false;
+            function send() {
+                var formData = new FormData( $form[0] );
+                formData.append('action',   'verifyistic_verify');
+                formData.append('nonce',    self.data.nonce);
+                formData.append('mode',     mode);
+                formData.append('page_url', window.location.href);
+                // Anti-bot guard fields (shared, live outside the <form>).
+                formData.append('vfy_hp',    $('#vfy-hp').val() || '');
+                formData.append('vfy_token', $('#vfy-form-token').val() || '');
 
-            $.ajax({
-                url:         this.data.ajaxUrl,
-                type:        'POST',
-                data:        formData,
-                processData: false,
-                contentType: false,
-                success: function (res) {
-                    self.setButtonLoading($btn, false);
-                    if (res.success) {
-                        self.onVerified(res.data, $form);
-                    } else {
-                        self.showError($err, res.data.message || self.data.strings.ageError);
-                        // Mint a fresh token so the user's next attempt
-                        // isn't blocked by an expired or stale-cache token.
+                $.ajax({
+                    url:         self.data.ajaxUrl,
+                    type:        'POST',
+                    data:        formData,
+                    processData: false,
+                    contentType: false,
+                    success: function (res) {
+                        self.setButtonLoading($btn, false);
+                        if (res.success) {
+                            self.onVerified(res.data, $form);
+                        } else {
+                            self.showError($err, res.data.message || self.data.strings.ageError);
+                            // Mint a fresh token so the user's next attempt
+                            // isn't blocked by an expired or stale-cache token.
+                            self.refreshToken();
+                        }
+                    },
+                    error: function (xhr) {
+                        // A 403 here is a stale nonce served from a cached
+                        // page, not a network problem: mint a fresh nonce +
+                        // token from the uncached endpoint and retry once,
+                        // instead of walling the visitor off with an error.
+                        if (!retriedAuth && xhr && xhr.status === 403) {
+                            retriedAuth = true;
+                            self.refreshToken(send);
+                            return;
+                        }
+                        self.setButtonLoading($btn, false);
+                        self.showError($err, 'Network error. Please try again.');
                         self.refreshToken();
                     }
-                },
-                error: function () {
-                    self.setButtonLoading($btn, false);
-                    self.showError($err, 'Network error. Please try again.');
-                    self.refreshToken();
-                }
-            });
+                });
+            }
+            send();
         },
 
         // ── Handle Yes/No Buttons ────────────────────────────────
@@ -185,27 +202,38 @@
             }
 
             // YES: verify
-            $.post(this.data.ajaxUrl, {
-                action:    'verifyistic_verify',
-                nonce:     this.data.nonce,
-                mode:      'yes_no',
-                page_url:  window.location.href,
-                vfy_hp:    $('#vfy-hp').val() || '',
-                vfy_token: $('#vfy-form-token').val() || ''
-            }, function (res) {
-                self.setButtonLoading($btn, false);
-                if (res.success && res.data && res.data.token) {
-                    self.onVerified(res.data, null);
-                } else {
-                    self.showYesNoError((res && res.data && res.data.message) || 'Verification failed. Please try again.');
+            var retriedAuth = false;
+            function sendYes() {
+                $.post(self.data.ajaxUrl, {
+                    action:    'verifyistic_verify',
+                    nonce:     self.data.nonce,
+                    mode:      'yes_no',
+                    page_url:  window.location.href,
+                    vfy_hp:    $('#vfy-hp').val() || '',
+                    vfy_token: $('#vfy-form-token').val() || ''
+                }, function (res) {
+                    self.setButtonLoading($btn, false);
+                    if (res.success && res.data && res.data.token) {
+                        self.onVerified(res.data, null);
+                    } else {
+                        self.showYesNoError((res && res.data && res.data.message) || 'Verification failed. Please try again.');
+                        self.refreshToken();
+                    }
+                }).fail(function (xhr) {
+                    // Stale cached nonce → 403: refresh + retry once before
+                    // treating it as a real failure.
+                    if (!retriedAuth && xhr && xhr.status === 403) {
+                        retriedAuth = true;
+                        self.refreshToken(sendYes);
+                        return;
+                    }
+                    self.setButtonLoading($btn, false);
+                    // SECURITY: do NOT let through on network failure. Fail closed.
+                    self.showYesNoError('Network error. Please try again.');
                     self.refreshToken();
-                }
-            }).fail(function () {
-                self.setButtonLoading($btn, false);
-                // SECURITY: do NOT let through on network failure. Fail closed.
-                self.showYesNoError('Network error. Please try again.');
-                self.refreshToken();
-            });
+                });
+            }
+            sendYes();
         },
 
         // ── Yes/No error display (no DOB form available) ─────────

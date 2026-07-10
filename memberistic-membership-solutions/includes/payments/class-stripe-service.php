@@ -25,6 +25,19 @@ final class Stripe_Service {
 	const API_BASE    = 'https://api.stripe.com/v1';
 	const API_VERSION = '2024-04-10';
 
+	/**
+	 * True while an inbound Stripe webhook event is being processed.
+	 *
+	 * Inbound events (e.g. customer.subscription.deleted) sync Stripe's state
+	 * into the local DB via change_status(), which fires
+	 * memberistic_membership_status_changed — the same hook the outbound
+	 * cancel listener uses. This flag stops the sync from calling Stripe back
+	 * to cancel a subscription Stripe just told us it cancelled.
+	 *
+	 * @var bool
+	 */
+	private static $processing_inbound_event = false;
+
 	public static function is_enabled() {
 		return 'yes' === memberistic_get_setting( 'stripe_enabled', 'no' ) && '' !== self::get_secret_key();
 	}
@@ -160,6 +173,102 @@ final class Stripe_Service {
 			array(
 				'customer'   => $customer_id,
 				'return_url' => $return_url,
+			)
+		);
+	}
+
+	/**
+	 * Cancel a Stripe subscription.
+	 *
+	 * @param string $subscription_id Stripe subscription id (sub_…).
+	 * @param bool   $at_period_end   True to stop billing at the end of the
+	 *                                current period instead of immediately.
+	 * @return array<string,mixed>|\WP_Error
+	 */
+	public static function cancel_subscription( $subscription_id, $at_period_end = false ) {
+		$subscription_id = trim( (string) $subscription_id );
+		if ( '' === $subscription_id ) {
+			return new \WP_Error( 'memberistic_missing_subscription', __( 'No subscription id provided.', 'memberistic' ) );
+		}
+		if ( $at_period_end ) {
+			return self::request( 'POST', '/subscriptions/' . rawurlencode( $subscription_id ), array( 'cancel_at_period_end' => 'true' ) );
+		}
+		return self::request( 'DELETE', '/subscriptions/' . rawurlencode( $subscription_id ) );
+	}
+
+	/**
+	 * Cancel the Stripe subscription behind a membership when its status is
+	 * changed to "cancelled" on the WordPress side.
+	 *
+	 * Hooked on memberistic_membership_status_changed, so every cancel that
+	 * goes through Memberships_Repository::change_status() — the admin REST
+	 * cancel action, the admin edit-screen status change, and the legacy
+	 * wp-admin members page — propagates to Stripe. Before this listener the
+	 * status flip was DB-only and Stripe kept billing the member.
+	 *
+	 * @param int    $membership_id Membership id.
+	 * @param string $status        New status.
+	 */
+	public static function maybe_cancel_remote_subscription( $membership_id, $status ) {
+		if ( 'cancelled' !== $status || self::$processing_inbound_event || ! self::is_enabled() ) {
+			return;
+		}
+
+		$membership = Memberships_Repository::get( (int) $membership_id );
+		if ( ! is_array( $membership ) || empty( $membership['stripe_subscription_id'] ) ) {
+			return;
+		}
+
+		$subscription_id = (string) $membership['stripe_subscription_id'];
+
+		/**
+		 * Filter whether the Stripe subscription should stop billing at the
+		 * end of the paid period (true) or immediately (false, default —
+		 * matches the local status flipping to cancelled right away).
+		 *
+		 * @param bool                $at_period_end Default false.
+		 * @param array<string,mixed> $membership    Membership row.
+		 */
+		$at_period_end = (bool) apply_filters( 'memberistic_stripe_cancel_at_period_end', false, $membership );
+
+		$result = self::cancel_subscription( $subscription_id, $at_period_end );
+
+		if ( is_wp_error( $result ) ) {
+			$data        = $result->get_error_data();
+			$http_status = is_array( $data ) && isset( $data['status'] ) ? (int) $data['status'] : 0;
+			$stripe_code = is_array( $data ) && isset( $data['response']['error']['code'] ) ? (string) $data['response']['error']['code'] : '';
+
+			// Idempotent terminus: the subscription is already gone or
+			// already cancelled at Stripe — nothing left to stop. Stripe
+			// answers "No such subscription" (resource_missing, 404) or
+			// "…has been canceled…" for those cases.
+			if ( 404 === $http_status || 'resource_missing' === $stripe_code || false !== stripos( $result->get_error_message(), 'has been canceled' ) ) {
+				return;
+			}
+
+			// Surface the failure instead of silently leaving billing live.
+			error_log( sprintf( 'Memberistic: failed to cancel Stripe subscription %s for membership #%d: %s', $subscription_id, $membership_id, $result->get_error_message() ) ); // phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log
+			Activity_Repository::log(
+				array(
+					'membership_id' => (int) $membership_id,
+					'activity_type' => 'membership_cancelled',
+					'title'         => sprintf(
+						/* translators: %s = Stripe error message */
+						__( 'Stripe cancellation FAILED — subscription may still be billing: %s', 'memberistic' ),
+						$result->get_error_message()
+					),
+				)
+			);
+			return;
+		}
+
+		Activity_Repository::log(
+			array(
+				'membership_id' => (int) $membership_id,
+				'activity_type' => 'membership_cancelled',
+				'title'         => $at_period_end
+					? __( 'Stripe subscription set to cancel at period end', 'memberistic' )
+					: __( 'Stripe subscription cancelled', 'memberistic' ),
 			)
 		);
 	}
@@ -578,24 +687,33 @@ final class Stripe_Service {
 
 		do_action( 'memberistic_stripe_webhook_event', $type, $obj, $event );
 
-		switch ( $type ) {
-			case 'checkout.session.completed':
-				return self::handle_checkout_completed( $obj );
-			case 'customer.subscription.deleted':
-				return self::handle_subscription_deleted( $obj );
-			case 'invoice.payment_failed':
-				return self::handle_invoice_failed( $obj );
-			case 'invoice.payment_succeeded':
-				return self::handle_invoice_succeeded( $obj );
-			case 'payment_intent.succeeded':
-			case 'payment_intent.payment_failed':
-				// Payment-intent events are handled by the invoice events for
-				// subscriptions; one-off PaymentIntents are not currently used
-				// but the hook above lets integrations extend.
-				return true;
-		}
+		// Inbound events reflect state Stripe already holds; flag the window
+		// so the outbound-cancel listener on the status-changed hook doesn't
+		// call Stripe back about a cancellation Stripe just reported.
+		self::$processing_inbound_event = true;
 
-		return true;
+		try {
+			switch ( $type ) {
+				case 'checkout.session.completed':
+					return self::handle_checkout_completed( $obj );
+				case 'customer.subscription.deleted':
+					return self::handle_subscription_deleted( $obj );
+				case 'invoice.payment_failed':
+					return self::handle_invoice_failed( $obj );
+				case 'invoice.payment_succeeded':
+					return self::handle_invoice_succeeded( $obj );
+				case 'payment_intent.succeeded':
+				case 'payment_intent.payment_failed':
+					// Payment-intent events are handled by the invoice events for
+					// subscriptions; one-off PaymentIntents are not currently used
+					// but the hook above lets integrations extend.
+					return true;
+			}
+
+			return true;
+		} finally {
+			self::$processing_inbound_event = false;
+		}
 	}
 
 	/**
