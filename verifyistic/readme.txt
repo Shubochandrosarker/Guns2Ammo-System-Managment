@@ -3,7 +3,7 @@ Contributors: wordpressistic
 Tags: age verification, age gate, age check, firearms, alcohol, adult, cannabis, popup, COPPA
 Requires at least: 5.8
 Tested up to: 6.7
-Stable tag: 1.4.0
+Stable tag: 1.4.1
 Requires PHP: 7.4
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
@@ -101,6 +101,18 @@ No. All verification is handled locally. The webhook integration is optional and
 8. Frontend popup — ID & Face upload mode
 
 == Changelog ==
+
+= 1.4.1 =
+* FIX: Visitors on page-cached sites were walled off with "Network error.
+  Please try again." and could not enter at all. The security nonce baked
+  into cached HTML expires after the WordPress nonce lifetime; once stale,
+  every verify request was rejected with a 403 — and the token-refresh
+  endpoint required that same stale nonce, so there was no way to recover.
+  The refresh endpoint no longer requires a nonce (it only mints anti-abuse
+  material and is now per-IP rate limited) and returns a fresh nonce along
+  with the fresh token. The popup JS refreshes both on show, and a submit
+  that still hits a 403 silently fetches fresh credentials and retries once
+  instead of dead-ending on the error message.
 
 = 1.3.2 =
 * FIX: Customers on page-cached sites (WP Rocket, LiteSpeed, Cloudflare, etc.)

@@ -15,15 +15,42 @@ class Verifyistic_Ajax {
     }
 
     /**
-     * Issue a fresh form token. Called by the popup JS on show + after each
-     * failed submission so users behind page caches (WP Rocket, LiteSpeed,
-     * Cloudflare, etc.) and users retrying after a typo aren't blocked by a
-     * stale or already-burned token baked into cached HTML.
+     * Issue a fresh form token AND a fresh nonce. Called by the popup JS on
+     * show + after each failed submission so users behind page caches
+     * (WP Rocket, LiteSpeed, Cloudflare, etc.) and users retrying after a
+     * typo aren't blocked by stale values baked into cached HTML.
+     *
+     * Deliberately NOT nonce-gated: this endpoint exists to recover from a
+     * stale nonce, so requiring the (possibly stale) nonce here dead-ended
+     * every visitor whose cached page outlived the nonce lifetime — the
+     * verify call 403'd, the refresh call 403'd with it, and the visitor was
+     * stuck at "Network error" with no way into the site. The endpoint mints
+     * only anti-abuse material (a signed timing token + a uid-0 nonce, the
+     * same values any fresh anonymous page load receives), touches no state,
+     * and is rate-limited per IP below.
      */
     public function handle_token() {
-        check_ajax_referer( 'verifyistic_verify_nonce', 'nonce' );
+        $ip = Verifyistic_Security::client_ip();
+
+        // Refuse mints to IPs already blocked for hammering verification.
+        if ( ! Verifyistic_Security::check_rate_limit( $ip ) ) {
+            wp_send_json_error( array( 'message' => __( 'Too many attempts. Please wait a few minutes and try again.', 'verifyistic' ) ), 429 );
+            return;
+        }
+
+        // Generous per-IP mint cap (separate bucket from failed attempts):
+        // a real visitor mints once on popup show + once per retry.
+        $mint_key = 'vfy_mint_' . md5( $ip );
+        $mints    = (int) get_transient( $mint_key );
+        if ( $mints >= 30 ) {
+            wp_send_json_error( array( 'message' => __( 'Too many attempts. Please wait a few minutes and try again.', 'verifyistic' ) ), 429 );
+            return;
+        }
+        set_transient( $mint_key, $mints + 1, 15 * MINUTE_IN_SECONDS );
+
         wp_send_json_success( array(
             'token' => Verifyistic_Security::issue_form_token(),
+            'nonce' => wp_create_nonce( 'verifyistic_verify_nonce' ),
         ) );
     }
 
