@@ -2,6 +2,7 @@ import { PageHeader } from '@/components/ui/PageHeader'
 import { StatCard } from '@/components/ui/StatCard'
 import { Card } from '@/components/ui/Card'
 import { Spinner } from '@/components/ui/Spinner'
+import { ErrorState } from '@/components/ui/ErrorState'
 import { useAsync } from '@/lib/hooks'
 import { api } from '@/lib/api'
 import { formatCurrency, formatNumber, formatPercent } from '@/lib/format'
@@ -15,6 +16,25 @@ export function BusinessAnalysis() {
   const seo        = useAsync(() => api.analytics.seo(),             [])
 
   if (revenue.loading) return <Spinner label="Crunching numbers…" />
+
+  const firstError = revenue.error ?? bookings.error ?? memberships.error ?? store.error ?? seo.error
+  if (firstError) {
+    return (
+      <Card title="Business Analysis">
+        <ErrorState
+          message={firstError}
+          onRetry={() => {
+            revenue.refresh()
+            bookings.refresh()
+            memberships.refresh()
+            store.refresh()
+            seo.refresh()
+          }}
+        />
+      </Card>
+    )
+  }
+
   if (!revenue.data || !bookings.data || !memberships.data || !store.data || !seo.data) {
     return <Card title="No data"><div className="text-sm text-ink-500">Try refreshing.</div></Card>
   }

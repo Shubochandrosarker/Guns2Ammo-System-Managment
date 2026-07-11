@@ -77,6 +77,10 @@
       lastFocus = document.activeElement;
       drawer.classList.add('open');
       drawer.setAttribute('aria-hidden', 'false');
+      // iOS Safari ignores `overflow:hidden` on <body> for background
+      // touch-scroll, so pin the body in place with position:fixed and
+      // remember the scroll offset to restore it on close.
+      document.body.style.top = (-window.scrollY) + 'px';
       document.body.classList.add('g2a-noscroll');
       if (burger) burger.setAttribute('aria-expanded', 'true');
       // Hide the rest of the page from assistive tech while the
@@ -96,7 +100,10 @@
       if (!drawer) return;
       drawer.classList.remove('open');
       drawer.setAttribute('aria-hidden', 'true');
+      var scrollY = -parseInt(document.body.style.top || '0', 10);
       document.body.classList.remove('g2a-noscroll');
+      document.body.style.top = '';
+      window.scrollTo(0, scrollY);
       if (burger) burger.setAttribute('aria-expanded', 'false');
       Array.prototype.forEach.call(document.body.children, function (el) {
         if (el.hasAttribute('data-g2a-inerted')) {

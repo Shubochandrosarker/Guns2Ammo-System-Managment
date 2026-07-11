@@ -13,6 +13,9 @@
  *    dashboard / check-in flow.
  *  - Membership lifecycle hooks    → keep `pos_customer_id` on the
  *    membership row stamped with the WP user id the POS CRM keys on.
+ *  - `g2a_pos_membership_sold`     → mirror a counter-sold membership into
+ *    Memberistic (member portal, waiver tracking, QR verification,
+ *    corporate-group tooling) instead of it being invisible to this plugin.
  *
  * Gated by the "POS Bridge" toggle on Memberistic → Integrations.
  *
@@ -22,6 +25,9 @@
 namespace WordPressistic\Memberistic\Integrations;
 
 use WordPressistic\Memberistic\Database\Memberships_Repository;
+use WordPressistic\Memberistic\Database\People_Repository;
+use WordPressistic\Memberistic\Database\Plans_Repository;
+use WordPressistic\Memberistic\Database\Activity_Repository;
 
 if ( ! defined( 'ABSPATH' ) ) {
 	exit;
@@ -37,6 +43,7 @@ final class POS_Bridge {
 		add_filter( 'g2a_pos_membership_lookup', array( self::class, 'membership_lookup' ), 10, 2 );
 		add_filter( 'g2a_pos_membership_bookings', array( self::class, 'membership_bookings' ), 10, 3 );
 		add_action( 'memberistic_membership_created', array( self::class, 'stamp_pos_customer' ), 10, 1 );
+		add_action( 'g2a_pos_membership_sold', array( self::class, 'membership_sold' ), 10, 2 );
 		add_action( 'memberistic_membership_activated', array( self::class, 'stamp_pos_customer' ), 10, 1 );
 	}
 
@@ -154,6 +161,107 @@ final class POS_Bridge {
 			array( 'id' => $membership_id ),
 			array( '%s' ),
 			array( '%d' )
+		);
+	}
+
+	/**
+	 * Mirror a counter-sold POS membership into Memberistic so it shows up
+	 * in the member portal, waiver tracking, QR verification, corporate
+	 * groups, and billing — previously nothing listened for a POS sale at
+	 * all, so these memberships were permanently invisible outside the POS.
+	 *
+	 * @param int   $pos_membership_id `g2a_memberships` row id (POS's own table).
+	 * @param array $body              Raw payload POS passed to its own repository's create().
+	 */
+	public static function membership_sold( $pos_membership_id, $body ) {
+		$body        = is_array( $body ) ? $body : array();
+		$customer_id = isset( $body['customer_id'] ) ? absint( $body['customer_id'] ) : 0;
+		if ( $customer_id <= 0 ) {
+			return; // POS sale with no linked WP customer — nothing to mirror against.
+		}
+
+		// Don't create a second Memberistic membership if this person already
+		// has one (e.g. they already subscribed on the website and also
+		// bought a walk-in pass at the counter) — just make sure the POS key
+		// is stamped on the existing row instead.
+		$existing = self::find_membership_for_user( $customer_id );
+		if ( $existing ) {
+			// stamp_pos_customer() re-fetches pos_customer_id itself and is a
+			// no-op if it's already stamped, so it's safe to call unconditionally.
+			self::stamp_pos_customer( (int) $existing['id'] );
+			return;
+		}
+
+		$user = get_user_by( 'id', $customer_id );
+		if ( ! $user ) {
+			return;
+		}
+
+		$tier_code  = isset( $body['tier_code'] ) ? sanitize_key( (string) $body['tier_code'] ) : '';
+		$tier_label = isset( $body['tier_label'] ) ? sanitize_text_field( (string) $body['tier_label'] ) : '';
+
+		$plan    = $tier_code ? Plans_Repository::get_by_slug( $tier_code ) : null;
+		$unmapped_note = '';
+		if ( ! $plan && '' !== $tier_label ) {
+			foreach ( (array) Plans_Repository::get_all() as $candidate ) {
+				if ( 0 === strcasecmp( (string) $candidate['name'], $tier_label ) ) {
+					$plan = $candidate;
+					break;
+				}
+			}
+		}
+		if ( ! $plan ) {
+			// Don't silently drop the sale — create the record so it isn't
+			// lost/invisible, but flag it clearly for staff to fix the plan
+			// mapping by hand (e.g. via Memberistic → Plans → rename/alias).
+			$unmapped_note = sprintf(
+				/* translators: 1: POS tier code, 2: POS tier label */
+				__( 'Needs plan mapping — imported from POS tier "%1$s" (%2$s). Set the correct plan manually.', 'memberistic' ),
+				$tier_label ?: $tier_code,
+				$tier_code ?: 'n/a'
+			);
+		}
+
+		$billing_cycle = isset( $body['billing_cycle'] ) ? sanitize_key( (string) $body['billing_cycle'] ) : 'monthly';
+		$start_date    = current_time( 'mysql' );
+
+		$membership_id = Memberships_Repository::create(
+			array(
+				'primary_user_id' => $customer_id,
+				'plan_id'         => $plan ? (int) $plan['id'] : 0,
+				'billing_cycle'   => $billing_cycle,
+				'status'          => 'active',
+				'start_date'      => $start_date,
+				'payment_source'  => 'pos',
+				'pos_customer_id' => (string) $customer_id,
+				'billing_amount'  => isset( $body['price_amount'] ) ? (float) $body['price_amount'] : null,
+				'notes'           => $unmapped_note,
+			)
+		);
+
+		if ( ! $membership_id ) {
+			return;
+		}
+
+		$person_id = People_Repository::create(
+			array(
+				'membership_id' => $membership_id,
+				'wp_user_id'    => $customer_id,
+				'role'          => 'primary',
+				'full_name'     => (string) $user->display_name,
+				'email'         => (string) $user->user_email,
+				'phone'         => (string) get_user_meta( $customer_id, 'billing_phone', true ),
+				'status'        => 'active',
+			)
+		);
+
+		Activity_Repository::log(
+			array(
+				'membership_id' => $membership_id,
+				'person_id'     => $person_id ?: null,
+				'activity_type' => 'membership_created',
+				'title'         => __( 'Membership sold at POS counter', 'memberistic' ),
+			)
 		);
 	}
 

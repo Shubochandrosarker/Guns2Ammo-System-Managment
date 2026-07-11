@@ -1,8 +1,8 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { PageHeader } from '@/components/ui/PageHeader'
 import { Card } from '@/components/ui/Card'
 import { Spinner } from '@/components/ui/Spinner'
-import { useAsync } from '@/lib/hooks'
+import { useAsync, useDialogA11y } from '@/lib/hooks'
 import { api, type ModelCatalogEntry, type ModelPatch, type ModelTestResult } from '@/lib/api'
 import type { ModelConnection } from '@/types/analytics'
 import { cn } from '@/lib/cn'
@@ -300,6 +300,8 @@ function ConnectionEditor({
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [catalog, setCatalog] = useState<ModelCatalogEntry[] | null>(null)
+  const dialogRef = useRef<HTMLDivElement>(null)
+  useDialogA11y(dialogRef, onClose)
 
   // The provider's model list makes the modelName field a picker instead of
   // guesswork. Only possible for saved connections (the catalog call needs
@@ -337,6 +339,11 @@ function ConnectionEditor({
   return (
     <div className="fixed inset-0 z-30" style={{ backgroundColor: 'var(--bg-overlay)' }} onClick={onClose}>
       <div
+        ref={dialogRef}
+        role="dialog"
+        aria-modal="true"
+        aria-label={initial ? 'Edit connection' : 'New connection'}
+        tabIndex={-1}
         className="absolute inset-y-0 right-0 shadow-xl w-full sm:max-w-md overflow-y-auto"
         style={{ backgroundColor: 'var(--bg-surface)' }}
         onClick={e => e.stopPropagation()}

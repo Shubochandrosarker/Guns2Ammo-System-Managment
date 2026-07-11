@@ -1,9 +1,10 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Outlet, useNavigate } from 'react-router-dom'
 import { Sidebar } from './Sidebar'
 import { TopBar } from './TopBar'
 import type { Session } from '@/lib/api'
 import { api } from '@/lib/api'
+import { useDialogA11y } from '@/lib/hooks'
 
 interface Props {
   session: Session
@@ -13,6 +14,16 @@ interface Props {
 export function AppLayout({ session, onSessionChange }: Props) {
   const nav = useNavigate()
   const [mobileOpen, setMobileOpen] = useState(false)
+
+  // Lock body scroll while the mobile nav drawer is open so the page behind
+  // it doesn't scroll along with it.
+  useEffect(() => {
+    if (!mobileOpen) return
+    document.body.classList.add('overflow-hidden')
+    return () => {
+      document.body.classList.remove('overflow-hidden')
+    }
+  }, [mobileOpen])
 
   function signOut() {
     api.auth.logout()
@@ -27,18 +38,7 @@ export function AppLayout({ session, onSessionChange }: Props) {
       </div>
 
       {mobileOpen && (
-        <div
-          className="fixed inset-0 z-30 lg:hidden"
-          style={{ backgroundColor: 'var(--bg-overlay)' }}
-          onClick={() => setMobileOpen(false)}
-        >
-          <div
-            className="absolute inset-y-0 left-0"
-            onClick={e => e.stopPropagation()}
-          >
-            <Sidebar onNavigate={() => setMobileOpen(false)} />
-          </div>
-        </div>
+        <MobileNavDrawer onClose={() => setMobileOpen(false)} />
       )}
 
       <div className="flex-1 flex flex-col min-w-0">
@@ -52,6 +52,31 @@ export function AppLayout({ session, onSessionChange }: Props) {
             <Outlet />
           </div>
         </main>
+      </div>
+    </div>
+  )
+}
+
+function MobileNavDrawer({ onClose }: { onClose: () => void }) {
+  const dialogRef = useRef<HTMLDivElement>(null)
+  useDialogA11y(dialogRef, onClose)
+
+  return (
+    <div
+      className="fixed inset-0 z-30 lg:hidden"
+      style={{ backgroundColor: 'var(--bg-overlay)' }}
+      onClick={onClose}
+    >
+      <div
+        ref={dialogRef}
+        role="dialog"
+        aria-modal="true"
+        aria-label="Navigation"
+        tabIndex={-1}
+        className="absolute inset-y-0 left-0"
+        onClick={e => e.stopPropagation()}
+      >
+        <Sidebar onNavigate={onClose} />
       </div>
     </div>
   )

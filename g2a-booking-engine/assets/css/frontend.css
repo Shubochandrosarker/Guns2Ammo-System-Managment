@@ -12,18 +12,18 @@
 }
 
 .g2ab-booking {
-	--g2ab-primary:    #5B7BFF;
-	--g2ab-accent:     #7C9CFF;
-	--g2ab-bg:         #0B1020;
-	--g2ab-surface:    #121833;
-	--g2ab-surface2:   #0E1530;
-	--g2ab-text:       #FFFFFF;
-	--g2ab-muted:      #8B93B4;
-	--g2ab-border:     rgba(255,255,255,0.08);
+	--g2ab-primary:    var(--color-brass);
+	--g2ab-accent:     var(--color-ember);
+	--g2ab-bg:         var(--color-void);
+	--g2ab-surface:    var(--color-gunmetal);
+	--g2ab-surface2:   var(--color-surface-1);
+	--g2ab-text:       var(--color-white);
+	--g2ab-muted:      var(--color-silver);
+	--g2ab-border:     var(--color-hairline);
 	--g2ab-radius:     16px;
 	--g2ab-radius-pill: 999px;
-	--g2ab-shadow:     0 30px 80px rgba(8,12,32,0.45);
-	--g2ab-font:       "Inter","Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+	--g2ab-shadow:     0 30px 80px rgba(0,0,0,0.45);
+	--g2ab-font:       var(--font-body);
 
 	font-family: var(--g2ab-font);
 	color: var(--g2ab-text);
@@ -38,13 +38,13 @@
 
 /* ===== Light theme override ============================================== */
 .g2ab-booking.g2ab-theme-light {
-	--g2ab-bg:       #F6F7FB;
+	--g2ab-bg:       #F4F2ED;
 	--g2ab-surface:  #FFFFFF;
-	--g2ab-surface2: #F0F2F8;
-	--g2ab-text:     #0E1530;
-	--g2ab-muted:    #5B6478;
-	--g2ab-border:   rgba(14,21,48,0.10);
-	--g2ab-shadow:   0 20px 60px rgba(14,21,48,0.10);
+	--g2ab-surface2: #EDEAE2;
+	--g2ab-text:     #2E2D33;
+	--g2ab-muted:    #6E6C74;
+	--g2ab-border:   rgba(20,18,10,0.10);
+	--g2ab-shadow:   0 20px 60px rgba(20,18,10,0.10);
 }
 
 /* ===== Midnight theme (matches the screenshot reference) ================= */
@@ -223,7 +223,7 @@
 .g2ab-chip.is-selected {
 	background: var(--g2ab-primary);
 	border-color: var(--g2ab-primary);
-	color: #fff;
+	color: var(--color-ink);
 	box-shadow: 0 6px 18px color-mix(in srgb, var(--g2ab-primary) 35%, transparent);
 }
 
@@ -272,7 +272,7 @@
 .g2ab-cal__nav:hover {
 	background: var(--g2ab-primary);
 	border-color: var(--g2ab-primary);
-	color: #fff;
+	color: var(--color-ink);
 }
 .g2ab-cal__title {
 	text-align: center;
@@ -315,7 +315,7 @@
 }
 .g2ab-cal__cell.is-selected {
 	background: var(--g2ab-primary);
-	color: #fff;
+	color: var(--color-ink);
 	box-shadow: 0 6px 14px color-mix(in srgb, var(--g2ab-primary) 35%, transparent);
 }
 
@@ -360,7 +360,7 @@
 .g2ab-slot.is-selected {
 	background: var(--g2ab-primary);
 	border-color: var(--g2ab-primary);
-	color: #fff;
+	color: var(--color-ink);
 	box-shadow: 0 6px 18px color-mix(in srgb, var(--g2ab-primary) 35%, transparent);
 }
 
@@ -393,7 +393,7 @@
 }
 .g2ab-btn--primary {
 	background: var(--g2ab-primary);
-	color: #fff;
+	color: var(--color-ink);
 	box-shadow: 0 12px 28px color-mix(in srgb, var(--g2ab-primary) 35%, transparent);
 }
 .g2ab-btn--primary:hover:not(:disabled) {
@@ -503,21 +503,21 @@
 	background: var(--g2ab-surface2);
 	padding: 4px 10px;
 	border-radius: 8px;
-	font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+	font-family: var(--font-mono);
 	font-size: 12px;
 	color: var(--g2ab-text);
 }
 
 /* ===== Error fallback ==================================================== */
 .g2ab-error {
-	background: var(--g2ab-surface, #121833);
-	border: 1px solid var(--g2ab-border, rgba(255,255,255,0.08));
+	background: var(--g2ab-surface, var(--color-gunmetal));
+	border: 1px solid var(--g2ab-border, var(--color-hairline));
 	border-radius: 16px;
 	padding: 24px;
-	color: var(--g2ab-text, #fff);
-	font-family: "Inter","Segoe UI",sans-serif;
-	box-shadow: 0 20px 60px rgba(8,12,32,0.45);
+	color: var(--g2ab-text, var(--color-white));
+	font-family: var(--font-body);
+	box-shadow: 0 20px 60px rgba(0,0,0,0.45);
 	max-width: 600px;
 	margin: 0 auto;
 }
-.g2ab-error p { margin: 0; color: var(--g2ab-muted, #8B93B4); }
+.g2ab-error p { margin: 0; color: var(--g2ab-muted, var(--color-silver)); }

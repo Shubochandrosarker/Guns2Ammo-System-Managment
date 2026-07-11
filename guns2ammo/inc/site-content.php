@@ -121,6 +121,26 @@ function g2a_content( $key, $default = '', $type = 'text', $label = '' ) {
 }
 
 /**
+ * Resolve a `g2a_content()` image URL to a Media Library attachment ID, so
+ * hero/background photos can be rendered with `wp_get_attachment_image()`
+ * (real srcset/sizes) instead of a single fixed-resolution CSS
+ * background-image. Only URLs uploaded through the Media Library resolve
+ * to a real attachment; the theme's own bundled `assets/img/...` default
+ * photos are not attachments and will always return 0 here — callers
+ * should keep their existing CSS-background markup as the fallback for
+ * that case rather than guessing at a size.
+ *
+ * @param string $url Absolute URL as returned by g2a_content( ..., 'image', ... ).
+ * @return int Attachment ID, or 0 if it can't be resolved to one.
+ */
+function g2a_content_image_id( $url ) {
+	if ( ! $url ) {
+		return 0;
+	}
+	return (int) attachment_url_to_postid( $url );
+}
+
+/**
  * Render a full, lazy-loading <img> for an editable image slot.
  * Returns '' when both the override and default are empty, so callers can
  * keep their placeholder markup as a graceful fallback.

@@ -3,6 +3,7 @@ import { PageHeader } from '@/components/ui/PageHeader'
 import { StatCard } from '@/components/ui/StatCard'
 import { Card } from '@/components/ui/Card'
 import { Spinner } from '@/components/ui/Spinner'
+import { ErrorState } from '@/components/ui/ErrorState'
 import { useAsync } from '@/lib/hooks'
 import { api } from '@/lib/api'
 import { formatNumber } from '@/lib/format'
@@ -10,6 +11,7 @@ import { formatNumber } from '@/lib/format'
 export function InsightisticAnalytics() {
   const q = useAsync(() => api.analytics.insightistic(), [])
   if (q.loading) return <Spinner label="Loading web analytics…" />
+  if (q.error) return <Card title="Insightistic Analytics"><ErrorState message={q.error} onRetry={q.refresh} /></Card>
   if (!q.data) return <Card title="No data" />
   const d = q.data
 

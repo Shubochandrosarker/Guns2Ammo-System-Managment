@@ -1,6 +1,13 @@
 /* G2A theme - book-a-lane page CSS, extracted from page-templates/template-book-a-lane.php */
 /* Photo hero (real range-lane shot) under theme-aware scrim tokens; the
-   .hero-media class on the markup keeps ink on-media in both modes. */
+   .hero-media class on the markup keeps ink on-media in both modes.
+   This photo is a static file bundled with the theme (assets/img/...),
+   not a Media Library upload — there is no attachment ID for it to
+   resolve via wp_get_attachment_image()/srcset, and template-book-a-lane.php
+   has no per-page override for it (unlike machine-gun's hero). Making it
+   responsive would mean either uploading it through the Media Library
+   (a content change) or adding new build tooling to pre-generate resized
+   files — both out of scope here, so it's left as a plain CSS background. */
 .bk-hero { padding: 140px 32px 64px; min-height: 50vh; display:flex; align-items:flex-end; position:relative; overflow:hidden; background: linear-gradient(180deg, var(--hero-scrim-soft), var(--hero-scrim-deep)), url("../img/guns2ammo-range-lane-view.jpg") center / cover no-repeat; }
 .bk-hero .container { max-width:1280px; margin:0 auto; width:100%; position:relative; }
 .bk-hero h1 { font-family: var(--font-display); font-size: clamp(56px, 9vw, 112px); line-height:0.92; color: var(--ink-on-media); }

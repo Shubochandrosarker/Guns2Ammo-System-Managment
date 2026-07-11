@@ -13,7 +13,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 final class G2AB_Installer {
 
 	const TABLES = array(
-		'bookings'           => 35,
+		'bookings'           => 36,
 		'resources'          => 12,
 		'booking_types'      => 20,
 		'forms'              => 9,
@@ -299,8 +299,10 @@ original_start_at DATETIME DEFAULT NULL,
 checked_in_at DATETIME DEFAULT NULL,
 event_id BIGINT UNSIGNED DEFAULT NULL,
 event_occurrence_id BIGINT UNSIGNED DEFAULT NULL,
+idempotency_key VARCHAR(80) DEFAULT NULL,
 PRIMARY KEY  (id),
 UNIQUE KEY uuid (uuid),
+UNIQUE KEY idempotency_key (idempotency_key),
 KEY idx_status (status),
 KEY idx_resource_time (resource_id, start_at, end_at),
 KEY idx_user (user_id),

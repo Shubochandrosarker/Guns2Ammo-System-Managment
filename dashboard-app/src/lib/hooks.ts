@@ -1,4 +1,5 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
+import type { RefObject } from 'react'
 
 // Minimal async-data hook. Deliberately simple — we do not need a full
 // react-query dependency for Phase 1, and every page owns a single fetch.
@@ -37,4 +38,61 @@ export function useAsync<T>(fn: () => Promise<T>, deps: unknown[] = []): AsyncSt
   }, [...deps, nonce])
 
   return { data, loading, error, refresh: () => setNonce(n => n + 1) }
+}
+
+const FOCUSABLE_SELECTOR = [
+  'a[href]',
+  'button:not([disabled])',
+  'textarea:not([disabled])',
+  'input:not([disabled])',
+  'select:not([disabled])',
+  '[tabindex]:not([tabindex="-1"])',
+].join(', ')
+
+// Shared modal/drawer accessibility behavior: focuses the first focusable
+// element (or the container itself) on open, traps Tab/Shift+Tab within the
+// container, closes on Escape, and returns focus to whatever triggered the
+// dialog once it unmounts. Intended to be attached to the outer element that
+// carries role="dialog" — mount/unmount of that element is treated as
+// open/close, so every one of this app's modals (which are only rendered
+// while open) gets this behavior for free just by calling the hook.
+export function useDialogA11y<T extends HTMLElement>(containerRef: RefObject<T>, onClose: () => void): void {
+  const previouslyFocused = useRef<HTMLElement | null>(null)
+
+  useEffect(() => {
+    previouslyFocused.current = document.activeElement instanceof HTMLElement ? document.activeElement : null
+
+    const container = containerRef.current
+    const focusables = container ? Array.from(container.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR)) : []
+    ;(focusables[0] ?? container)?.focus()
+
+    function onKeyDown(e: KeyboardEvent) {
+      if (e.key === 'Escape') {
+        e.preventDefault()
+        onClose()
+        return
+      }
+      if (e.key !== 'Tab') return
+      const el = containerRef.current
+      if (!el) return
+      const items = Array.from(el.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR))
+      if (items.length === 0) return
+      const first = items[0]
+      const last = items[items.length - 1]
+      if (e.shiftKey && document.activeElement === first) {
+        e.preventDefault()
+        last.focus()
+      } else if (!e.shiftKey && document.activeElement === last) {
+        e.preventDefault()
+        first.focus()
+      }
+    }
+
+    document.addEventListener('keydown', onKeyDown)
+    return () => {
+      document.removeEventListener('keydown', onKeyDown)
+      previouslyFocused.current?.focus()
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 }

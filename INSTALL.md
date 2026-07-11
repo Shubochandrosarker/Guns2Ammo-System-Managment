@@ -8,15 +8,15 @@ All zips are at the repo root and can be uploaded directly via **WP Admin → Pl
 
 | Artifact | Filename | Current version |
 |---|---|---|
-| Theme | `WPistic-Theme-For-G2A-Version-1.8.9.zip` *(also in `releases/`, current archive `WPistic-Theme-For-G2A-Version-1.27.9.zip`)* | **1.27.9** |
-| Booking Engine plugin | `g2a-booking-engine.zip` (current archive `g2a-booking-engine-1.9.9.5.zip`) | **1.9.9.5** |
-| Memberistic Membership Solutions plugin | `memberistic-membership-solutions.zip` (current archive `memberistic-membership-solutions-1.10.2.zip`) | **1.10.2** |
+| Theme | `WPistic-Theme-For-G2A-Version-1.8.9.zip` *(also in `releases/`, current archive `WPistic-Theme-For-G2A-Version-1.27.10.zip`)* | **1.27.10** |
+| Booking Engine plugin | `g2a-booking-engine.zip` (current archive `g2a-booking-engine-1.9.9.6.zip`) | **1.9.9.6** |
+| Memberistic Membership Solutions plugin | `memberistic-membership-solutions.zip` (current archive `memberistic-membership-solutions-1.10.3.zip`) | **1.10.3** |
 | WPistic Contact Form plugin | `wpistic-contact-form.zip` | **1.5.6** (DB schema 1.2.0) |
 | G2A Theme Control plugin | `g2a-theme-control.zip` | **1.0.0** |
-| Verifyistic (age verification) plugin | `verifyistic.zip` | **1.4.0** |
-| Advanced FFL Checkout (G2A Edition) plugin | `advanced-ffl-checkout.zip` (current archive `advanced-ffl-checkout-1.9.1.zip`) | **1.9.1** (DB schema 1.2.0) |
-| Messageistic (SMS / local gateway) plugin | `messageistic.zip` | **0.5.1** |
-| G2A POS Core plugin | `g2a-pos-core.zip` | **3.1.2** (PHP 8.1+, vendors included) |
+| Verifyistic (age verification) plugin | `verifyistic.zip` (current archive `verifyistic-1.4.2.zip`) | **1.4.2** |
+| Advanced FFL Checkout (G2A Edition) plugin | `advanced-ffl-checkout.zip` (current archive `advanced-ffl-checkout-1.9.2.zip`) | **1.9.2** (DB schema 1.2.0) |
+| Messageistic (SMS / local gateway) plugin | `messageistic.zip` (current archive `messageistic-0.5.2.zip`) | **0.5.2** |
+| G2A POS Core plugin | `g2a-pos-core.zip` (current archive `g2a-pos-core-3.1.7.zip`) | **3.1.7** (PHP 8.1+, vendors included) |
 
 > The root `WPistic-Theme-For-G2A-Version-1.8.9.zip` filename is preserved so the WP "Replace existing theme" flow recognises the upgrade. The `style.css` header inside reads `Version: 1.27.0` so WP treats it as an update, not a downgrade.
 >

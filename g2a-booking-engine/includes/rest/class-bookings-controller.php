@@ -799,6 +799,25 @@ final class G2AB_REST_Bookings_Controller {
 		$confirm_token  = wp_generate_password( 32, false );
 		$bookings_table = $wpdb->prefix . 'g2ab_bookings';
 
+		// ─── Idempotency key ────────────────────────────────────────────────
+		// A network retry or a double form-submit (slow response, impatient
+		// double-click) resubmits the exact same resource/type/time/customer —
+		// without this, each attempt was a fresh insert, so on a resource with
+		// spare capacity two submissions could both succeed as separate
+		// bookings (and, for a paid booking type, trigger two separate payment-
+		// gateway intent/charge creations). Deriving the key from the request
+		// content plus a coarse time bucket needs no client changes: retries of
+		// the SAME attempt land in the same bucket and collide on the unique
+		// idempotency_key index below; a deliberate new booking of the same
+		// slot made later (a different bucket) is never blocked.
+		$idempotency_key = hash( 'sha256', implode( '|', array(
+			$resource_id,
+			$booking_type_id,
+			$start_sql,
+			strtolower( $customer_email ),
+			(int) floor( time() / 600 ), // 10-minute bucket
+		) ) );
+
 		// ─── Race-safe + capacity-aware insert ──────────────────────────────
 		// One transaction, one FOR UPDATE load query, one INSERT. Concurrent
 		// submitters see a consistent view and are serialised by row/gap locks.
@@ -869,9 +888,23 @@ final class G2AB_REST_Bookings_Controller {
 			'created_by'       => $user_id ?: null,
 			'created_at'       => $now_mysql,
 			'updated_at'       => $now_mysql,
-		), array( '%s','%d','%d','%d','%d','%s','%s','%s','%s','%s','%d','%d','%s','%s','%f','%f','%s','%s','%s','%d','%s','%d','%s','%s' ) );
+			'idempotency_key'  => $idempotency_key,
+		), array( '%s','%d','%d','%d','%d','%s','%s','%s','%s','%s','%d','%d','%s','%s','%f','%f','%s','%s','%s','%d','%s','%d','%s','%s','%s' ) );
 
 		if ( false === $inserted ) {
+			// A duplicate idempotency_key means this exact request was already
+			// processed a moment ago (retry/double-submit) — return the booking
+			// that attempt created instead of erroring or creating a second one.
+			if ( false !== stripos( (string) $wpdb->last_error, 'idempotency_key' ) ) {
+				$wpdb->query( 'ROLLBACK' );
+				$existing_id = (int) $wpdb->get_var( $wpdb->prepare(
+					"SELECT id FROM {$bookings_table} WHERE idempotency_key = %s LIMIT 1",
+					$idempotency_key
+				) );
+				if ( $existing_id > 0 ) {
+					return $this->idempotent_replay_response( $existing_id );
+				}
+			}
 			$wpdb->query( 'ROLLBACK' );
 			return new WP_Error( 'g2ab_insert_failed', __( 'Could not save booking.', 'g2a-booking' ), array( 'status' => 500 ) );
 		}
@@ -976,6 +1009,57 @@ final class G2AB_REST_Bookings_Controller {
 		if ( ! $email_automation_active && 1 === (int) get_option( 'g2ab_send_confirmation_email', 1 ) ) {
 			$this->send_confirmation_email( $customer_email, $customer_name, $resource->name, $start_sql, $uuid );
 		}
+
+		return rest_ensure_response( array( 'success' => true, 'data' => $response ) );
+	}
+
+	/**
+	 * Build the same success response shape create_booking() returns, from an
+	 * already-existing booking row — used when an idempotency-key collision
+	 * shows the current request is a retry/double-submit of one that already
+	 * succeeded, so the caller gets the original booking back instead of a
+	 * confusing error (or a second booking/charge).
+	 *
+	 * @param int $booking_id Existing g2ab_bookings row id.
+	 * @return \WP_REST_Response|WP_Error
+	 */
+	private function idempotent_replay_response( $booking_id ) {
+		global $wpdb;
+		$bookings_table = $wpdb->prefix . 'g2ab_bookings';
+		$res_table      = $wpdb->prefix . 'g2ab_resources';
+
+		$row = $wpdb->get_row( $wpdb->prepare(
+			"SELECT b.*, r.name AS resource_name FROM {$bookings_table} b
+			 LEFT JOIN {$res_table} r ON r.id = b.resource_id
+			 WHERE b.id = %d",
+			$booking_id
+		) );
+		if ( ! $row ) {
+			return new WP_Error( 'g2ab_insert_failed', __( 'Could not save booking.', 'g2a-booking' ), array( 'status' => 500 ) );
+		}
+
+		$metadata = json_decode( (string) $row->metadata, true );
+		$metadata = is_array( $metadata ) ? $metadata : array();
+
+		$response = array(
+			'id'               => (int) $row->id,
+			'uuid'             => (string) $row->uuid,
+			'status'           => (string) $row->status,
+			'start_at'         => (string) $row->start_at,
+			'end_at'           => (string) $row->end_at,
+			'resource'         => (string) $row->resource_name,
+			'total'            => number_format( (float) $row->total_amount, 2 ),
+			'subtotal'         => number_format( (float) ( $metadata['subtotal'] ?? $row->total_amount ), 2 ),
+			'discount'         => number_format( (float) ( $metadata['discount_amount'] ?? 0 ), 2 ),
+			'due_now'          => number_format( (float) ( $metadata['due_now'] ?? 0 ), 2 ),
+			'discount_label'   => (string) ( $metadata['discount_label'] ?? '' ),
+			'gateway'          => (string) ( $metadata['gateway'] ?? '' ),
+			'payment_required' => (float) ( $metadata['due_now'] ?? 0 ) > 0,
+			'redirect_url'     => '',
+			'message'          => __( 'This booking was already received — showing your existing reservation.', 'g2a-booking' ),
+			'confirm_token'    => (string) ( $metadata['confirm_token'] ?? '' ),
+			'idempotent_replay'=> true,
+		);
 
 		return rest_ensure_response( array( 'success' => true, 'data' => $response ) );
 	}
@@ -1280,6 +1364,16 @@ final class G2AB_REST_Bookings_Controller {
 		$uuid          = wp_generate_uuid4();
 		$confirm_token = wp_generate_password( 32, false );
 
+		// See create_booking() for why this exists: a retry/double-submit of
+		// the same seat request must not create a second reservation (and, for
+		// a paid event, a second payment-gateway intent).
+		$idempotency_key = hash( 'sha256', implode( '|', array(
+			'event',
+			$occurrence_id,
+			strtolower( $customer_email ),
+			(int) floor( time() / 600 ),
+		) ) );
+
 		// ─── Race-safe seat reservation ─────────────────────────────────────
 		$in = "'" . implode( "','", array_map( 'esc_sql', G2AB_Events::ACTIVE_STATUSES ) ) . "'";
 		$wpdb->query( 'START TRANSACTION' );
@@ -1327,9 +1421,20 @@ final class G2AB_REST_Bookings_Controller {
 			'created_by'          => $user_id ?: null,
 			'created_at'          => $now_mysql,
 			'updated_at'          => $now_mysql,
-		), array( '%s','%d','%s','%s','%d','%s','%s','%s','%s','%s','%d','%d','%s','%s','%f','%f','%s','%s','%s','%d','%s','%d','%d','%d','%s','%s' ) );
+			'idempotency_key'     => $idempotency_key,
+		), array( '%s','%d','%s','%s','%d','%s','%s','%s','%s','%s','%d','%d','%s','%s','%f','%f','%s','%s','%s','%d','%s','%d','%d','%d','%s','%s','%s' ) );
 
 		if ( false === $inserted ) {
+			if ( false !== stripos( (string) $wpdb->last_error, 'idempotency_key' ) ) {
+				$wpdb->query( 'ROLLBACK' );
+				$existing_id = (int) $wpdb->get_var( $wpdb->prepare(
+					"SELECT id FROM {$bookings_table} WHERE idempotency_key = %s LIMIT 1",
+					$idempotency_key
+				) );
+				if ( $existing_id > 0 ) {
+					return $this->idempotent_replay_response( $existing_id );
+				}
+			}
 			$wpdb->query( 'ROLLBACK' );
 			return new WP_Error( 'g2ab_insert_failed', __( 'Could not save your reservation.', 'g2a-booking' ), array( 'status' => 500 ) );
 		}

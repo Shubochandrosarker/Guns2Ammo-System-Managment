@@ -63,12 +63,14 @@ final class SMS_Service {
             return new WP_Error( 'messageistic_location_provider_mismatch', __( 'The selected location is configured for a different provider.', 'messageistic' ) );
         }
 
-        $pilot_locked = false;
-        if ( ! empty( $general['pilot_mode_enabled'] ) ) {
-            $pilot_locked = Pilot_Send_Lock::acquire();
-            if ( ! $pilot_locked ) {
-                return new WP_Error( 'messageistic_pilot_lock_timeout', __( 'Could not reserve the controlled pilot send slot. Please retry.', 'messageistic' ) );
-            }
+        // Serialize the policy check (Policy_Engine::evaluate()'s daily/contact
+        // frequency COUNT(*) reads) and the message row that satisfies it into
+        // one atomic step for EVERY send, not just pilot-mode ones — otherwise
+        // two concurrent sends can both read a count under the limit and both
+        // proceed, silently exceeding the configured caps.
+        $pilot_locked = Pilot_Send_Lock::acquire();
+        if ( ! $pilot_locked ) {
+            return new WP_Error( 'messageistic_send_lock_timeout', __( 'Could not reserve a send slot. Please retry.', 'messageistic' ) );
         }
 
         $idempotency_key = sanitize_text_field( (string) ( $args['idempotency_key'] ?? '' ) );

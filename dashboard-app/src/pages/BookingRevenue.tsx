@@ -2,6 +2,7 @@ import { PageHeader } from '@/components/ui/PageHeader'
 import { StatCard } from '@/components/ui/StatCard'
 import { Card } from '@/components/ui/Card'
 import { Spinner } from '@/components/ui/Spinner'
+import { ErrorState } from '@/components/ui/ErrorState'
 import { useAsync } from '@/lib/hooks'
 import { api } from '@/lib/api'
 import { formatCurrency, formatNumber, formatPercent } from '@/lib/format'
@@ -11,6 +12,7 @@ export function BookingRevenue() {
   const b = useAsync(() => api.analytics.bookings(), [])
 
   if (b.loading) return <Spinner />
+  if (b.error) return <Card title="Booking Revenue"><ErrorState message={b.error} onRetry={b.refresh} /></Card>
   if (!b.data) return <Card title="No data" />
 
   const d = b.data

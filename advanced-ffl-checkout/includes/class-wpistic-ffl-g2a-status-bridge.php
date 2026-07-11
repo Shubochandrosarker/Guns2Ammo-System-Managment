@@ -106,11 +106,19 @@ class G2A_Status_Bridge {
 			return;
 		}
 
-		$wpdb->update( // phpcs:ignore WordPress.DB
+		// Re-check status in the WHERE clause, not just the earlier PHP read —
+		// a WooCommerce order-status webhook retry or an admin edit racing this
+		// same call can only advance the row once; whichever call's UPDATE
+		// actually matches the row still being at $row->status wins, so the
+		// event log + hook below only fire for that one, not for both.
+		$updated = $wpdb->update( // phpcs:ignore WordPress.DB
 			DB::table( 'transfers' ),
 			[ 'status' => $new_status, 'updated_at' => current_time( 'mysql' ) ],
-			[ 'id' => $transfer_id ]
+			[ 'id' => $transfer_id, 'status' => $row->status ]
 		);
+		if ( ! $updated ) {
+			return;
+		}
 
 		$wpdb->insert( DB::table( 'events' ), [ // phpcs:ignore WordPress.DB
 			'transfer_id' => $transfer_id,

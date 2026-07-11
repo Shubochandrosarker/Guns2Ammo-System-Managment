@@ -2,12 +2,14 @@ import { PageHeader } from '@/components/ui/PageHeader'
 import { Card } from '@/components/ui/Card'
 import { StatCard } from '@/components/ui/StatCard'
 import { Spinner } from '@/components/ui/Spinner'
+import { ErrorState } from '@/components/ui/ErrorState'
 import { useAsync } from '@/lib/hooks'
 import { api } from '@/lib/api'
 
 export function ShooterInsights() {
   const q = useAsync(() => api.analytics.shooterInsights(), [])
   if (q.loading) return <Spinner label="Loading shooter segments…" />
+  if (q.error) return <Card title="Shooter Insights"><ErrorState message={q.error} onRetry={q.refresh} /></Card>
   if (!q.data) return <Card title="No data" />
   const d = q.data
 

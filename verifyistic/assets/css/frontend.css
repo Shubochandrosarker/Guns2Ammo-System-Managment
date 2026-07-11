@@ -1,21 +1,23 @@
 /* =========================================================
    Verifyistic Frontend Popup CSS — by WordPressistic
+   Re-skinned to the Guns 2 Ammo tactical-luxury brand tokens
+   (defined in guns2ammo/assets/css/tokens.css and enqueued
+   alongside this stylesheet, so var() resolves at runtime).
    ========================================================= */
-@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&display=swap');
 
 /* ── Defaults ──────────────────────────────────────────── */
 :root {
-  --vfy-popup-bg:       #0f172a;
-  --vfy-overlay:        rgba(0,0,0,0.80);
-  --vfy-font-clr:       #f8fafc;
-  --vfy-btn-yes:        #14b8a6;
-  --vfy-btn-no:         #475569;
-  --vfy-btn-yes-txt:    #ffffff;
-  --vfy-btn-no-txt:     #ffffff;
+  --vfy-popup-bg:       var(--color-gunmetal);
+  --vfy-overlay:        var(--hero-scrim-deep);
+  --vfy-font-clr:       var(--color-white);
+  --vfy-btn-yes:        var(--color-brass);
+  --vfy-btn-no:         var(--color-steel);
+  --vfy-btn-yes-txt:    var(--color-ink);
+  --vfy-btn-no-txt:     var(--color-white);
   --vfy-btn-radius:     8px;
   --vfy-popup-width:    480px;
   --vfy-logo-width:     160px;
-  --vfy-accent:         #14b8a6;
+  --vfy-accent:         var(--color-brass);
 }
 
 /* ── Overlay ───────────────────────────────────────────── */
@@ -64,7 +66,7 @@
   content: '';
   display: block;
   height: 3px;
-  background: linear-gradient(90deg, var(--vfy-accent), #6366f1, #0891b2);
+  background: linear-gradient(90deg, var(--vfy-accent), var(--color-ember), var(--color-brass-dim));
 }
 
 /* ── Inner Padding ─────────────────────────────────────── */
@@ -94,12 +96,12 @@
 .vfy-shield-icon {
   width: 64px; height: 64px;
   margin: 0 auto 22px;
-  background: linear-gradient(135deg, rgba(20,184,166,.2), rgba(99,102,241,.2));
+  background: linear-gradient(135deg, rgba(201,168,76,.2), rgba(232,128,47,.2));
   border-radius: 18px;
   display: flex;
   align-items: center;
   justify-content: center;
-  border: 1px solid rgba(20,184,166,.25);
+  border: 1px solid rgba(201,168,76,.25);
 }
 
 .vfy-shield-icon svg {
@@ -110,7 +112,7 @@
 /* ── Heading & Text ────────────────────────────────────── */
 .vfy-heading {
   color: var(--vfy-font-clr);
-  font-family: 'Outfit', sans-serif;
+  font-family: var(--font-display);
   font-size: 22px;
   font-weight: 800;
   text-align: center;
@@ -120,8 +122,8 @@
 }
 
 .vfy-message {
-  color: rgba(248,250,252,.65);
-  font-family: 'Outfit', sans-serif;
+  color: var(--color-fog);
+  font-family: var(--font-body);
   font-size: 14px;
   font-weight: 400;
   text-align: center;
@@ -134,8 +136,8 @@
   display: inline-flex;
   align-items: center;
   gap: 5px;
-  background: rgba(20,184,166,.12);
-  border: 1px solid rgba(20,184,166,.25);
+  background: rgba(201,168,76,.12);
+  border: 1px solid rgba(201,168,76,.25);
   color: var(--vfy-accent);
   border-radius: 50px;
   padding: 4px 12px;
@@ -151,7 +153,7 @@
 /* ── Divider ───────────────────────────────────────────── */
 .vfy-divider {
   height: 1px;
-  background: rgba(255,255,255,.07);
+  background: var(--color-hairline);
   margin: 0 0 24px;
 }
 
@@ -170,10 +172,10 @@
 
 .vfy-form-label {
   display: block;
-  font-family: 'Outfit', sans-serif;
+  font-family: var(--font-mono);
   font-size: 12px;
   font-weight: 600;
-  color: rgba(248,250,252,.55);
+  color: var(--color-silver);
   margin-bottom: 5px;
   letter-spacing: .3px;
   text-transform: uppercase;
@@ -185,10 +187,10 @@
   background: rgba(255,255,255,.06);
   border: 1.5px solid rgba(255,255,255,.1);
   border-radius: 10px;
-  font-family: 'Outfit', sans-serif;
+  font-family: var(--font-body);
   font-size: 14px;
   font-weight: 500;
-  color: #f8fafc;
+  color: var(--color-white);
   outline: none;
   transition: all .18s ease;
   -webkit-appearance: none;
@@ -196,11 +198,11 @@
 
 .vfy-form-input:focus {
   border-color: var(--vfy-accent);
-  background: rgba(20,184,166,.06);
-  box-shadow: 0 0 0 3px rgba(20,184,166,.15);
+  background: rgba(201,168,76,.06);
+  box-shadow: 0 0 0 3px rgba(201,168,76,.15);
 }
 
-.vfy-form-input::placeholder { color: rgba(148,163,184,.5); }
+.vfy-form-input::placeholder { color: var(--color-silver); }
 
 /* DOB Month / Day / Year dropdowns — mobile-friendly (no native date spinner) */
 .vfy-dob-row {
@@ -212,13 +214,13 @@ select.vfy-dob-part {
   width: 100%;
   cursor: pointer;
   padding-right: 30px;
-  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%2394a3b8' stroke-width='3'><path d='M6 9l6 6 6-6'/></svg>");
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23A7A6AE' stroke-width='3'><path d='M6 9l6 6 6-6'/></svg>");
   background-repeat: no-repeat;
   background-position: right 11px center;
   text-align: left;
 }
-select.vfy-dob-part:invalid { color: rgba(148,163,184,.6); } /* shows the placeholder option dimmed */
-select.vfy-dob-part option { color: #0f172a; }
+select.vfy-dob-part:invalid { color: var(--color-silver); } /* shows the placeholder option dimmed */
+select.vfy-dob-part option { color: var(--color-ink); }
 
 /* Date input fix */
 .vfy-form-input[type="date"]::-webkit-calendar-picker-indicator {
@@ -240,7 +242,7 @@ select.vfy-dob-part option { color: #0f172a; }
 
 .vfy-upload-area:hover {
   border-color: var(--vfy-accent);
-  background: rgba(20,184,166,.05);
+  background: rgba(201,168,76,.05);
 }
 
 .vfy-upload-area input[type="file"] {
@@ -253,15 +255,15 @@ select.vfy-dob-part option { color: #0f172a; }
 
 .vfy-upload-icon {
   width: 32px; height: 32px;
-  stroke: rgba(148,163,184,.6);
+  stroke: var(--color-silver);
   display: block;
   margin: 0 auto 8px;
 }
 
 .vfy-upload-text {
-  font-family: 'Outfit', sans-serif;
+  font-family: var(--font-body);
   font-size: 13px;
-  color: rgba(148,163,184,.7);
+  color: var(--color-fog);
   font-weight: 500;
 }
 
@@ -294,9 +296,9 @@ select.vfy-dob-part option { color: #0f172a; }
 }
 
 .vfy-remember-label {
-  font-family: 'Outfit', sans-serif;
+  font-family: var(--font-body);
   font-size: 13px;
-  color: rgba(248,250,252,.55);
+  color: var(--color-silver);
   cursor: pointer;
 }
 
@@ -318,7 +320,7 @@ select.vfy-dob-part option { color: #0f172a; }
   width: 100%;
   padding: 13px 20px;
   border-radius: var(--vfy-btn-radius);
-  font-family: 'Outfit', sans-serif;
+  font-family: var(--font-condensed);
   font-size: 15px;
   font-weight: 700;
   cursor: pointer;
@@ -378,8 +380,8 @@ select.vfy-dob-part option { color: #0f172a; }
 .vfy-btn-spinner {
   display: inline-block;
   width: 16px; height: 16px;
-  border: 2px solid rgba(255,255,255,.3);
-  border-top-color: #fff;
+  border: 2px solid rgba(17,17,20,.3);
+  border-top-color: var(--color-ink);
   border-radius: 50%;
   animation: vfy-spin .6s linear infinite;
 }
@@ -395,7 +397,7 @@ select.vfy-dob-part option { color: #0f172a; }
   color: #fca5a5;
   border-radius: 8px;
   padding: 10px 14px;
-  font-family: 'Outfit', sans-serif;
+  font-family: var(--font-body);
   font-size: 13px;
   font-weight: 500;
   margin-bottom: 14px;
@@ -419,7 +421,7 @@ select.vfy-dob-part option { color: #0f172a; }
 
 .vfy-success-icon {
   width: 60px; height: 60px;
-  background: rgba(16,185,129,.15);
+  background: rgba(74,222,128,.15);
   border-radius: 50%;
   display: flex;
   align-items: center;
@@ -429,34 +431,34 @@ select.vfy-dob-part option { color: #0f172a; }
 
 .vfy-success-icon svg {
   width: 28px; height: 28px;
-  stroke: #34d399;
+  stroke: var(--color-active);
 }
 
 .vfy-success-title {
-  font-family: 'Outfit', sans-serif;
+  font-family: var(--font-display);
   font-size: 20px;
   font-weight: 800;
-  color: #f8fafc;
+  color: var(--color-white);
   margin: 0 0 8px;
 }
 
 .vfy-success-msg {
-  font-family: 'Outfit', sans-serif;
+  font-family: var(--font-body);
   font-size: 14px;
-  color: rgba(248,250,252,.55);
+  color: var(--color-silver);
 }
 
 /* ── Privacy Text ──────────────────────────────────────── */
 .vfy-privacy {
-  font-family: 'Outfit', sans-serif;
+  font-family: var(--font-body);
   font-size: 11.5px;
-  color: rgba(148,163,184,.45);
+  color: var(--color-silver);
   text-align: center;
   margin-top: 16px;
   line-height: 1.5;
 }
 
-.vfy-privacy a { color: rgba(148,163,184,.65); text-decoration: underline; }
+.vfy-privacy a { color: var(--color-fog); text-decoration: underline; }
 
 /* ── Powered By ────────────────────────────────────────── */
 .vfy-powered {
@@ -465,14 +467,14 @@ select.vfy-dob-part option { color: #0f172a; }
   justify-content: center;
   gap: 5px;
   padding: 12px 0 4px;
-  font-family: 'Outfit', sans-serif;
+  font-family: var(--font-mono);
   font-size: 10.5px;
   font-weight: 500;
-  color: rgba(148,163,184,.3);
+  color: var(--color-silver);
   text-decoration: none;
 }
 
-.vfy-powered:hover { color: rgba(148,163,184,.5); }
+.vfy-powered:hover { color: var(--color-brass-bright); }
 
 .vfy-powered svg {
   width: 12px; height: 12px;
