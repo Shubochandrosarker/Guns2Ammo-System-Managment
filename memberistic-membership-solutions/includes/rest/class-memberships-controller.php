@@ -198,7 +198,7 @@ final class Memberships_Controller extends REST_Controller {
 				array(
 					'methods'             => \WP_REST_Server::READABLE,
 					'callback'            => array( $this, 'get_item' ),
-					'permission_callback' => array( $this, 'admin_permissions_check' ),
+					'permission_callback' => array( $this, 'pii_permissions_check' ),
 					'args'                => $this->id_arg(),
 				),
 				array(
@@ -223,7 +223,7 @@ final class Memberships_Controller extends REST_Controller {
 				array(
 					'methods'             => \WP_REST_Server::READABLE,
 					'callback'            => array( $this, 'get_people' ),
-					'permission_callback' => array( $this, 'admin_permissions_check' ),
+					'permission_callback' => array( $this, 'pii_permissions_check' ),
 					'args'                => $this->id_arg(),
 				),
 				array(
@@ -273,7 +273,7 @@ final class Memberships_Controller extends REST_Controller {
 				array(
 					'methods'             => \WP_REST_Server::READABLE,
 					'callback'            => array( $this, 'get_payments' ),
-					'permission_callback' => array( $this, 'admin_permissions_check' ),
+					'permission_callback' => array( $this, 'pii_permissions_check' ),
 					'args'                => $this->id_arg(),
 				),
 				array(
@@ -323,7 +323,7 @@ final class Memberships_Controller extends REST_Controller {
 			array(
 				'methods'             => \WP_REST_Server::READABLE,
 				'callback'            => array( $this, 'get_activity' ),
-				'permission_callback' => array( $this, 'admin_permissions_check' ),
+				'permission_callback' => array( $this, 'pii_permissions_check' ),
 				'args'                => $this->id_arg(),
 			)
 		);
@@ -334,7 +334,7 @@ final class Memberships_Controller extends REST_Controller {
 			array(
 				'methods'             => \WP_REST_Server::READABLE,
 				'callback'            => array( $this, 'get_bookings' ),
-				'permission_callback' => array( $this, 'admin_permissions_check' ),
+				'permission_callback' => array( $this, 'pii_permissions_check' ),
 				'args'                => $this->id_arg(),
 			)
 		);
@@ -581,7 +581,7 @@ final class Memberships_Controller extends REST_Controller {
 			array(
 				'methods'             => \WP_REST_Server::READABLE,
 				'callback'            => array( $this, 'get_email_directory' ),
-				'permission_callback' => array( $this, 'admin_permissions_check' ),
+				'permission_callback' => array( $this, 'pii_permissions_check' ),
 				'args'                => array(
 					'search'        => array( 'type' => 'string', 'required' => false, 'sanitize_callback' => 'sanitize_text_field' ),
 					'status'        => array( 'type' => 'string', 'required' => false, 'sanitize_callback' => 'sanitize_key' ),
@@ -641,12 +641,15 @@ final class Memberships_Controller extends REST_Controller {
 			return true;
 		}
 		$user_id = get_current_user_id();
-		// Require an active Memberistic linkage. Fall back to a capability check
-		// if the helper isn't available so site admins can still opt in.
-		if ( function_exists( 'memberistic_user_has_membership' ) && memberistic_user_has_membership( $user_id ) ) {
-			return true;
-		}
-		if ( current_user_can( 'edit_user', $user_id ) ) {
+		// Require an active Memberistic linkage. NOTE: this previously also
+		// fell back to current_user_can('edit_user', $user_id) when the
+		// membership helper was missing — but map_meta_cap() grants
+		// edit_user unconditionally when a user checks it against their OWN
+		// id, so that fallback made the whole gate a no-op for any logged-in
+		// user regardless of role. memberistic_user_has_membership() is now
+		// a real, always-defined function (see includes/utilities/global-
+		// functions.php), so there's no missing-helper case to fall back for.
+		if ( memberistic_user_has_membership( $user_id ) ) {
 			return true;
 		}
 		return new \WP_Error(

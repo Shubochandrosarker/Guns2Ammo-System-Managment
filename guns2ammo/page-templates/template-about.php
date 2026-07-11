@@ -55,6 +55,11 @@ get_header();
 .tour-grid { display:grid; grid-template-columns: 2fr 1fr 1fr; grid-template-rows: 1fr 1fr; gap:8px; height: 600px; }
 @media(max-width:900px){ .tour-grid { grid-template-columns: 1fr 1fr; grid-template-rows: 200px 200px 200px; height:auto; } .tour-grid .photo:nth-child(1) { grid-column: span 2; } }
 .photo { background-image: linear-gradient(180deg, rgba(26,25,30,0.3), rgba(26,25,30,0.7)), repeating-linear-gradient(135deg, #1f1f23 0 14px, #18181b 14px 28px); background-size: cover; background-position: center; position:relative; overflow:hidden; }
+/* Responsive-photo path (real Media Library upload): plain in-flow
+   children, no z-index needed — document order alone stacks the photo
+   below the scrim, and both below `.cap` (also just a later sibling). */
+.g2a-cover-img { position:absolute; inset:0; width:100%; height:100%; object-fit:cover; }
+.g2a-photo-scrim { position:absolute; inset:0; background: linear-gradient(180deg, rgba(26,25,30,0.25), rgba(26,25,30,0.75)); pointer-events:none; }
 .photo .cap { position:absolute; bottom:14px; left:14px; right:14px; font-family: var(--font-condensed); font-weight:600; letter-spacing:0.06em; text-transform: uppercase; color: var(--ink-on-media); font-size:14px; }
 .photo .cap small { font-family: var(--font-mono); font-size:10px; letter-spacing:0.22em; color: var(--brass-on-media); display:block; margin-bottom:4px; }
 .tour-grid .photo:nth-child(1) { grid-row: span 2; }
@@ -176,8 +181,18 @@ get_header();
           if ( ! $g2a_member_photo && $g2a_member_slot ) {
             $g2a_member_photo = $g2a_member_slot;
           }
+          // Real Media Library upload? Render it responsively (srcset/sizes)
+          // instead of a single fixed-resolution CSS background. External
+          // URLs / no photo at all fall back to the existing markup below.
+          $g2a_member_photo_id = ( $g2a_member_photo && function_exists( 'g2a_content_image_id' ) ) ? g2a_content_image_id( $g2a_member_photo ) : 0;
           ?>
-          <?php if ( $g2a_member_photo ) : ?>
+          <?php if ( $g2a_member_photo_id ) : ?>
+            <div class="photo"><?php echo wp_get_attachment_image( $g2a_member_photo_id, 'large', false, array(
+              'alt'   => '',
+              'class' => 'g2a-cover-img',
+              'sizes' => '(max-width: 900px) 50vw, 25vw',
+            ) ); ?></div>
+          <?php elseif ( $g2a_member_photo ) : ?>
             <div class="photo" style="background-image:url('<?php echo esc_url( $g2a_member_photo ); ?>');background-size:cover;background-position:center;"></div>
           <?php else : ?>
             <div class="photo" data-pl="<?php echo esc_attr( strtoupper( $g2a_member['name'] ) ); ?>"></div>
@@ -214,8 +229,23 @@ get_header();
       <?php foreach ( $g2a_tour_slots as $g2a_slot ) :
         list( $g2a_slot_key, $g2a_slot_default, $g2a_slot_label, $g2a_slot_small, $g2a_slot_cap ) = $g2a_slot;
         $g2a_slot_url = g2a_content( $g2a_slot_key, $g2a_slot_default, 'image', $g2a_slot_label );
+        // Only a real Media Library upload (not the theme's bundled default
+        // JPG) resolves to an attachment ID and gets the responsive <img>
+        // treatment; the default/static case keeps the existing CSS
+        // background untouched below.
+        $g2a_slot_id  = function_exists( 'g2a_content_image_id' ) ? g2a_content_image_id( $g2a_slot_url ) : 0;
       ?>
-      <div class="photo"<?php if ( $g2a_slot_url ) : ?> style="background-image:linear-gradient(180deg, rgba(26,25,30,0.25), rgba(26,25,30,0.75)), url('<?php echo esc_url( $g2a_slot_url ); ?>');background-size:cover;background-position:center;"<?php endif; ?>><div class="cap"><small><?php echo esc_html( $g2a_slot_small ); ?></small><?php echo wp_kses_post( $g2a_slot_cap ); ?></div></div>
+      <div class="photo"<?php if ( $g2a_slot_url && ! $g2a_slot_id ) : ?> style="background-image:linear-gradient(180deg, rgba(26,25,30,0.25), rgba(26,25,30,0.75)), url('<?php echo esc_url( $g2a_slot_url ); ?>');background-size:cover;background-position:center;"<?php endif; ?>>
+        <?php if ( $g2a_slot_id ) : ?>
+          <?php echo wp_get_attachment_image( $g2a_slot_id, 'large', false, array(
+            'alt'   => '',
+            'class' => 'g2a-cover-img',
+            'sizes' => '(max-width: 900px) 50vw, 25vw',
+          ) ); ?>
+          <div class="g2a-photo-scrim" aria-hidden="true"></div>
+        <?php endif; ?>
+        <div class="cap"><small><?php echo esc_html( $g2a_slot_small ); ?></small><?php echo wp_kses_post( $g2a_slot_cap ); ?></div>
+      </div>
       <?php endforeach; ?>
     </div>
   </div>

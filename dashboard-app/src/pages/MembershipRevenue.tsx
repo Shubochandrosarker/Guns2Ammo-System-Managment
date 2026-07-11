@@ -2,6 +2,7 @@ import { PageHeader } from '@/components/ui/PageHeader'
 import { StatCard } from '@/components/ui/StatCard'
 import { Card } from '@/components/ui/Card'
 import { Spinner } from '@/components/ui/Spinner'
+import { ErrorState } from '@/components/ui/ErrorState'
 import { useAsync } from '@/lib/hooks'
 import { api } from '@/lib/api'
 import { formatCurrency, formatNumber } from '@/lib/format'
@@ -9,6 +10,7 @@ import { formatCurrency, formatNumber } from '@/lib/format'
 export function MembershipRevenue() {
   const m = useAsync(() => api.analytics.memberships(), [])
   if (m.loading) return <Spinner />
+  if (m.error) return <Card title="Membership Revenue"><ErrorState message={m.error} onRetry={m.refresh} /></Card>
   if (!m.data) return <Card title="No data" />
   const d = m.data
 

@@ -1455,6 +1455,26 @@ final class Corporate_Members_Repository {
 final class Corporate_Member_Service {
 
 	/**
+	 * Named-lock scope for add_member() so two near-simultaneous invites to
+	 * the SAME group can't both pass the seat-capacity check before either
+	 * one's row is inserted (the check-then-insert below spans several
+	 * tables — membership, person, group-member — so it can't be wrapped in
+	 * a single SQL transaction; a MySQL advisory lock serializes it instead,
+	 * scoped per-group so unrelated groups' invites aren't slowed down).
+	 */
+	private static function acquire_seat_lock( $group_id, $timeout = 5 ) {
+		global $wpdb;
+		$name = 'memberistic_corp_seats_' . (int) $group_id;
+		return 1 === (int) $wpdb->get_var( $wpdb->prepare( 'SELECT GET_LOCK(%s, %d)', $name, max( 0, (int) $timeout ) ) );
+	}
+
+	private static function release_seat_lock( $group_id ) {
+		global $wpdb;
+		$name = 'memberistic_corp_seats_' . (int) $group_id;
+		$wpdb->get_var( $wpdb->prepare( 'SELECT RELEASE_LOCK(%s)', $name ) );
+	}
+
+	/**
 	 * Add one member. Returns array{ status:string, message:string,
 	 * member_id?:int, user_id?:int }.
 	 *
@@ -1474,8 +1494,28 @@ final class Corporate_Member_Service {
 			return array( 'status' => 'invalid', 'message' => sprintf( __( 'Skipped "%s": a valid name and email are required.', 'memberistic' ), $name ?: $email ) );
 		}
 
-		// Seat guard — never exceed seats_total.
-		$used = Corporate_Members_Repository::active_count( $group_id );
+		if ( ! self::acquire_seat_lock( $group_id ) ) {
+			return array( 'status' => 'error', 'message' => __( 'This group is busy processing another invite — please try again in a moment.', 'memberistic' ) );
+		}
+
+		try {
+			return self::add_member_locked( $group_id, $group, $name, $email, $phone, $send_email );
+		} finally {
+			self::release_seat_lock( $group_id );
+		}
+	}
+
+	/**
+	 * The actual add-member body, always called with the per-group seat
+	 * lock already held by add_member().
+	 */
+	private static function add_member_locked( $group_id, $group, $name, $email, $phone, $send_email ) {
+		// Seat guard — never exceed seats_total. Re-read seats_total fresh
+		// (not from the $group snapshot the caller may have fetched slightly
+		// earlier) now that we hold the lock, so a concurrent seats_total
+		// change is respected too.
+		$group = Corporate_Groups_Repository::get( $group_id ) ?: $group;
+		$used  = Corporate_Members_Repository::active_count( $group_id );
 		if ( $used >= (int) $group->seats_total ) {
 			return array( 'status' => 'seat_full', 'message' => sprintf( __( 'Seat limit reached (%d). Increase seats to add more.', 'memberistic' ), (int) $group->seats_total ) );
 		}
@@ -1674,30 +1714,40 @@ final class Corporate_Member_Service {
 			}
 		}
 
-		if ( Corporate_Members_Repository::active_count( $group_id ) >= (int) $group->seats_total ) {
-			return 'seat_full';
+		// Same per-group advisory lock add_member() uses — closes the same
+		// TOCTOU window (two concurrent attach/invite calls for one group
+		// both reading a seat count under the limit before either inserts).
+		if ( ! self::acquire_seat_lock( $group_id ) ) {
+			return 'error';
 		}
-		$existing = Corporate_Members_Repository::find( $group_id, $user_id );
-		if ( $existing && 'removed' !== $existing->status ) {
-			return 'exists';
-		}
+		try {
+			if ( Corporate_Members_Repository::active_count( $group_id ) >= (int) $group->seats_total ) {
+				return 'seat_full';
+			}
+			$existing = Corporate_Members_Repository::find( $group_id, $user_id );
+			if ( $existing && 'removed' !== $existing->status ) {
+				return 'exists';
+			}
 
-		$waiver = ( $person && ! empty( $person['waiver_status'] ) ) ? $person['waiver_status'] : 'missing';
-		$qr_token = '';
-		if ( class_exists( '\WordPressistic\Memberistic\Utilities\Verification' ) ) {
-			$qr_token = \WordPressistic\Memberistic\Utilities\Verification::get_or_create_token( $user_id );
-		}
+			$waiver = ( $person && ! empty( $person['waiver_status'] ) ) ? $person['waiver_status'] : 'missing';
+			$qr_token = '';
+			if ( class_exists( '\WordPressistic\Memberistic\Utilities\Verification' ) ) {
+				$qr_token = \WordPressistic\Memberistic\Utilities\Verification::get_or_create_token( $user_id );
+			}
 
-		Corporate_Members_Repository::insert( array(
-			'group_id'      => (int) $group_id,
-			'user_id'       => $user_id,
-			'membership_id' => $mid,
-			'role'          => 'member',
-			'status'        => 'active',
-			'waiver_status' => $waiver,
-			'qr_token'      => $qr_token,
-		) );
-		self::recount_seats( $group_id );
+			Corporate_Members_Repository::insert( array(
+				'group_id'      => (int) $group_id,
+				'user_id'       => $user_id,
+				'membership_id' => $mid,
+				'role'          => 'member',
+				'status'        => 'active',
+				'waiver_status' => $waiver,
+				'qr_token'      => $qr_token,
+			) );
+			self::recount_seats( $group_id );
+		} finally {
+			self::release_seat_lock( $group_id );
+		}
 
 		$u = get_userdata( $user_id );
 		Corporate_Groups_Repository::log_activity( $group_id, 'member_attached', sprintf(

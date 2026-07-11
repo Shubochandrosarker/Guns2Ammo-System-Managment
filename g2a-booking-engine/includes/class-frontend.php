@@ -539,12 +539,12 @@ final class G2AB_Frontend {
 			</div>
 		</div><!-- /g2ab-unified -->
 		<style>
-		.g2ab-unified{max-width:980px;margin:24px auto;font-family:var(--g2ab-font,'Inter',system-ui,sans-serif);}
-		.g2ab-unified__switch{display:flex;flex-wrap:wrap;align-items:center;gap:12px 16px;background:var(--g2ab-surface,#171B22);border:1px solid var(--g2ab-border,#2A323D);border-top:4px solid var(--g2ab-primary,#D2691E);border-radius:12px 12px 0 0;padding:16px 20px;}
-		.g2ab-unified__q{font-size:13px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--g2ab-text,#E8E8E8);}
-		.g2ab-unified__opts{display:inline-flex;gap:8px;background:var(--g2ab-bg,#0F1115);padding:4px;border-radius:999px;border:1px solid var(--g2ab-border,#2A323D);}
-		.g2ab-unified__opt{appearance:none;border:none;background:transparent;color:var(--g2ab-muted,#8A95A5);padding:8px 18px;border-radius:999px;font-size:13px;font-weight:700;cursor:pointer;transition:all .15s ease;}
-		.g2ab-unified__opt.is-active{background:var(--g2ab-primary,#D2691E);color:#fff;}
+		.g2ab-unified{max-width:980px;margin:24px auto;font-family:var(--g2ab-font,var(--font-body));}
+		.g2ab-unified__switch{display:flex;flex-wrap:wrap;align-items:center;gap:12px 16px;background:var(--g2ab-surface,var(--color-gunmetal));border:1px solid var(--g2ab-border,var(--color-hairline));border-top:4px solid var(--g2ab-primary,var(--color-brass));border-radius:12px 12px 0 0;padding:16px 20px;}
+		.g2ab-unified__q{font-size:13px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--g2ab-text,var(--color-white));}
+		.g2ab-unified__opts{display:inline-flex;gap:8px;background:var(--g2ab-bg,var(--color-void));padding:4px;border-radius:999px;border:1px solid var(--g2ab-border,var(--color-hairline));}
+		.g2ab-unified__opt{appearance:none;border:none;background:transparent;color:var(--g2ab-muted,var(--color-silver));padding:8px 18px;border-radius:999px;font-size:13px;font-weight:700;cursor:pointer;transition:all .15s ease;}
+		.g2ab-unified__opt.is-active{background:var(--g2ab-primary,var(--color-brass));color:var(--color-ink);}
 		.g2ab-unified__panel{margin-top:-1px;}
 		.g2ab-unified__panel[hidden]{display:none;}
 		.g2ab-unified .g2ab-evb{margin-top:0;border-radius:0 0 12px 12px;border-top:none;max-width:none;}

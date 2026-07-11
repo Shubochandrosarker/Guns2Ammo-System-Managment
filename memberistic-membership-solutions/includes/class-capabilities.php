@@ -32,6 +32,7 @@ final class Capabilities {
 			'manage_memberistic_settings',
 			'memberistic_checkin_members',
 			'memberistic_add_notes',
+			'view_memberistic_pii',
 		);
 
 		return apply_filters( 'memberistic_capabilities', $capabilities );
@@ -64,6 +65,7 @@ final class Capabilities {
 				'manage_memberistic_settings',
 				'memberistic_checkin_members',
 				'memberistic_add_notes',
+				'view_memberistic_pii',
 			),
 			'memberistic_staff'      => array(
 				'view_memberistic_dashboard',
@@ -72,6 +74,7 @@ final class Capabilities {
 				'edit_memberistic_members',
 				'memberistic_checkin_members',
 				'memberistic_add_notes',
+				'view_memberistic_pii',
 			),
 			'memberistic_cashier'    => array(
 				'view_memberistic_dashboard',

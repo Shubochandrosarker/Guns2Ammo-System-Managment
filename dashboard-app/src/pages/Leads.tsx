@@ -1,9 +1,9 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { PageHeader } from '@/components/ui/PageHeader'
 import { Card } from '@/components/ui/Card'
 import { StatCard } from '@/components/ui/StatCard'
 import { Spinner } from '@/components/ui/Spinner'
-import { useAsync } from '@/lib/hooks'
+import { useAsync, useDialogA11y } from '@/lib/hooks'
 import { api, type LeadsListParams } from '@/lib/api'
 import type { Agent, Lead, LeadStatus } from '@/types/analytics'
 import { formatNumber } from '@/lib/format'
@@ -269,6 +269,8 @@ function LeadDrawer({
   const [current, setCurrent] = useState(lead)
   const [busy, setBusy] = useState(false)
   const [status, setStatus] = useState<{ ok: boolean; msg: string } | null>(null)
+  const dialogRef = useRef<HTMLDivElement>(null)
+  useDialogA11y(dialogRef, onClose)
 
   async function patch(next: { status?: LeadStatus; assignedAgent?: string | null }) {
     setBusy(true)
@@ -292,6 +294,11 @@ function LeadDrawer({
       onClick={onClose}
     >
       <div
+        ref={dialogRef}
+        role="dialog"
+        aria-modal="true"
+        aria-label={current.contactName || `Lead #${current.id}`}
+        tabIndex={-1}
         className={cn(
           'absolute inset-y-0 right-0 shadow-xl',
           'w-full sm:max-w-lg lg:max-w-xl overflow-y-auto',

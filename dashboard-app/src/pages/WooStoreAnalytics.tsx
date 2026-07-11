@@ -2,6 +2,7 @@ import { PageHeader } from '@/components/ui/PageHeader'
 import { StatCard } from '@/components/ui/StatCard'
 import { Card } from '@/components/ui/Card'
 import { Spinner } from '@/components/ui/Spinner'
+import { ErrorState } from '@/components/ui/ErrorState'
 import { useAsync } from '@/lib/hooks'
 import { api } from '@/lib/api'
 import { formatCurrency, formatNumber, formatPercent } from '@/lib/format'
@@ -10,6 +11,7 @@ import { BarChart, Bar, ResponsiveContainer, Tooltip, XAxis, YAxis, CartesianGri
 export function WooStoreAnalytics() {
   const s = useAsync(() => api.analytics.store(), [])
   if (s.loading) return <Spinner />
+  if (s.error) return <Card title="Woo Store Analytics"><ErrorState message={s.error} onRetry={s.refresh} /></Card>
   if (!s.data) return <Card title="No data" />
   const d = s.data
 

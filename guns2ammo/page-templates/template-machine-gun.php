@@ -18,8 +18,31 @@ $g2a_mg_ccw_replace      = get_post_meta( $g2a_page_id, 'mg_ccw_remove_text', tr
 // client clears the URL, the original ember-gradient background from
 // machine-gun.css takes over — page never renders broken.
 $g2a_mg_hero_bg = function_exists( 'g2a_content' ) ? g2a_content( 'mg_hero_bg', g2a_asset( 'img/gallery/guns2ammo-shooter-on-the-line.jpg' ), 'image', 'Machine Gun — Hero background photo' ) : '';
+// If the client picked a real Media Library upload for the hero photo, we
+// can render it as a responsive <img> (srcset/sizes) instead of a single
+// fixed-resolution CSS background — see g2a_content_image_id(). The
+// theme's own bundled default photo above is not a Media Library
+// attachment, so this resolves to 0 for it and the original CSS
+// background (inline style below) keeps handling that case unchanged.
+$g2a_mg_hero_id = function_exists( 'g2a_content_image_id' ) ? g2a_content_image_id( $g2a_mg_hero_bg ) : 0;
 ?>
-<header class="mg-hero hero-media"<?php if ( $g2a_mg_hero_bg ) : ?> style="background-image:linear-gradient(100deg, rgba(13,13,15,0.95) 30%, rgba(13,13,15,0.72) 60%, rgba(42,32,32,0.55)), url('<?php echo esc_url( $g2a_mg_hero_bg ); ?>');background-size:cover;background-position:center right;"<?php endif; ?>>
+<header class="mg-hero hero-media"<?php if ( $g2a_mg_hero_bg && ! $g2a_mg_hero_id ) : ?> style="background-image:linear-gradient(100deg, rgba(13,13,15,0.95) 30%, rgba(13,13,15,0.72) 60%, rgba(42,32,32,0.55)), url('<?php echo esc_url( $g2a_mg_hero_bg ); ?>');background-size:cover;background-position:center right;"<?php endif; ?>>
+  <?php if ( $g2a_mg_hero_id ) : ?>
+    <?php
+    // Real attachment: responsive photo layered under the gradient scrim
+    // + content. Order matters here — with both elements at the default
+    // stacking level, document order alone puts the scrim above the photo
+    // and both below `.c` (which has z-index:2), no z-index juggling needed.
+    echo wp_get_attachment_image( $g2a_mg_hero_id, 'full', false, array(
+      'alt'           => '',
+      'class'         => 'mg-hero-img',
+      'sizes'         => '100vw',
+      'loading'       => 'eager',
+      'fetchpriority' => 'high',
+    ) );
+    ?>
+    <div class="mg-hero-scrim" aria-hidden="true"></div>
+  <?php endif; ?>
   <div class="c">
     <span class="eyebrow" style="color: var(--color-ember);">Signature Experience  Booked 4–6 weeks out</span>
     <h1 style="margin-top:18px;"><?php echo g2a_content( // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- g2a_content() returns wp_kses_post-escaped HTML.

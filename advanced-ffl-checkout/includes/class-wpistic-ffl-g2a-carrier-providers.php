@@ -609,15 +609,28 @@ class G2A_Carrier_Providers {
 			&& ! empty( $settings['auto_advance_on_delivered'] )
 			&& in_array( $row->status, [ 'shipped_to_dealer', 'shipped' ], true )
 		) {
-			$wpdb->update( // phpcs:ignore WordPress.DB
+			// The WHERE clause's status check (not just the earlier PHP-side
+			// read) is what makes this atomic: a carrier-webhook retry racing
+			// this same poll/webhook can only advance the row once — whichever
+			// call's UPDATE actually matches a still-"shipped" row wins, and
+			// $wpdb->update()'s return value tells us which one that was, so
+			// the event log + hook only fire for the call that truly advanced
+			// the transfer instead of both.
+			$updated = $wpdb->update( // phpcs:ignore WordPress.DB
 				DB::table( 'transfers' ),
 				[
 					'status'                => 'received_by_dealer',
 					'dealer_received_date'  => current_time( 'Y-m-d' ),
 					'updated_at'            => current_time( 'mysql' ),
 				],
-				[ 'id' => $transfer_id ]
+				[
+					'id'     => $transfer_id,
+					'status' => $row->status,
+				]
 			);
+			if ( ! $updated ) {
+				return false;
+			}
 			$wpdb->insert( DB::table( 'events' ), [ // phpcs:ignore WordPress.DB
 				'transfer_id' => $transfer_id,
 				'event_type'  => 'status_change',

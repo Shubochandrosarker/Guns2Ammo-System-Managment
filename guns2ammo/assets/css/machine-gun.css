@@ -3,7 +3,21 @@
    backdrop went dark-to-light-bone in light mode while the headline ink
    flipped dark, leaving unreadable text. Now: real brand photo under
    theme-aware scrim tokens, with on-media ink via .hero-media. */
+/* Background here only ever paints when template-machine-gun.php renders
+   the header with NO inline background-image at all — i.e. the client
+   cleared the "Hero background photo" Site Content field. It's a static,
+   theme-bundled JPG (not a Media Library upload) so it has no attachment
+   ID and can't be made responsive without new image-processing tooling;
+   left as a plain CSS background on purpose (rare/edge-case path only). */
 .mg-hero { min-height: 100vh; padding: 140px 32px 64px; display:flex; align-items:center; position:relative; overflow:hidden; background: radial-gradient(ellipse at 70% 50%, rgba(232,128,47,0.18), transparent 55%), linear-gradient(180deg, var(--hero-scrim), var(--hero-scrim-deep)), url("../img/guns2ammo-firearm-display-wall.jpg") center / cover no-repeat; }
+/* Responsive-photo path (real Media Library upload picked via Site
+   Content): the <img> and the gradient scrim are plain in-flow children
+   with no explicit z-index, so document order alone stacks them
+   correctly — img first (bottom), scrim second (covers it) — both still
+   below `.mg-hero .c` (z-index:2, below) and `.mg-hero::after`'s ember
+   glow (last in source, so painted above both). */
+.mg-hero-img { position:absolute; inset:0; width:100%; height:100%; object-fit:cover; object-position:center right; }
+.mg-hero-scrim { position:absolute; inset:0; background: linear-gradient(100deg, rgba(13,13,15,0.95) 30%, rgba(13,13,15,0.72) 60%, rgba(42,32,32,0.55)); pointer-events:none; }
 .mg-hero::after { content:""; position:absolute; right:-200px; top:50%; transform:translateY(-50%); width:800px; height:800px; background: radial-gradient(circle, rgba(232,128,47,0.15), transparent 60%); }
 .mg-hero .c { max-width:1280px; margin:0 auto; width:100%; position:relative; z-index:2; }
 .mg-hero h1 { font-family: var(--font-display); line-height:0.86; font-size: clamp(64px, 12vw, 168px); letter-spacing:0.005em; color: var(--ink-on-media); }

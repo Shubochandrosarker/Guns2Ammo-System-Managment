@@ -1,8 +1,8 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { PageHeader } from '@/components/ui/PageHeader'
 import { Card } from '@/components/ui/Card'
 import { Spinner } from '@/components/ui/Spinner'
-import { useAsync } from '@/lib/hooks'
+import { useAsync, useDialogA11y } from '@/lib/hooks'
 import { api, type AgentHistoryEntry, type PromptVersion } from '@/lib/api'
 import type { Agent, BrainQueryResult, BrainStatsData } from '@/types/analytics'
 import { cn } from '@/lib/cn'
@@ -347,6 +347,9 @@ function Row({ label, value }: { label: string; value: string }) {
 }
 
 function Drawer({ agent, kind, onClose }: { agent: Agent; kind: DrawerKind; onClose: () => void }) {
+  const dialogRef = useRef<HTMLDivElement>(null)
+  useDialogA11y(dialogRef, onClose)
+
   return (
     <div
       className="fixed inset-0 z-30"
@@ -354,6 +357,11 @@ function Drawer({ agent, kind, onClose }: { agent: Agent; kind: DrawerKind; onCl
       onClick={onClose}
     >
       <div
+        ref={dialogRef}
+        role="dialog"
+        aria-modal="true"
+        aria-label={kind === 'history' ? 'Run history' : 'Prompt template'}
+        tabIndex={-1}
         className={cn(
           'absolute inset-y-0 right-0 shadow-xl',
           'w-full sm:max-w-lg lg:max-w-xl overflow-y-auto',

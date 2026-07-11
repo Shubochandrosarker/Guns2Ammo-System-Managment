@@ -48,6 +48,45 @@ if ( ! function_exists( 'memberistic_mask_secret' ) ) {
 	}
 }
 
+if ( ! function_exists( 'memberistic_user_has_membership' ) ) {
+	/**
+	 * Whether a WP user has an active (or trial) Memberistic membership,
+	 * either as the primary owner or as a linked person on someone else's
+	 * plan (e.g. a Patriot/Guardian family member).
+	 *
+	 * This was previously called from class-memberships-controller.php's
+	 * member_self_permissions_check() but never actually defined anywhere —
+	 * function_exists() silently short-circuited that branch, which made the
+	 * REST permission check fall through to an unrelated, always-true WP
+	 * core capability check. It's now real.
+	 *
+	 * @param int $user_id WP user id.
+	 * @return bool
+	 */
+	function memberistic_user_has_membership( $user_id ) {
+		$user_id = (int) $user_id;
+		if ( $user_id <= 0 ) {
+			return false;
+		}
+
+		global $wpdb;
+		$active_statuses = array( 'active', 'trial' );
+		$placeholders     = implode( ',', array_fill( 0, count( $active_statuses ), '%s' ) );
+
+		$row = $wpdb->get_var( $wpdb->prepare(
+			"SELECT m.id
+			 FROM {$wpdb->prefix}memberistic_memberships m
+			 LEFT JOIN {$wpdb->prefix}memberistic_people p ON p.membership_id = m.id
+			 WHERE ( m.primary_user_id = %d OR p.wp_user_id = %d )
+			   AND m.status IN ( {$placeholders} )
+			 LIMIT 1",
+			array_merge( array( $user_id, $user_id ), $active_statuses )
+		) );
+
+		return null !== $row;
+	}
+}
+
 if ( ! function_exists( 'memberistic_waiver_on_file' ) ) {
 	/**
 	 * Public lookup: the current waiver-on-file for a person, by email (then

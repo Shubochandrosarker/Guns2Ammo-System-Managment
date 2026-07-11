@@ -16,6 +16,21 @@ final class MembershipBillingController {
 	public static function create( WP_REST_Request $request ) {
 		$body = $request->get_json_params() ?: array();
 		$id   = ( new MembershipRepository() )->create( $body );
+
+		if ( $id > 0 ) {
+			/**
+			 * Fires after a membership is sold at the POS counter.
+			 *
+			 * Lets other plugins (e.g. Memberistic) mirror the sale so it isn't
+			 * invisible to the member portal, waiver tracking, QR verification,
+			 * and corporate-group tooling — previously nothing listened for this.
+			 *
+			 * @param int   $id   The new g2a_memberships row id.
+			 * @param array $body Raw request payload passed to MembershipRepository::create().
+			 */
+			do_action( 'g2a_pos_membership_sold', $id, $body );
+		}
+
 		return array( 'id' => $id );
 	}
 

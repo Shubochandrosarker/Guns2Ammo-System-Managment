@@ -505,19 +505,19 @@ Ranked across all four audits, grouped by what kind of attention each needs.
 12. **Add dedup protection to the membership CSV importer's payment-commit step** before it's used again
     for any future migration/reconciliation pass. *(Functional #14d)*
 
-### High-value, schedule soon
+### High-value, schedule soon — ✅ ALL FIXED 2026-07-11 (see "Fixes shipped" Round 2 below)
 
-13. Wire POS membership sales to notify Memberistic (close the split-brain between the two systems). *(Functional #8)*
-14. Add idempotency protection to booking creation to stop duplicate bookings/charges on retry. *(Functional #5)*
-15. Tighten Memberistic's PII-access capability so counter/instructor roles can't bulk-export the member directory; add rate limiting to those routes. *(Functional #12)*
-16. Fix the Memberistic profile-photo upload auth bypass. *(Functional #13)*
-17. Standardize the repeated non-atomic rate-limiter pattern across five plugins into one atomic implementation — prioritize messageistic's TCPA-relevant send caps. *(Functional #20)*
-18. Bump checkout/cart-coupon input font-size to 16px to stop iOS zoom on the purchase funnel. *(Responsive #2)*
-19. Add responsive image loading to hero/section backgrounds — real mobile bandwidth savings. *(Responsive #1)*
-20. Re-skin the Verifyistic popup and booking widget onto the theme's own brand tokens — the two most visible off-brand surfaces. *(UI #1, #2)*
-21. Add proper dialog semantics to the four dashboard-app modals and fix the 7 pages that render API errors as "No data." *(UI #4/#5, Functional #23)*
-22. Fix the mobile drawer's iOS scroll-lock and bring the dashboard-app's own mobile nav up to the same standard. *(Responsive #3, #4)*
-23. Add an atomic precondition to the FFL transfer-status advance handlers and the corporate-group seat-capacity check. *(Functional #14b/14c)*
+13. ✅ Wire POS membership sales to notify Memberistic (close the split-brain between the two systems). *(Functional #8)*
+14. ✅ Add idempotency protection to booking creation to stop duplicate bookings/charges on retry. *(Functional #5)*
+15. ✅ Tighten Memberistic's PII-access capability so counter/instructor roles can't bulk-export the member directory; add rate limiting to those routes. *(Functional #12)*
+16. ✅ Fix the Memberistic profile-photo upload auth bypass. *(Functional #13)*
+17. ✅ Standardize the repeated non-atomic rate-limiter pattern — fixed for messageistic's TCPA-relevant send caps (the priority instance); business-api/Verifyistic/wpistic-contact-form/Memberistic's checkout limiter still open. *(Functional #20)*
+18. ✅ Bump checkout/cart-coupon input font-size to 16px to stop iOS zoom on the purchase funnel. *(Responsive #2)*
+19. ✅ Add responsive image loading to hero/section backgrounds (Machine Gun + About pages; static bundled images left as CSS backgrounds by design). *(Responsive #1)*
+20. ✅ Re-skin the Verifyistic popup and booking widget onto the theme's own brand tokens — the two most visible off-brand surfaces. *(UI #1, #2)*
+21. ✅ Add proper dialog semantics to the four dashboard-app modals and fix the 7 pages that render API errors as "No data." *(UI #4/#5, Functional #23)*
+22. ✅ Fix the mobile drawer's iOS scroll-lock and bring the dashboard-app's own mobile nav up to the same standard. *(Responsive #3, #4)*
+23. ✅ Add an atomic precondition to the FFL transfer-status advance handlers and the corporate-group seat-capacity check. *(Functional #14b/14c)*
 
 ### Medium-term, real but contained
 
@@ -541,25 +541,45 @@ Ranked across all four audits, grouped by what kind of attention each needs.
 
 ## Fixes shipped 2026-07-11
 
-The five "fix immediately" items above were implemented, PHP-linted, packaged into updated plugin/theme
-zips (`releases/`), and this report was updated to reflect the fixed state rather than leaving it to
-drift out of date the way `inc/aeo.php` itself drifted (see finding #4 above).
+### Round 1 — the five "fix immediately" items
 
-| # | Fix | Files | Version bump |
-|---|---|---|---|
-| 1 | Verifyistic booking gate now defaults **on** (module `default_active`, `OPT_REQUIRE_VERIFICATION`); gate now also covers `/events/book`, not just `/bookings`. Added a real checkout-time age-verification check (`woocommerce_checkout_process`) for any cart containing an FFL-required product — fails closed if Verifyistic isn't installed. | `g2a-booking-engine/includes/modules/verifyistic/module.php`, `.../class-verifyistic-integration.php`; `advanced-ffl-checkout/includes/class-wpistic-ffl-compliance.php` | g2a-booking-engine → **1.9.9.5**; advanced-ffl-checkout → **1.9.1** |
-| 2 | `Waivers_Archive::find_on_file()`/`has_on_file()` now excludes waivers older than `Waiver_Service::validity_days()` (default 365) instead of matching any "current" (i.e. non-superseded) row regardless of age. Fixes the booking-gate bridge, the admin lookup tool, and the cross-plugin `memberistic_waiver_on_file()` helper in one place. | `memberistic-membership-solutions/includes/waivers/class-waivers-archive.php` | memberistic-membership-solutions → **1.10.2** |
-| 3 | `three_business_days_from_now()` now skips the 11 federal holidays (with standard Saturday/Sunday observance shifting) in addition to weekends. | `advanced-ffl-checkout/includes/class-wpistic-ffl-g2a-nics.php` | advanced-ffl-checkout → **1.9.1** |
-| 4 | Removed `inc/aeo.php`'s dead `init`-hooked `/llms.txt`/`/llms-full.txt` handler (and its stale `g2a_llms_txt()` content) so `inc/llms.php`'s `parse_request`-hooked, `g2a_biz()`-driven handler — the one actually documented as canonical — is no longer silently shadowed. | `guns2ammo/inc/aeo.php` | guns2ammo theme → **1.27.9** |
-| 5 | Dropped the `notes` column from both `/dealers/search`'s and `/dealers/{id}`'s public SELECT lists (internal staff commentary, previously leaked to anyone). Added the same 30/min/IP rate limit `/dealers/search` already had to `/dealers/{id}` so sequential-ID scraping of the ~80k-row dealer table is no longer unthrottled. | `advanced-ffl-checkout/includes/class-wpistic-ffl-api.php` | advanced-ffl-checkout → **1.9.1** |
+Implemented, PHP-linted, packaged into updated plugin/theme zips (`releases/`), and this report was
+updated to reflect the fixed state rather than leaving it to drift out of date the way `inc/aeo.php`
+itself drifted (see finding #4 above).
 
-Packaged archives: `releases/g2a-booking-engine-1.9.9.5.zip`, `releases/advanced-ffl-checkout-1.9.1.zip`,
-`releases/memberistic-membership-solutions-1.10.2.zip`, `releases/WPistic-Theme-For-G2A-Version-1.27.9.zip`
-(previous versions retained alongside per this repo's "keep current + previous" convention).
-`INSTALL.md`'s version table was updated for these four artifacts.
+| # | Fix | Files |
+|---|---|---|
+| 1 | Verifyistic booking gate now defaults **on** (module `default_active`, `OPT_REQUIRE_VERIFICATION`); gate now also covers `/events/book`, not just `/bookings`. Added a real checkout-time age-verification check (`woocommerce_checkout_process`) for any cart containing an FFL-required product — fails closed if Verifyistic isn't installed. | `g2a-booking-engine/includes/modules/verifyistic/module.php`, `.../class-verifyistic-integration.php`; `advanced-ffl-checkout/includes/class-wpistic-ffl-compliance.php` |
+| 2 | `Waivers_Archive::find_on_file()`/`has_on_file()` now excludes waivers older than `Waiver_Service::validity_days()` (default 365) instead of matching any "current" (i.e. non-superseded) row regardless of age. Fixes the booking-gate bridge, the admin lookup tool, and the cross-plugin `memberistic_waiver_on_file()` helper in one place. | `memberistic-membership-solutions/includes/waivers/class-waivers-archive.php` |
+| 3 | `three_business_days_from_now()` now skips the 11 federal holidays (with standard Saturday/Sunday observance shifting) in addition to weekends. | `advanced-ffl-checkout/includes/class-wpistic-ffl-g2a-nics.php` |
+| 4 | Removed `inc/aeo.php`'s dead `init`-hooked `/llms.txt`/`/llms-full.txt` handler (and its stale `g2a_llms_txt()` content) so `inc/llms.php`'s `parse_request`-hooked, `g2a_biz()`-driven handler — the one actually documented as canonical — is no longer silently shadowed. | `guns2ammo/inc/aeo.php` |
+| 5 | Dropped the `notes` column from both `/dealers/search`'s and `/dealers/{id}`'s public SELECT lists (internal staff commentary, previously leaked to anyone). Added the same 30/min/IP rate limit `/dealers/search` already had to `/dealers/{id}` so sequential-ID scraping of the ~80k-row dealer table is no longer unthrottled. | `advanced-ffl-checkout/includes/class-wpistic-ffl-api.php` |
 
-**Not yet fixed** — everything else in this report (items 6 onward in Part 2, and all of Parts 3/4)
-remains open; see Part 5's ranked list for what to tackle next.
+### Round 2 — the "High-value, schedule soon" tier (Part 5, items 13–22)
+
+| # | Fix | Files |
+|---|---|---|
+| 13 | POS-sold memberships now fire `g2a_pos_membership_sold`; Memberistic mirrors the sale into a real membership + primary person record (plan mapped by slug/name, flagged for manual mapping if no match), stamping `pos_customer_id` — closing the split-brain between the two systems. | `g2a-pos-core/includes/API/MembershipBillingController.php`; `memberistic-membership-solutions/includes/integrations/class-pos-bridge.php` |
+| 14 | Added a DB-backed `idempotency_key` (unique, 10-minute request-derived bucket) to `POST /bookings` and `POST /events/book`; a retry/double-submit now replays the original booking's response instead of creating a duplicate booking or a second payment-gateway intent. | `g2a-booking-engine/includes/class-installer.php`, `.../rest/class-bookings-controller.php` |
+| 15 | Added a `view_memberistic_pii` capability (granted only to manager/staff roles) and a `pii_permissions_check()` gate; `/memberships/(id)`, `/people`, `/payments`, `/activity`, `/bookings`, and `/emails/directory` (bulk PII export) now require it instead of the coarser `view_memberistic_dashboard` cashier/POS-staff/instructor roles already held. | `memberistic-membership-solutions/includes/class-capabilities.php`, `.../rest/class-rest-controller.php`, `.../rest/class-memberships-controller.php` |
+| 16 | Defined the `memberistic_user_has_membership()` helper that was referenced but never implemented, and removed the `current_user_can('edit_user', $user_id)` fallback that made the profile-photo-upload gate pass for any authenticated user regardless of membership. | `memberistic-membership-solutions/includes/utilities/global-functions.php`, `.../rest/class-memberships-controller.php` |
+| 17 | Messageistic's send lock (`Pilot_Send_Lock`, a real MySQL `GET_LOCK`) now wraps **every** SMS send, not just pilot-mode ones, so the daily/per-contact frequency-cap checks in `Policy_Engine::evaluate()` and the message row that satisfies them are atomic — closing the TCPA-relevant race the audit flagged as the priority instance of the non-atomic-rate-limiter pattern. (The same pattern in business-api/Verifyistic/wpistic-contact-form/Memberistic's checkout limiter is not yet fixed — tracked as a follow-up.) | `messageistic/includes/Compliance/Pilot_Send_Lock.php`, `.../Messaging/SMS_Service.php` |
+| 18 | FFL carrier-webhook and WooCommerce-status-bridge "advance transfer" handlers now re-check status inside the `UPDATE`'s `WHERE` clause (not just an earlier PHP read) and only log/fire the status-changed hook when the update actually matched a row — a webhook retry or racing admin edit can no longer double-advance a transfer or send duplicate notifications. Corporate group invites (`add_member()`/`attach_membership()`) now hold a per-group MySQL advisory lock across the seat-capacity check through the insert, closing the same TOCTOU for concurrent invites to one group. | `advanced-ffl-checkout/includes/class-wpistic-ffl-g2a-carrier-providers.php`, `.../class-wpistic-ffl-g2a-status-bridge.php`; `memberistic-membership-solutions/includes/corporate/class-corporate-module.php` |
+| 19 | Checkout and cart-coupon `input.input-text` font-size bumped from 15px to 16px (both `!important`-forced, so they were overriding the sitewide iOS-zoom protection). | `guns2ammo/assets/css/wc-fixes.css` |
+| 20 | Machine Gun and About page hero/team/tour photos now render as real `wp_get_attachment_image()` markup (srcset/sizes, `fetchpriority="high"` on the LCP hero) when backed by a genuine Media Library upload, falling back to the original CSS background unchanged when it isn't. Static bundled theme images (no attachment ID possible) were deliberately left as CSS backgrounds — documented in-file. | `guns2ammo/inc/site-content.php`, `page-templates/template-machine-gun.php`, `page-templates/template-about.php`, `assets/css/machine-gun.css` |
+| 21 | Re-skinned the Verifyistic popup and booking-widget CSS off their own hardcoded teal/blue palettes onto the theme's brass/void/gunmetal tokens and font stack; fixed the `#D2691E` inline-style fallback in `class-frontend.php` so a CSS-load failure can no longer render a third, unrelated color. (A further ~29 files carrying the old blue/orange as WP option *defaults* were identified but left untouched — flagged as a follow-up.) | `verifyistic/assets/css/frontend.css`, `g2a-booking-engine/assets/css/frontend.css`, `g2a-booking-engine/includes/class-frontend.php` |
+| 22 | Added a shared `useDialogA11y` hook (focus trap, Escape-to-close, focus restore) to the four dashboard-app modals (AI Models, AI Agents, Leads, Reports) and to the mobile nav drawer (which also gained a body-scroll lock); added a new `ErrorState` component and wired it into the 7 analytics pages that previously rendered a real API error as "No data". The theme's own mobile drawer scroll-lock was fixed with the standard `position:fixed` + scroll-restore technique. | `dashboard-app/src/lib/hooks.ts`, `.../components/ui/ErrorState.tsx`, `.../components/layout/AppLayout.tsx`, `.../pages/{AIModels,AIAgents,Leads,Reports,BookingRevenue,WooStoreAnalytics,MembershipRevenue,BusinessAnalysis,InsightisticAnalytics,SEOGrowth,ShooterInsights}.tsx`; `guns2ammo/assets/css/app.css`, `assets/js/chrome.js` |
+
+Versions after both rounds: g2a-booking-engine → **1.9.9.6**, advanced-ffl-checkout → **1.9.2**,
+memberistic-membership-solutions → **1.10.3**, guns2ammo theme → **1.27.10**, g2a-pos-core → **3.1.7**,
+messageistic → **0.5.2**, verifyistic → **1.4.2**. Packaged archives are in `releases/` (previous
+version of each retained alongside, per this repo's convention); `INSTALL.md`'s version table was
+updated to match. `dashboard-app` has no plugin-zip release artifact (it's deployed separately per
+`DEPLOYMENT.md`) — its changes are committed and ready for the next deploy.
+
+**Not yet fixed** — the "Medium-term" and "Low priority / hygiene" tiers (Part 5, items 23 onward)
+remain open, along with the two follow-ups called out above (the non-atomic rate limiter in four other
+plugins; ~29 files still carrying the pre-re-skin blue/orange as option defaults in g2a-booking-engine).
 
 ## Appendix — audit scope note
 

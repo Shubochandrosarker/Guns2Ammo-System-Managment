@@ -174,8 +174,18 @@ img, video, iframe, svg, canvas { max-width: 100%; height: auto; }
    and the footer across tablet, phone and small-phone breakpoints.
    ==================================================================== */
 
-/* Lock background scroll while the mobile drawer is open */
-body.g2a-noscroll { overflow: hidden; }
+/* Lock background scroll while the mobile drawer is open.
+   `overflow:hidden` alone does not stop iOS Safari's rubber-band/
+   touch scroll behind an open drawer, so the body is also pinned
+   with `position:fixed` (scroll position is saved/restored via
+   `top` by the JS that toggles this class — see chrome.js). */
+body.g2a-noscroll {
+  position: fixed;
+  left: 0;
+  right: 0;
+  width: 100%;
+  overflow: hidden;
+}
 
 /* ---- Mobile drawer: slide-in, always above the nav, fully scrollable ---- */
 .g2a-mobile {
