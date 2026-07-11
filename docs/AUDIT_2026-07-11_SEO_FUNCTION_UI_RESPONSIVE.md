@@ -21,13 +21,15 @@ webhook signature verification, WooCommerce responsive fixes, the mobile drawer'
 audit surfaced **five issues that belong at the top of the list regardless of anything else in this
 document**, because they touch money, compliance, or security directly:
 
-1. **Age verification is not enforced anywhere a firearm is actually purchased or booked**, by default. (Functional §1)
-2. **Waiver expiry (1-year policy) is not checked at the booking gate** — an expired waiver still lets someone book/check in. (Functional §2)
-3. **NICS 3-business-day math ignores federal holidays**, so the "3-day rule reached" flag can fire early. (Functional §3)
-4. **`/llms.txt` and `/llms-full.txt` — the files built specifically to ground AI answer engines — are silently shadowed by dead legacy code** and serve stale, inaccurate business info to every AI crawler that requests them. (SEO §5)
-5. **An unauthenticated endpoint leaks internal FFL dealer notes and can be scraped to exfiltrate the entire dealer database.** (Functional §16)
+1. **✅ FIXED (2026-07-11).** Age verification is not enforced anywhere a firearm is actually purchased or booked, by default. (Functional §1)
+2. **✅ FIXED (2026-07-11).** Waiver expiry (1-year policy) is not checked at the booking gate — an expired waiver still lets someone book/check in. (Functional §2)
+3. **✅ FIXED (2026-07-11).** NICS 3-business-day math ignores federal holidays, so the "3-day rule reached" flag can fire early. (Functional §3)
+4. **✅ FIXED (2026-07-11).** `/llms.txt` and `/llms-full.txt` — the files built specifically to ground AI answer engines — are silently shadowed by dead legacy code and serve stale, inaccurate business info to every AI crawler that requests them. (SEO §5)
+5. **✅ FIXED (2026-07-11).** An unauthenticated endpoint leaks internal FFL dealer notes and can be scraped to exfiltrate the entire dealer database. (Functional §16)
 
-Everything else in this report is real and worth fixing, but these five should move first.
+Everything else in this report is real and worth fixing, but these five were addressed first. See the
+**"Fixes shipped 2026-07-11"** section at the end of this document for exactly what changed, in which
+plugin, and at which new version number.
 
 ---
 
@@ -536,6 +538,28 @@ Ranked across all four audits, grouped by what kind of attention each needs.
 35. Reconcile the confetti/recap-card claim in `FEATURES.md` against actual code — build it or correct the doc. *(UI)*
 
 ---
+
+## Fixes shipped 2026-07-11
+
+The five "fix immediately" items above were implemented, PHP-linted, packaged into updated plugin/theme
+zips (`releases/`), and this report was updated to reflect the fixed state rather than leaving it to
+drift out of date the way `inc/aeo.php` itself drifted (see finding #4 above).
+
+| # | Fix | Files | Version bump |
+|---|---|---|---|
+| 1 | Verifyistic booking gate now defaults **on** (module `default_active`, `OPT_REQUIRE_VERIFICATION`); gate now also covers `/events/book`, not just `/bookings`. Added a real checkout-time age-verification check (`woocommerce_checkout_process`) for any cart containing an FFL-required product — fails closed if Verifyistic isn't installed. | `g2a-booking-engine/includes/modules/verifyistic/module.php`, `.../class-verifyistic-integration.php`; `advanced-ffl-checkout/includes/class-wpistic-ffl-compliance.php` | g2a-booking-engine → **1.9.9.5**; advanced-ffl-checkout → **1.9.1** |
+| 2 | `Waivers_Archive::find_on_file()`/`has_on_file()` now excludes waivers older than `Waiver_Service::validity_days()` (default 365) instead of matching any "current" (i.e. non-superseded) row regardless of age. Fixes the booking-gate bridge, the admin lookup tool, and the cross-plugin `memberistic_waiver_on_file()` helper in one place. | `memberistic-membership-solutions/includes/waivers/class-waivers-archive.php` | memberistic-membership-solutions → **1.10.2** |
+| 3 | `three_business_days_from_now()` now skips the 11 federal holidays (with standard Saturday/Sunday observance shifting) in addition to weekends. | `advanced-ffl-checkout/includes/class-wpistic-ffl-g2a-nics.php` | advanced-ffl-checkout → **1.9.1** |
+| 4 | Removed `inc/aeo.php`'s dead `init`-hooked `/llms.txt`/`/llms-full.txt` handler (and its stale `g2a_llms_txt()` content) so `inc/llms.php`'s `parse_request`-hooked, `g2a_biz()`-driven handler — the one actually documented as canonical — is no longer silently shadowed. | `guns2ammo/inc/aeo.php` | guns2ammo theme → **1.27.9** |
+| 5 | Dropped the `notes` column from both `/dealers/search`'s and `/dealers/{id}`'s public SELECT lists (internal staff commentary, previously leaked to anyone). Added the same 30/min/IP rate limit `/dealers/search` already had to `/dealers/{id}` so sequential-ID scraping of the ~80k-row dealer table is no longer unthrottled. | `advanced-ffl-checkout/includes/class-wpistic-ffl-api.php` | advanced-ffl-checkout → **1.9.1** |
+
+Packaged archives: `releases/g2a-booking-engine-1.9.9.5.zip`, `releases/advanced-ffl-checkout-1.9.1.zip`,
+`releases/memberistic-membership-solutions-1.10.2.zip`, `releases/WPistic-Theme-For-G2A-Version-1.27.9.zip`
+(previous versions retained alongside per this repo's "keep current + previous" convention).
+`INSTALL.md`'s version table was updated for these four artifacts.
+
+**Not yet fixed** — everything else in this report (items 6 onward in Part 2, and all of Parts 3/4)
+remains open; see Part 5's ranked list for what to tackle next.
 
 ## Appendix — audit scope note
 

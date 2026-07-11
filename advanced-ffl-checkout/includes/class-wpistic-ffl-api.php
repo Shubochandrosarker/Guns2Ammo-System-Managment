@@ -902,7 +902,7 @@ class API {
 		$sql = "SELECT
 				d.id, d.license_number, d.lic_type, d.business_name,
 				d.premise_street, d.premise_city, d.premise_state, d.premise_zip,
-				d.phone, d.transfer_fee, d.is_preferred, d.notes, d.lic_xprdte,
+				d.phone, d.transfer_fee, d.is_preferred, d.lic_xprdte,
 				d.lat, d.lng,
 				{$distance_select}
 			FROM {$t_dealers} d
@@ -957,13 +957,29 @@ class API {
 
 	public function get_dealer( \WP_REST_Request $req ): \WP_REST_Response|\WP_Error {
 		global $wpdb;
-		// Public endpoint: return only the same column set the public dealer
-		// search exposes — never SELECT * (leaks dealer email/import metadata).
+
+		// G2A: rate-limit this public endpoint the same as /dealers/search — it
+		// exposes the same per-record data via a sequential auto-increment ID,
+		// so without its own limit it could be used to scrape the entire ~80k
+		// row dealer database (bypassing the search endpoint's throttle).
+		$ip            = Token::client_ip();
+		$rl_key        = 'wpistic_ffl_getdealer_rl_' . wp_hash( $ip );
+		$hits          = (int) get_transient( $rl_key );
+		$limit_per_min = (int) apply_filters( 'wpistic_ffl_search_rate_limit', 30 );
+		if ( $hits >= $limit_per_min ) {
+			return new \WP_Error( 'rate_limited', 'Too many requests. Please wait a moment.', [ 'status' => 429 ] );
+		}
+		set_transient( $rl_key, $hits + 1, MINUTE_IN_SECONDS );
+
+		// Public endpoint: return only the same public-safe column set
+		// /dealers/search exposes — never SELECT * (leaks dealer email/import
+		// metadata), and never `notes` (internal staff commentary about the
+		// dealer, writable only via the manager-gated PUT /dealers/{id}).
 		$dealer = $wpdb->get_row( // phpcs:ignore WordPress.DB.DirectDatabaseQuery
 			$wpdb->prepare(
 				'SELECT id, license_number, lic_type, business_name,
 				        premise_street, premise_city, premise_state, premise_zip,
-				        phone, transfer_fee, is_preferred, notes, lic_xprdte, lat, lng
+				        phone, transfer_fee, is_preferred, lic_xprdte, lat, lng
 				 FROM ' . DB::table( 'dealers' ) . ' WHERE id = %d',
 				$req['id']
 			)

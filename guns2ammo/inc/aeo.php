@@ -66,104 +66,17 @@ add_action( 'wp_head', function () {
 	] );
 }, 7 );
 
-/* ---------- llms.txt content ---------- */
-function g2a_llms_txt( $full = false ) {
-	$h = untrailingslashit( home_url( '/' ) );
-
-	$out  = "# Guns 2 Ammo\n\n";
-	$out .= "> Mesa, Arizona indoor shooting range, FFL-licensed firearm store, and NRA-certified training facility. Book a lane, train for an Arizona CCW permit, shoot a machine gun, buy or sell firearms, and join a range membership.\n\n";
-	$out .= "Guns 2 Ammo is a locally owned indoor shooting range and gun store at 6030 E Main St, Suite 103, Mesa, AZ 85205. Phone: (602) 715-2677. Email: sales@guns2ammo.com. ";
-	$out .= "Hours: MondayThursday 10am6pm, Friday 10am7pm, Saturday 10am7pm, Sunday 12pm6pm. ";
-	$out .= "Rated 4.7 stars across 449+ Google reviews. Serving Mesa, Phoenix, Gilbert, Tempe, Chandler, Scottsdale, Apache Junction, Queen Creek and the greater Phoenix East Valley in Maricopa County, Arizona.\n\n";
-
-	$out .= "## Range & Memberships\n";
-	$out .= "- [Book A Lane]({$h}/book-a-lane/): Reserve a lane at the 6-lane climate-controlled indoor range. Hours, pricing, rules and what to bring.\n";
-	$out .= "- [Memberships]({$h}/memberships/): Range memberships  Defender \$29.99/mo (1 person), Patriot \$39.99/mo (2 people), Guardian \$59.99/mo (4 people). Unlimited range time, no contracts.\n";
-	$out .= "- [Range Fees & Pricing]({$h}/pricing/): Walk-in lane and rental pricing, and member savings.\n";
-	$out .= "- [Ladies Tuesday]({$h}/ladies-tuesday/): Every Tuesday, women shoot for a free hour of lane time.\n";
-	$out .= "- [Range Safety Rules]({$h}/range-safety/): Range rules, eye/ear protection policy, and ammunition policy.\n\n";
-
-	$out .= "## Training & CCW\n";
-	$out .= "- [Training Courses]({$h}/training/): NRA-certified firearms courses for every level.\n";
-	$out .= "- [Arizona CCW Certification]({$h}/arizona-ccw-certification/): State-recognized concealed carry course, taught Saturdays, with 37+ state reciprocity.\n";
-	$out .= "- [California CCW]({$h}/training/california-ccw/): Live-fire shooting component for the California CCW requirement.\n";
-	$out .= "- [Defensive Pistol]({$h}/training/defensive-pistol/): 3-hour defensive handgun course.\n";
-	$out .= "- [Private Instruction]({$h}/private-instruction/): One-on-one firearms training.\n\n";
-
-	$out .= "## Shop, Transfers & Selling\n";
-	$out .= "- [Shop Firearms]({$h}/shop/): Handguns, rifles, ammunition and magazines with same-day local pickup in Mesa.\n";
-	$out .= "- [Collections]({$h}/collections/): Browse handguns, rifles, ammunition and magazines.\n";
-	$out .= "- [FFL Transfers]({$h}/transfers/): Federal firearm transfer service from a base \$30 transfer fee.\n";
-	$out .= "- [FFL & NFA Services]({$h}/ffl-services/): NFA / Class III items, firearm shipping, consignment and trusts.\n";
-	$out .= "- [Sell Your Gun]({$h}/sell-your-gun/): Sell used firearms to Guns 2 Ammo for a fair cash offer from a licensed dealer.\n\n";
-
-	$out .= "## Experience\n";
-	$out .= "- [Machine Gun Experience]({$h}/machine-gun/): Shoot full-auto platforms  M16, Glock 18, MP5, AK-47, AK-74  with a certified RSO at your side.\n\n";
-
-	$out .= "## Help\n";
-	$out .= "- [Get Support]({$h}/get-support/): Membership, selling, transfer, order and general support requests.\n";
-	$out .= "- [Contact]({$h}/contact/): Visit, call, or get directions.\n";
-	$out .= "- [Knowledge Hub]({$h}/blog/): Guides on CCW law, range safety, training and gear.\n";
-
-	if ( $full ) {
-		$out .= "\n## About Guns 2 Ammo\n\n";
-		$out .= "Guns 2 Ammo has served the Phoenix East Valley from Mesa, Arizona since 2014. The facility combines three businesses under one roof: a 6-lane, climate-controlled indoor shooting range; a federally licensed (FFL) firearm retail store; and an NRA- and USCCA-certified training academy. It is a family-owned local business, not a national chain.\n\n";
-
-		$out .= "### Location & contact\n";
-		$out .= "Address: 6030 E Main St, Suite 103, Mesa, AZ 85205, United States. Phone: (602) 715-2677. Email: sales@guns2ammo.com. ";
-		$out .= "Directions: https://www.google.com/maps/dir/?api=1&destination=Guns+2+Ammo,+6030+E+Main+St+%23103,+Mesa,+AZ+85205. ";
-		$out .= "The range sits on East Main Street in east Mesa, a short drive from Apache Junction, Gilbert and the wider East Valley.\n\n";
-
-		$out .= "### Hours\n";
-		$out .= "Monday 10am6pm, Tuesday 10am6pm, Wednesday 10am6pm, Thursday 10am6pm, Friday 10am7pm, Saturday 10am7pm, Sunday 12pm6pm. The last lane booking each day is taken one hour before close.\n\n";
-
-		$out .= "### Memberships in detail\n";
-		$out .= "- Defender  \$29.99/month or \$299.99/year. Individual membership for 1 person. Includes unlimited range time, online lane reservations, and member profile and waiver tracking.\n";
-		$out .= "- Patriot  \$39.99/month or \$449.99/year. Two-person membership: a primary member plus one linked profile, with per-person waiver and check-in tracking.\n";
-		$out .= "- Guardian  \$59.99/month or \$649.99/year. Four-person membership for families or groups: a primary member plus three linked profiles.\n";
-		$out .= "All memberships include unlimited range time during open hours and can be cancelled at any time with no contract. Members shoot lane time free and receive discounted rentals, ammunition and course tuition. Law enforcement, active military and veterans receive 15% off any plan with valid ID.\n\n";
-
-		$out .= "### Walk-in range pricing\n";
-		$out .= "Lane rental is \$20 per hour with each additional shooter \$15 per lane (up to 3 shooters per lane). Handgun rentals start at \$15, rifle rentals start at \$25. Eye and ear protection and paper targets are available at check-in. Members on qualifying plans receive included lane time and discounted guest rates.\n\n";
-
-		$out .= "### Training courses\n";
-		$out .= "Basic Handgun, Arizona CCW Certification, California CCW (live-fire component), Church Security, Women's Intro, Defensive Pistol, Rifle Fundamentals, Refuse To Be A Victim, and Youth Firearm Safety. The Arizona CCW course is held on Saturdays and covers laws, regulations and safe handling. Members save on course tuition.\n\n";
-
-		$out .= "### Machine gun experience\n";
-		$out .= "One-on-one, fully-automatic instruction with a certified Range Safety Officer. Current full-auto platforms include the M16, Glock 18, MP5, AK-47 and AK-74, with more added as the collection grows. A photo and video pack is available. Machine gun rentals are popular with visitors and out-of-town guests who cannot access full-auto firearms at home.\n\n";
-
-		$out .= "### FFL transfers, NFA & selling\n";
-		$out .= "Guns 2 Ammo is a licensed FFL dealer. Standard incoming firearm transfers start at a \$30 base fee plus actual shipping and insurance. NFA / Class III items (suppressors, SBRs, full-auto) are supported, and a notary is available on site to help set up gun trusts. Non-member customers who buy and transfer an NFA item elsewhere pay a \$75 fee; there is no fee when the firearm is purchased from Guns 2 Ammo. The store also buys used firearms from the public  handguns, rifles, shotguns, collectible and estate firearms. No license is required to sell a firearm you lawfully own to a licensed dealer; sellers bring a valid Arizona photo ID. Offers are typically returned the same business day, payable as cash or boosted store credit.\n\n";
-
-		$out .= "### Service area\n";
-		$out .= "Mesa, Phoenix, Gilbert, Tempe, Chandler, Scottsdale, Apache Junction, Queen Creek, and all of Maricopa County, Arizona. Firearms can also be shipped nationwide where lawful via FFL transfer.\n\n";
-
-		$out .= "### Common questions\n";
-		$out .= "- Do I need a membership to shoot? No  walk-ins are welcome for solo lane rental, no appointment required.\n";
-		$out .= "- Can beginners shoot here? Yes  shooters 8+ are welcome with a parent or guardian, and an RSO is always on duty.\n";
-		$out .= "- Do you rent firearms? Yes  40+ rental firearms are available on site.\n";
-		$out .= "- Can I bring my own gun and ammo? Yes  factory-new ammunition only; no reloads or steel-core.\n";
-		$out .= "- How do I get an Arizona CCW permit? Take the Arizona CCW Certification course, held Saturdays at the range.\n";
-	}
-
-	$out .= "\n## Canonical\n";
-	$out .= "- Website: {$h}/\n";
-	$out .= "- Sitemap (HTML): {$h}/sitemap/\n";
-	$out .= "- Sitemap (XML): {$h}/sitemap.xml\n";
-	$out .= "- Full profile: {$h}/llms-full.txt\n";
-
-	return $out;
-}
-
-/* ---------- Serve /llms.txt and /llms-full.txt ---------- */
-add_action( 'init', function () {
-	$path = trim( (string) parse_url( $_SERVER['REQUEST_URI'] ?? '', PHP_URL_PATH ), '/' );
-	if ( 'llms.txt' !== $path && 'llms-full.txt' !== $path ) return;
-	header( 'Content-Type: text/plain; charset=utf-8' );
-	header( 'X-Robots-Tag: all' );
-	echo g2a_llms_txt( 'llms-full.txt' === $path );
-	exit;
-} );
+/* ---------- llms.txt / llms-full.txt ----------
+ * Intentionally NOT handled here. This file used to intercept these paths
+ * on `init` (which always fires before `parse_request`), which meant it
+ * silently won the request over inc/llms.php's `parse_request`-hooked
+ * handler no matter what — every AI crawler was served this file's static,
+ * hand-written text (with a stale review count and hardcoded NAP/hours)
+ * instead of inc/llms.php's live, g2a_biz()-driven, content-DB-backed
+ * version, which is the one actually documented and meant to be canonical.
+ * inc/llms.php owns /llms.txt and /llms-full.txt; do not re-add a handler
+ * for them here.
+ */
 
 /* ====================================================================
    LOCAL-BUSINESS XML SITEMAP    served at /sitemap.xml

@@ -18,7 +18,7 @@ return array(
 	'category'       => 'integrations',
 	'icon'           => 'V',
 	'color'          => '#14b8a6',
-	'default_active' => false,
+	'default_active' => true,
 	'bootstrap'      => 'G2AB_Module_Verifyistic',
 	'configure'      => 'admin.php?page=g2ab-settings&tab=verifyistic',
 );

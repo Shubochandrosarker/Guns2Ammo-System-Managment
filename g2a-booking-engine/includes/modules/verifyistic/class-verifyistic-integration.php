@@ -37,7 +37,12 @@ final class G2AB_Module_Verifyistic {
 
 	private function __construct() {
 		add_option( self::OPT_ENABLED, 1 );
-		add_option( self::OPT_REQUIRE_VERIFICATION, 0 );
+		// Default ON: a firearms range should not ship with age verification
+		// optional. add_option() is a no-op on sites where an admin already
+		// made an explicit choice (including a deliberate opt-out to 0), so
+		// this only changes behavior for installs where the option has never
+		// been set.
+		add_option( self::OPT_REQUIRE_VERIFICATION, 1 );
 		add_option( self::OPT_AUTO_WAIVER, 1 );
 		add_option( self::OPT_AUTOFILL_NAME, 1 );
 		// Freshness window in minutes. Default 525600 (≈1 year) is the documented
@@ -161,14 +166,24 @@ final class G2AB_Module_Verifyistic {
 
 		$route  = (string) $request->get_route();
 		$method = strtoupper( (string) $request->get_method() );
-		// Only guard OUR booking-creation endpoint. Anchor on the full namespace so
-		// a "/bookings" route in some other plugin's namespace can't trip the gate.
-		$bookings_base = '/' . G2AB_REST_NAMESPACE . '/bookings';
-		if ( 'POST' !== $method || 0 !== strpos( $route, $bookings_base ) ) {
+		if ( 'POST' !== $method ) {
+			return $result;
+		}
+
+		// Guard OUR two booking-creation endpoints. Anchor on the full namespace so a
+		// "/bookings" route in some other plugin's namespace can't trip the gate.
+		// "/events/book" (firearms classes/events) is a distinct creation route from
+		// "/bookings" (lane rentals) and must be covered too — age verification is not
+		// specific to one booking type.
+		$bookings_base   = '/' . G2AB_REST_NAMESPACE . '/bookings';
+		$events_book_route = '/' . G2AB_REST_NAMESPACE . '/events/book';
+		$is_bookings_create = ( 0 === strpos( $route, $bookings_base ) );
+		$is_events_book     = ( $route === $events_book_route );
+		if ( ! $is_bookings_create && ! $is_events_book ) {
 			return $result;
 		}
 		// Skip if the request looks like /bookings/{uuid}/confirm-payment (not actual creation).
-		if ( preg_match( '#/bookings/[a-f0-9-]{36}/#', $route ) ) {
+		if ( $is_bookings_create && preg_match( '#/bookings/[a-f0-9-]{36}/#', $route ) ) {
 			return $result;
 		}
 

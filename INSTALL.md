@@ -8,13 +8,13 @@ All zips are at the repo root and can be uploaded directly via **WP Admin → Pl
 
 | Artifact | Filename | Current version |
 |---|---|---|
-| Theme | `WPistic-Theme-For-G2A-Version-1.8.9.zip` *(also in `releases/`)* | **1.27.3** |
-| Booking Engine plugin | `g2a-booking-engine.zip` | **1.14.6** |
-| Memberistic Membership Solutions plugin | `memberistic-membership-solutions.zip` | **1.46.0** |
+| Theme | `WPistic-Theme-For-G2A-Version-1.8.9.zip` *(also in `releases/`, current archive `WPistic-Theme-For-G2A-Version-1.27.9.zip`)* | **1.27.9** |
+| Booking Engine plugin | `g2a-booking-engine.zip` (current archive `g2a-booking-engine-1.9.9.5.zip`) | **1.9.9.5** |
+| Memberistic Membership Solutions plugin | `memberistic-membership-solutions.zip` (current archive `memberistic-membership-solutions-1.10.2.zip`) | **1.10.2** |
 | WPistic Contact Form plugin | `wpistic-contact-form.zip` | **1.5.6** (DB schema 1.2.0) |
 | G2A Theme Control plugin | `g2a-theme-control.zip` | **1.0.0** |
 | Verifyistic (age verification) plugin | `verifyistic.zip` | **1.4.0** |
-| Advanced FFL Checkout (G2A Edition) plugin | `advanced-ffl-checkout.zip` | **1.7.5** (DB schema 1.2.0) |
+| Advanced FFL Checkout (G2A Edition) plugin | `advanced-ffl-checkout.zip` (current archive `advanced-ffl-checkout-1.9.1.zip`) | **1.9.1** (DB schema 1.2.0) |
 | Messageistic (SMS / local gateway) plugin | `messageistic.zip` | **0.5.1** |
 | G2A POS Core plugin | `g2a-pos-core.zip` | **3.1.2** (PHP 8.1+, vendors included) |
 
