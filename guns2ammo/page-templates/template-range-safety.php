@@ -57,7 +57,7 @@ get_header();
   .acc-b { display: none; padding: 24px 28px 28px 80px; background: var(--color-gunmetal); }
   .acc-b ul { list-style: none; padding: 0; margin: 0; display: grid; gap: 10px; color: var(--color-fog); font-size: 14px; line-height: 1.7; }
   .acc-b ul li { padding-left: 24px; position: relative; }
-  .acc-b ul li::before { content: ""; color: var(--color-brass-bright); position: absolute; left: 0; opacity: 0.7; }
+  .acc-b ul li::before { content: ""; background: var(--color-brass-bright); position: absolute; left: 0; top: 0.45em; width: 6px; height: 6px; border-radius: 50%; opacity: 0.7; }
   .acc-item.open .acc-b { display: block; animation: slideDown 280ms var(--ease-out); }
   @keyframes slideDown { from { opacity: 0; max-height: 0; } to { opacity: 1; max-height: 600px; } }
 

@@ -16,7 +16,9 @@ $items = [
 	[ 'Learn',      home_url( '/blog/' ) ],
 	[ 'About',      home_url( '/about/' ) ],
 ];
-$phone = get_theme_mod( 'g2a_phone', '(602) 715-2677' );
+// Single source of truth for NAP — see inc/business-info.php.
+$g2a_drawer_biz = function_exists( 'g2a_biz' ) ? g2a_biz() : array();
+$phone          = $g2a_drawer_biz['phone'] ?? '(602) 715-2677';
 ?>
 <div class="g2a-mobile" id="g2a-mobile"
 	role="dialog"
@@ -40,6 +42,6 @@ $phone = get_theme_mod( 'g2a_phone', '(602) 715-2677' );
 		<?php else : ?>
 			<a class="btn btn-ghost" href="<?php echo esc_url( home_url( '/login/' ) ); ?>"><?php esc_html_e( 'Sign In', 'guns2ammo' ); ?></a>
 		<?php endif; ?>
-		<a class="g2a-mobile__tel" href="tel:<?php echo esc_attr( preg_replace( '/[^0-9+]/', '', '+1' . $phone ) ); ?>"><?php echo esc_html( str_replace( [ '(', ')', ' ', '-' ], [ '', '', '  ', '' ], $phone ) ); ?></a>
+		<a class="g2a-mobile__tel" href="<?php echo esc_url( function_exists( 'g2a_biz_tel_href' ) ? g2a_biz_tel_href() : 'tel:' . preg_replace( '/[^0-9+]/', '', '+1' . $phone ) ); ?>"><?php echo esc_html( str_replace( [ '(', ')', ' ', '-' ], [ '', '', '  ', '' ], $phone ) ); ?></a>
 	</div>
 </div>

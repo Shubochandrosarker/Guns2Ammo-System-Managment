@@ -13,7 +13,7 @@ defined( 'ABSPATH' ) || exit;
 class DB {
 
 	/** Current schema version */
-	const SCHEMA_VERSION = '1.4.0';
+	const SCHEMA_VERSION = '1.4.1';
 
 	/**
 	 * Install or upgrade all plugin tables.
@@ -103,7 +103,7 @@ CREATE TABLE {$p}transfers (
   updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY  (id),
   UNIQUE KEY uidx_ref (transfer_ref),
-  KEY idx_order (order_id),
+  UNIQUE KEY uniq_order (order_id),
   KEY idx_status (status),
   KEY idx_dealer (dealer_id),
   KEY idx_customer (customer_id),

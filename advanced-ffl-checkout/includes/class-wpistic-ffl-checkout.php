@@ -367,7 +367,7 @@ class Checkout {
 			Compliance::validate_dealer_for_buyer( $dealer_row, $order );
 		}
 
-		$wpdb->insert( DB::table( 'transfers' ), [ // phpcs:ignore WordPress.DB.DirectDatabaseQuery
+		$inserted = $wpdb->insert( DB::table( 'transfers' ), [ // phpcs:ignore WordPress.DB.DirectDatabaseQuery
 			'transfer_ref'     => $ref,
 			'order_id'         => $order_id,
 			'customer_id'      => $order->get_customer_id() ?: null,
@@ -385,11 +385,33 @@ class Checkout {
 		] );
 
 		$transfer_id = $wpdb->insert_id;
+		$is_new_transfer = (bool) ( $inserted && $transfer_id );
+
+		// This method is registered on both woocommerce_payment_complete and
+		// woocommerce_order_status_processing, which many gateways fire close
+		// together — the `get_meta(self::META_TRANSFER_ID)` guard above is
+		// check-then-act, not atomic, so both hooks could reach this insert
+		// for the same order before either sets the meta. transfers.order_id
+		// is now UNIQUE, so the losing call's insert fails here instead of
+		// silently creating a second transfer; recover by looking up the
+		// transfer the winning call created so this order still gets linked
+		// to it, rather than the order meta being left unset even though a
+		// real transfer record exists. $is_new_transfer stays false here so
+		// the audit-event/email/dealer-notify side effects below only fire
+		// once, for whichever call actually created the row.
+		if ( ! $is_new_transfer ) {
+			$transfer_id = (int) $wpdb->get_var( $wpdb->prepare( // phpcs:ignore WordPress.DB.DirectDatabaseQuery
+				'SELECT id FROM ' . DB::table( 'transfers' ) . ' WHERE order_id = %d LIMIT 1',
+				$order_id
+			) );
+		}
 
 		if ( $transfer_id ) {
 			$order->update_meta_data( self::META_TRANSFER_ID, $transfer_id );
 			$order->save();
+		}
 
+		if ( $transfer_id && $is_new_transfer ) {
 			// Audit event
 			$wpdb->insert( DB::table( 'events' ), [ // phpcs:ignore WordPress.DB.DirectDatabaseQuery
 				'transfer_id' => $transfer_id,

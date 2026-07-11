@@ -460,7 +460,8 @@ PRIMARY KEY  (id),
 KEY idx_booking (booking_id),
 KEY idx_transaction (transaction_id),
 KEY idx_status (status),
-KEY idx_extref (external_ref)
+KEY idx_extref (external_ref),
+UNIQUE KEY uniq_gateway_txn (gateway, transaction_id(191))
 ) {$collate};";
 
 		$schemas['logs'] = "CREATE TABLE {$prefix}g2ab_logs (

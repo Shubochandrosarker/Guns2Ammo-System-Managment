@@ -8,6 +8,8 @@
 if ( ! defined( 'ABSPATH' ) ) exit;
 
 $recent = get_posts( [ 'numberposts' => 5, 'post_status' => 'publish' ] );
+// Single source of truth for membership pricing — see inc/pricing.php.
+$g2a_sidebar_from_price = function_exists( 'g2a_plan_price_from_fmt' ) ? g2a_plan_price_from_fmt() : '$29.99';
 ?>
 <aside class="kh-side">
   <style>
@@ -77,7 +79,7 @@ $recent = get_posts( [ 'numberposts' => 5, 'post_status' => 'publish' ] );
 
   <div class="promo dark">
     <div class="eyebrow">Join The Range</div>
-    <h4 style="font-size:26px;">Unlimited Range Time From $29.99/mo</h4>
+    <h4 style="font-size:26px;">Unlimited Range Time From <?php echo esc_html( $g2a_sidebar_from_price ); ?>/mo</h4>
     <p>Defender, Patriot &amp; Guardian memberships  unlimited lanes, member pricing, no contracts.</p>
     <a class="btn btn-ember btn-sm" style="width:100%;" href="<?php echo esc_url( home_url( '/memberships/' ) ); ?>">See Membership Plans </a>
   </div>

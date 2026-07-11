@@ -132,6 +132,12 @@ add_filter( 'body_class', function ( $classes ) {
 /* ---------- SEO + Schema ---------- */
 require_once G2A_DIR . '/inc/business-info.php';
 require_once G2A_DIR . '/inc/instructors.php';
+
+/* ---------- Membership pricing  single source of truth (reads
+ * Memberistic's Plans_Repository when the plugin is active, falls back
+ * to the last-known static prices otherwise) ---------- */
+require_once G2A_DIR . '/inc/pricing.php';
+
 require_once G2A_DIR . '/inc/seo.php';
 
 /* ---------- WooCommerce tweaks ---------- */

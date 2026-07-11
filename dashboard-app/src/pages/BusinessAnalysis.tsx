@@ -59,7 +59,7 @@ export function BusinessAnalysis() {
         subtitle="Where the money comes from, where it&apos;s leaking, and where the next lever is."
       />
 
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
         <StatCard label="Total revenue"    value={r.totalRevenue}       format="currency" deltaPct={r.revenueGrowthPct} />
         <StatCard label="Avg order value"  value={r.averageOrderValue}  format="currency" sublabel="Store orders" />
         <StatCard label="Conversion"       value={b.conversionRate}     format="percent"  sublabel="Booking flow" intent="success" />

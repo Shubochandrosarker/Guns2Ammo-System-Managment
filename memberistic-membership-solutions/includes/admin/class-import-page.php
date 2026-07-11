@@ -1038,6 +1038,7 @@ final class Import_Page {
 		$matched           = 0;
 		$created_instore   = 0;
 		$attached_walkin   = 0;
+		$skipped_duplicate = 0;
 		$errors            = array();
 		$walkin_membership = null;
 		$no_plan           = null;
@@ -1116,12 +1117,26 @@ final class Import_Page {
 				: ( in_array( $status, array( 'refunded', 'refund' ), true ) ? 'refunded'
 					: ( in_array( $status, array( 'failed', 'error', 'declined' ), true ) ? 'failed' : 'pending' ) );
 
+			$txn_id = self::val( $row, 'txn_id' ) ?: ( self::val( $row, 'order_code' ) ?: self::val( $row, 'order_id' ) );
+
+			// Re-uploading the same CSV (or an admin double-clicking "Confirm
+			// & Import") used to insert a full second copy of every payment
+			// row — unlike the Stripe/Woo webhook paths, which already guard
+			// against a duplicate gateway_transaction_id. Apply the same
+			// guard here when a row carries one (most real exports do); rows
+			// with no transaction id at all have no reliable natural key to
+			// dedupe on and are imported as before.
+			if ( '' !== trim( (string) $txn_id ) && Payments_Repository::get_by_gateway_transaction_id( $txn_id ) ) {
+				$skipped_duplicate++;
+				continue;
+			}
+
 			$ok = Payments_Repository::create(
 				array(
 					'membership_id'          => (int) $membership['id'],
 					'amount'                 => $amount,
 					'payment_gateway'        => self::val( $row, 'gateway' ) ?: ( 'matched' === $disposition ? 'manual' : 'instore' ),
-					'gateway_transaction_id' => self::val( $row, 'txn_id' ) ?: self::val( $row, 'order_code' ) ?: self::val( $row, 'order_id' ),
+					'gateway_transaction_id' => $txn_id,
 					'status'                 => $status,
 					'paid_at'                => self::val( $row, 'date' ),
 				)
@@ -1139,6 +1154,7 @@ final class Import_Page {
 				__( '— matched to existing members', 'memberistic' )     => $matched,
 				__( '— attached to new Instore members', 'memberistic' ) => $created_instore,
 				__( '— attached to Walk-in', 'memberistic' )             => $attached_walkin,
+				__( 'Skipped (already imported)', 'memberistic' )        => $skipped_duplicate,
 				__( 'Errors', 'memberistic' )                            => count( $errors ),
 			),
 			'errors'  => $errors,

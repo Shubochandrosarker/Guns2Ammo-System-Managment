@@ -804,7 +804,7 @@ $lane_url    = home_url( '/book-a-lane/' );
 .memberistic-acct-photo-actions{display:flex;gap:8px;flex-wrap:wrap;}
 .memberistic-acct-photo-btn{background:none;border:1px solid rgba(255,255,255,.2);color:inherit;font-size:11px;letter-spacing:.06em;text-transform:uppercase;padding:4px 10px;border-radius:4px;cursor:pointer;}
 .memberistic-acct-photo-btn:hover{background:rgba(255,255,255,.06);}
-.memberistic-acct-photo-msg{font-size:12px;color:var(--ma-muted,#8A95A5);margin-top:6px;display:none;}
+.memberistic-acct-photo-msg{font-size:12px;color:var(--ma-muted,var(--ma-silver));margin-top:6px;display:none;}
 .memberistic-acct-photo-msg.is-err{color:#E8802F;display:block;}
 .memberistic-acct-photo-msg.is-ok{color:#9DE05B;display:block;}
 @media print{ .memberistic-acct-photo-actions{display:none!important;} }

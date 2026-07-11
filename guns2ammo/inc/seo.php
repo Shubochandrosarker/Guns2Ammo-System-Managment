@@ -32,6 +32,13 @@ function g2a_seo_plugin_active() {
 function g2a_seo_page_meta_map() {
 	static $map = null;
 	if ( null === $map ) {
+		// Single source of truth for NAP — see inc/business-info.php.
+		$g2a_biz       = function_exists( 'g2a_biz' ) ? g2a_biz() : array();
+		$g2a_seo_phone = $g2a_biz['phone'] ?? '(602) 715-2677';
+		$g2a_seo_addr1 = $g2a_biz['addr1'] ?? '6030 E Main St, Suite 103';
+		$g2a_seo_addr2 = $g2a_biz['addr2'] ?? 'Mesa, AZ 85205';
+		// Single source of truth for membership pricing — see inc/pricing.php.
+		$g2a_seo_from_price = function_exists( 'g2a_plan_price_from_fmt' ) ? g2a_plan_price_from_fmt() : '$29.99';
 		$map = [
 			'/' => [
 				'title' => 'Indoor Shooting Range & Gun Store in Mesa, AZ | Guns 2 Ammo',
@@ -83,8 +90,8 @@ function g2a_seo_page_meta_map() {
 				'desc'  => 'One-on-one firearms coaching at Guns 2 Ammo in Mesa. $140/hr for up to 2 shooters — range time, targets & eye/ear included. Book your private session.',
 			],
 			'/memberships/' => [
-				'title' => 'Gun Range Memberships in Mesa From $29.99/mo | G2A',
-				'desc'  => 'Unlimited range time at Mesa\'s Guns 2 Ammo from $29.99/mo. Free lane time, discounted rentals & training, guest passes. No contracts — cancel anytime.',
+				'title' => 'Gun Range Memberships in Mesa From ' . $g2a_seo_from_price . '/mo | G2A',
+				'desc'  => 'Unlimited range time at Mesa\'s Guns 2 Ammo from ' . $g2a_seo_from_price . '/mo. Free lane time, discounted rentals & training, guest passes. No contracts — cancel anytime.',
 			],
 			'/pricing/' => [
 				'title' => 'Range Pricing in Mesa, AZ — Lanes From $20/hr | G2A',
@@ -95,8 +102,8 @@ function g2a_seo_page_meta_map() {
 				'desc'  => 'Veteran- and family-owned. Guns 2 Ammo has run Mesa\'s most-trusted indoor range, gun store & training academy since 2014. Meet the team & tour the facility.',
 			],
 			'/contact/' => [
-				'title' => 'Contact Guns 2 Ammo — Mesa, AZ | (602) 715-2677',
-				'desc'  => 'Visit Guns 2 Ammo at 6030 E Main St, Ste 103, Mesa, AZ 85205. Open 7 days. Call (602) 715-2677 or send a message — range, training, transfers & sales.',
+				'title' => 'Contact Guns 2 Ammo — Mesa, AZ | ' . $g2a_seo_phone,
+				'desc'  => 'Visit Guns 2 Ammo at ' . $g2a_seo_addr1 . ', ' . $g2a_seo_addr2 . '. Open 7 days. Call ' . $g2a_seo_phone . ' or send a message — range, training, transfers & sales.',
 			],
 			'/range-safety/' => [
 				'title' => 'Range Safety Rules — Guns 2 Ammo Indoor Range, Mesa',
@@ -343,6 +350,12 @@ add_action( 'wp_head', function () {
 	// exist — never fabricated.
 	$biz = function_exists( 'g2a_biz' ) ? g2a_biz() : array();
 
+	// Single source of truth for membership pricing — see inc/pricing.php.
+	$g2a_has_pricing_helper = function_exists( 'g2a_plan_price' );
+	$g2a_defender_price = $g2a_has_pricing_helper ? g2a_plan_price( 'defender', 'monthly' ) : 29.99;
+	$g2a_patriot_price  = $g2a_has_pricing_helper ? g2a_plan_price( 'patriot', 'monthly' ) : 39.99;
+	$g2a_guardian_price = $g2a_has_pricing_helper ? g2a_plan_price( 'guardian', 'monthly' ) : 59.99;
+
 	$day_names = [ 0 => 'Sunday', 1 => 'Monday', 2 => 'Tuesday', 3 => 'Wednesday', 4 => 'Thursday', 5 => 'Friday', 6 => 'Saturday' ];
 	$hours_spec = [];
 	if ( ! empty( $biz['hours'] ) ) {
@@ -404,9 +417,9 @@ add_action( 'wp_head', function () {
 			'@type' => 'OfferCatalog',
 			'name'  => 'Guns 2 Ammo Range Memberships',
 			'itemListElement' => [
-				[ '@type' => 'Offer', 'name' => 'Defender Membership', 'description' => 'Individual range membership for one person.', 'price' => '29.99', 'priceCurrency' => 'USD', 'url' => home_url( '/memberships/' ) ],
-				[ '@type' => 'Offer', 'name' => 'Patriot Membership',  'description' => 'Two-person range membership with linked member profiles.', 'price' => '39.99', 'priceCurrency' => 'USD', 'url' => home_url( '/memberships/' ) ],
-				[ '@type' => 'Offer', 'name' => 'Guardian Membership', 'description' => 'Four-person range membership for families and groups.', 'price' => '59.99', 'priceCurrency' => 'USD', 'url' => home_url( '/memberships/' ) ],
+				[ '@type' => 'Offer', 'name' => 'Defender Membership', 'description' => 'Individual range membership for one person.', 'price' => number_format( $g2a_defender_price, 2, '.', '' ), 'priceCurrency' => 'USD', 'url' => home_url( '/memberships/' ) ],
+				[ '@type' => 'Offer', 'name' => 'Patriot Membership',  'description' => 'Two-person range membership with linked member profiles.', 'price' => number_format( $g2a_patriot_price, 2, '.', '' ), 'priceCurrency' => 'USD', 'url' => home_url( '/memberships/' ) ],
+				[ '@type' => 'Offer', 'name' => 'Guardian Membership', 'description' => 'Four-person range membership for families and groups.', 'price' => number_format( $g2a_guardian_price, 2, '.', '' ), 'priceCurrency' => 'USD', 'url' => home_url( '/memberships/' ) ],
 			],
 		],
 		'sameAs' => array_values( array_filter( [

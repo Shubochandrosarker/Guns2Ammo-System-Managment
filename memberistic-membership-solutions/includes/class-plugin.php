@@ -455,7 +455,10 @@ final class Plugin {
 			return;
 		}
 
-		wp_enqueue_style( 'memberistic-frontend', MEMBERISTIC_URL . 'assets/frontend.css', array(), MEMBERISTIC_VERSION );
+		// Token bridge must load first so its --memberistic-* custom
+		// properties are already resolved when frontend.css's var() calls run.
+		wp_enqueue_style( 'memberistic-token-bridge', MEMBERISTIC_URL . 'assets/token-bridge.css', array(), MEMBERISTIC_VERSION );
+		wp_enqueue_style( 'memberistic-frontend', MEMBERISTIC_URL . 'assets/frontend.css', array( 'memberistic-token-bridge' ), MEMBERISTIC_VERSION );
 		wp_enqueue_script( 'memberistic-frontend', MEMBERISTIC_URL . 'assets/frontend.js', array(), MEMBERISTIC_VERSION, true );
 		// SECURITY: use a plugin-namespaced global instead of clobbering the
 		// global `wpApiSettings` (used by core's wp-api script and by other

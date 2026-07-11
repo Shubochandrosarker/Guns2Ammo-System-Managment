@@ -11,6 +11,11 @@
 if ( ! defined( 'ABSPATH' ) ) exit;
 get_header();
 
+// Single source of truth for NAP — see inc/business-info.php.
+$g2a_biz                = function_exists( 'g2a_biz' ) ? g2a_biz() : array();
+$g2a_collection_street  = trim( explode( ',', $g2a_biz['addr1'] ?? '6030 E Main St, Suite 103' )[0] );
+$g2a_collection_city    = $g2a_biz['city'] ?? 'Mesa';
+
 $slug = '';
 $qo   = get_queried_object();
 if ( $qo && isset( $qo->post_name ) ) $slug = $qo->post_name;
@@ -73,7 +78,7 @@ $collections = [
 			[ 't' => 'Our Range Ammo Policy', 'd' => 'Factory-new ammunition only on our indoor range  no reloads and no steel-core. It keeps every lane safe.' ],
 		],
 		'faq'       => [
-			[ 'q' => 'Can ammunition be shipped to my home?', 'a' => 'Pick up in store at 6030 E Main St, Mesa. In-store purchase is fastest and lets our team confirm the right load for your firearm.' ],
+			[ 'q' => 'Can ammunition be shipped to my home?', 'a' => 'Pick up in store at ' . $g2a_collection_street . ', ' . $g2a_collection_city . '. In-store purchase is fastest and lets our team confirm the right load for your firearm.' ],
 			[ 'q' => 'Do you offer bulk or case pricing?', 'a' => 'Yes. Case quantities are discounted, and members get additional savings on range and practice ammunition.' ],
 			[ 'q' => 'What ammo can I use on your range?', 'a' => 'Factory-new brass or aluminum-cased ammunition only. No reloads, no steel-core, and no steel-jacketed rounds.' ],
 		],

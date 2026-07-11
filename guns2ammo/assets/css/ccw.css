@@ -16,7 +16,7 @@
 .col ul { list-style:none; padding:0; margin:0; }
 .col ul li { padding: 10px 0; font-size:14px; color: var(--color-fog); display:flex; gap:12px; border-bottom:1px solid var(--color-hairline); }
 .col ul li:last-child { border-bottom:0; }
-.col ul li::before { content:""; color: var(--color-brass-bright); font-size:10px; line-height:1.6; }
+.col ul li::before { content:""; width:6px; height:6px; flex:0 0 6px; align-self:center; background: var(--color-brass-bright); border-radius:50%; }
 
 .timeline { padding: 100px 32px; background: var(--color-gunmetal); border-top:1px solid var(--color-hairline); border-bottom:1px solid var(--color-hairline); }
 .timeline .c { max-width:1280px; margin:0 auto; }

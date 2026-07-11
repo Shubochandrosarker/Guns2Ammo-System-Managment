@@ -1,0 +1,79 @@
+/**
+ * Memberistic <-> Guns 2 Ammo theme token bridge.
+ *
+ * This file defines a `--memberistic-*` custom-property layer that points
+ * at the theme's real design tokens (guns2ammo/assets/css/tokens.css)
+ * instead of hardcoding brand hex values inside this plugin.
+ *
+ * Why this file exists: frontend.css previously hardcoded ~155 unique
+ * hex/rgb/rgba colors with almost no relationship to the brand. Baking
+ * the theme's brass/void hex values into this plugin as fresh literals
+ * would only replace one set of hardcoded snapshots with another — if
+ * the theme's brass hue is ever retuned, this plugin would silently
+ * drift out of sync again. Referencing the LIVE `--color-*` custom
+ * properties here means Memberistic always tracks the theme, in both
+ * color modes (tokens.css flips every --color-* value under
+ * html[data-theme="light"]).
+ *
+ * Enqueue order: this stylesheet MUST load before frontend.css (see
+ * includes/class-plugin.php) so these custom properties are already
+ * resolved when frontend.css's var() calls run.
+ */
+
+:root {
+	/* ---- Surfaces ---- */
+	--memberistic-bg: var(--color-void);                 /* page-level / form-field background */
+	--memberistic-surface: var(--color-gunmetal);         /* cards, panels, modals */
+	--memberistic-surface-alt: var(--color-surface-2);    /* subtle/secondary panels (e.g. summary strips) */
+	--memberistic-surface-glass: var(--color-chrome-glass); /* translucent panels over photography */
+
+	/* ---- Brand accents ---- */
+	--memberistic-primary: var(--color-brass);            /* headings, links, accent borders, brass fills */
+	--memberistic-primary-strong: var(--color-brass-bright); /* brighter brass — hover/emphasis text */
+	--memberistic-primary-dim: var(--color-brass-dim);
+	--memberistic-primary-ink: var(--color-ink);          /* text placed ON brass/bright-success fills */
+	--memberistic-cta: var(--color-ember);                /* solid-fill buttons/bars (pairs with light text) */
+	--memberistic-cta-dim: var(--color-ember-dim);
+	--memberistic-info: var(--color-brass);               /* neutral informational banners */
+	--memberistic-warning: var(--color-ember);            /* expiring / attention-needed banners */
+
+	/* ---- Text ---- */
+	--memberistic-text: var(--color-white);               /* primary/light text on dark surfaces */
+	--memberistic-text-soft: var(--color-fog);             /* secondary body copy */
+	--memberistic-muted: var(--color-silver);              /* labels, captions, least-emphasis text */
+
+	/* ---- Borders ---- */
+	--memberistic-border: var(--color-hairline);           /* card/table/divider borders */
+	--memberistic-border-strong: var(--color-hairline-bright);
+	--memberistic-input-border: var(--color-steel);        /* form field borders (matches .field) */
+
+	/* ---- Ambient glows (decorative page-background gradients) ---- */
+	--memberistic-glow-primary: var(--color-page-glow-a);
+	--memberistic-glow-cta: var(--color-page-glow-b);
+
+	/* ---- Photo scrims (dark gradient overlays atop hero/background photography) ---- */
+	--memberistic-scrim: var(--hero-scrim);
+	--memberistic-scrim-deep: var(--hero-scrim-deep);
+
+	/* ---- Semantic states ---- */
+	--memberistic-success: var(--color-active);            /* the same "live/open" token Verifyistic reuses */
+
+	/*
+	 * No error/danger token exists in guns2ammo/assets/css/tokens.css
+	 * (confirmed during this pass — there is no --color-danger or
+	 * --color-error). Verifyistic's own re-skin hit the same gap and
+	 * kept a plain semantic red (#fca5a5 / #f87171) rather than force-
+	 * fitting brass/ember onto a failure state. These three are the
+	 * deliberate, documented exception for the same reason — expired /
+	 * failed / error states need to read as "wrong", not "on-brand".
+	 */
+	--memberistic-danger: #b91c1c;         /* base red — icons, fills, strong borders */
+	--memberistic-danger-bright: #fca5a5;  /* light red — text on dark/tinted backgrounds (matches Verifyistic) */
+	--memberistic-danger-text: #991b1b;    /* darker red — text on soft/light-tinted danger badges */
+
+	/* ---- Type ---- */
+	--memberistic-font-display: var(--font-display);     /* Bebas Neue — headings */
+	--memberistic-font-body: var(--font-body);           /* DM Sans — body copy (already inherited from <body>) */
+	--memberistic-font-mono: var(--font-mono);           /* Space Mono — uppercase micro-labels/badges */
+	--memberistic-font-condensed: var(--font-condensed); /* Barlow Condensed — buttons/CTAs (matches theme .btn) */
+}

@@ -13,6 +13,9 @@ get_header();
 $img  = '/wp-content/uploads/';
 $sent = isset( $_GET['g2a_sent'] );
 
+// Single source of truth for NAP — see inc/business-info.php.
+$g2a_biz = function_exists( 'g2a_biz' ) ? g2a_biz() : array();
+
 $steps = [
 	[ 'n' => '01', 't' => 'Tell Us About It', 'd' => 'Fill out the quick form below  make, model, condition, and what you are hoping to get. Two minutes, no obligation.' ],
 	[ 'n' => '02', 't' => 'Get A Cash Offer', 'd' => 'Our buyer reviews your firearm and emails or calls you a fair, no-pressure offer  usually the same business day.' ],
@@ -167,7 +170,7 @@ if ( function_exists( 'g2a_faq_schema' ) && function_exists( 'g2a_emit_jsonld' )
     <?php if ( $sent ) : ?>
       <div class="alert success" style="margin-top:22px;">
         <span class="ic"></span>
-        <div><div class="h">Request Received</div>Thanks  your details are in. Our buyer will review your firearm and send a fair cash offer, usually the same business day. Questions? Call (602)&nbsp;715-2677.</div>
+        <div><div class="h">Request Received</div>Thanks  your details are in. Our buyer will review your firearm and send a fair cash offer, usually the same business day. Questions? Call <?php echo str_replace( ' ', '&nbsp;', esc_html( trim( $g2a_biz['phone'] ?? '(602) 715-2677' ) ) ); ?>.</div>
       </div>
     <?php else : ?>
       <p style="color:var(--color-fog); font-size:14px; line-height:1.7; margin:12px 0 22px;">The more detail you give us, the more accurate your offer. Not sure about a field? Leave it blank  our team will follow up. Submitting this form is free and never an obligation to sell.</p>

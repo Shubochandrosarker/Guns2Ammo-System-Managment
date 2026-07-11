@@ -21,7 +21,7 @@ export function ShooterInsights() {
         subtitle="Who is walking through the door, who is coming back, and who is at risk of drifting away."
       />
 
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4">
         <StatCard label="Known shooters"        value={d.knownShooters} />
         <StatCard label="Repeat rate"           value={d.repeatRatePct}       format="percent" intent="warn" />
         <StatCard label="First-time this month" value={d.firstTimeThisMonth}  intent="success" />

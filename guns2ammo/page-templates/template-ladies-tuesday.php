@@ -8,8 +8,24 @@
  */
 if ( ! defined( 'ABSPATH' ) ) exit;
 
+// Single source of truth for NAP + hours — see inc/business-info.php.
+$g2a_biz     = function_exists( 'g2a_biz' ) ? g2a_biz() : array();
+$g2a_lt_tue_hours = $g2a_biz['hours'][2] ?? array( 'open' => 600, 'close' => 1080 ); // Tuesday
+$g2a_lt_fmt_hour  = function ( $mins, $upper = true ) {
+	$h    = intdiv( $mins, 60 );
+	$m    = $mins % 60;
+	$ampm = $h < 12 ? 'am' : 'pm';
+	$h12  = $h % 12 ?: 12;
+	$out  = $h12 . ( $m ? ':' . sprintf( '%02d', $m ) : '' ) . $ampm;
+	return $upper ? strtoupper( $out ) : $out;
+};
+$g2a_lt_open_ampm  = $g2a_lt_fmt_hour( $g2a_lt_tue_hours['open'] );
+$g2a_lt_close_ampm = $g2a_lt_fmt_hour( $g2a_lt_tue_hours['close'] );
+$g2a_lt_open_lc    = $g2a_lt_fmt_hour( $g2a_lt_tue_hours['open'], false );
+$g2a_lt_close_lc   = $g2a_lt_fmt_hour( $g2a_lt_tue_hours['close'], false );
+
 $g2a_lt_title       = 'Ladies Night Gun Range in Mesa, AZ | Free Range Time for Women Every Tuesday';
-$g2a_lt_description = 'Ladies Tuesday at our Mesa, AZ gun range: women get one free hour of lane time every Tuesday, 10AM-6PM. No membership needed, rentals 25% off, beginners welcome.';
+$g2a_lt_description = 'Ladies Tuesday at our Mesa, AZ gun range: women get one free hour of lane time every Tuesday, ' . $g2a_lt_open_ampm . '-' . $g2a_lt_close_ampm . '. No membership needed, rentals 25% off, beginners welcome.';
 $g2a_lt_url         = home_url( '/ladies-tuesday/' );
 
 /* Keep the page-specific search snippet consistent across WordPress, Rank Math,
@@ -36,7 +52,12 @@ if ( $g2a_lt_page instanceof WP_Post ) {
 }
 
 /* Weekly Event JSON-LD — free, recurring every Tuesday. */
-add_action( 'wp_head', function () use ( $g2a_lt_url, $g2a_lt_description ) {
+add_action( 'wp_head', function () use ( $g2a_lt_url, $g2a_lt_description, $g2a_biz ) {
+	// Tuesday = weekday index 2 in the g2a_biz() hours table.
+	$g2a_lt_tue        = $g2a_biz['hours'][2] ?? array( 'open' => 600, 'close' => 1080 );
+	$g2a_lt_fmt_24h    = function ( $mins ) {
+		return sprintf( '%02d:%02d', intdiv( $mins, 60 ), $mins % 60 );
+	};
 	$schema = [
 		'@context'            => 'https://schema.org',
 		'@type'               => 'Event',
@@ -50,21 +71,21 @@ add_action( 'wp_head', function () use ( $g2a_lt_url, $g2a_lt_description ) {
 		'eventSchedule'       => [
 			'@type'            => 'Schedule',
 			'byDay'            => 'https://schema.org/Tuesday',
-			'startTime'        => '10:00',
-			'endTime'          => '18:00',
+			'startTime'        => $g2a_lt_fmt_24h( $g2a_lt_tue['open'] ),
+			'endTime'          => $g2a_lt_fmt_24h( $g2a_lt_tue['close'] ),
 			'repeatFrequency'  => 'P1W',
 			'scheduleTimezone' => 'America/Phoenix',
 		],
 		'location'            => [
 			'@type'   => 'Place',
-			'name'    => 'Guns 2 Ammo',
+			'name'    => $g2a_biz['name'] ?? 'Guns 2 Ammo',
 			'address' => [
 				'@type'           => 'PostalAddress',
-				'streetAddress'   => '6030 E Main St Ste 103',
-				'addressLocality' => 'Mesa',
-				'addressRegion'   => 'AZ',
-				'postalCode'      => '85205',
-				'addressCountry'  => 'US',
+				'streetAddress'   => $g2a_biz['addr1'] ?? '6030 E Main St, Suite 103',
+				'addressLocality' => $g2a_biz['city'] ?? 'Mesa',
+				'addressRegion'   => $g2a_biz['region'] ?? 'AZ',
+				'postalCode'      => $g2a_biz['postal'] ?? '85205',
+				'addressCountry'  => $g2a_biz['country'] ?? 'US',
 			],
 		],
 		'organizer'           => [ '@id' => home_url( '/#business' ) ],
@@ -269,7 +290,7 @@ $g2a_ladies_events_shortcode = get_post_meta( $g2a_page_id, 'ladies_upcoming_eve
           </div>
         </div>
         <aside class="lt-disc">
-          <div class="day">Tuesdays · All Day · 10AM&ndash;6PM</div>
+          <div class="day">Tuesdays · All Day · <?php echo esc_html( $g2a_lt_open_ampm ); ?>&ndash;<?php echo esc_html( $g2a_lt_close_ampm ); ?></div>
           <div class="pct"><em>FREE</em></div>
           <div class="lbl"><?php echo esc_html( $g2a_ladies_offer_text ? $g2a_ladies_offer_text : 'Free 1 Hour Lane Time For Women On Tuesdays' ); ?></div>
           <div class="fine">One free hour of lane time for women every Tuesday during open hours</div>
@@ -360,7 +381,7 @@ $g2a_ladies_events_shortcode = get_post_meta( $g2a_page_id, 'ladies_upcoming_eve
         <div class="row">
           <div class="n">01</div>
           <div class="body">
-            <div class="t">Arrive Any Time, 10AM&ndash;6PM</div>
+            <div class="t">Arrive Any Time, <?php echo esc_html( $g2a_lt_open_ampm ); ?>&ndash;<?php echo esc_html( $g2a_lt_close_ampm ); ?></div>
             <div class="d">No appointment needed &mdash; walk in whenever suits you on a Tuesday. If you'd rather lock in a time, reserve a lane below.</div>
           </div>
         </div>
@@ -447,7 +468,7 @@ $g2a_ladies_events_shortcode = get_post_meta( $g2a_page_id, 'ladies_upcoming_eve
           <div class="n">01</div>
           <div class="body">
             <div class="t">Walk In Or Reserve</div>
-            <div class="d">No code needed. Show up any time between 10am and 6pm on a Tuesday. Online reservations open six weeks out.</div>
+            <div class="d">No code needed. Show up any time between <?php echo esc_html( $g2a_lt_open_lc ); ?> and <?php echo esc_html( $g2a_lt_close_lc ); ?> on a Tuesday. Online reservations open six weeks out.</div>
           </div>
         </div>
         <div class="row">
@@ -537,7 +558,7 @@ $g2a_ladies_events_shortcode = get_post_meta( $g2a_page_id, 'ladies_upcoming_eve
           <a class="btn btn-ember btn-lg" href="#reserve">Reserve A Tuesday Lane</a>
           <a class="btn btn-brass btn-lg" href="<?php echo esc_url( home_url( "/contact/" ) ); ?>">Group &amp; Private Bookings</a>
         </div>
-        <div class="micro">Walk-Ins Welcome · Mesa, AZ · 6030 E Main St Ste 103</div>
+        <div class="micro">Walk-Ins Welcome · <?php echo esc_html( ( $g2a_biz['city'] ?? 'Mesa' ) . ', ' . ( $g2a_biz['region'] ?? 'AZ' ) ); ?> · <?php echo esc_html( $g2a_biz['addr1'] ?? '6030 E Main St, Suite 103' ); ?></div>
       </div>
     </section>
   </main>

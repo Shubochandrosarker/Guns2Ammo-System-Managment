@@ -82,7 +82,7 @@ $g2a_mg4_desc           = get_post_meta( $g2a_page_id, 'mg_fourth_weapon_desc', 
     <div class="prop" data-reveal>
       <div class="ic"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="12" r="10"/><path d="M8 12 L10.5 14.5 L16 9"/></svg></div>
       <h3>Member Pricing</h3>
-      <p>Unlimited range time from $29.99/mo. Cancel anytime. No contracts.</p>
+      <p>Unlimited range time from <?php echo esc_html( function_exists( 'g2a_plan_price_from_fmt' ) ? g2a_plan_price_from_fmt() : '$29.99' ); ?>/mo. Cancel anytime. No contracts.</p>
     </div>
   </div>
 </section>

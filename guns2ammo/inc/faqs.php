@@ -38,6 +38,20 @@ function g2a_faqs_ensure_page() {
  * @return array<int, array{ topic:string, items:array<int, array{q:string,a:string}> }>
  */
 function g2a_faqs_data() {
+	// Single source of truth for hours + address — see inc/business-info.php.
+	$g2a_biz         = function_exists( 'g2a_biz' ) ? g2a_biz() : array();
+	$g2a_hours_human = function_exists( 'g2a_biz_hours_human' ) ? str_replace( ' · ', ', ', g2a_biz_hours_human() ) : 'Mon–Thu 10am–6pm, Fri 10am–7pm, Sat 10am–7pm, Sun 12pm–6pm';
+	$g2a_addr_line   = function_exists( 'g2a_biz_addr_line' ) ? g2a_biz_addr_line() : '6030 E Main St, Suite 103, Mesa, AZ 85205';
+
+	// Single source of truth for membership pricing — see inc/pricing.php.
+	$g2a_has_pricing_helper = function_exists( 'g2a_plan_price' );
+	$g2a_defender_m = $g2a_has_pricing_helper ? g2a_plan_price_fmt( 'defender', 'monthly' ) : '$29.99';
+	$g2a_patriot_m  = $g2a_has_pricing_helper ? g2a_plan_price_fmt( 'patriot', 'monthly' ) : '$39.99';
+	$g2a_guardian_m = $g2a_has_pricing_helper ? g2a_plan_price_fmt( 'guardian', 'monthly' ) : '$59.99';
+	$g2a_max_save   = $g2a_has_pricing_helper
+		? number_format( max( g2a_plan_annual_savings( 'defender' ), g2a_plan_annual_savings( 'patriot' ), g2a_plan_annual_savings( 'guardian' ) ), 2 )
+		: '69.89';
+
 	$faqs = array(
 		array(
 			'topic' => 'Visiting the Range',
@@ -48,7 +62,7 @@ function g2a_faqs_data() {
 				),
 				array(
 					'q' => 'What are your hours?',
-					'a' => 'Mon–Thu 10am–6pm, Fri 10am–7pm, Sat 10am–7pm, Sun 12pm–6pm (all times Arizona / MST — Arizona does not observe Daylight Saving Time).',
+					'a' => $g2a_hours_human . ' (all times Arizona / MST — Arizona does not observe Daylight Saving Time).',
 				),
 				array(
 					'q' => 'How old do you have to be to shoot?',
@@ -56,7 +70,7 @@ function g2a_faqs_data() {
 				),
 				array(
 					'q' => 'Do you have parking?',
-					'a' => 'Yes — free parking on-site at 6030 E Main St, Suite 103, Mesa, AZ 85205. The lot is large and accessible.',
+					'a' => 'Yes — free parking on-site at ' . $g2a_addr_line . '. The lot is large and accessible.',
 				),
 				array(
 					'q' => 'Is the range ADA accessible?',
@@ -69,7 +83,7 @@ function g2a_faqs_data() {
 			'items' => array(
 				array(
 					'q' => 'How much does it cost to shoot?',
-					'a' => 'Walk-in lane rental is $20 per shooter per hour. Members get included lane time: Defender (1 person) $29.99/month, Patriot (2 people) $39.99/month, Guardian (4 people) $59.99/month. Annual billing saves up to $69.89/year.',
+					'a' => 'Walk-in lane rental is $20 per shooter per hour. Members get included lane time: Defender (1 person) ' . $g2a_defender_m . '/month, Patriot (2 people) ' . $g2a_patriot_m . '/month, Guardian (4 people) ' . $g2a_guardian_m . '/month. Annual billing saves up to $' . $g2a_max_save . '/year.',
 				),
 				array(
 					'q' => 'Can my members bring guests?',
@@ -179,10 +193,15 @@ function g2a_faqs_data() {
  * @return array<int, array{q:string,a:string}>
  */
 function g2a_home_faqs() {
+	// Single source of truth for hours — see inc/business-info.php.
+	$g2a_hours_human = function_exists( 'g2a_biz_hours_human' ) ? str_replace( ' · ', ', ', g2a_biz_hours_human() ) : 'Mon–Thu 10am–6pm, Fri 10am–7pm, Sat 10am–7pm, Sun 12pm–6pm';
+	// Single source of truth for membership pricing — see inc/pricing.php.
+	$g2a_from_price = function_exists( 'g2a_plan_price_from_fmt' ) ? g2a_plan_price_from_fmt() : '$29.99';
+
 	$faqs = array(
 		array(
 			'q' => 'How much does it cost to shoot?',
-			'a' => 'Walk-in lane rental is $20 per shooter per hour. Members get included lane time on every visit, with plans starting at $29.99/month — cancel anytime, no contracts.',
+			'a' => 'Walk-in lane rental is $20 per shooter per hour. Members get included lane time on every visit, with plans starting at ' . $g2a_from_price . '/month — cancel anytime, no contracts.',
 		),
 		array(
 			'q' => 'Do I need my own gun?',
@@ -194,7 +213,7 @@ function g2a_home_faqs() {
 		),
 		array(
 			'q' => 'What are your hours?',
-			'a' => 'Mon–Thu 10am–6pm, Fri 10am–7pm, Sat 10am–7pm, Sun 12pm–6pm. All times Arizona / MST — Arizona does not observe Daylight Saving Time.',
+			'a' => $g2a_hours_human . '. All times Arizona / MST — Arizona does not observe Daylight Saving Time.',
 		),
 		array(
 			'q' => 'How much is the CCW class?',

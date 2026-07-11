@@ -34,9 +34,12 @@ function g2a_plugin_section( $shortcode, $atts = '', $fallback = '' ) {
 	if ( '' !== $fallback ) {
 		return $fallback;
 	}
+	// Single source of truth for NAP — see inc/business-info.php.
+	$g2a_biz   = function_exists( 'g2a_biz' ) ? g2a_biz() : array();
+	$g2a_phone = $g2a_biz['phone'] ?? '(602) 715-2677';
 	return '<div class="g2a-plugin-missing"><strong>Coming online shortly.</strong> '
 		. 'This section is powered by a Guns&nbsp;2&nbsp;Ammo system that activates once the '
-		. 'site is fully configured. Please check back soon or call (602)&nbsp;715-2677.</div>';
+		. 'site is fully configured. Please check back soon or call ' . str_replace( ' ', '&nbsp;', $g2a_phone ) . '.</div>';
 }
 
 /** True when Memberistic is active. */

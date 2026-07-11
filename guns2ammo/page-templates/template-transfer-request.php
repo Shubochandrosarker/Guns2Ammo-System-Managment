@@ -10,6 +10,9 @@
 if ( ! defined( 'ABSPATH' ) ) exit;
 get_header();
 
+// Single source of truth for NAP — see inc/business-info.php.
+$g2a_biz = function_exists( 'g2a_biz' ) ? g2a_biz() : array();
+
 $sent = isset( $_GET['g2a_sent'] );
 
 $faq = [
@@ -73,7 +76,7 @@ if ( function_exists( 'g2a_faq_schema' ) && function_exists( 'g2a_emit_jsonld' )
     <?php if ( $sent ) : ?>
       <div class="alert success" style="margin-top:22px;">
         <span class="ic"></span>
-        <div><div class="h">Request Received</div>Thanks  your transfer request is in. Our FFL team will review it and reach out to coordinate with your seller, usually within one business day. Questions? Call (602)&nbsp;715-2677.</div>
+        <div><div class="h">Request Received</div>Thanks  your transfer request is in. Our FFL team will review it and reach out to coordinate with your seller, usually within one business day. Questions? Call <?php echo str_replace( ' ', '&nbsp;', esc_html( trim( $g2a_biz['phone'] ?? '(602) 715-2677' ) ) ); ?>.</div>
       </div>
     <?php else : ?>
       <p style="color:var(--color-fog); font-size:14px; line-height:1.7; margin:12px 0 22px;">The more detail you give us, the faster we can get your seller what they need. Nothing here is a commitment  it simply starts the transfer.</p>
@@ -114,7 +117,7 @@ if ( function_exists( 'g2a_faq_schema' ) && function_exists( 'g2a_emit_jsonld' )
       <div class="label">Ship Firearms To</div>
       <div class="val">Guns 2 Ammo<br><span style="font-size:16px;">Attn: FFL Receiving</span></div>
       <div class="label">Address</div>
-      <div class="val brass" style="font-size:20px;">6030 E Main St<br>Mesa, AZ 85205</div>
+      <div class="val brass" style="font-size:20px;"><?php echo esc_html( $g2a_biz['addr1'] ?? '6030 E Main St, Suite 103' ); ?><br><?php echo esc_html( $g2a_biz['addr2'] ?? 'Mesa, AZ 85205' ); ?></div>
       <?php $g2a_ffl = get_theme_mod( 'g2a_ffl_license', '' ); if ( $g2a_ffl ) : ?>
       <div class="label">FFL License Number</div>
       <div class="val brass" style="font-family:var(--font-mono); font-size:16px; letter-spacing:0.08em;"><?php echo esc_html( $g2a_ffl ); ?></div>

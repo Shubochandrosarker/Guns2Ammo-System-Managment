@@ -9,6 +9,9 @@
  * later reused by the v1.3.0 calendar's "quick add" popup. Intentionally
  * lighter than the public POST /bookings: no rate-limit, no waiver gate, and
  * staff can choose `in_store`, `cash`, `card_terminal`, or `admin_comp`.
+ * Blackout/business-hours ARE enforced (same as the public endpoint) unless
+ * the request explicitly sets `override_availability` — e.g. for a private
+ * event on a day the range is otherwise closed to the public.
  *
  * Permission: requires manage_g2ab_bookings + a verified nonce.
  *
@@ -62,6 +65,7 @@ final class G2AB_REST_Admin_Bookings_Controller {
 		$customer_phone  = sanitize_text_field( (string) $request->get_param( 'customer_phone' ) );
 		$send_email      = (bool) $request->get_param( 'send_email' );
 		$skip_waiver     = (bool) $request->get_param( 'skip_waiver' );
+		$override_availability = (bool) $request->get_param( 'override_availability' );
 
 		if ( ! in_array( $payment_mode, self::ALLOWED_PAYMENT_MODES, true ) ) {
 			$payment_mode = 'in_store';
@@ -103,6 +107,42 @@ final class G2AB_REST_Admin_Bookings_Controller {
 		$end_eff_sql      = $end_dt->modify( '+' . max( 0, $buffer_after ) . ' minutes' )->format( 'Y-m-d H:i:s' );
 		$start_sql        = $start_dt->format( 'Y-m-d H:i:s' );
 		$end_sql          = $end_dt->format( 'Y-m-d H:i:s' );
+
+		// Blackout + business-hours — same rules the public booking endpoint
+		// enforces. This endpoint used to skip both entirely (only rate-limit
+		// and the waiver gate were documented as intentionally skipped), so a
+		// staff manual-booking or calendar quick-add could create a booking on
+		// a day the range is closed to everyone (a holiday blackout, a safety
+		// closure) with no system-level guard at all. `override_availability`
+		// is an explicit, named escape hatch for real exceptions (e.g. a
+		// private event on an otherwise-blacked-out day) — logged below so
+		// there's a record of when and why it was used.
+		if ( ! $override_availability ) {
+			$rules_table = $wpdb->prefix . 'g2ab_availability_rules';
+			$dow         = (int) $start_dt->format( 'w' );
+			$date_str    = $start_dt->format( 'Y-m-d' );
+
+			$hours = $wpdb->get_row( $wpdb->prepare(
+				"SELECT start_time, end_time FROM {$rules_table} WHERE rule_type = 'business_hours' AND day_of_week = %d AND is_active = 1 ORDER BY priority DESC LIMIT 1",
+				$dow
+			) );
+			if ( ! $hours ) {
+				return new WP_Error( 'g2ab_closed', __( 'Bookings are not available on this day. Check "override availability" to book anyway.', 'g2a-booking' ), array( 'status' => 400 ) );
+			}
+			$open_dt  = DateTimeImmutable::createFromFormat( 'Y-m-d H:i:s', $date_str . ' ' . substr( (string) $hours->start_time, 0, 8 ), $tz );
+			$close_dt = DateTimeImmutable::createFromFormat( 'Y-m-d H:i:s', $date_str . ' ' . substr( (string) $hours->end_time, 0, 8 ), $tz );
+			if ( ! $open_dt || ! $close_dt || $start_dt < $open_dt || $end_dt > $close_dt ) {
+				return new WP_Error( 'g2ab_outside_hours', __( 'This time is outside business hours. Check "override availability" to book anyway.', 'g2a-booking' ), array( 'status' => 400 ) );
+			}
+
+			$blackout = $wpdb->get_var( $wpdb->prepare(
+				"SELECT id FROM {$rules_table} WHERE rule_type = 'blackout' AND is_active = 1 AND start_date <= %s AND end_date >= %s LIMIT 1",
+				$date_str, $date_str
+			) );
+			if ( $blackout ) {
+				return new WP_Error( 'g2ab_blackout', __( 'This date is closed. Check "override availability" to book anyway.', 'g2a-booking' ), array( 'status' => 400 ) );
+			}
+		}
 
 		if ( '' === $customer_name ) {
 			return new WP_Error( 'g2ab_missing_name', __( 'Customer name is required.', 'g2a-booking' ), array( 'status' => 400 ) );
@@ -186,12 +226,18 @@ final class G2AB_REST_Admin_Bookings_Controller {
 			'booking_id' => $booking_id,
 			'user_id'    => get_current_user_id(),
 			'event_type' => 'admin_created',
-			'severity'   => 'info',
-			'message'    => sprintf( 'Manual booking created by staff (source=%s, payment=%s).', $source, $payment_mode ),
+			'severity'   => $override_availability ? 'warning' : 'info',
+			'message'    => sprintf(
+				'Manual booking created by staff (source=%s, payment=%s).%s',
+				$source,
+				$payment_mode,
+				$override_availability ? ' Availability rules (blackout/business-hours) were explicitly overridden.' : ''
+			),
 			'context'    => wp_json_encode( array(
-				'resource_id'     => $resource_id,
-				'booking_type_id' => $booking_type_id,
-				'send_email'      => $send_email,
+				'resource_id'           => $resource_id,
+				'booking_type_id'       => $booking_type_id,
+				'send_email'            => $send_email,
+				'override_availability' => $override_availability,
 			) ),
 			'created_at' => $now_mysql,
 		) );

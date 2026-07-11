@@ -23,7 +23,7 @@ export function SEOGrowth() {
         subtitle="Where organic search sends traffic, which pages are climbing, and which need attention."
       />
 
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
         <StatCard label="Clicks"      value={d.clicks}      format="number" intent="success" />
         <StatCard label="Impressions" value={d.impressions} format="number" />
         <StatCard label="CTR"         value={d.ctr}         format="percent" />

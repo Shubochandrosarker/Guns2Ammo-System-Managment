@@ -47,10 +47,20 @@ class G2AB_Email_Cron {
 		// Only care about confirmed/paid bookings — reservations not yet paid don't get reminders.
 		$active_statuses = "'reserved','confirmed','paid'";
 
+		// bookings.start_at is stored as site-local wall-clock time (see
+		// class-bookings-controller.php), so window bounds must be computed
+		// as site-local wall-clock too. Using a wp_timezone()-aware
+		// DateTimeImmutable (rather than strtotime()+gmdate(), which only
+		// produced the right wall-clock string because parsing "as UTC" and
+		// formatting "as UTC" happened to cancel out — fragile, and wrong
+		// the moment the site timezone observes DST) keeps this correct
+		// across DST transitions.
+		$tz  = function_exists( 'wp_timezone' ) ? wp_timezone() : new DateTimeZone( date_default_timezone_get() );
+		$now = new DateTimeImmutable( current_time( 'mysql' ), $tz );
+
 		// 24h window: start_at between (now+23h) and (now+25h)
-		$now = current_time( 'mysql' );
-		$start_24 = gmdate( 'Y-m-d H:i:s', strtotime( $now ) + ( 23 * HOUR_IN_SECONDS ) );
-		$end_24   = gmdate( 'Y-m-d H:i:s', strtotime( $now ) + ( 25 * HOUR_IN_SECONDS ) );
+		$start_24 = $now->modify( '+23 hours' )->format( 'Y-m-d H:i:s' );
+		$end_24   = $now->modify( '+25 hours' )->format( 'Y-m-d H:i:s' );
 
 		$rows_24 = $wpdb->get_results( $wpdb->prepare(
 			"SELECT * FROM {$bk} WHERE start_at BETWEEN %s AND %s AND status IN ({$active_statuses}) AND id NOT IN ( SELECT booking_id FROM {$lg} WHERE booking_id IS NOT NULL AND event_type = %s ) ORDER BY start_at ASC LIMIT 200",
@@ -69,8 +79,8 @@ class G2AB_Email_Cron {
 		}
 
 		// 2h window: start_at between (now+1h45m) and (now+2h15m)
-		$start_2 = gmdate( 'Y-m-d H:i:s', strtotime( $now ) + ( 105 * MINUTE_IN_SECONDS ) );
-		$end_2   = gmdate( 'Y-m-d H:i:s', strtotime( $now ) + ( 135 * MINUTE_IN_SECONDS ) );
+		$start_2 = $now->modify( '+105 minutes' )->format( 'Y-m-d H:i:s' );
+		$end_2   = $now->modify( '+135 minutes' )->format( 'Y-m-d H:i:s' );
 
 		$rows_2 = $wpdb->get_results( $wpdb->prepare(
 			"SELECT * FROM {$bk} WHERE start_at BETWEEN %s AND %s AND status IN ({$active_statuses}) AND id NOT IN ( SELECT booking_id FROM {$lg} WHERE booking_id IS NOT NULL AND event_type = %s ) ORDER BY start_at ASC LIMIT 200",

@@ -8,6 +8,8 @@
  */
 if ( ! defined( 'ABSPATH' ) ) exit;
 get_header();
+// Single source of truth for NAP — see inc/business-info.php.
+$g2a_biz = function_exists( 'g2a_biz' ) ? g2a_biz() : array();
 ?>
 <style>.hero { padding: 160px 32px 80px; min-height: 70vh; display:flex; align-items:center; position:relative; overflow:hidden; }
 .hero .c { max-width:1280px; margin:0 auto; }
@@ -260,11 +262,11 @@ get_header();
       <div class="contact-grid">
         <div class="contact-card">
           <div class="label">Address</div>
-          <div class="val">6030 E Main St<br>Mesa, AZ 85205</div>
+          <div class="val"><?php echo esc_html( $g2a_biz['addr1'] ?? '6030 E Main St, Suite 103' ); ?><br><?php echo esc_html( $g2a_biz['addr2'] ?? 'Mesa, AZ 85205' ); ?></div>
         </div>
         <div class="contact-card">
           <div class="label">Phone</div>
-          <div class="val"><a href="tel:+16027152677">(602) 715-2677</a></div>
+          <div class="val"><a href="<?php echo esc_url( function_exists( 'g2a_biz_tel_href' ) ? g2a_biz_tel_href() : 'tel:+16027152677' ); ?>"><?php echo esc_html( $g2a_biz['phone'] ?? '(602) 715-2677' ); ?></a></div>
         </div>
         <div class="contact-card">
           <div class="label">Hours  Weekdays</div>
@@ -296,7 +298,7 @@ get_header();
       </div>
       <div style="display:flex; gap:14px; margin-top: 32px; flex-wrap:wrap;">
         <a class="btn btn-ember" href="<?php echo esc_url( home_url( "/book-a-lane/" ) ); ?>">Book A Lane </a>
-        <a class="btn btn-brass" href="tel:+16027152677">Call Us</a>
+        <a class="btn btn-brass" href="<?php echo esc_url( function_exists( 'g2a_biz_tel_href' ) ? g2a_biz_tel_href() : 'tel:+16027152677' ); ?>">Call Us</a>
       </div>
     </div>
     <div class="map">
@@ -304,7 +306,11 @@ get_header();
       <span class="city" style="top: 70%; left: 22%;">Gilbert</span>
       <span class="city" style="top: 78%; right: 18%;">Chandler</span>
       <span class="city" style="top: 28%; right: 20%;">Tempe</span>
-      <div class="pin"><div class="lbl">G2A  6030 E MAIN ST</div><div class="dot"></div></div>
+      <?php
+      // Street only (drop ", Suite ###") to match the original short pin label.
+      $g2a_pin_street = strtoupper( trim( explode( ',', $g2a_biz['addr1'] ?? '6030 E Main St, Suite 103' )[0] ) );
+      ?>
+      <div class="pin"><div class="lbl">G2A  <?php echo esc_html( $g2a_pin_street ); ?></div><div class="dot"></div></div>
     </div>
   </div>
 </section>

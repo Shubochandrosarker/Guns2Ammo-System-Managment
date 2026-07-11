@@ -9,6 +9,11 @@
 if ( ! defined( 'ABSPATH' ) ) exit;
 get_header();
 
+// Single source of truth for NAP — see inc/business-info.php.
+$g2a_biz              = function_exists( 'g2a_biz' ) ? g2a_biz() : array();
+$g2a_collections_street = trim( explode( ',', $g2a_biz['addr1'] ?? '6030 E Main St, Suite 103' )[0] );
+$g2a_collections_city   = $g2a_biz['city'] ?? 'Mesa';
+
 $tiles = [
 	[ 'slug' => 'handguns',   'name' => 'HANDGUNS',   'href' => home_url( '/collections/handguns/' ),   'img' => g2a_asset( 'img/guns2ammo-handgun-case-display.jpg' ), 'desc' => 'Carry pistols, duty guns, and range favorites fitted to your hand.' ],
 	[ 'slug' => 'rifles',     'name' => 'RIFLES',     'href' => home_url( '/collections/rifles/' ),     'img' => g2a_asset( 'img/guns2ammo-rifles-rack.jpg' ), 'desc' => 'AR carbines, bolt guns, and SBR builds from trusted makers.' ],
@@ -80,7 +85,7 @@ $tiles = [
     <h2>WHY SHOP GUNS&nbsp;2&nbsp;AMMO</h2>
     <div class="row">
       <a href="<?php echo esc_url( home_url( '/transfers/' ) ); ?>"><h3>FFL Transfers</h3><p>Bought online? We process the federal transfer at a flat rate.</p></a>
-      <a href="<?php echo esc_url( home_url( '/shop/' ) ); ?>"><h3>Local Pickup</h3><p>Reserve online, pick up same day at 6030 E Main St, Mesa.</p></a>
+      <a href="<?php echo esc_url( home_url( '/shop/' ) ); ?>"><h3>Local Pickup</h3><p>Reserve online, pick up same day at <?php echo esc_html( $g2a_collections_street . ', ' . $g2a_collections_city ); ?>.</p></a>
       <a href="<?php echo esc_url( home_url( '/contact/' ) ); ?>"><h3>Expert Fitment</h3><p>Instructor guidance before you buy  no commission pressure.</p></a>
       <a href="<?php echo esc_url( home_url( '/ffl-services/' ) ); ?>"><h3>All Federal Laws</h3><p>Background checks and full Arizona &amp; federal compliance.</p></a>
     </div>

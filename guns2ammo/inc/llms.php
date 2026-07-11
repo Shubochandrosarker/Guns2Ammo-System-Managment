@@ -37,11 +37,23 @@ function g2a_llms_intercept( $wp ) {
 }
 
 function g2a_llms_short() {
-	$phone = get_theme_mod( 'g2a_phone', '(602) 715-2677' );
-	$email = get_theme_mod( 'g2a_email', 'sales@guns2ammo.com' );
-	$addr1 = get_theme_mod( 'g2a_addr1', '6030 E Main St, Suite 103' );
-	$addr2 = get_theme_mod( 'g2a_addr2', 'Mesa, AZ 85205' );
-	$site  = home_url( '/' );
+	// Single source of truth for NAP + hours — see inc/business-info.php.
+	$g2a_biz = function_exists( 'g2a_biz' ) ? g2a_biz() : array();
+	$phone   = $g2a_biz['phone'] ?? '(602) 715-2677';
+	$email   = $g2a_biz['email'] ?? 'sales@guns2ammo.com';
+	$addr1   = $g2a_biz['addr1'] ?? '6030 E Main St, Suite 103';
+	$addr2   = $g2a_biz['addr2'] ?? 'Mesa, AZ 85205';
+	$hours   = function_exists( 'g2a_biz_hours_human' ) ? g2a_biz_hours_human() : 'Mon–Thu 10am–6pm · Fri 10am–7pm · Sat 10am–7pm · Sun 12pm–6pm';
+	$site    = home_url( '/' );
+
+	// Single source of truth for membership pricing — see inc/pricing.php.
+	$g2a_has_pricing_helper = function_exists( 'g2a_plan_price_fmt' );
+	$g2a_defender_m = $g2a_has_pricing_helper ? g2a_plan_price_fmt( 'defender', 'monthly' ) : '$29.99';
+	$g2a_defender_a = $g2a_has_pricing_helper ? g2a_plan_price_fmt( 'defender', 'annual' ) : '$299.99';
+	$g2a_patriot_m  = $g2a_has_pricing_helper ? g2a_plan_price_fmt( 'patriot', 'monthly' ) : '$39.99';
+	$g2a_patriot_a  = $g2a_has_pricing_helper ? g2a_plan_price_fmt( 'patriot', 'annual' ) : '$449.99';
+	$g2a_guardian_m = $g2a_has_pricing_helper ? g2a_plan_price_fmt( 'guardian', 'monthly' ) : '$59.99';
+	$g2a_guardian_a = $g2a_has_pricing_helper ? g2a_plan_price_fmt( 'guardian', 'annual' ) : '$649.99';
 
 	$out  = "# Guns 2 Ammo — Arizona Shooting Range\n\n";
 	$out .= "> Mesa's premier indoor shooting range, FFL-licensed firearms store, and NRA-certified training facility. Founded 2014. Serving the East Valley: Mesa, Phoenix, Gilbert, Tempe, Chandler, Scottsdale, Apache Junction, Queen Creek.\n\n";
@@ -49,7 +61,7 @@ function g2a_llms_short() {
 	$out .= "- Address: {$addr1}, {$addr2}\n";
 	$out .= "- Phone: {$phone}\n";
 	$out .= "- Email: {$email}\n";
-	$out .= "- Hours (Arizona / MST, no DST): Mon–Thu 10am–6pm · Fri 10am–7pm · Sat 10am–7pm · Sun 12pm–6pm\n";
+	$out .= "- Hours (Arizona / MST, no DST): {$hours}\n";
 	$out .= "- Federal Firearms License (FFL): Yes — full sales, transfers, and buying used.\n";
 	$out .= "- NRA-certified training facility.\n\n";
 	$out .= "## What we offer\n";
@@ -63,9 +75,9 @@ function g2a_llms_short() {
 	$out .= "- NRA-certified firearm training for first-timers, intermediate, and advanced shooters.\n";
 	$out .= "- Ladies Tuesday: female shooters get 1 hour free lane time + 25% off rentals every Tuesday.\n\n";
 	$out .= "## Memberships\n";
-	$out .= "- Defender — 1 person — \$29.99/mo or \$299.99/yr. Free 1hr lane time per visit. Guest shooters \$15/hr.\n";
-	$out .= "- Patriot  — 2 people (primary + 1 linked) — \$39.99/mo or \$449.99/yr. Free 1hr lane time. Guest shooters \$10/hr.\n";
-	$out .= "- Guardian — 4 people (primary + 3 linked) — \$59.99/mo or \$649.99/yr. Free 1hr lane time. Guest shooters \$10/hr.\n";
+	$out .= "- Defender — 1 person — {$g2a_defender_m}/mo or {$g2a_defender_a}/yr. Free 1hr lane time per visit. Guest shooters \$15/hr.\n";
+	$out .= "- Patriot  — 2 people (primary + 1 linked) — {$g2a_patriot_m}/mo or {$g2a_patriot_a}/yr. Free 1hr lane time. Guest shooters \$10/hr.\n";
+	$out .= "- Guardian — 4 people (primary + 3 linked) — {$g2a_guardian_m}/mo or {$g2a_guardian_a}/yr. Free 1hr lane time. Guest shooters \$10/hr.\n";
 	$out .= "- All plans: cancel anytime, no contracts. 15% off for military / veterans / law enforcement.\n\n";
 	$out .= "## Key pages\n";
 	$out .= "- Homepage: {$site}\n";

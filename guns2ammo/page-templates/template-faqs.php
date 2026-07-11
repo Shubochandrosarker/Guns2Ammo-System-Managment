@@ -14,6 +14,8 @@ if ( ! defined( 'ABSPATH' ) ) {
 get_header();
 
 $faqs = function_exists( 'g2a_faqs_data' ) ? g2a_faqs_data() : array();
+// Single source of truth for NAP — see inc/business-info.php.
+$g2a_biz = function_exists( 'g2a_biz' ) ? g2a_biz() : array();
 ?>
 <style>
 .g2a-faqs-hero { padding: 140px 32px 32px; text-align: center; position: relative; }
@@ -42,7 +44,7 @@ $faqs = function_exists( 'g2a_faqs_data' ) ? g2a_faqs_data() : array();
 <section class="g2a-faqs-hero">
   <span class="eyebrow" style="margin-bottom:18px; display:inline-block;">Frequently Asked Questions</span>
   <h1>HOW CAN WE HELP?</h1>
-  <p>Range hours, membership pricing, firearm transfers, training classes, safety, online orders — the most common questions, answered. Can't find what you're looking for? Call us at <?php echo esc_html( get_theme_mod( 'g2a_phone', '(602) 715-2677' ) ); ?>.</p>
+  <p>Range hours, membership pricing, firearm transfers, training classes, safety, online orders — the most common questions, answered. Can't find what you're looking for? Call us at <?php echo esc_html( $g2a_biz['phone'] ?? '(602) 715-2677' ); ?>.</p>
 </section>
 
 <div class="g2a-faqs-wrap">

@@ -8,6 +8,8 @@
  */
 if ( ! defined( 'ABSPATH' ) ) exit;
 get_header();
+// Single source of truth for NAP — see inc/business-info.php.
+$g2a_biz = function_exists( 'g2a_biz' ) ? g2a_biz() : array();
 ?>
 <style>.hero { padding: 140px 32px 64px; min-height:60vh; display:flex; align-items:center; }
 .hero .c { max-width:1280px; margin:0 auto; display:grid; grid-template-columns: 1.1fr 1fr; gap: 56px; align-items:center; }
@@ -196,7 +198,7 @@ get_header();
       <div class="label">ATTENTION</div>
       <div class="val">FFL Receiving</div>
       <div class="label">ADDRESS</div>
-      <div class="val brass" style="font-size:22px;">6030 E Main St<br>Mesa, AZ 85205</div>
+      <div class="val brass" style="font-size:22px;"><?php echo esc_html( $g2a_biz['addr1'] ?? '6030 E Main St, Suite 103' ); ?><br><?php echo esc_html( $g2a_biz['addr2'] ?? 'Mesa, AZ 85205' ); ?></div>
       <?php $g2a_ffl = get_theme_mod( 'g2a_ffl_license', '' ); if ( $g2a_ffl ) : ?>
       <div class="label">FFL LICENSE NUMBER</div>
       <div class="val brass" style="font-family: var(--font-mono); font-size:18px; letter-spacing:0.1em;"><?php echo esc_html( $g2a_ffl ); ?></div>
@@ -226,7 +228,7 @@ get_header();
   <p style="color: var(--color-fog); max-width: 500px; margin: 0 auto 32px;">Submit our quick form and we'll email the seller everything they need.</p>
   <div style="display:inline-flex; gap:14px; flex-wrap:wrap;">
     <a class="btn btn-ember btn-lg">Start A Transfer </a>
-    <a class="btn btn-brass btn-lg" href="tel:+16027152677">Call (602) 715-2677</a>
+    <a class="btn btn-brass btn-lg" href="<?php echo esc_url( function_exists( 'g2a_biz_tel_href' ) ? g2a_biz_tel_href() : 'tel:+16027152677' ); ?>">Call <?php echo esc_html( $g2a_biz['phone'] ?? '(602) 715-2677' ); ?></a>
   </div>
 </section>
 <?php get_footer();

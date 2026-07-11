@@ -60,8 +60,25 @@ final class G2AB_REST_Webhooks_Controller {
 		}
 
 		$result = $gw->process_webhook_event( $event );
-		$type = $event['type'] ?? ( $event['event_type'] ?? 'unknown' );
-		$this->log( $gateway_id, $type, wp_json_encode( $result ), null );
+		$type   = $event['type'] ?? ( $event['event_type'] ?? 'unknown' );
+
+		// A verified-but-unhandled event (booking not found, no uuid, amount
+		// mismatch, refund with no matching payment row, etc.) used to still
+		// return 200 here — the gateway marks the webhook delivered and never
+		// retries, so a real charge could land against a booking that had
+		// just been deleted by the expiry cron (a real race) with nothing
+		// ever reconciling it and no operator-visible signal beyond a
+		// severity:'info' log row. `handled: false` now returns a non-2xx so
+		// the gateway keeps retrying (giving a transient race a chance to
+		// resolve on a later delivery) and the event is logged at a severity
+		// an admin would actually notice.
+		$handled  = ! empty( $result['handled'] );
+		$severity = $handled ? 'info' : 'warning';
+		$this->log( $gateway_id, $type, wp_json_encode( $result ), null, $severity );
+
+		if ( ! $handled ) {
+			return new WP_REST_Response( array( 'ok' => false, 'gateway' => $gateway_id, 'type' => $type, 'result' => $result ), 422 );
+		}
 
 		return new WP_REST_Response( array( 'ok' => true, 'gateway' => $gateway_id, 'type' => $type, 'result' => $result ), 200 );
 	}
@@ -71,11 +88,11 @@ final class G2AB_REST_Webhooks_Controller {
 	public function handle_fortis( WP_REST_Request $request ) { return $this->dispatch( 'fortis', $request ); }
 	public function handle_authnet( WP_REST_Request $request ) { return $this->dispatch( 'authnet', $request ); }
 
-	private function log( $gateway, $event_type, $message, $body ) {
+	private function log( $gateway, $event_type, $message, $body, $severity = 'info' ) {
 		global $wpdb;
 		$wpdb->insert( $wpdb->prefix . 'g2ab_logs', array(
 			'event_type' => 'webhook_' . sanitize_key( $gateway ) . '_' . sanitize_key( $event_type ),
-			'severity'   => 'info',
+			'severity'   => sanitize_key( $severity ),
 			'message'    => substr( (string) $message, 0, 1000 ),
 			'context'    => wp_json_encode( array( 'gateway' => $gateway, 'event' => $event_type, 'body_size' => is_string( $body ) ? strlen( $body ) : 0 ) ),
 			'ip_address' => function_exists( 'g2ab_get_client_ip' ) ? g2ab_get_client_ip() : '',

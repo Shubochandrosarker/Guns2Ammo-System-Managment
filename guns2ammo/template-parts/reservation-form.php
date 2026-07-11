@@ -28,6 +28,8 @@ $rf_intro    = $args['intro'] ?? 'Send your details and our team will confirm av
 $rf_cta      = $args['cta'] ?? 'Request Reservation';
 $rf_packages = ! empty( $args['packages'] ) && is_array( $args['packages'] ) ? array_values( array_filter( $args['packages'] ) ) : [];
 $rf_sent     = isset( $_GET['g2a_sent'] );
+// Single source of truth for NAP — see inc/business-info.php.
+$rf_biz      = function_exists( 'g2a_biz' ) ? g2a_biz() : array();
 ?>
 <section class="g2a-resv" id="reserve">
   <style>
@@ -47,7 +49,7 @@ $rf_sent     = isset( $_GET['g2a_sent'] );
     <?php if ( $rf_sent ) : ?>
       <div class="alert success" style="margin-top:22px;">
         <span class="ic"></span>
-        <div><div class="h">Request Received</div>Thanks  your reservation request is in. Our team will reach out to confirm availability shortly. For anything urgent, call (602)&nbsp;715-2677.</div>
+        <div><div class="h">Request Received</div>Thanks  your reservation request is in. Our team will reach out to confirm availability shortly. For anything urgent, call <?php echo str_replace( ' ', '&nbsp;', esc_html( trim( $rf_biz['phone'] ?? '(602) 715-2677' ) ) ); ?>.</div>
       </div>
     <?php else : ?>
       <p class="rf-intro"><?php echo esc_html( $rf_intro ); ?></p>

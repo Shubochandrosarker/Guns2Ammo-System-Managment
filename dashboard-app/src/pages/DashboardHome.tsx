@@ -43,7 +43,7 @@ export function DashboardHome() {
         subtitle="Central operating view for revenue, bookings, memberships, growth signals, and AI-recommended actions."
       />
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
         <StatCard label="Total revenue"      value={r.totalRevenue}       format="currency" deltaPct={r.revenueGrowthPct} sublabel={`Best source: ${r.bestRevenueSource}`} />
         <StatCard label="Store revenue"      value={r.woocommerceRevenue} format="currency" sublabel={`${formatNumber(2)}× the booking channel`} />
         <StatCard label="Booking revenue"    value={r.bookingRevenue}     format="currency" sublabel={`Top: ${b.topBookingType}`} intent="success" />
