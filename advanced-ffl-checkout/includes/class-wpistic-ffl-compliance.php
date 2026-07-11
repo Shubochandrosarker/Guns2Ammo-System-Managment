@@ -17,9 +17,81 @@ defined( 'ABSPATH' ) || exit;
 
 class Compliance {
 
+	/** Cookie set by the Verifyistic age-verification plugin on a passed check. */
+	const VERIFY_COOKIE = 'verifyistic_verified';
+
 	public function __construct() {
+		add_action( 'woocommerce_checkout_process', [ $this, 'validate_age_verification' ], 5 );
 		add_action( 'woocommerce_checkout_process', [ $this, 'validate_state_compliance' ] );
 		add_filter( 'woocommerce_available_payment_gateways', [ $this, 'maybe_block_gateways' ] );
+	}
+
+	/**
+	 * Block checkout for any cart containing an FFL-required (firearm) item unless
+	 * the current visitor has passed Verifyistic age verification.
+	 *
+	 * This is the actual point-of-sale enforcement point: the Verifyistic popup
+	 * shown elsewhere on the site is only a UI prompt, not a server-side gate, so
+	 * without this check a firearm purchase could complete with no age check at
+	 * all. Runs before validate_state_compliance() (priority 5) so a customer
+	 * sees the age-verification error first.
+	 */
+	public function validate_age_verification(): void {
+		if ( ! WC()->cart ) {
+			return;
+		}
+
+		// Site owner can turn this off (e.g. a different in-house age-gate mechanism
+		// is used instead) but it defaults ON — a firearms checkout should never ship
+		// with age verification optional.
+		if ( '1' !== (string) get_option( 'wpistic_ffl_require_age_verification', '1' ) ) {
+			return;
+		}
+
+		if ( empty( $this->get_cart_ffl_item_types() ) ) {
+			return;
+		}
+
+		if ( $this->is_current_visitor_age_verified() ) {
+			return;
+		}
+
+		wc_add_notice(
+			__( 'Please complete age verification before purchasing a firearm-related item. Use the age-verification prompt on the site, then return to checkout.', 'advanced-ffl-checkout' ),
+			'error'
+		);
+	}
+
+	/**
+	 * Check whether the current visitor holds a valid Verifyistic "passed"
+	 * verification, mirroring the same cookie + wp_verifyistic_logs lookup the
+	 * booking engine's Verifyistic module uses so both enforcement points agree.
+	 */
+	private function is_current_visitor_age_verified(): bool {
+		$cookie_token = isset( $_COOKIE[ self::VERIFY_COOKIE ] ) ? sanitize_text_field( wp_unslash( $_COOKIE[ self::VERIFY_COOKIE ] ) ) : '';
+		if ( '' === $cookie_token ) {
+			return false;
+		}
+		// Some Verifyistic versions store a bare "1" rather than a lookup token.
+		if ( '1' === $cookie_token ) {
+			return true;
+		}
+
+		global $wpdb;
+		$table = $wpdb->prefix . 'verifyistic_logs';
+		$exists = $wpdb->get_var( $wpdb->prepare( 'SHOW TABLES LIKE %s', $table ) ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery
+		if ( $exists !== $table ) {
+			// Verifyistic isn't installed/active — fail closed. A range cannot sell
+			// firearms with no way to verify age at all.
+			return false;
+		}
+
+		$row = $wpdb->get_var( $wpdb->prepare( // phpcs:ignore WordPress.DB.DirectDatabaseQuery
+			"SELECT id FROM {$table} WHERE verify_token = %s AND status = 'passed' ORDER BY id DESC LIMIT 1",
+			$cookie_token
+		) );
+
+		return null !== $row;
 	}
 
 	/**

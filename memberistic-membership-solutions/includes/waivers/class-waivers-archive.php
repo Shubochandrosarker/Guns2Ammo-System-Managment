@@ -81,8 +81,19 @@ final class Waivers_Archive {
 	}
 
 	/**
-	 * The current waiver row for a person, looked up by email first, then by
-	 * last name + DOB, then by full name. Returns null when nothing is on file.
+	 * The current, NOT-EXPIRED waiver row for a person, looked up by email
+	 * first, then by last name + DOB, then by full name. Returns null when
+	 * nothing valid is on file.
+	 *
+	 * This archive table has no explicit expires_at column (it's populated
+	 * largely from historical Ottertext/OtterWaiver imports), so "current"
+	 * previously meant only "the newest of possibly several re-signs" with
+	 * no age limit at all — a waiver signed years ago would satisfy this
+	 * lookup forever. We now apply the same validity window Memberistic uses
+	 * for member waivers elsewhere (Waiver_Service::validity_days(), default
+	 * 365 days) against signed_at, so a stale signature no longer silently
+	 * satisfies the booking/check-in gate. A row with no signed_at at all is
+	 * treated as unverifiable-age and excluded rather than trusted forever.
 	 *
 	 * @param string $email
 	 * @param string $name  "First Last" (optional).
@@ -91,12 +102,13 @@ final class Waivers_Archive {
 	 */
 	public static function find_on_file( $email, $name = '', $dob = '' ) {
 		global $wpdb;
-		$table = self::table();
-		$email = strtolower( trim( (string) $email ) );
+		$table  = self::table();
+		$email  = strtolower( trim( (string) $email ) );
+		$cutoff = wp_date( 'Y-m-d H:i:s', current_time( 'timestamp' ) - ( Waiver_Service::validity_days() * DAY_IN_SECONDS ) );
 
 		if ( '' !== $email ) {
 			// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
-			$row = $wpdb->get_row( $wpdb->prepare( "SELECT * FROM {$table} WHERE email = %s AND is_current = 1 ORDER BY signed_at DESC LIMIT 1", $email ), ARRAY_A );
+			$row = $wpdb->get_row( $wpdb->prepare( "SELECT * FROM {$table} WHERE email = %s AND is_current = 1 AND signed_at IS NOT NULL AND signed_at >= %s ORDER BY signed_at DESC LIMIT 1", $email, $cutoff ), ARRAY_A );
 			if ( $row ) {
 				return $row;
 			}
@@ -111,14 +123,14 @@ final class Waivers_Archive {
 
 			if ( '' !== $dob ) {
 				// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
-				$row = $wpdb->get_row( $wpdb->prepare( "SELECT * FROM {$table} WHERE last_name = %s AND dob = %s AND is_current = 1 ORDER BY signed_at DESC LIMIT 1", $last, $dob ), ARRAY_A );
+				$row = $wpdb->get_row( $wpdb->prepare( "SELECT * FROM {$table} WHERE last_name = %s AND dob = %s AND is_current = 1 AND signed_at IS NOT NULL AND signed_at >= %s ORDER BY signed_at DESC LIMIT 1", $last, $dob, $cutoff ), ARRAY_A );
 				if ( $row ) {
 					return $row;
 				}
 			}
 			if ( '' !== $first ) {
 				// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
-				$row = $wpdb->get_row( $wpdb->prepare( "SELECT * FROM {$table} WHERE last_name = %s AND first_name = %s AND is_current = 1 ORDER BY signed_at DESC LIMIT 1", $last, $first ), ARRAY_A );
+				$row = $wpdb->get_row( $wpdb->prepare( "SELECT * FROM {$table} WHERE last_name = %s AND first_name = %s AND is_current = 1 AND signed_at IS NOT NULL AND signed_at >= %s ORDER BY signed_at DESC LIMIT 1", $last, $first, $cutoff ), ARRAY_A );
 				if ( $row ) {
 					return $row;
 				}
@@ -127,7 +139,7 @@ final class Waivers_Archive {
 		return null;
 	}
 
-	/** Convenience boolean. */
+	/** Convenience boolean. Only true when a non-expired waiver is on file. */
 	public static function has_on_file( $email, $name = '', $dob = '' ) {
 		return null !== self::find_on_file( $email, $name, $dob );
 	}
