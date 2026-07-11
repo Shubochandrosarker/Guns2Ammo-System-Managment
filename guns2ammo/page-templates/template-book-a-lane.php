@@ -12,6 +12,46 @@ get_header();
 $g2a_page_id                 = get_the_ID();
 $g2a_lane_hero_title         = get_post_meta( $g2a_page_id, 'lane_hero_title', true );
 $g2a_lane_membership_pitch   = get_post_meta( $g2a_page_id, 'lane_membership_pitch', true );
+
+// Single source of truth for NAP + hours — see inc/business-info.php.
+$g2a_biz              = function_exists( 'g2a_biz' ) ? g2a_biz() : array();
+$g2a_bal_street       = trim( explode( ',', $g2a_biz['addr1'] ?? '6030 E Main St, Suite 103' )[0] );
+$g2a_bal_city         = $g2a_biz['city'] ?? 'Mesa';
+$g2a_bal_day_names    = array(
+	0 => __( 'Sunday', 'guns2ammo' ),
+	1 => __( 'Monday', 'guns2ammo' ),
+	2 => __( 'Tuesday', 'guns2ammo' ),
+	3 => __( 'Wednesday', 'guns2ammo' ),
+	4 => __( 'Thursday', 'guns2ammo' ),
+	5 => __( 'Friday', 'guns2ammo' ),
+	6 => __( 'Saturday', 'guns2ammo' ),
+);
+$g2a_bal_fmt_hour = function ( $mins ) {
+	$h    = intdiv( $mins, 60 );
+	$m    = $mins % 60;
+	$ampm = $h < 12 ? 'AM' : 'PM';
+	$h12  = $h % 12 ?: 12;
+	return sprintf( '%d:%02d %s', $h12, $m, $ampm );
+};
+// Collapse consecutive identical day-ranges into runs, same approach as
+// the homepage hours block (front-page.php) and the contact page.
+$g2a_bal_hour_runs = array();
+$g2a_bal_run_days = array(); $g2a_bal_run_key = null;
+foreach ( array( 1, 2, 3, 4, 5, 6, 0 ) as $g2a_bal_dow ) {
+	$g2a_bal_hrs = $g2a_biz['hours'][ $g2a_bal_dow ] ?? null;
+	$g2a_bal_key = $g2a_bal_hrs ? $g2a_bal_hrs['open'] . '-' . $g2a_bal_hrs['close'] : 'closed';
+	if ( $g2a_bal_run_key === $g2a_bal_key ) {
+		$g2a_bal_run_days[] = $g2a_bal_dow;
+		continue;
+	}
+	if ( $g2a_bal_run_days ) {
+		$g2a_bal_hour_runs[] = array( $g2a_bal_run_days, $g2a_bal_run_key );
+	}
+	$g2a_bal_run_days = array( $g2a_bal_dow ); $g2a_bal_run_key = $g2a_bal_key;
+}
+if ( $g2a_bal_run_days ) {
+	$g2a_bal_hour_runs[] = array( $g2a_bal_run_days, $g2a_bal_run_key );
+}
 ?>
 <header class="bk-hero hero-media">
   <div class="container">
@@ -63,7 +103,7 @@ if ( ! $g2a_is_member ) : ?>
     </div>
     <div class="bk-promo__cta">
       <a class="btn btn-ember" href="<?php echo esc_url( home_url( '/memberships/' ) ); ?>">Join The Members Hub </a>
-      <span class="bk-promo__price">Plans from $29.99/mo  Cancel anytime  No contracts</span>
+      <span class="bk-promo__price">Plans from <?php echo esc_html( function_exists( 'g2a_plan_price_from_fmt' ) ? g2a_plan_price_from_fmt() : '$29.99' ); ?>/mo  Cancel anytime  No contracts</span>
     </div>
   </div>
 </aside>
@@ -82,8 +122,8 @@ if ( ! $g2a_is_member ) : ?>
       The online lane reservation system is loading. Please call the
       range to book a lane and we will get you on the floor.
     </p>
-    <a class="btn btn-ember btn-lg" href="tel:<?php echo esc_attr( preg_replace( '/[^0-9+]/', '', get_theme_mod( 'g2a_phone', '(602) 715-2677' ) ) ); ?>">
-      Call <?php echo esc_html( get_theme_mod( 'g2a_phone', '(602) 715-2677' ) ); ?>
+    <a class="btn btn-ember btn-lg" href="<?php echo esc_url( function_exists( 'g2a_biz_tel_href' ) ? g2a_biz_tel_href() : 'tel:+16027152677' ); ?>">
+      Call <?php echo esc_html( $g2a_biz['phone'] ?? '(602) 715-2677' ); ?>
     </a>
     <p style="margin-top:14px; font-size:12px; color: var(--color-silver);">
       Walk-ins welcome during open hours.
@@ -96,7 +136,7 @@ if ( ! $g2a_is_member ) : ?>
   <div class="ig-head">
     <span class="eyebrow" style="margin-bottom:14px;">Before You Book</span>
     <h2>HOURS, PRICING, RULES &amp; WHAT TO BRING</h2>
-    <p>Everything you need to plan your visit to our climate-controlled indoor range at 6030 E Main St in Mesa. New to the range? Read it through  then book with confidence.</p>
+    <p>Everything you need to plan your visit to our climate-controlled indoor range at <?php echo esc_html( $g2a_bal_street ); ?> in <?php echo esc_html( $g2a_bal_city ); ?>. New to the range? Read it through  then book with confidence.</p>
   </div>
   <div class="container">
     <div class="info-card">
@@ -104,10 +144,18 @@ if ( ! $g2a_is_member ) : ?>
       <h4>HOURS</h4>
       <p>The range is open seven days a week with extended weekend hours.</p>
       <ul>
-        <li>Monday, Tuesday, Wednesday, Thursday  10:00 AM to 6:00 PM</li>
-        <li>Friday  10:00 AM to 7:00 PM</li>
-        <li>Saturday  10:00 AM to 7:00 PM</li>
-        <li>Sunday  12:00 PM to 6:00 PM</li>
+        <?php foreach ( $g2a_bal_hour_runs as $g2a_bal_run ) :
+          list( $g2a_bal_run_day_list, $g2a_bal_run_key ) = $g2a_bal_run;
+          $g2a_bal_run_label = implode( ', ', array_map( function ( $d ) use ( $g2a_bal_day_names ) { return $g2a_bal_day_names[ $d ]; }, $g2a_bal_run_day_list ) );
+          if ( 'closed' === $g2a_bal_run_key ) {
+            $g2a_bal_run_time = __( 'Closed', 'guns2ammo' );
+          } else {
+            list( $g2a_bal_run_open, $g2a_bal_run_close ) = array_map( 'intval', explode( '-', $g2a_bal_run_key ) );
+            $g2a_bal_run_time = $g2a_bal_fmt_hour( $g2a_bal_run_open ) . ' to ' . $g2a_bal_fmt_hour( $g2a_bal_run_close );
+          }
+        ?>
+        <li><?php echo esc_html( $g2a_bal_run_label ); ?>  <?php echo esc_html( $g2a_bal_run_time ); ?></li>
+        <?php endforeach; ?>
         <li>Last lane booking is taken one hour before close</li>
       </ul>
       <a class="more" href="<?php echo esc_url( home_url( '/contact/' ) ); ?>">Holiday hours &amp; directions </a>

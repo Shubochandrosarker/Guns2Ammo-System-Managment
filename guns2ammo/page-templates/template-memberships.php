@@ -8,6 +8,29 @@
  */
 if ( ! defined( 'ABSPATH' ) ) exit;
 get_header();
+
+/* Single source of truth for membership pricing — see inc/pricing.php.
+ * Reads Memberistic's Plans_Repository when the plugin is active, falls
+ * back to the last-known static prices otherwise. Only used by the
+ * static fallback cards below (rendered when Memberistic itself is
+ * inactive and can't render its own live [memberistic_plans] shortcode). */
+$g2a_has_pricing_helper = function_exists( 'g2a_plan_price' );
+$g2a_plan_m = array(
+	'defender' => $g2a_has_pricing_helper ? g2a_plan_price( 'defender', 'monthly' ) : 29.99,
+	'patriot'  => $g2a_has_pricing_helper ? g2a_plan_price( 'patriot', 'monthly' ) : 39.99,
+	'guardian' => $g2a_has_pricing_helper ? g2a_plan_price( 'guardian', 'monthly' ) : 59.99,
+);
+$g2a_plan_a = array(
+	'defender' => $g2a_has_pricing_helper ? g2a_plan_price( 'defender', 'annual' ) : 299.99,
+	'patriot'  => $g2a_has_pricing_helper ? g2a_plan_price( 'patriot', 'annual' ) : 449.99,
+	'guardian' => $g2a_has_pricing_helper ? g2a_plan_price( 'guardian', 'annual' ) : 649.99,
+);
+$g2a_plan_save = array(
+	'defender' => $g2a_has_pricing_helper ? g2a_plan_annual_savings( 'defender' ) : 59.89,
+	'patriot'  => $g2a_has_pricing_helper ? g2a_plan_annual_savings( 'patriot' ) : 29.89,
+	'guardian' => $g2a_has_pricing_helper ? g2a_plan_annual_savings( 'guardian' ) : 69.89,
+);
+$g2a_plan_max_save = max( $g2a_plan_save );
 ?>
 <style>.gw-hero { padding: 140px 32px 40px; text-align:center; position:relative; overflow:hidden; }
   .gw-hero::before { content:""; position:absolute; inset:0; pointer-events:none; background-image: linear-gradient(180deg, var(--hero-scrim), var(--color-void)), url("<?php echo esc_url( g2a_asset( 'img/guns2ammo-store-overview.jpg' ) ); ?>"); background-size:cover; background-position:center; }
@@ -83,7 +106,7 @@ get_header();
     <label for="bill-a">Annual</label>
     <div class="pill"></div>
   </div>
-  <span class="save-pill" id="annual-save" style="opacity:0;">SAVE UP TO $69.89/YR</span>
+  <span class="save-pill" id="annual-save" style="opacity:0;">SAVE UP TO $<?php echo esc_html( number_format( $g2a_plan_max_save, 2 ) ); ?>/YR</span>
 </div>
 
 <?php if ( function_exists( 'g2a_has_memberistic' ) && g2a_has_memberistic() ) : ?>
@@ -93,7 +116,7 @@ get_header();
   <article class="plan fade-up d1">
     <div class="name">DEFENDER</div>
     <div class="tag">Individual  1 Person</div>
-    <div class="price"><span class="num" data-monthly="29.99" data-annual="299.99">$29.99</span><span class="per">/month</span></div>
+    <div class="price"><span class="num" data-monthly="<?php echo esc_attr( $g2a_plan_m['defender'] ); ?>" data-annual="<?php echo esc_attr( $g2a_plan_a['defender'] ); ?>">$<?php echo esc_html( number_format( $g2a_plan_m['defender'], 2 ) ); ?></span><span class="per">/month</span></div>
     <div class="pays">For the solo shooter who wants the best lane price in Mesa</div>
     <ul class="feats">
       <li><strong>1 free hour of lane time</strong> per visit</li>
@@ -111,7 +134,7 @@ get_header();
     <div class="pop-banner"> Most Popular</div>
     <div class="name">PATRIOT</div>
     <div class="tag">Two-Person  2 People</div>
-    <div class="price"><span class="num" data-monthly="39.99" data-annual="449.99">$39.99</span><span class="per">/month</span></div>
+    <div class="price"><span class="num" data-monthly="<?php echo esc_attr( $g2a_plan_m['patriot'] ); ?>" data-annual="<?php echo esc_attr( $g2a_plan_a['patriot'] ); ?>">$<?php echo esc_html( number_format( $g2a_plan_m['patriot'], 2 ) ); ?></span><span class="per">/month</span></div>
     <div class="pays">For couples, range buddies, and two-person teams</div>
     <ul class="feats">
       <li>Covers 2 people  primary + 1 linked profile</li>
@@ -128,7 +151,7 @@ get_header();
   <article class="plan fade-up d3">
     <div class="name">GUARDIAN</div>
     <div class="tag">Family / Group  4 People</div>
-    <div class="price"><span class="num" data-monthly="59.99" data-annual="649.99">$59.99</span><span class="per">/month</span></div>
+    <div class="price"><span class="num" data-monthly="<?php echo esc_attr( $g2a_plan_m['guardian'] ); ?>" data-annual="<?php echo esc_attr( $g2a_plan_a['guardian'] ); ?>">$<?php echo esc_html( number_format( $g2a_plan_m['guardian'], 2 ) ); ?></span><span class="per">/month</span></div>
     <div class="pays">For families and groups of up to 4 shooters</div>
     <ul class="feats">
       <li>Covers 4 people  primary + 3 linked profiles</li>
@@ -202,7 +225,7 @@ get_header();
     <h2 class="sec" style="margin-bottom: 28px;">FAQ</h2>
     <div class="acc">
       <details open><summary>Can I cancel anytime?</summary><div class="answer">Yes. Cancel from your dashboard or email us  no fees, no questions. Access remains active until the end of your billing period.</div></details>
-      <details><summary>Annual vs Monthly  which is right?</summary><div class="answer">Monthly is best if you're trying us out. Annual is one upfront charge  Defender $299.99/yr, Patriot $449.99/yr, Guardian $649.99/yr  saving up to $69.89 versus paying month to month.</div></details>
+      <details><summary>Annual vs Monthly  which is right?</summary><div class="answer">Monthly is best if you're trying us out. Annual is one upfront charge  Defender $<?php echo esc_html( number_format( $g2a_plan_a['defender'], 2 ) ); ?>/yr, Patriot $<?php echo esc_html( number_format( $g2a_plan_a['patriot'], 2 ) ); ?>/yr, Guardian $<?php echo esc_html( number_format( $g2a_plan_a['guardian'], 2 ) ); ?>/yr  saving up to $<?php echo esc_html( number_format( $g2a_plan_max_save, 2 ) ); ?> versus paying month to month.</div></details>
       <details><summary>Can I share my membership with family?</summary><div class="answer">Patriot covers two people  a primary member plus one linked profile. Guardian covers four  a primary member plus three linked profiles. Each person gets their own member profile, waiver, and check-in tracking.</div></details>
       <details><summary>What's included with each plan?</summary><div class="answer">Every plan includes unlimited range time during open hours, online lane reservations, and member profile + waiver tracking. Defender is for one person, Patriot for two, and Guardian for four.</div></details>
       <details><summary>Do you offer veteran or LEO discounts?</summary><div class="answer">Yes  15% off any plan with a valid LEO, military, or veteran ID, stackable with annual savings.</div></details>

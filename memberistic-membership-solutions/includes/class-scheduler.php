@@ -23,6 +23,7 @@ use WordPressistic\Memberistic\Database\Email_Logs_Repository;
 use WordPressistic\Memberistic\Database\Memberships_Repository;
 use WordPressistic\Memberistic\Database\People_Repository;
 use WordPressistic\Memberistic\Emails\Email_Service;
+use WordPressistic\Memberistic\Payments\Stripe_Service;
 
 if ( ! defined( 'ABSPATH' ) ) {
 	exit;
@@ -172,33 +173,54 @@ final class Scheduler {
 			// Recurring Stripe memberships should not be hard-expired just because
 			// the local renewal_date is stale. A delayed/missed Stripe webhook can
 			// leave the site one cycle behind even when Stripe will retry or has
-			// already charged the member. Give subscriptions a short grace window,
-			// then mark them past_due and send the payment-update template instead
-			// of a misleading "membership expired" notice.
+			// already charged the member. Ask Stripe directly what the
+			// subscription's real state is before acting; only fall back to the
+			// fixed grace-period guess if Stripe can't be reached.
 			if ( self::row_has_recurring_billing( $row ) ) {
-				if ( ! self::is_beyond_recurring_grace_period( $row ) ) {
+				$stripe_status = self::reconcile_recurring_with_stripe( $row );
+
+				if ( 'active' === $stripe_status ) {
+					// Stripe confirms the subscription is current — renewal_date
+					// was just synced from Stripe's current_period_end. Nothing
+					// to do; the missed webhook is now caught up.
 					continue;
 				}
 
-				Memberships_Repository::change_status( $membership_id, 'past_due' );
-
-				Activity_Repository::log(
-					array(
-						'membership_id' => $membership_id,
-						'activity_type' => 'payment_past_due',
-						'title'         => __( 'Recurring membership marked past due after renewal grace period', 'memberistic' ),
-					)
-				);
-
-				if ( ! Email_Logs_Repository::was_sent_for_membership(
-					$membership_id,
-					'payment_failed',
-					wp_date( 'Y-m-d H:i:s', current_time( 'timestamp' ) - 7 * DAY_IN_SECONDS )
-				) ) {
-					Email_Service::send_membership_email( $membership_id, 'payment_failed' );
+				if ( null === $stripe_status && ! self::is_beyond_recurring_grace_period( $row ) ) {
+					// Stripe lookup was inconclusive (API disabled/unreachable) —
+					// fall back to the short grace window as a safety net.
+					continue;
 				}
 
-				continue;
+				if ( 'expire' !== $stripe_status ) {
+					// 'past_due', or an inconclusive lookup that's past its grace
+					// window — mark past_due rather than silently expiring.
+					Memberships_Repository::change_status( $membership_id, 'past_due' );
+
+					Activity_Repository::log(
+						array(
+							'membership_id' => $membership_id,
+							'activity_type' => 'payment_past_due',
+							'title'         => 'past_due' === $stripe_status
+								? __( 'Recurring membership marked past due (Stripe subscription is past_due/unpaid)', 'memberistic' )
+								: __( 'Recurring membership marked past due after renewal grace period', 'memberistic' ),
+						)
+					);
+
+					if ( ! Email_Logs_Repository::was_sent_for_membership(
+						$membership_id,
+						'payment_failed',
+						wp_date( 'Y-m-d H:i:s', current_time( 'timestamp' ) - 7 * DAY_IN_SECONDS )
+					) ) {
+						Email_Service::send_membership_email( $membership_id, 'payment_failed' );
+					}
+
+					continue;
+				}
+
+				// 'expire' — Stripe confirms the subscription is canceled /
+				// incomplete_expired, so this is a genuine end-of-membership,
+				// not a lagging webhook. Fall through to the hard-expire below.
 			}
 
 			Memberships_Repository::change_status( $membership_id, 'expired' );
@@ -226,6 +248,54 @@ final class Scheduler {
 	private static function row_has_recurring_billing( $row ) {
 		$payment_source = isset( $row['payment_source'] ) ? (string) $row['payment_source'] : '';
 		return ! empty( $row['stripe_subscription_id'] ) || 'stripe' === $payment_source || 'stripe_subscription' === $payment_source;
+	}
+
+	/**
+	 * Ask Stripe for the real state of a recurring membership's subscription
+	 * instead of guessing from a fixed local grace period.
+	 *
+	 * @param array $row Membership row (needs id, stripe_subscription_id).
+	 * @return string|null 'active' (renewal_date synced from Stripe),
+	 *                     'past_due', 'expire', or null when Stripe isn't
+	 *                     configured/reachable and the caller should fall
+	 *                     back to the fixed grace-period heuristic.
+	 */
+	private static function reconcile_recurring_with_stripe( $row ) {
+		if ( ! class_exists( Stripe_Service::class ) || ! Stripe_Service::is_enabled() ) {
+			return null;
+		}
+
+		$subscription_id = isset( $row['stripe_subscription_id'] ) ? trim( (string) $row['stripe_subscription_id'] ) : '';
+		if ( '' === $subscription_id ) {
+			return null;
+		}
+
+		$subscription = Stripe_Service::get_subscription( $subscription_id );
+		if ( is_wp_error( $subscription ) || empty( $subscription['status'] ) ) {
+			return null;
+		}
+
+		$status = (string) $subscription['status'];
+
+		if ( in_array( $status, array( 'active', 'trialing' ), true ) ) {
+			if ( ! empty( $subscription['current_period_end'] ) ) {
+				Memberships_Repository::update(
+					(int) $row['id'],
+					array( 'renewal_date' => wp_date( 'Y-m-d H:i:s', (int) $subscription['current_period_end'] ) )
+				);
+			}
+			return 'active';
+		}
+
+		if ( in_array( $status, array( 'past_due', 'unpaid', 'incomplete' ), true ) ) {
+			return 'past_due';
+		}
+
+		if ( in_array( $status, array( 'canceled', 'incomplete_expired' ), true ) ) {
+			return 'expire';
+		}
+
+		return null;
 	}
 
 	private static function is_beyond_recurring_grace_period( $row ) {

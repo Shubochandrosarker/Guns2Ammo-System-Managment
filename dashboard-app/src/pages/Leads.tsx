@@ -103,7 +103,7 @@ export function Leads() {
         subtitle="Every Formistic enquiry, booking-engine submission, and membership signup lands here, categorized automatically."
       />
 
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
         <StatCard label="Total leads" value={totalLeads} />
         <StatCard label="New today" value={stats.data?.today ?? 0} intent="warn" />
         <StatCard label="This week" value={stats.data?.last7d ?? 0} intent="success" />

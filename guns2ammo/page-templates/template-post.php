@@ -8,6 +8,8 @@
  */
 if ( ! defined( 'ABSPATH' ) ) exit;
 get_header();
+// Single source of truth for NAP — see inc/business-info.php.
+$g2a_biz = function_exists( 'g2a_biz' ) ? g2a_biz() : array();
 ?>
 <style>/* Progress bar */
   .progress { position: fixed; top: 0; left: 0; height: 2px; background: var(--color-brass); z-index: 200; transition: width 80ms linear; width: 0; }
@@ -214,7 +216,7 @@ get_header();
 
     <div class="post-hero">
       <div class="img"></div>
-      <div class="cap">Mesa, AZ  January 2026. The Arizona state flag at our 6030 E Main St facility.</div>
+      <div class="cap">Mesa, AZ  January 2026. The Arizona state flag at our <?php echo esc_html( trim( explode( ',', $g2a_biz['addr1'] ?? '6030 E Main St, Suite 103' )[0] ) ); ?> facility.</div>
     </div>
 
     <div class="post-shell">

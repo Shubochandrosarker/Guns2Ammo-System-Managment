@@ -24,14 +24,15 @@ remove_action( 'woocommerce_sidebar', 'woocommerce_get_sidebar', 10 );
 
 /* ------------------------------------------------------------------
  * Product schema (JSON-LD) on single-product pages.
- * - skipped when Rank Math / Yoast is active (avoid duplicate Product)
+ * - the theme is the sole schema source (inc/seo.php's
+ *   g2a_seo_disable_rankmath_overlap() already silences RankMath's own
+ *   `rank_math/json_ld` and `rank_math/schema/output`), so this always
+ *   runs — the previous g2a_seo_plugin_active() early-return caused
+ *   zero Product schema site-wide whenever Rank Math was active.
  * - placeholder image fallback when product has no thumbnail
  * ------------------------------------------------------------------ */
 add_action( 'wp_head', function () {
 	if ( ! function_exists( 'is_product' ) || ! is_product() ) {
-		return;
-	}
-	if ( function_exists( 'g2a_seo_plugin_active' ) && g2a_seo_plugin_active() ) {
 		return;
 	}
 	global $product;

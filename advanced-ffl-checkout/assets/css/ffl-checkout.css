@@ -118,7 +118,7 @@
 .wpistic-ffl-select {
 	width: 100%;
 	padding: 11px 14px;
-	font-size: 14px;
+	font-size: 16px; /* prevent iOS zoom on focus at any viewport width */
 	font-family: inherit;
 	color: var(--wf-text);
 	background: var(--wf-surface);
@@ -563,7 +563,6 @@
 	.wpistic-ffl-input,
 	.wpistic-ffl-select {
 		min-height: 44px; /* iOS finger target */
-		font-size: 16px;  /* prevent iOS zoom on focus */
 	}
 	.wpistic-ffl-btn {
 		min-height: 44px;

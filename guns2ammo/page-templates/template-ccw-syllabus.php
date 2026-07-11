@@ -62,7 +62,7 @@ if ( function_exists( 'g2a_faq_schema' ) && function_exists( 'g2a_emit_jsonld' )
 .sy-row .body .t { font-family: var(--font-condensed); font-weight:600; font-size:19px; text-transform:uppercase; letter-spacing:0.03em; color: var(--color-white); margin-bottom:12px; }
 .sy-mod-list { list-style:none; padding:0; margin:0; display:grid; gap:9px; }
 .sy-mod-list li { color: var(--color-fog); font-size:14px; line-height:1.6; padding-left:20px; position:relative; }
-.sy-mod-list li::before { content:""; position:absolute; left:0; color: var(--color-brass-bright); font-size:9px; top:5px; }
+.sy-mod-list li::before { content:""; position:absolute; left:0; top:0.45em; width:6px; height:6px; background: var(--color-brass-bright); border-radius:50%; }
 .sy-band { background: var(--color-gunmetal); border-top:1px solid var(--color-hairline); border-bottom:1px solid var(--color-hairline); }
 .sy-cta { text-align:center; }
 </style>

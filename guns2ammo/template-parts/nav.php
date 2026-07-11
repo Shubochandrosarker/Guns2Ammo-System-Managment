@@ -74,8 +74,10 @@ $nav = [
 	] ],
 ];
 
-$phone = get_theme_mod( 'g2a_phone', '(602) 715-2677' );
-$phone_tel = preg_replace( '/[^0-9+]/', '', '+1' . $phone );
+// Single source of truth for NAP — see inc/business-info.php.
+$g2a_nav_biz = function_exists( 'g2a_biz' ) ? g2a_biz() : array();
+$phone       = $g2a_nav_biz['phone'] ?? '(602) 715-2677';
+$phone_tel   = $g2a_nav_biz['phone_tel'] ?? '+16027152677';
 ?>
 <nav class="g2a-nav" id="g2a-nav">
 	<a class="logo" href="<?php echo esc_url( home_url( '/' ) ); ?>"><span class="mark"></span>GUNS&nbsp;2&nbsp;AMMO</a>

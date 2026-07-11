@@ -483,26 +483,26 @@ were found anywhere.
 
 Ranked across all four audits, grouped by what kind of attention each needs.
 
-### Fix immediately — compliance, security, and money
+### Fix immediately — compliance, security, and money — ✅ ALL FIXED (Round 1 + Round 3, see "Fixes shipped" below)
 
-1. **Enforce age verification at the point of sale** — wire a real checkout-time gate for firearm
+1. ✅ **Enforce age verification at the point of sale** — wire a real checkout-time gate for firearm
    products and flip the existing (but disabled) booking-engine gate on by default. *(Functional #1)*
-2. **Make waiver-expiry actually gate bookings**, not just display a banner. *(Functional #2)*
-3. **Add a federal-holiday calendar to the NICS 3-day computation.** *(Functional #3)*
-4. **Add blackout/business-hours checks to admin/manual bookings.** *(Functional #4)*
-5. **Lock down the FFL dealer endpoint** — require auth (or at minimum strip `notes` from public
+2. ✅ **Make waiver-expiry actually gate bookings**, not just display a banner. *(Functional #2)*
+3. ✅ **Add a federal-holiday calendar to the NICS 3-day computation.** *(Functional #3)*
+4. ✅ **Add blackout/business-hours checks to admin/manual bookings.** *(Functional #4)*
+5. ✅ **Lock down the FFL dealer endpoint** — require auth (or at minimum strip `notes` from public
    responses) and rate-limit `/dealers/{id}` the same as `/dealers/search`. *(Functional #6)*
-6. **Fix the llms.txt hook-order bug** so AI answer engines stop getting stale business info. *(SEO #5)*
-7. **Restore Product schema** for the entire catalog. *(SEO #1)*
-8. **Fix the FFL SMS bridge's mismatched hook name** so transfer texts go through the TCPA-compliant
+6. ✅ **Fix the llms.txt hook-order bug** so AI answer engines stop getting stale business info. *(SEO #5)*
+7. ✅ **Restore Product schema** for the entire catalog. *(SEO #1)*
+8. ✅ **Fix the FFL SMS bridge's mismatched hook name** so transfer texts go through the TCPA-compliant
    messaging engine like every other message type. *(Functional #7)*
-9. **Fix the dashboard-app login token-overwrite bug** before staff rely on the live (non-mock) build. *(Functional #9)*
-10. **Make webhook handlers reflect real failure states** (non-2xx on failure, not an always-200 that
+9. ✅ **Fix the dashboard-app login token-overwrite bug** before staff rely on the live (non-mock) build. *(Functional #9)*
+10. ✅ **Make webhook handlers reflect real failure states** (non-2xx on failure, not an always-200 that
     silently drops retries) across booking-engine's four payment gateways. *(Functional #10)*
-11. **Add a unique constraint (or an atomic claim step) on FFL `transfers.order_id`** and give the
+11. ✅ **Add a unique constraint (or an atomic claim step) on FFL `transfers.order_id`** and give the
     carrier-webhook/status-bridge advance handlers a `WHERE status = <expected>` precondition — closes
     both the duplicate-transfer-per-order and duplicate-status-notification races. *(Functional #14a/14b)*
-12. **Add dedup protection to the membership CSV importer's payment-commit step** before it's used again
+12. ✅ **Add dedup protection to the membership CSV importer's payment-commit step** before it's used again
     for any future migration/reconciliation pass. *(Functional #14d)*
 
 ### High-value, schedule soon — ✅ ALL FIXED 2026-07-11 (see "Fixes shipped" Round 2 below)
@@ -519,15 +519,15 @@ Ranked across all four audits, grouped by what kind of attention each needs.
 22. ✅ Fix the mobile drawer's iOS scroll-lock and bring the dashboard-app's own mobile nav up to the same standard. *(Responsive #3, #4)*
 23. ✅ Add an atomic precondition to the FFL transfer-status advance handlers and the corporate-group seat-capacity check. *(Functional #14b/14c)*
 
-### Medium-term, real but contained
+### Medium-term, real but contained — ✅ ALL FIXED 2026-07-11 (see "Fixes shipped" Round 3 below)
 
-24. Add `UNIQUE(gateway, transaction_id)` to the payments table; fix PayPal's refund-ledger gap. *(Functional #15, #16)*
-25. Replace the booking-engine reminder cron's accidentally-correct timezone math with an explicit, tested implementation. *(Functional #11)*
-26. Build a real CSS token-bridge and re-skin Memberistic's account dashboard onto it. *(UI #3, #6)*
-27. Fix the five invisible-bullet CSS rules and add a hover state to the machine-gun cards. *(UI #7, #8)*
-28. Add a `md:` breakpoint step to the dashboard's KPI grids and widen the FFL widget's iOS-zoom fix. *(Responsive #5, #10)*
-29. Finish the NAP/pricing sweep (now 18 + 11 files) before the next time hours or prices change. *(SEO #6)*
-30. Replace Memberistic's fixed grace-period "reconciliation" with a real Stripe-state poll. *(Functional #18)*
+24. ✅ Add `UNIQUE(gateway, transaction_id)` to the payments table; fix PayPal's refund-ledger gap. *(Functional #15, #16)*
+25. ✅ Replace the booking-engine reminder cron's accidentally-correct timezone math with an explicit, tested implementation. *(Functional #11)*
+26. ✅ Build a real CSS token-bridge and re-skin Memberistic's account dashboard onto it. *(UI #3, #6)*
+27. ✅ Fix the five invisible-bullet CSS rules and add a hover state to the machine-gun cards. *(UI #7, #8)*
+28. ✅ Add a `md:` breakpoint step to the dashboard's KPI grids and widen the FFL widget's iOS-zoom fix. *(Responsive #5, #10)*
+29. ✅ Finish the NAP/pricing sweep (now 27 + 11 files) before the next time hours or prices change. *(SEO #6)*
+30. ✅ Replace Memberistic's fixed grace-period "reconciliation" with a real Stripe-state poll. *(Functional #18)*
 
 ### Low priority / hygiene, batch together
 
@@ -570,16 +570,50 @@ itself drifted (see finding #4 above).
 | 21 | Re-skinned the Verifyistic popup and booking-widget CSS off their own hardcoded teal/blue palettes onto the theme's brass/void/gunmetal tokens and font stack; fixed the `#D2691E` inline-style fallback in `class-frontend.php` so a CSS-load failure can no longer render a third, unrelated color. (A further ~29 files carrying the old blue/orange as WP option *defaults* were identified but left untouched — flagged as a follow-up.) | `verifyistic/assets/css/frontend.css`, `g2a-booking-engine/assets/css/frontend.css`, `g2a-booking-engine/includes/class-frontend.php` |
 | 22 | Added a shared `useDialogA11y` hook (focus trap, Escape-to-close, focus restore) to the four dashboard-app modals (AI Models, AI Agents, Leads, Reports) and to the mobile nav drawer (which also gained a body-scroll lock); added a new `ErrorState` component and wired it into the 7 analytics pages that previously rendered a real API error as "No data". The theme's own mobile drawer scroll-lock was fixed with the standard `position:fixed` + scroll-restore technique. | `dashboard-app/src/lib/hooks.ts`, `.../components/ui/ErrorState.tsx`, `.../components/layout/AppLayout.tsx`, `.../pages/{AIModels,AIAgents,Leads,Reports,BookingRevenue,WooStoreAnalytics,MembershipRevenue,BusinessAnalysis,InsightisticAnalytics,SEOGrowth,ShooterInsights}.tsx`; `guns2ammo/assets/css/app.css`, `assets/js/chrome.js` |
 
-Versions after both rounds: g2a-booking-engine → **1.9.9.6**, advanced-ffl-checkout → **1.9.2**,
+Versions after Rounds 1-2: g2a-booking-engine → **1.9.9.6**, advanced-ffl-checkout → **1.9.2**,
 memberistic-membership-solutions → **1.10.3**, guns2ammo theme → **1.27.10**, g2a-pos-core → **3.1.7**,
-messageistic → **0.5.2**, verifyistic → **1.4.2**. Packaged archives are in `releases/` (previous
-version of each retained alongside, per this repo's convention); `INSTALL.md`'s version table was
-updated to match. `dashboard-app` has no plugin-zip release artifact (it's deployed separately per
-`DEPLOYMENT.md`) — its changes are committed and ready for the next deploy.
+messageistic → **0.5.2**, verifyistic → **1.4.2**.
 
-**Not yet fixed** — the "Medium-term" and "Low priority / hygiene" tiers (Part 5, items 23 onward)
-remain open, along with the two follow-ups called out above (the non-atomic rate limiter in four other
-plugins; ~29 files still carrying the pre-re-skin blue/orange as option defaults in g2a-booking-engine).
+### Round 3 — the remaining "Fix immediately" items (4, 7-12) + the entire "Medium-term" tier
+
+Auditing our own prior work turned up a gap: only 5 of the 12 "Fix immediately" items (1, 2, 3, 5, 6)
+were actually implemented in Round 1, even though the report already marked the tier as addressed. The
+7 higher-severity items below were fixed first, ahead of the medium-term work that was originally
+requested for this round, since they outrank it.
+
+| # | Fix | Files |
+|---|---|---|
+| 4 | Admin/manual bookings now run the same blackout + business-hours check as public bookings, gated behind an explicit, audit-logged `override_availability` param for the rare legitimate override (e.g. a manager honoring a phone booking outside posted hours). | `g2a-booking-engine/includes/rest/class-admin-bookings-controller.php` |
+| 7 | Removed the theme's own `g2a_seo_plugin_active()` early-return around its Product JSON-LD block — `inc/seo.php`'s RankMath overlap guard already silences RankMath's own `rank_math/json_ld`/`rank_math/schema/output` filters, so the theme was the sole possible schema source and that guard was producing zero Product schema site-wide whenever RankMath was active. | `guns2ammo/inc/woocommerce.php` |
+| 8 | Messageistic's FFL bridge was listening for a hook advanced-ffl-checkout never fires (`ffl_transfer_status_changed` with a single array arg); rewired to the real `wpistic_ffl_transfer_status_changed( $transfer_id, $old_status, $new_status )` signature and to query the transfers table directly, so FFL status-change texts now go through the TCPA-compliant messaging engine instead of bypassing it via a separate webhook-only path. | `messageistic/includes/Integrations/FFL_Checkout/FFL_Integration.php` |
+| 9 | Fixed an object-spread ordering bug in the dashboard-app's login handler — `{ token: basic, ...server }` let the backend's own throwaway `token` field silently overwrite the real Basic-auth credential every subsequent request needs; reordered to `{ ...server, token: basic }`. | `dashboard-app/src/lib/api.ts` |
+| 10 | `g2a-booking-engine`'s webhook controller now returns HTTP 422 (not always-200) when a gateway event isn't actually handled, and logs it at `warning` severity instead of `info` — gateways can now tell a dropped/misrouted event from a real success and retry it. | `g2a-booking-engine/includes/rest/class-webhooks-controller.php` |
+| 11 | Added `UNIQUE KEY uniq_order (order_id)` to the FFL `transfers` table (the carrier-webhook/status-bridge `WHERE status = <expected>` half of this item was already fixed as Round 2 item 18); `create_transfer_on_payment()` now recovers from the duplicate-key case by re-querying the existing row and only fires the created-transfer side effects (email, dealer notify, `wpistic_ffl_transfer_created`) for the call that actually inserted it. | `advanced-ffl-checkout/includes/class-wpistic-ffl-db.php`, `.../class-wpistic-ffl-checkout.php` |
+| 12 | The membership CSV importer's `commit_payments()` now checks `Payments_Repository::get_by_gateway_transaction_id()` (the same dedup check the Stripe webhook path already used) before inserting, and reports a "Skipped (already imported)" count — safe to re-run a migration/reconciliation import. | `memberistic-membership-solutions/includes/admin/class-import-page.php` |
+
+With the compliance/security backlog closed, the originally-requested medium-term tier (items 24-30)
+was completed in the same round:
+
+| # | Fix | Files |
+|---|---|---|
+| 24 | Added `UNIQUE KEY uniq_gateway_txn (gateway, transaction_id(191))` to `g2ab_payments`; introduced a shared `g2ab_insert_or_update_payment()` helper (insert, recover from the duplicate-key failure by re-querying, update instead) and wired Stripe/PayPal/Authorize.Net onto it. PayPal's `mark_booking_refunded()` now also updates the payment ledger row (previously only the booking), pulling `capture_id` from `custom_id` or the PayPal `links` "up" relation as a fallback. | `g2a-booking-engine/includes/helpers/functions.php`, `.../class-installer.php`, `.../payments/class-stripe.php`, `.../class-paypal.php`, `.../class-authnet.php` |
+| 25 | Replaced the reminder cron's `strtotime()`+`gmdate()` window math — which only produced the correct wall-clock string because parsing "as UTC" and formatting "as UTC" happened to cancel out — with an explicit `wp_timezone()`-aware `DateTimeImmutable`, so the 24h/2h reminder windows stay correct through DST transitions instead of by accident. | `g2a-booking-engine/includes/modules/email-automation/class-email-cron.php` |
+| 26 | Built a `--memberistic-*` CSS custom-property token bridge mapped to the theme's own `--color-*`/`--font-*` tokens and re-skinned `frontend.css` (~155 hardcoded hex colors) onto it. | `memberistic-membership-solutions/assets/token-bridge.css`, `.../assets/frontend.css`, `.../includes/class-plugin.php`, `.../templates/account.php` |
+| 27 | Fixed five invisible-bullet CSS rules and added a hover state to the machine-gun cards; widened the FFL widget's iOS-zoom input fix. | `guns2ammo/assets/css/{ccw,book-a-lane,machine-gun}.css`, `advanced-ffl-checkout/assets/css/ffl-checkout.css`, `guns2ammo/page-templates/{template-ccw-syllabus,template-range-safety}.php` |
+| 28 | Added a `md:` breakpoint step to the dashboard-app's KPI grids so 2-column tablet layouts no longer jump straight from 1 to 4 columns. | 10 files under `dashboard-app/src/pages/` |
+| 29 | Extended the NAP/pricing sweep from the originally-scoped 18+11 files to all 27+11 files actually carrying hardcoded phone/address/hours/price strings (broad grep turned up 9 more than the audit's original file list); built a `g2a_biz()`-backed helper set plus a new `inc/pricing.php` (reads Memberistic's live `Plans_Repository` when active, transient-cached, invalidated on plan create/update) so a hours/price/NAP change in one place now shows up everywhere instead of drifting out of 20+ hardcoded copies. `template-about.php`'s two-bucket weekday/weekend hours card doesn't cleanly fit the real per-day hours table (Friday differs) — left as-is, flagged for a product decision on redesigning that card. | `guns2ammo/inc/pricing.php` (new), `guns2ammo/functions.php`, and 31 other theme files (see commit diff) |
+| 30 | Replaced the fixed 3-day grace-period guess with a real Stripe subscription-status check (`Stripe_Service::get_subscription()`) before hard-expiring a recurring membership: `active`/`trialing` re-syncs `renewal_date` from Stripe's `current_period_end` and skips expiry, `past_due`/`unpaid`/`incomplete` marks `past_due`, `canceled`/`incomplete_expired` proceeds to a genuine expiry. Falls back to the old fixed-grace-period heuristic only if Stripe is unreachable/misconfigured. | `memberistic-membership-solutions/includes/class-scheduler.php` |
+
+Versions after Round 3: g2a-booking-engine → **1.9.9.7** (DB schema 1.5.2), advanced-ffl-checkout →
+**1.9.3** (DB schema 1.4.1), memberistic-membership-solutions → **1.10.4**, guns2ammo theme →
+**1.27.11**, messageistic → **0.5.3**. g2a-pos-core and verifyistic are unchanged this round. Packaged
+archives are in `releases/` (previous version of each retained alongside, per this repo's convention);
+`INSTALL.md`'s version table was updated to match. `dashboard-app` has no plugin-zip release artifact
+(it's deployed separately per `DEPLOYMENT.md`) — its changes are committed and ready for the next deploy.
+
+**Not yet fixed** — only the "Low priority / hygiene" tier (Part 5, items 31-35) remains open, along
+with the two follow-ups called out in Round 2 (the non-atomic rate limiter in four other plugins; ~29
+files still carrying the pre-re-skin blue/orange as option defaults in g2a-booking-engine).
 
 ## Appendix — audit scope note
 

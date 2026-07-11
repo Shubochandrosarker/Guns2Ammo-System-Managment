@@ -11,6 +11,13 @@
 if ( ! defined( 'ABSPATH' ) ) exit;
 get_header();
 
+// Single source of truth for NAP — see inc/business-info.php.
+$g2a_biz          = function_exists( 'g2a_biz' ) ? g2a_biz() : array();
+$g2a_legal_email  = $g2a_biz['email'] ?? 'sales@guns2ammo.com';
+$g2a_legal_phone  = $g2a_biz['phone'] ?? '(602) 715-2677';
+$g2a_legal_addr   = 'Guns 2 Ammo, ' . ( $g2a_biz['addr1'] ?? '6030 E Main St, Suite 103' ) . ', ' . ( $g2a_biz['addr2'] ?? 'Mesa, AZ 85205' );
+$g2a_legal_addr_no_prefix = ( $g2a_biz['addr1'] ?? '6030 E Main St, Suite 103' ) . ', ' . ( $g2a_biz['addr2'] ?? 'Mesa, AZ 85205' );
+
 $slug    = '';
 $qo      = get_queried_object();
 if ( $qo && isset( $qo->post_name ) ) $slug = $qo->post_name;
@@ -27,7 +34,7 @@ $docs = [
 			[ 'h' => 'Sharing Your Information', 'p' => [ 'We do not sell your personal information. We share it only with service providers who help us operate the business (such as payment processors and email tools), and when required by law or to comply with firearms regulations.' ] ],
 			[ 'h' => 'Data Security & Retention', 'p' => [ 'We use reasonable administrative and technical safeguards to protect your information, and retain it only as long as needed for the purposes above or as required by law. Firearms transaction records are retained as mandated by federal regulation.' ] ],
 			[ 'h' => 'Your Choices', 'p' => [ 'You may request access to, correction of, or deletion of the personal information we hold about you, subject to legal record-keeping requirements. To make a request, contact us using the details below.' ] ],
-			[ 'h' => 'Contact Us', 'p' => [ 'Questions about this policy? Email sales@guns2ammo.com, call (602) 715-2677, or write to Guns 2 Ammo, 6030 E Main St, Suite 103, Mesa, AZ 85205.' ] ],
+			[ 'h' => 'Contact Us', 'p' => [ 'Questions about this policy? Email ' . $g2a_legal_email . ', call ' . $g2a_legal_phone . ', or write to ' . $g2a_legal_addr . '.' ] ],
 		],
 	],
 	'terms-and-conditions' => [
@@ -43,7 +50,7 @@ $docs = [
 			[ 'h' => 'Intellectual Property', 'p' => [ 'All content on this website  text, graphics, logos, and images  is the property of Guns 2 Ammo or its licensors and may not be reproduced without permission.' ] ],
 			[ 'h' => 'Limitation of Liability', 'p' => [ 'To the fullest extent permitted by law, Guns 2 Ammo is not liable for indirect or consequential damages arising from the use of our website, products, or facilities. Nothing in these terms limits liability that cannot be limited by law.' ] ],
 			[ 'h' => 'Governing Law', 'p' => [ 'These terms are governed by the laws of the State of Arizona. Any dispute will be handled in the state or federal courts located in Maricopa County, Arizona.' ] ],
-			[ 'h' => 'Contact Us', 'p' => [ 'Questions about these terms? Email sales@guns2ammo.com, call (602) 715-2677, or write to Guns 2 Ammo, 6030 E Main St, Suite 103, Mesa, AZ 85205.' ] ],
+			[ 'h' => 'Contact Us', 'p' => [ 'Questions about these terms? Email ' . $g2a_legal_email . ', call ' . $g2a_legal_phone . ', or write to ' . $g2a_legal_addr . '.' ] ],
 		],
 	],
 	'refund-and-returns-policy' => [
@@ -56,7 +63,7 @@ $docs = [
 			[ 'h' => 'FFL Transfer Fees', 'p' => [ 'Transfer fees cover work already performed and are non-refundable once a firearm has been received and processed.' ] ],
 			[ 'h' => 'Range Fees, Training & Events', 'p' => [ 'Range time and lane fees are non-refundable once used. Training courses may be rescheduled or refunded up to 48 hours before the class start time; inside 48 hours we will reschedule you at no charge.' ] ],
 			[ 'h' => 'Memberships', 'p' => [ 'Memberships can be cancelled at any time and remain active through the end of the current billing period. Membership fees already billed are not pro-rated or refunded.' ] ],
-			[ 'h' => 'How To Request A Return', 'p' => [ 'To start a return or ask a question, visit our Get Support page, email sales@guns2ammo.com, or call (602) 715-2677. Bring your item and proof of purchase to 6030 E Main St, Suite 103, Mesa, AZ 85205.' ] ],
+			[ 'h' => 'How To Request A Return', 'p' => [ 'To start a return or ask a question, visit our Get Support page, email ' . $g2a_legal_email . ', or call ' . $g2a_legal_phone . '. Bring your item and proof of purchase to ' . $g2a_legal_addr_no_prefix . '.' ] ],
 		],
 	],
 ];

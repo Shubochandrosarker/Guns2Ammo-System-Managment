@@ -10,6 +10,9 @@
  */
 if ( ! defined( 'ABSPATH' ) ) exit;
 
+// Single source of truth for NAP — see inc/business-info.php.
+$g2a_biz = function_exists( 'g2a_biz' ) ? g2a_biz() : array();
+
 $g2a_ccw_title       = 'Arizona CCW Class in Mesa, AZ | $85 · Saturdays 11:30 AM';
 $g2a_ccw_description = 'Arizona CCW class in Mesa: $85 · 4-hour classroom course, Saturdays 11:30 AM, DPS paperwork done in class. Live-fire option $149.99 · 5 hours. NRA-certified instructors.';
 $g2a_ccw_url         = home_url( '/arizona-ccw-certification/' );
@@ -69,17 +72,17 @@ $g2a_ccw_faqs = [
 ];
 
 /* Course JSON-LD for both formats + HowTo for the DPS application. */
-add_action( 'wp_head', function () use ( $g2a_ccw_url, $g2a_ccw_description ) {
+add_action( 'wp_head', function () use ( $g2a_ccw_url, $g2a_ccw_description, $g2a_biz ) {
 	$place = [
 		'@type'   => 'Place',
-		'name'    => 'Guns 2 Ammo',
+		'name'    => $g2a_biz['name'] ?? 'Guns 2 Ammo',
 		'address' => [
 			'@type'           => 'PostalAddress',
-			'streetAddress'   => '6030 E Main St, Suite 103',
-			'addressLocality' => 'Mesa',
-			'addressRegion'   => 'AZ',
-			'postalCode'      => '85205',
-			'addressCountry'  => 'US',
+			'streetAddress'   => $g2a_biz['addr1'] ?? '6030 E Main St, Suite 103',
+			'addressLocality' => $g2a_biz['city'] ?? 'Mesa',
+			'addressRegion'   => $g2a_biz['region'] ?? 'AZ',
+			'postalCode'      => $g2a_biz['postal'] ?? '85205',
+			'addressCountry'  => $g2a_biz['country'] ?? 'US',
 		],
 	];
 	$area  = [
@@ -456,10 +459,10 @@ if ( function_exists( 'g2a_emit_jsonld' ) && function_exists( 'g2a_faq_schema' )
     <?php if ( isset( $_GET['g2a_sent'] ) ) : ?>
       <div class="alert success" style="margin-top:22px;">
         <span class="ic"></span>
-        <div><div class="h">Request Received</div>Thanks — your CCW class reservation request is in. Our team will reach out to confirm your date. For anything urgent, call (602)&nbsp;715-2677.</div>
+        <div><div class="h">Request Received</div>Thanks — your CCW class reservation request is in. Our team will reach out to confirm your date. For anything urgent, call <?php echo str_replace( ' ', '&nbsp;', esc_html( trim( $g2a_biz['phone'] ?? '(602) 715-2677' ) ) ); ?>.</div>
       </div>
     <?php else : ?>
-      <p class="rf-intro">Pick your course, tell us when you'd like to attend, and our team will confirm your seat by phone or email — usually within one business day. Guns 2 Ammo · 6030 E Main St #103, Mesa, AZ 85205.</p>
+      <p class="rf-intro">Pick your course, tell us when you'd like to attend, and our team will confirm your seat by phone or email — usually within one business day. <?php echo esc_html( ( $g2a_biz['name'] ?? 'Guns 2 Ammo' ) . ' · ' . ( $g2a_biz['addr1'] ?? '6030 E Main St, Suite 103' ) . ', ' . ( $g2a_biz['addr2'] ?? 'Mesa, AZ 85205' ) ); ?>.</p>
       <div>
           <?php echo g2a_plugin_section( 'g2a_event_booking' ); ?>
         </div>

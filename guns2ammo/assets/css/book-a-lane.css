@@ -78,7 +78,7 @@
 @media (max-width:640px){ .info-grid .container { grid-template-columns: 1fr; } }
 .info-card ul { list-style:none; padding:0; margin:12px 0 0; display:grid; gap:7px; }
 .info-card ul li { font-size:13px; color:var(--color-fog); padding-left:16px; position:relative; line-height:1.55; }
-.info-card ul li::before { content:""; position:absolute; left:0; color:var(--color-brass-bright); font-size:8px; top:4px; }
+.info-card ul li::before { content:""; position:absolute; left:0; top:0.45em; width:6px; height:6px; background: var(--color-brass-bright); border-radius:50%; }
 .info-card .more { display:inline-block; margin-top:14px; font-family:var(--font-condensed); font-weight:600; font-size:11px; letter-spacing:0.12em; text-transform:uppercase; color:var(--color-ember); text-decoration:none; }
 .info-card { padding: 24px; background: var(--color-gunmetal); border:1px solid var(--color-hairline); }
 .info-card .ic { width:36px; height:36px; border:1.5px solid var(--color-brass); display:grid; place-items:center; color: var(--color-brass-bright); margin-bottom:14px; }

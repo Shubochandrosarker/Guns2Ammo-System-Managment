@@ -26,7 +26,7 @@ export function BookingRevenue() {
         subtitle="Lanes, classes, Ladies Tuesday, CCW, private events — where bookings convert and where they leak."
       />
 
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
         <StatCard label="Booking revenue" value={totalRevenue}          format="currency" intent="success" />
         <StatCard label="Conversion"      value={d.conversionRate}      format="percent"  sublabel="Landing → booked" />
         <StatCard label="Cancellation"    value={d.cancellationRate}    format="percent"  intent="warn" />

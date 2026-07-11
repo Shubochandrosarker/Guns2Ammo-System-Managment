@@ -10,6 +10,13 @@
 if ( ! defined( 'ABSPATH' ) ) exit;
 get_header();
 
+// Single source of truth for NAP + hours — see inc/business-info.php.
+$g2a_biz             = function_exists( 'g2a_biz' ) ? g2a_biz() : array();
+$g2a_si_street       = trim( explode( ',', $g2a_biz['addr1'] ?? '6030 E Main St, Suite 103' )[0] );
+$g2a_si_city         = $g2a_biz['city'] ?? 'Mesa';
+$g2a_si_addr_line    = function_exists( 'g2a_biz_addr_line' ) ? g2a_biz_addr_line() : '6030 E Main St, Suite 103, Mesa, AZ 85205';
+$g2a_si_hours_human  = function_exists( 'g2a_biz_hours_human' ) ? g2a_biz_hours_human() : 'Mon–Thu 10am–6pm · Fri 10am–7pm · Sat 10am–7pm · Sun 12pm–6pm';
+
 $slug = '';
 $qo   = get_queried_object();
 if ( $qo && isset( $qo->post_name ) ) $slug = $qo->post_name;
@@ -58,8 +65,8 @@ $pages = [
 		],
 		'detail_h' => 'PICKUP LOCATION & HOURS',
 		'detail'  => [
-			'Guns 2 Ammo  6030 E Main St, Suite 103, Mesa, AZ 85205.',
-			'Mon, Wed, Thu 10am6pm  Sat 9am8pm  Sun 12pm6pm  Friday closed.',
+			( $g2a_biz['name'] ?? 'Guns 2 Ammo' ) . ' · ' . $g2a_si_addr_line . '.',
+			$g2a_si_hours_human . '.',
 			'Ammunition and accessories are released immediately at pickup.',
 			'Firearms release after ATF Form 4473 and an approved NICS background check.',
 		],
@@ -207,7 +214,7 @@ if ( function_exists( 'g2a_faq_schema' ) && function_exists( 'g2a_emit_jsonld' )
   <div class="si-cta">
     <span class="eyebrow" style="margin:0 auto 18px;">Ready When You Are</span>
     <h2 style="font-family:var(--font-display); font-size:clamp(36px,5vw,64px); color:var(--color-white);">QUESTIONS? WE'VE GOT ANSWERS.</h2>
-    <p style="color:var(--color-fog); max-width:52ch; margin:16px auto 28px;">Our team at 6030 E Main St in Mesa is happy to walk you through it in person or over the phone.</p>
+    <p style="color:var(--color-fog); max-width:52ch; margin:16px auto 28px;">Our team at <?php echo esc_html( $g2a_si_street ); ?> in <?php echo esc_html( $g2a_si_city ); ?> is happy to walk you through it in person or over the phone.</p>
     <div style="display:flex; gap:12px; justify-content:center; flex-wrap:wrap;">
       <a class="btn btn-ember btn-arrow" href="<?php echo esc_url( $d['cta_h'] ); ?>"><?php echo esc_html( $d['cta_t'] ); ?></a>
       <a class="btn btn-ghost" href="<?php echo esc_url( home_url( '/contact/' ) ); ?>">Contact Guns 2 Ammo</a>

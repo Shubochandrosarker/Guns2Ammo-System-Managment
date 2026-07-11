@@ -188,6 +188,73 @@ function g2ab_validate_payment_amount( $booking, $amount_paid ) {
 }
 
 /**
+ * Insert a g2ab_payments row, recovering safely if a concurrent webhook
+ * delivery already inserted a row for the same (gateway, transaction_id)
+ * — the table has a UNIQUE KEY on that pair specifically to catch this.
+ *
+ * Each gateway's mark_booking_paid() already does its own SELECT-then-
+ * insert-or-update to avoid duplicates in the common case (matching by
+ * transaction_id, a pending-row heuristic, etc.), but that check is not
+ * atomic with the insert — two near-simultaneous webhook deliveries for
+ * the same charge can both pass the SELECT and both attempt an INSERT.
+ * Without this helper the second INSERT would just fail silently (no
+ * unique key existed before) or, once the key exists, fail loudly and
+ * lose that delivery's data. This makes the failure recoverable: on a
+ * unique-key collision, fetch the row that won the race and UPDATE it
+ * with this call's data instead, so the payment is never dropped.
+ *
+ * @param string        $table   Full g2ab_payments table name.
+ * @param array         $data    Row data for INSERT. Must include 'gateway' and
+ *                               'transaction_id' (transaction_id may be empty/null —
+ *                               in that case no recovery is possible on collision,
+ *                               matching the column's NULL-is-distinct semantics).
+ * @param string[]|null $formats wpdb format specifiers, SAME LENGTH AND ORDER as $data,
+ *                               or null to let $wpdb auto-detect (matches $wpdb->insert()'s
+ *                               own optional-formats behavior).
+ * @return int|false Row id (new or recovered), or false on a non-recoverable failure.
+ */
+function g2ab_insert_or_update_payment( $table, array $data, $formats = null ) {
+	global $wpdb;
+
+	$inserted = $wpdb->insert( $table, $data, $formats );
+	if ( false !== $inserted ) {
+		return (int) $wpdb->insert_id;
+	}
+
+	$is_duplicate = false !== stripos( (string) $wpdb->last_error, 'uniq_gateway_txn' )
+		|| false !== stripos( (string) $wpdb->last_error, 'Duplicate entry' );
+	if ( ! $is_duplicate || empty( $data['transaction_id'] ) || empty( $data['gateway'] ) ) {
+		return false;
+	}
+
+	$existing_id = (int) $wpdb->get_var( $wpdb->prepare(
+		"SELECT id FROM {$table} WHERE gateway = %s AND transaction_id = %s LIMIT 1",
+		$data['gateway'],
+		$data['transaction_id']
+	) );
+	if ( ! $existing_id ) {
+		return false;
+	}
+
+	$update_data = $data;
+	unset( $update_data['booking_id'], $update_data['gateway'], $update_data['transaction_id'], $update_data['created_at'] );
+
+	$update_formats = null;
+	if ( is_array( $formats ) && count( $formats ) === count( $data ) ) {
+		// Map field => format so we can safely drop identity fields from the
+		// update payload without breaking positional format-array alignment.
+		$field_formats  = array_combine( array_keys( $data ), $formats );
+		$update_formats = array();
+		foreach ( array_keys( $update_data ) as $key ) {
+			$update_formats[] = $field_formats[ $key ];
+		}
+	}
+
+	$wpdb->update( $table, $update_data, array( 'id' => $existing_id ), $update_formats, array( '%d' ) );
+	return $existing_id;
+}
+
+/**
  * Build a signed access token for an invoice.
  *
  * Signature is HMAC-SHA256( uuid + '|' + exp, secret ). Used so invoice URLs

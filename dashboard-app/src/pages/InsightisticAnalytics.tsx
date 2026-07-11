@@ -25,7 +25,7 @@ export function InsightisticAnalytics() {
         subtitle="Google Analytics 4 sessions, engagement, and revenue attribution overlaid on the WordPress/WooCommerce truth-set."
       />
 
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
         <StatCard label="Sessions / 30d"     value={d.sessions}          format="number" />
         <StatCard label="Engaged sessions"   value={d.engagedSessions}   format="number" intent="success" />
         <StatCard label="Revenue attributed" value={d.revenueAttributed} format="currency" />

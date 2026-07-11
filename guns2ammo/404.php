@@ -2,6 +2,8 @@
 /** 404 page  Guns 2 Ammo */
 if ( ! defined( 'ABSPATH' ) ) exit;
 get_header();
+// Single source of truth for NAP — see inc/business-info.php.
+$g2a_biz = function_exists( 'g2a_biz' ) ? g2a_biz() : array();
 ?>
 <style>body { background: var(--color-void); overflow-x: hidden; }
   .e-shell { min-height: 100vh; display: grid; place-items: center; padding: 140px 24px 80px; position: relative; overflow: hidden; }
@@ -172,7 +174,7 @@ get_header();
         <a href="<?php echo esc_url( home_url( "/memberships/" ) ); ?>">
           <div class="ic"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="3" y="6" width="18" height="12" rx="1"/><line x1="3" y1="11" x2="21" y2="11"/></svg></div>
           <div class="t">Membership</div>
-          <div class="d">From $29.99/mo</div>
+          <div class="d">From <?php echo esc_html( function_exists( 'g2a_plan_price_from_fmt' ) ? g2a_plan_price_from_fmt() : '$29.99' ); ?>/mo</div>
         </a>
         <a href="<?php echo esc_url( home_url( "/blog/" ) ); ?>">
           <div class="ic"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M4 4h12a4 4 0 0 1 4 4v12H8a4 4 0 0 1-4-4z"/><line x1="8" y1="9" x2="16" y2="9"/><line x1="8" y1="13" x2="16" y2="13"/></svg></div>
@@ -192,7 +194,7 @@ get_header();
         <a href="<?php echo esc_url( home_url( "/contact/" ) ); ?>">
           <div class="ic"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M22 16.92V20a2 2 0 0 1-2.18 2 19.86 19.86 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6A19.86 19.86 0 0 1 2.12 4.18 2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg></div>
           <div class="t">Contact</div>
-          <div class="d">(602) 715-2677</div>
+          <div class="d"><?php echo esc_html( $g2a_biz['phone'] ?? '(602) 715-2677' ); ?></div>
         </a>
       </div>
 

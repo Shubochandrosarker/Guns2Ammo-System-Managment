@@ -11,15 +11,17 @@ if ( ! defined( 'ABSPATH' ) ) exit;
 
 /* ---------- Organization + WebSite JSON-LD (every page) ---------- */
 add_action( 'wp_head', function () {
+	// Single source of truth for NAP — see inc/business-info.php.
+	$g2a_biz = function_exists( 'g2a_biz' ) ? g2a_biz() : array();
 	$home  = home_url( '/' );
-	$phone = get_theme_mod( 'g2a_phone', '(602) 715-2677' );
+	$phone = $g2a_biz['phone'] ?? '(602) 715-2677';
 	$logo  = g2a_seo_image() ?: home_url( '/wp-content/uploads/g2a-logo.png' );
 
 	g2a_emit_jsonld( [
 		'@context' => 'https://schema.org',
 		'@type'    => 'Organization',
 		'@id'      => $home . '#organization',
-		'name'     => 'Guns 2 Ammo',
+		'name'     => $g2a_biz['name'] ?? 'Guns 2 Ammo',
 		'url'      => $home,
 		'logo'     => $logo,
 		'image'    => $logo,
@@ -27,11 +29,11 @@ add_action( 'wp_head', function () {
 		'description' => "Guns 2 Ammo is a Mesa, Arizona indoor shooting range, FFL-licensed firearm store, and NRA-certified training facility. We sell and buy firearms, run CCW certification courses, and offer range memberships.",
 		'address'  => [
 			'@type'           => 'PostalAddress',
-			'streetAddress'   => get_theme_mod( 'g2a_addr1', '6030 E Main St, Suite 103' ),
-			'addressLocality' => 'Mesa',
-			'addressRegion'   => 'AZ',
-			'postalCode'      => '85205',
-			'addressCountry'  => 'US',
+			'streetAddress'   => $g2a_biz['addr1'] ?? '6030 E Main St, Suite 103',
+			'addressLocality' => $g2a_biz['city'] ?? 'Mesa',
+			'addressRegion'   => $g2a_biz['region'] ?? 'AZ',
+			'postalCode'      => $g2a_biz['postal'] ?? '85205',
+			'addressCountry'  => $g2a_biz['country'] ?? 'US',
 		],
 		'contactPoint' => [
 			'@type'       => 'ContactPoint',
@@ -199,10 +201,13 @@ add_action( 'init', function () {
 	$home    = untrailingslashit( home_url( '/' ) );
 	$default = gmdate( DATE_W3C );
 
+	// Single source of truth for NAP — see inc/business-info.php.
+	$g2a_biz = function_exists( 'g2a_biz' ) ? g2a_biz() : array();
+
 	echo '<?xml version="1.0" encoding="UTF-8"?>' . "\n";
 	echo '<?xml-stylesheet type="text/xsl" href="' . esc_url( home_url( '/wp-sitemap.xsl' ) ) . '"?>' . "\n";
 	echo "<!-- Guns 2 Ammo  Mesa, AZ indoor shooting range, gun store & training facility. -->\n";
-	echo "<!-- Local business sitemap. NAP: Guns 2 Ammo, 6030 E Main St Suite 103, Mesa, AZ 85205, (602) 715-2677. -->\n";
+	echo '<!-- Local business sitemap. NAP: ' . ( $g2a_biz['name'] ?? 'Guns 2 Ammo' ) . ', ' . ( $g2a_biz['addr1'] ?? '6030 E Main St, Suite 103' ) . ', ' . ( $g2a_biz['addr2'] ?? 'Mesa, AZ 85205' ) . ', ' . ( $g2a_biz['phone'] ?? '(602) 715-2677' ) . ". -->\n";
 	echo '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:image="http://www.google.com/schemas/sitemap-image/1.1">' . "\n";
 
 	foreach ( g2a_sitemap_urls() as $u ) {
@@ -233,12 +238,15 @@ add_filter( 'robots_txt', function ( $output, $public ) {
 		return $output;
 	}
 
+	// Single source of truth for NAP — see inc/business-info.php.
+	$g2a_biz = function_exists( 'g2a_biz' ) ? g2a_biz() : array();
+
 	$lines = [];
 
 	$lines[] = '# ======================================================================';
 	$lines[] = '# robots.txt  Guns 2 Ammo';
 	$lines[] = '# Mesa, Arizona indoor shooting range, FFL gun store & NRA training facility';
-	$lines[] = '# 6030 E Main St, Suite 103, Mesa, AZ 85205  (602) 715-2677';
+	$lines[] = '# ' . ( $g2a_biz['addr1'] ?? '6030 E Main St, Suite 103' ) . ', ' . ( $g2a_biz['addr2'] ?? 'Mesa, AZ 85205' ) . '  ' . ( $g2a_biz['phone'] ?? '(602) 715-2677' );
 	$lines[] = '# ======================================================================';
 	$lines[] = '';
 

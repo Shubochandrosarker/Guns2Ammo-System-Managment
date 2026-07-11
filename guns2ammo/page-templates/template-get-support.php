@@ -10,6 +10,9 @@
 if ( ! defined( 'ABSPATH' ) ) exit;
 get_header();
 
+// Single source of truth for NAP + hours — see inc/business-info.php.
+$g2a_biz = function_exists( 'g2a_biz' ) ? g2a_biz() : array();
+
 $sent = isset( $_GET['g2a_sent'] );
 
 $topics = [
@@ -22,7 +25,7 @@ $topics = [
 ];
 
 $faq = [
-	[ 'q' => 'How fast will I hear back?', 'a' => 'Most support requests receive a reply within one business day. For anything urgent, call us at (602) 715-2677 during open hours.' ],
+	[ 'q' => 'How fast will I hear back?', 'a' => 'Most support requests receive a reply within one business day. For anything urgent, call us at ' . ( $g2a_biz['phone'] ?? '(602) 715-2677' ) . ' during open hours.' ],
 	[ 'q' => 'Can I cancel or change my membership here?', 'a' => 'Yes  submit a Membership request below and our team will process the change. You can also manage your plan from your member dashboard.' ],
 	[ 'q' => 'I have a question about selling a gun. Is this the right place?', 'a' => 'You can ask general questions here, but to receive an actual cash offer use the dedicated form on our Sell Your Gun page  it captures the firearm details our buyer needs.' ],
 ];
@@ -86,7 +89,7 @@ if ( function_exists( 'g2a_faq_schema' ) && function_exists( 'g2a_emit_jsonld' )
     <?php if ( $sent ) : ?>
       <div class="alert success" style="margin-top:22px;">
         <span class="ic"></span>
-        <div><div class="h">Request Received</div>Thanks  your support request is in. The right team member will follow up, usually within one business day. For anything urgent, call (602)&nbsp;715-2677.</div>
+        <div><div class="h">Request Received</div>Thanks  your support request is in. The right team member will follow up, usually within one business day. For anything urgent, call <?php echo str_replace( ' ', '&nbsp;', esc_html( trim( $g2a_biz['phone'] ?? '(602) 715-2677' ) ) ); ?>.</div>
       </div>
     <?php else : ?>
       <p style="color:var(--color-fog); font-size:14px; line-height:1.7; margin:12px 0 22px;">Pick the topic that fits best and tell us what is going on. Include any order or membership number so we can find your account fast.</p>
@@ -116,9 +119,9 @@ if ( function_exists( 'g2a_faq_schema' ) && function_exists( 'g2a_emit_jsonld' )
       </form>
     <?php endif; ?>
     <div class="gs-contact">
-      <div class="it"><strong>Call Us</strong><a href="tel:+16027152677">(602) 715-2677</a></div>
-      <div class="it"><strong>Visit</strong>6030 E Main St, Mesa, AZ 85205</div>
-      <div class="it"><strong>Hours</strong>MonThu 106  Sat 98  Sun 126</div>
+      <div class="it"><strong>Call Us</strong><a href="<?php echo esc_url( function_exists( 'g2a_biz_tel_href' ) ? g2a_biz_tel_href() : 'tel:+16027152677' ); ?>"><?php echo esc_html( $g2a_biz['phone'] ?? '(602) 715-2677' ); ?></a></div>
+      <div class="it"><strong>Visit</strong><?php echo esc_html( function_exists( 'g2a_biz_addr_line' ) ? g2a_biz_addr_line() : '6030 E Main St, Suite 103, Mesa, AZ 85205' ); ?></div>
+      <div class="it"><strong>Hours</strong><?php echo esc_html( function_exists( 'g2a_biz_hours_human' ) ? g2a_biz_hours_human() : 'Mon–Thu 10am–6pm · Fri 10am–7pm · Sat 10am–7pm · Sun 12pm–6pm' ); ?></div>
     </div>
   </div>
 </section>

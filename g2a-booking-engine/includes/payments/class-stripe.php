@@ -300,7 +300,7 @@ final class G2AB_Gateway_Stripe {
 				'processed_at' => current_time( 'mysql' ),
 			), array( 'id' => $existing ), array( '%s', '%f', '%s', '%s' ), array( '%d' ) );
 		} else {
-			$wpdb->insert( $pt, array(
+			g2ab_insert_or_update_payment( $pt, array(
 				'booking_id' => $booking->id,
 				'gateway' => 'stripe',
 				'transaction_id' => $session['id'],
@@ -311,7 +311,7 @@ final class G2AB_Gateway_Stripe {
 				'gateway_response' => wp_json_encode( $session ),
 				'processed_at' => current_time( 'mysql' ),
 				'created_at' => current_time( 'mysql' ),
-			) );
+			), array( '%d', '%s', '%s', '%f', '%s', '%s', '%s', '%s', '%s', '%s' ) );
 		}
 
 		// Audit log.

@@ -192,7 +192,13 @@ export const api = {
           method: 'POST',
           body: JSON.stringify({ email, password }),
         })
-        const session: Session = { token: basic, ...server }
+        // `server` is typed as Omit<Session, 'token'> but the PHP backend's
+        // /auth/login response actually does include its own `token` field
+        // (a throwaway random string, not a usable credential) — spreading
+        // it AFTER the explicit `token: basic` would silently overwrite the
+        // real Basic-auth credential every request needs, breaking auth on
+        // the very next call. Spread first, then set `token` so it always wins.
+        const session: Session = { ...server, token: basic }
         writeSession(session)
         return session
       } catch (err) {

@@ -8,6 +8,49 @@
  */
 if ( ! defined( 'ABSPATH' ) ) exit;
 get_header();
+// Single source of truth for NAP + hours — see inc/business-info.php.
+// Hours table below follows the same dynamic pattern used on the
+// homepage (front-page.php) so this page can never show a different
+// schedule than the rest of the site.
+$g2a_biz = function_exists( 'g2a_biz' ) ? g2a_biz() : array();
+$g2a_contact_day_labels = array(
+	0 => __( 'Sun', 'guns2ammo' ),
+	1 => __( 'Mon', 'guns2ammo' ),
+	2 => __( 'Tue', 'guns2ammo' ),
+	3 => __( 'Wed', 'guns2ammo' ),
+	4 => __( 'Thu', 'guns2ammo' ),
+	5 => __( 'Fri', 'guns2ammo' ),
+	6 => __( 'Sat', 'guns2ammo' ),
+);
+try {
+	$g2a_contact_now  = new DateTime( 'now', new DateTimeZone( $g2a_biz['timezone'] ?? 'America/Phoenix' ) );
+	$g2a_today_dow    = (int) $g2a_contact_now->format( 'w' );
+} catch ( \Exception $e ) {
+	$g2a_today_dow = (int) gmdate( 'w' );
+}
+$g2a_fmt_hour = function ( $mins ) {
+	$h = intdiv( $mins, 60 ); $am = $h < 12; $h12 = $h % 12 ?: 12;
+	return $h12 . ( $am ? 'am' : 'pm' );
+};
+// Collapse consecutive identical day-ranges into runs (Mon–Thu, Fri, Sat, Sun…)
+// exactly like the homepage hours block.
+$g2a_contact_hour_runs = array();
+$g2a_run_days = array(); $g2a_run_key = null;
+foreach ( array( 1, 2, 3, 4, 5, 6, 0 ) as $g2a_dow ) {
+	$g2a_hrs = $g2a_biz['hours'][ $g2a_dow ] ?? null;
+	$g2a_key = $g2a_hrs ? $g2a_hrs['open'] . '-' . $g2a_hrs['close'] : 'closed';
+	if ( $g2a_run_key === $g2a_key ) {
+		$g2a_run_days[] = $g2a_dow;
+		continue;
+	}
+	if ( $g2a_run_days ) {
+		$g2a_contact_hour_runs[] = array( $g2a_run_days, $g2a_run_key );
+	}
+	$g2a_run_days = array( $g2a_dow ); $g2a_run_key = $g2a_key;
+}
+if ( $g2a_run_days ) {
+	$g2a_contact_hour_runs[] = array( $g2a_run_days, $g2a_run_key );
+}
 ?>
 <style>body { background: var(--color-void); }
   .hero { padding: 140px 32px 80px; border-bottom:1px solid var(--color-hairline); }
@@ -94,7 +137,7 @@ get_header();
       <h2>SEND A MESSAGE</h2>
       <p class="sub">Replies within 1 business day. For urgent range questions, please call.</p>
       <?php if ( isset( $_GET['g2a_sent'] ) ) : ?>
-        <div class="alert success"><span class="ic"></span><div><div class="h">Message Received</div>Thanks  we'll be in touch within one business day. For anything urgent, call (602)&nbsp;715-2677.</div></div>
+        <div class="alert success"><span class="ic"></span><div><div class="h">Message Received</div>Thanks  we'll be in touch within one business day. For anything urgent, call <?php echo str_replace( ' ', '&nbsp;', esc_html( trim( $g2a_biz['phone'] ?? '(602) 715-2677' ) ) ); ?>.</div></div>
       <?php else : ?>
       <form method="post" action="<?php echo esc_url( g2a_form_action_url() ); ?>">
         <input type="hidden" name="action" value="g2a_request">
@@ -113,7 +156,7 @@ get_header();
 
         <div class="form-row">
           <div><label class="form-label">Full Name</label><input class="field" name="g2a_f_name" required placeholder="John Garcia"></div>
-          <div><label class="form-label">Phone</label><input class="field" name="g2a_f_phone" placeholder="(602) 715-2677"></div>
+          <div><label class="form-label">Phone</label><input class="field" name="g2a_f_phone" placeholder="<?php echo esc_attr( $g2a_biz['phone'] ?? '(602) 715-2677' ); ?>"></div>
         </div>
         <label class="form-label">Email</label>
         <input class="field" type="email" name="g2a_f_email" required placeholder="you@email.com">
@@ -123,7 +166,7 @@ get_header();
         <textarea class="field" name="g2a_f_message" rows="5" required placeholder="Tell us what you're after  we'll route it to the right person."></textarea>
         <label class="checkbox" style="margin-top: 14px;"><input type="checkbox" name="g2a_f_newsletter" value="Yes"> Subscribe to monthly range update newsletter (no spam  once per month).</label>
         <button class="btn btn-brass btn-lg" type="submit" style="width: 100%; margin-top: 22px;">Send Message </button>
-        <div class="form-help" style="text-align: center; margin-top: 12px;"> Or call (602) 715-2677 during business hours</div>
+        <div class="form-help" style="text-align: center; margin-top: 12px;"> Or call <?php echo esc_html( $g2a_biz['phone'] ?? '(602) 715-2677' ); ?> during business hours</div>
       </form>
       <?php endif; ?>
     </div>
@@ -131,12 +174,23 @@ get_header();
     <div class="info-side">
       <div class="info-card brass">
         <div class="k"> Visit</div>
-        <div class="v">6030 E Main St, Suite 103<br>Mesa, Arizona 85205</div>
+        <div class="v"><?php echo esc_html( $g2a_biz['addr1'] ?? '6030 E Main St, Suite 103' ); ?><br><?php echo esc_html( $g2a_biz['addr2'] ?? 'Mesa, AZ 85205' ); ?></div>
         <div style="margin-top: 18px;">
-          <div class="row"><span>Mon  Thu</span><span class="vh">10am  6pm</span></div>
-          <div class="row"><span>Fri</span><span class="vh">10am   7pm</span></div>
-          <div class="row"><span>Sat</span><span class="vh">10am  7pm</span></div>
-          <div class="row"><span>Sun</span><span class="vh">12pm  6pm</span></div>
+          <?php foreach ( $g2a_contact_hour_runs as $g2a_run ) :
+            list( $g2a_run_dow_list, $g2a_run_key ) = $g2a_run;
+            $g2a_run_is_now = in_array( $g2a_today_dow, $g2a_run_dow_list, true );
+            $g2a_run_label  = ( count( $g2a_run_dow_list ) > 1 )
+              ? $g2a_contact_day_labels[ $g2a_run_dow_list[0] ] . '–' . $g2a_contact_day_labels[ end( $g2a_run_dow_list ) ]
+              : $g2a_contact_day_labels[ $g2a_run_dow_list[0] ];
+            if ( 'closed' === $g2a_run_key ) {
+              $g2a_run_time = __( 'Closed', 'guns2ammo' );
+            } else {
+              list( $g2a_run_open, $g2a_run_close ) = array_map( 'intval', explode( '-', $g2a_run_key ) );
+              $g2a_run_time = $g2a_fmt_hour( $g2a_run_open ) . '  ' . $g2a_fmt_hour( $g2a_run_close );
+            }
+          ?>
+          <div class="row<?php echo $g2a_run_is_now ? ' now' : ''; ?>"><span><?php echo esc_html( $g2a_run_label ); ?></span><span class="vh"><?php echo esc_html( $g2a_run_time ); ?></span></div>
+          <?php endforeach; ?>
         </div>
       </div>
 
@@ -145,18 +199,26 @@ get_header();
                  map) with the animated brand pin overlaid — replaces the old
                  stylised schematic so the contact page shows the real
                  location and stays interactive. */ ?>
+        <?php
+        $g2a_contact_addr1  = $g2a_biz['addr1'] ?? '6030 E Main St, Suite 103';
+        $g2a_contact_addr2  = $g2a_biz['addr2'] ?? 'Mesa, AZ 85205';
+        $g2a_contact_map_q  = rawurlencode( ( $g2a_biz['name'] ?? 'Guns 2 Ammo' ) . ', ' . $g2a_contact_addr1 . ', ' . $g2a_contact_addr2 );
+        $g2a_contact_map_src = 'https://www.google.com/maps?q=' . $g2a_contact_map_q . '&output=embed';
+        // Short pin label: street only (drop ", Suite ###") to match the original design.
+        $g2a_contact_pin_street = trim( explode( ',', $g2a_contact_addr1 )[0] );
+        ?>
         <iframe
-          src="https://www.google.com/maps?q=Guns+2+Ammo,+6030+E+Main+St+%23103,+Mesa,+AZ+85205&output=embed"
+          src="<?php echo esc_url( $g2a_contact_map_src ); ?>"
           loading="lazy" referrerpolicy="no-referrer-when-downgrade"
-          title="<?php esc_attr_e( 'Guns 2 Ammo on Google Maps — 6030 E Main St Suite 103, Mesa AZ', 'guns2ammo' ); ?>"
+          title="<?php echo esc_attr( sprintf( /* translators: 1: street address, 2: city/state/zip */ __( 'Guns 2 Ammo on Google Maps — %1$s, %2$s', 'guns2ammo' ), $g2a_contact_addr1, $g2a_contact_addr2 ) ); ?>"
           allowfullscreen></iframe>
-        <div class="pin" aria-hidden="true"><span class="lbl">G2A — 6030 E Main</span><span class="dot"></span></div>
+        <div class="pin" aria-hidden="true"><span class="lbl">G2A — <?php echo esc_html( $g2a_contact_pin_street ); ?></span><span class="dot"></span></div>
       </div>
 
       <div class="info-card">
         <div class="k"> Direct</div>
-        <div class="row"><span>Phone</span><span class="vh"><a href="tel:+16027152677" style="color: inherit; text-decoration: none;">(602) 715-2677</a></span></div>
-        <div class="row"><span>Email</span><span class="vh">sales@guns2ammo.com</span></div>
+        <div class="row"><span>Phone</span><span class="vh"><a href="<?php echo esc_url( function_exists( 'g2a_biz_tel_href' ) ? g2a_biz_tel_href() : 'tel:+16027152677' ); ?>" style="color: inherit; text-decoration: none;"><?php echo esc_html( $g2a_biz['phone'] ?? '(602) 715-2677' ); ?></a></span></div>
+        <div class="row"><span>Email</span><span class="vh"><?php echo esc_html( $g2a_biz['email'] ?? 'sales@guns2ammo.com' ); ?></span></div>
         <div class="row"><span>FFL #</span><span class="vh">Available In Store</span></div>
       </div>
     </div>
@@ -182,7 +244,7 @@ get_header();
       </a>
       <a class="ql" href="<?php echo esc_url( home_url( "/memberships/" ) ); ?>">
         <div class="ic"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="3" y="6" width="18" height="12" rx="1"/><line x1="3" y1="11" x2="21" y2="11"/><line x1="7" y1="15" x2="11" y2="15"/></svg></div>
-        <div class="t">Membership</div><div class="d">From $29.99/mo</div>
+        <div class="t">Membership</div><div class="d">From <?php echo esc_html( function_exists( 'g2a_plan_price_from_fmt' ) ? g2a_plan_price_from_fmt() : '$29.99' ); ?>/mo</div>
       </a>
     </div>
   </div>

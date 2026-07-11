@@ -3,7 +3,7 @@
  * Plugin Name:       Messageistic
  * Plugin URI:        https://www.wordpressistic.com
  * Description:       Premium provider-independent SMS and customer communication engine. Supports self-hosted SMS via a local Android gateway app or Jasmin, plus OtterText, Twilio, and Testing providers through a pluggable adapter system.
- * Version:           0.5.2
+ * Version:           0.5.3
  * Requires at least: 6.2
  * Requires PHP:      8.0
  * Author:            WordPressistic
@@ -18,7 +18,7 @@
 
 defined( 'ABSPATH' ) || exit;
 
-define( 'MESSAGEISTIC_VERSION', '0.5.2' );
+define( 'MESSAGEISTIC_VERSION', '0.5.3' );
 define( 'MESSAGEISTIC_FILE', __FILE__ );
 define( 'MESSAGEISTIC_DIR', plugin_dir_path( __FILE__ ) );
 define( 'MESSAGEISTIC_URL', plugin_dir_url( __FILE__ ) );

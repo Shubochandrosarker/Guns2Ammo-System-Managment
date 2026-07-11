@@ -79,7 +79,7 @@ export function EmailManagement() {
         subtitle="Live Formistic enquiries, newsletter growth, SMS traffic, and BridGistic-generated drafts. Nothing goes out until you click Send."
       />
 
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
         <StatCard
           label="New enquiries today"
           value={formistic?.newToday ?? 0}

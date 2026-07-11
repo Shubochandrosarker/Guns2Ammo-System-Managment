@@ -13,6 +13,27 @@ $g2a_page_id                    = get_the_ID();
 $g2a_pricing_lane_fee_text      = get_post_meta( $g2a_page_id, 'pricing_walkin_lane_fee', true );
 $g2a_pricing_additional_text    = get_post_meta( $g2a_page_id, 'pricing_additional_shooter', true );
 $g2a_pricing_unlimited_text     = get_post_meta( $g2a_page_id, 'pricing_unlimited_text', true );
+
+/* Single source of truth for membership pricing — see inc/pricing.php.
+ * Reads Memberistic's Plans_Repository when the plugin is active, falls
+ * back to the last-known static prices otherwise. */
+$g2a_has_pricing_helper = function_exists( 'g2a_plan_price' );
+$g2a_plan_m = array(
+	'defender' => $g2a_has_pricing_helper ? g2a_plan_price( 'defender', 'monthly' ) : 29.99,
+	'patriot'  => $g2a_has_pricing_helper ? g2a_plan_price( 'patriot', 'monthly' ) : 39.99,
+	'guardian' => $g2a_has_pricing_helper ? g2a_plan_price( 'guardian', 'monthly' ) : 59.99,
+);
+$g2a_plan_a = array(
+	'defender' => $g2a_has_pricing_helper ? g2a_plan_price( 'defender', 'annual' ) : 299.99,
+	'patriot'  => $g2a_has_pricing_helper ? g2a_plan_price( 'patriot', 'annual' ) : 449.99,
+	'guardian' => $g2a_has_pricing_helper ? g2a_plan_price( 'guardian', 'annual' ) : 649.99,
+);
+$g2a_plan_save = array(
+	'defender' => $g2a_has_pricing_helper ? g2a_plan_annual_savings( 'defender' ) : 59.89,
+	'patriot'  => $g2a_has_pricing_helper ? g2a_plan_annual_savings( 'patriot' ) : 29.89,
+	'guardian' => $g2a_has_pricing_helper ? g2a_plan_annual_savings( 'guardian' ) : 69.89,
+);
+$g2a_plan_max_save = max( $g2a_plan_save );
 ?>
 <style>.ph-hero { padding: 140px 32px 60px; position:relative; overflow:hidden; background: var(--color-void); }
   .ph-hero .photo { position:absolute; inset:0; background-image: linear-gradient(180deg, var(--hero-scrim-soft), var(--hero-scrim-deep)), url("<?php echo esc_url( g2a_asset( 'img/guns2ammo-retail-floor-mesa.jpg' ) ); ?>"); background-size: cover; background-position: center; }
@@ -49,7 +70,7 @@ $g2a_pricing_unlimited_text     = get_post_meta( $g2a_page_id, 'pricing_unlimite
     <div class="eyebrow fade-up" style="margin-bottom:20px;">Membership  Range Fees</div>
     <h1 class="fade-up d1">RANGE TIME WITHOUT THE <em>HASSLE</em></h1>
     <p class="sub fade-up d2"><?php echo esc_html( $g2a_pricing_unlimited_text ? $g2a_pricing_unlimited_text : 'Unlimited lane access available with select plans. Members-only pricing. No contracts. Train when you want, with the people you trust.' ); ?></p>
-    <div class="micro fade-up d3">Cancel Anytime  No Lock-In  Save Up To $69.89 With Annual Billing</div>
+    <div class="micro fade-up d3">Cancel Anytime  No Lock-In  Save Up To $<?php echo esc_html( number_format( $g2a_plan_max_save, 2 ) ); ?> With Annual Billing</div>
   </div>
 </section>
 
@@ -62,15 +83,15 @@ $g2a_pricing_unlimited_text     = get_post_meta( $g2a_page_id, 'pricing_unlimite
     <label for="bill-a">Annual</label>
     <div class="pill"></div>
   </div>
-  <span class="save-pill" id="annual-save" style="opacity:0;">SAVE UP TO $69.89/YR</span>
+  <span class="save-pill" id="annual-save" style="opacity:0;">SAVE UP TO $<?php echo esc_html( number_format( $g2a_plan_max_save, 2 ) ); ?>/YR</span>
 </div>
 
 <div class="plans-wrap">
   <article class="plan fade-up d1" data-plan="defender">
     <div class="name">DEFENDER</div>
     <div class="tag">Individual  1 Person</div>
-    <div class="price"><span class="num" data-monthly="29.99" data-annual="299.99">$29.99</span><span class="per">/month</span></div>
-    <div class="pays">For the solo shooter who wants the best lane price in Mesa  Annual saves $59.89/year</div>
+    <div class="price"><span class="num" data-monthly="<?php echo esc_attr( $g2a_plan_m['defender'] ); ?>" data-annual="<?php echo esc_attr( $g2a_plan_a['defender'] ); ?>">$<?php echo esc_html( number_format( $g2a_plan_m['defender'], 2 ) ); ?></span><span class="per">/month</span></div>
+    <div class="pays">For the solo shooter who wants the best lane price in Mesa  Annual saves $<?php echo esc_html( number_format( $g2a_plan_save['defender'], 2 ) ); ?>/year</div>
     <ul class="feats">
       <li><strong>1 free hour of lane time</strong> per visit</li>
       <li>Bring friends: <strong>$15 / extra shooter / hour</strong></li>
@@ -87,8 +108,8 @@ $g2a_pricing_unlimited_text     = get_post_meta( $g2a_page_id, 'pricing_unlimite
     <div class="pop-banner"> Most Popular</div>
     <div class="name">PATRIOT</div>
     <div class="tag">Two-Person  2 People</div>
-    <div class="price"><span class="num" data-monthly="39.99" data-annual="449.99">$39.99</span><span class="per">/month</span></div>
-    <div class="pays">For couples, range buddies, and two-person teams  Annual saves $29.89/year</div>
+    <div class="price"><span class="num" data-monthly="<?php echo esc_attr( $g2a_plan_m['patriot'] ); ?>" data-annual="<?php echo esc_attr( $g2a_plan_a['patriot'] ); ?>">$<?php echo esc_html( number_format( $g2a_plan_m['patriot'], 2 ) ); ?></span><span class="per">/month</span></div>
+    <div class="pays">For couples, range buddies, and two-person teams  Annual saves $<?php echo esc_html( number_format( $g2a_plan_save['patriot'], 2 ) ); ?>/year</div>
     <ul class="feats">
       <li>Covers 2 people  primary + 1 linked profile</li>
       <li><strong>1 free hour of lane time</strong> for the primary member</li>
@@ -104,8 +125,8 @@ $g2a_pricing_unlimited_text     = get_post_meta( $g2a_page_id, 'pricing_unlimite
   <article class="plan fade-up d3" data-plan="guardian">
     <div class="name">GUARDIAN</div>
     <div class="tag">Family / Group  4 People</div>
-    <div class="price"><span class="num" data-monthly="59.99" data-annual="649.99">$59.99</span><span class="per">/month</span></div>
-    <div class="pays">For families and groups of up to 4 shooters  Annual saves $69.89/year</div>
+    <div class="price"><span class="num" data-monthly="<?php echo esc_attr( $g2a_plan_m['guardian'] ); ?>" data-annual="<?php echo esc_attr( $g2a_plan_a['guardian'] ); ?>">$<?php echo esc_html( number_format( $g2a_plan_m['guardian'], 2 ) ); ?></span><span class="per">/month</span></div>
+    <div class="pays">For families and groups of up to 4 shooters  Annual saves $<?php echo esc_html( number_format( $g2a_plan_save['guardian'], 2 ) ); ?>/year</div>
     <ul class="feats">
       <li>Covers 4 people  primary + 3 linked profiles</li>
       <li><strong>1 free hour of lane time</strong> for the primary member</li>
@@ -216,7 +237,7 @@ $g2a_pricing_unlimited_text     = get_post_meta( $g2a_page_id, 'pricing_unlimite
     <h2 class="sec" style="margin-bottom: 32px;">MEMBERSHIP FAQ</h2>
     <div class="acc">
       <details open><summary>Can I cancel anytime?</summary><div class="answer">Yes. Cancel from your member dashboard or email us  no fees, no questions, no contracts. Your access remains active until the end of your current billing period.</div></details>
-      <details><summary>How much does annual billing save?</summary><div class="answer">Annual billing is one upfront charge per year instead of twelve monthly payments. Defender is $299.99/year (saves $59.89), Patriot is $449.99/year (saves $29.89), and Guardian is $649.99/year (saves $69.89) versus paying month to month.</div></details>
+      <details><summary>How much does annual billing save?</summary><div class="answer">Annual billing is one upfront charge per year instead of twelve monthly payments. Defender is $<?php echo esc_html( number_format( $g2a_plan_a['defender'], 2 ) ); ?>/year (saves $<?php echo esc_html( number_format( $g2a_plan_save['defender'], 2 ) ); ?>), Patriot is $<?php echo esc_html( number_format( $g2a_plan_a['patriot'], 2 ) ); ?>/year (saves $<?php echo esc_html( number_format( $g2a_plan_save['patriot'], 2 ) ); ?>), and Guardian is $<?php echo esc_html( number_format( $g2a_plan_a['guardian'], 2 ) ); ?>/year (saves $<?php echo esc_html( number_format( $g2a_plan_save['guardian'], 2 ) ); ?>) versus paying month to month.</div></details>
       <details><summary>What does "linked profiles" mean for Patriot and Guardian?</summary><div class="answer">Patriot includes a primary member plus one linked profile (2 people total). Guardian includes a primary member plus three linked profiles (4 people total)  built for families or groups with separate people records. Each person gets their own waiver and check-in tracking. Add or swap linked members anytime from your dashboard.</div></details>
       <details><summary>Are there extra fees beyond the membership?</summary><div class="answer">No range fees, no equipment fees, no reservation fees. Members buy ammunition (or bring their own factory-new) and pay for rentals at the discounted rate. Targets are included.</div></details>
       <details><summary>Do you offer law enforcement, military, or veteran discounts?</summary><div class="answer">Yes  15% off any plan with a valid LEO, active military, or veteran ID, on top of any other promotion. Apply during checkout or at the front desk.</div></details>

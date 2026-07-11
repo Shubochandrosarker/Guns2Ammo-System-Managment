@@ -8,6 +8,8 @@
  */
 if ( ! defined( 'ABSPATH' ) ) exit;
 get_header();
+// Single source of truth for NAP — see inc/business-info.php.
+$g2a_biz = function_exists( 'g2a_biz' ) ? g2a_biz() : array();
 ?>
 <style>body { background: var(--color-void); }
   .hero { padding: 140px 32px 80px; border-bottom:1px solid var(--color-hairline); }
@@ -201,7 +203,7 @@ get_header();
         <?php if ( isset( $_GET['g2a_sent'] ) ) : ?>
           <div class="alert success" style="margin-top:14px;">
             <span class="ic"></span>
-            <div><div class="h">Request Received</div>Thanks - our FFL team will confirm your drop-off window by email or phone shortly. For anything urgent, call (602)&nbsp;715-2677.</div>
+            <div><div class="h">Request Received</div>Thanks - our FFL team will confirm your drop-off window by email or phone shortly. For anything urgent, call <?php echo str_replace( ' ', '&nbsp;', esc_html( trim( $g2a_biz['phone'] ?? '(602) 715-2677' ) ) ); ?>.</div>
           </div>
         <?php else : ?>
         <form method="post" action="<?php echo esc_url( g2a_form_action_url() ); ?>">

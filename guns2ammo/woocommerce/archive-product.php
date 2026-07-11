@@ -17,6 +17,9 @@ $cat    = sanitize_title( wp_unslash( $_GET['product_cat'] ?? '' ) );
 
 $cats = get_terms( [ 'taxonomy' => 'product_cat', 'hide_empty' => true ] );
 
+// Single source of truth for NAP — see inc/business-info.php.
+$g2a_biz = function_exists( 'g2a_biz' ) ? g2a_biz() : array();
+
 get_header( 'shop' );
 ?>
 <style>
@@ -138,7 +141,7 @@ get_header( 'shop' );
 				</div>
 				<div class="card">
 					<h4>Local Pickup</h4>
-					<p>Skip shipping. Reserve online and pick up at 6030 E Main St, Mesa.</p>
+					<p>Skip shipping. Reserve online and pick up at <?php echo esc_html( trim( explode( ',', $g2a_biz['addr1'] ?? '6030 E Main St, Suite 103' )[0] ) . ', ' . ( $g2a_biz['city'] ?? 'Mesa' ) ); ?>.</p>
 					<a href="<?php echo esc_url( home_url( '/shop-services/local-pickup/' ) ); ?>">Pickup Details &rarr;</a>
 				</div>
 				<div class="card">

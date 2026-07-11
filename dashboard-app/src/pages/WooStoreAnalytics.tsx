@@ -23,7 +23,7 @@ export function WooStoreAnalytics() {
         subtitle="Orders, product performance, category and brand revenue, refunds, and slow-movers."
       />
 
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
         <StatCard label="Orders"           value={d.orders}             format="number" />
         <StatCard label="Store revenue"    value={d.revenue}            format="currency" intent="success" />
         <StatCard label="Avg order value"  value={d.averageOrderValue}  format="currency" />

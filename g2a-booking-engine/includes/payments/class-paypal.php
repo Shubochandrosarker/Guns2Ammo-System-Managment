@@ -306,7 +306,7 @@ final class G2AB_Gateway_Paypal {
 				'processed_at' => current_time( 'mysql' ),
 			), array( 'id' => $existing ), array( '%s', '%s', '%f', '%s', '%s' ), array( '%d' ) );
 		} else {
-			$wpdb->insert( $pt, array(
+			g2ab_insert_or_update_payment( $pt, array(
 				'booking_id' => (int) $booking->id,
 				'gateway' => 'paypal',
 				'transaction_id' => $capture_id,
@@ -317,7 +317,7 @@ final class G2AB_Gateway_Paypal {
 				'gateway_response' => wp_json_encode( $res ),
 				'processed_at' => current_time( 'mysql' ),
 				'created_at' => current_time( 'mysql' ),
-			) );
+			), array( '%d', '%s', '%s', '%f', '%s', '%s', '%s', '%s', '%s', '%s' ) );
 		}
 
 		$wpdb->insert( $wpdb->prefix . 'g2ab_logs', array(
@@ -333,15 +333,53 @@ final class G2AB_Gateway_Paypal {
 
 	private function mark_booking_refunded( $res ) {
 		global $wpdb;
-		$uuid = $res['custom_id'] ?? '';
-		if ( empty( $uuid ) ) return array( 'handled' => false );
-		$bt = $wpdb->prefix . 'g2ab_bookings';
-		$booking = $wpdb->get_row( $wpdb->prepare( "SELECT * FROM {$bt} WHERE uuid = %s", $uuid ) );
-		if ( ! $booking ) return array( 'handled' => false );
 
-		$amount = (float) ( $res['amount']['value'] ?? 0 );
-		$wpdb->update( $bt, array( 'status' => 'refunded', 'updated_at' => current_time( 'mysql' ) ), array( 'id' => $booking->id ), array( '%s', '%s' ), array( '%d' ) );
-		do_action( 'g2ab_payment_refunded', $booking->id, $amount );
-		return array( 'handled' => true, 'booking_id' => $booking->id, 'status' => 'refunded' );
+		// PAYMENT.CAPTURE.REFUNDED resources don't reliably carry custom_id
+		// (it's copied from the original order only in some flows) — the
+		// dependable link back to the original capture is the "up" HATEOAS
+		// link PayPal always includes, pointing at
+		// .../v2/payments/captures/{capture_id}. Try custom_id first as a
+		// fast path, then fall back to parsing the capture id out of that
+		// link so a real-world refund payload (which is what's actually
+		// missing custom_id) can still be matched.
+		$capture_id = (string) ( $res['custom_id'] ?? '' );
+		if ( '' === $capture_id ) {
+			foreach ( (array) ( $res['links'] ?? array() ) as $link ) {
+				if ( isset( $link['rel'] ) && 'up' === $link['rel'] && ! empty( $link['href'] ) ) {
+					$path       = (string) wp_parse_url( (string) $link['href'], PHP_URL_PATH );
+					$segments   = array_filter( explode( '/', $path ) );
+					$capture_id = (string) end( $segments );
+					break;
+				}
+			}
+		}
+		if ( '' === $capture_id ) {
+			return array( 'handled' => false, 'reason' => 'no_capture_id' );
+		}
+
+		// Find the payment row by the capture id we stored as transaction_id
+		// at mark_booking_paid() time — same robust pattern the Stripe
+		// gateway uses, instead of re-deriving the booking from the webhook
+		// resource's own (unreliable) fields.
+		$pt      = $wpdb->prefix . 'g2ab_payments';
+		$payment = $wpdb->get_row( $wpdb->prepare( "SELECT * FROM {$pt} WHERE gateway = 'paypal' AND transaction_id = %s LIMIT 1", $capture_id ) );
+		if ( ! $payment ) {
+			return array( 'handled' => false, 'reason' => 'payment_not_found' );
+		}
+
+		$refund_amount = (float) ( $res['amount']['value'] ?? 0 );
+
+		$wpdb->update( $pt, array(
+			'status'        => 'refunded',
+			'refund_amount' => $refund_amount,
+		), array( 'id' => $payment->id ), array( '%s', '%f' ), array( '%d' ) );
+
+		$wpdb->update( $wpdb->prefix . 'g2ab_bookings', array(
+			'status'     => 'refunded',
+			'updated_at' => current_time( 'mysql' ),
+		), array( 'id' => $payment->booking_id ), array( '%s', '%s' ), array( '%d' ) );
+
+		do_action( 'g2ab_payment_refunded', $payment->booking_id, $refund_amount );
+		return array( 'handled' => true, 'booking_id' => $payment->booking_id, 'status' => 'refunded' );
 	}
 }

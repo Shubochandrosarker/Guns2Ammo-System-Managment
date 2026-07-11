@@ -79,7 +79,7 @@ export function SystemHealth() {
         actions={<button className="btn-secondary text-sm">Re-run checks</button>}
       />
 
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
         <StatCard label="Healthy" value={ok}    intent="success" />
         <StatCard label="Warnings" value={warn}  intent="warn" />
         <StatCard label="Errors"   value={error} intent="danger" />
@@ -176,7 +176,7 @@ export function SystemHealth() {
       </div>
 
       {namespaces.data && THIRD_PARTY_CARDS.some(c => namespaces.data!.detected[c.key]) && (
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mt-6">
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 mt-6">
           {THIRD_PARTY_CARDS.filter(c => namespaces.data!.detected[c.key]).map(c => (
             <Card key={c.key} title={c.label} subtitle={c.namespaceHint}>
               <span className="pill-green">detected</span>

@@ -364,7 +364,7 @@ final class G2AB_Gateway_Authnet {
 			$data['booking_id'] = (int) $booking->id;
 			$data['gateway']    = 'authnet';
 			$data['created_at'] = current_time( 'mysql' );
-			$wpdb->insert( $payments_table, $data );
+			g2ab_insert_or_update_payment( $payments_table, $data );
 		}
 
 		$wpdb->insert( $wpdb->prefix . 'g2ab_logs', array(

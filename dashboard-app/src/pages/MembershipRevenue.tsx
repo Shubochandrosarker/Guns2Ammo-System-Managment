@@ -22,7 +22,7 @@ export function MembershipRevenue() {
         subtitle="Active members, renewals, churn risk, corporate accounts, and per-plan revenue performance."
       />
 
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
         <StatCard label="Active members"     value={d.active}       format="number"  intent="success" />
         <StatCard label="New this period"    value={d.newThisPeriod}format="number"  />
         <StatCard label="MRR"                value={d.mrr}          format="currency" sublabel={`Corporate: ${d.corporate}`} />
