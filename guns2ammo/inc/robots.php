@@ -101,11 +101,18 @@ function g2a_robots_body() {
 		'ClaudeBot',
 		'anthropic-ai',
 		'PerplexityBot',
+		'Perplexity-User',
 		'Google-Extended',
 		'Applebot-Extended',
 		'CCBot',
 		'Bingbot',
 		'YouBot',
+		'DuckDuckBot',
+		'YandexBot',
+		'Amazonbot',
+		'cohere-ai',
+		'Bytespider',
+		'Meta-ExternalAgent',
 	) as $bot ) {
 		$lines[] = '';
 		$lines[] = 'User-agent: ' . $bot;

@@ -31,6 +31,93 @@ remove_action( 'woocommerce_sidebar', 'woocommerce_get_sidebar', 10 );
  *   zero Product schema site-wide whenever Rank Math was active.
  * - placeholder image fallback when product has no thumbnail
  * ------------------------------------------------------------------ */
+/**
+ * Real hasMerchantReturnPolicy for a product's Offer, sourced from the
+ * actual published policy at /refund-and-returns-policy/ (never
+ * fabricated): firearms are a final sale once transferred (federal
+ * law + safety), everything else gets the real 14-day accessories
+ * window stated on that page.
+ */
+function g2a_seo_product_return_policy( WC_Product $product ) {
+	$is_firearm = 'yes' === get_post_meta( $product->get_id(), '_wpistic_ffl_required', true );
+	$link       = home_url( '/refund-and-returns-policy/' );
+
+	if ( $is_firearm ) {
+		return [
+			'@type'                => 'MerchantReturnPolicy',
+			'returnPolicyCategory' => 'https://schema.org/MerchantReturnNotPermitted',
+			'merchantReturnLink'   => $link,
+		];
+	}
+
+	return [
+		'@type'                => 'MerchantReturnPolicy',
+		'returnPolicyCategory' => 'https://schema.org/MerchantReturnFiniteReturnWindow',
+		'merchantReturnDays'   => 14,
+		'returnMethod'         => 'https://schema.org/ReturnInStore',
+		'returnFees'           => 'https://schema.org/FreeReturn',
+		'merchantReturnLink'   => $link,
+	];
+}
+
+/**
+ * Real shippingDetails from the store's actual configured WooCommerce
+ * shipping zones — not a fabricated flat number. Firearms never ship
+ * direct-to-consumer (FFL transfer or in-store pickup only, per
+ * Terms & Conditions), so they intentionally get no shippingDetails at
+ * all rather than a misleading one. Delivery/handling time estimates
+ * are omitted because the store has no real transit-time data to
+ * report — same "never fabricated" rule this file already applies to
+ * aggregateRating below.
+ */
+function g2a_seo_product_shipping_details() {
+	static $details = null;
+	if ( null !== $details ) {
+		return $details;
+	}
+	$details = false;
+
+	if ( ! class_exists( 'WC_Shipping_Zones' ) ) {
+		return $details;
+	}
+
+	$cost = null;
+	foreach ( WC_Shipping_Zones::get_zones() as $zone_data ) {
+		foreach ( (array) ( $zone_data['shipping_methods'] ?? [] ) as $method ) {
+			if ( ! $method->is_enabled() ) {
+				continue;
+			}
+			if ( 'free_shipping' === $method->id ) {
+				$cost = 0.0;
+				break 2;
+			}
+			if ( 'flat_rate' === $method->id && null === $cost ) {
+				$cost = (float) $method->get_option( 'cost' );
+			}
+		}
+	}
+	if ( null === $cost ) {
+		return $details;
+	}
+
+	$countries = function_exists( 'WC' ) && WC()->countries
+		? array_keys( (array) WC()->countries->get_allowed_countries() )
+		: [ 'US' ];
+
+	$details = [
+		'@type'               => 'OfferShippingDetails',
+		'shippingRate'        => [
+			'@type'    => 'MonetaryAmount',
+			'value'    => $cost,
+			'currency' => get_woocommerce_currency(),
+		],
+		'shippingDestination' => array_map( function ( $country ) {
+			return [ '@type' => 'DefinedRegion', 'addressCountry' => $country ];
+		}, $countries ?: [ 'US' ] ),
+	];
+	return $details;
+}
+
 add_action( 'wp_head', function () {
 	if ( ! function_exists( 'is_product' ) || ! is_product() ) {
 		return;
@@ -43,6 +130,25 @@ add_action( 'wp_head', function () {
 		return;
 	}
 
+	$is_firearm = 'yes' === get_post_meta( $product->get_id(), '_wpistic_ffl_required', true );
+
+	$offer = [
+		'@type'                  => 'Offer',
+		'priceCurrency'          => get_woocommerce_currency(),
+		'price'                  => $product->get_price(),
+		'priceValidUntil'        => gmdate( 'Y-m-d', strtotime( '+90 days' ) ),
+		'availability'           => $product->is_in_stock() ? 'https://schema.org/InStock' : 'https://schema.org/OutOfStock',
+		'url'                    => get_permalink( $product->get_id() ),
+		'hasMerchantReturnPolicy'=> g2a_seo_product_return_policy( $product ),
+	];
+
+	if ( ! $is_firearm ) {
+		$shipping = g2a_seo_product_shipping_details();
+		if ( $shipping ) {
+			$offer['shippingDetails'] = $shipping;
+		}
+	}
+
 	$ld = [
 		'@context'    => 'https://schema.org',
 		'@type'       => 'Product',
@@ -53,13 +159,7 @@ add_action( 'wp_head', function () {
 			? wp_get_attachment_url( $product->get_image_id() )
 			: ( function_exists( 'wc_placeholder_img_src' ) ? wc_placeholder_img_src( 'woocommerce_single' ) : '' ),
 		'brand'       => [ '@type' => 'Brand', 'name' => get_bloginfo( 'name' ) ],
-		'offers'      => [
-			'@type'         => 'Offer',
-			'priceCurrency' => get_woocommerce_currency(),
-			'price'         => $product->get_price(),
-			'availability'  => $product->is_in_stock() ? 'https://schema.org/InStock' : 'https://schema.org/OutOfStock',
-			'url'           => get_permalink( $product->get_id() ),
-		],
+		'offers'      => $offer,
 	];
 
 	if ( $product->get_review_count() > 0 ) {

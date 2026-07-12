@@ -175,7 +175,7 @@ function g2a_faqs_data() {
 				),
 				array(
 					'q' => 'What is your refund policy?',
-					'a' => 'See our Refund and Returns Policy for full details. Most accessories are returnable within 30 days; firearms and ammunition follow stricter federal rules.',
+					'a' => 'See our Refund and Returns Policy for full details. Most accessories are returnable within 14 days; firearms and ammunition follow stricter federal rules.',
 				),
 			),
 		),

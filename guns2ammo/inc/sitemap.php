@@ -133,19 +133,69 @@ function g2a_sitemap_open() {
 	echo '<' . '?xml-stylesheet type="text/xsl" href="' . esc_url( home_url( '/?g2a_sitemap_xsl=1' ) ) . '"?' . '>' . "\n";
 }
 
+/**
+ * Real "last content change" timestamp for one sitemap slice, instead of
+ * stamping every sub-sitemap with the current request time regardless of
+ * whether anything in it actually changed. Falls back to now() only when
+ * the post type has no published rows yet (empty catalog, no posts).
+ * Cached for an hour alongside the other sitemap transients.
+ */
+function g2a_sitemap_last_modified( $post_type ) {
+	$cache_key = 'g2a_sitemap_lastmod_' . $post_type;
+	$cached    = get_transient( $cache_key );
+	if ( false !== $cached ) {
+		return $cached;
+	}
+
+	$latest = get_posts( array(
+		'post_type'      => $post_type,
+		'post_status'    => 'publish',
+		'posts_per_page' => 1,
+		'orderby'        => 'modified',
+		'order'          => 'DESC',
+		'no_found_rows'  => true,
+		'fields'         => 'ids',
+	) );
+
+	$lastmod = $latest
+		? get_post_modified_time( 'Y-m-d\TH:i:s+00:00', true, $latest[0] )
+		: gmdate( 'Y-m-d\TH:i:s+00:00' );
+
+	set_transient( $cache_key, $lastmod, HOUR_IN_SECONDS );
+	return $lastmod;
+}
+
+/* Invalidate the per-post-type freshness cache as soon as content actually
+   changes, rather than waiting up to an hour for a stale lastmod to clear. */
+add_action( 'save_post', function ( $post_id ) {
+	if ( wp_is_post_revision( $post_id ) ) {
+		return;
+	}
+	delete_transient( 'g2a_sitemap_lastmod_' . get_post_type( $post_id ) );
+} );
+add_action( 'deleted_post', function ( $post_id ) {
+	delete_transient( 'g2a_sitemap_lastmod_' . get_post_type( $post_id ) );
+} );
+
 function g2a_sitemap_render_index() {
 	g2a_sitemap_open();
 	echo '<sitemapindex xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">';
 	$base = trailingslashit( home_url() );
 	$now  = gmdate( 'Y-m-d\TH:i:s+00:00' );
-	foreach ( array(
-		'sitemap-pages.xml',
-		'sitemap-posts.xml',
-		'sitemap-products.xml',
-		'sitemap-product-cats.xml',
-		'sitemap-faqs.xml',
-	) as $slug ) {
-		echo '<sitemap><loc>' . esc_url( $base . $slug ) . '</loc><lastmod>' . esc_html( $now ) . '</lastmod></sitemap>';
+	$lastmods = array(
+		'sitemap-pages.xml'        => g2a_sitemap_last_modified( 'page' ),
+		'sitemap-posts.xml'        => g2a_sitemap_last_modified( 'post' ),
+		'sitemap-products.xml'     => post_type_exists( 'product' ) ? g2a_sitemap_last_modified( 'product' ) : $now,
+		// Term/category modified dates aren't tracked by WP core, and the
+		// FAQs sitemap is a single static URL — no reliable per-slice
+		// freshness signal exists for either, so these two keep the
+		// request-time fallback (documented here rather than silently
+		// implying a freshness guarantee that doesn't exist).
+		'sitemap-product-cats.xml' => $now,
+		'sitemap-faqs.xml'         => $now,
+	);
+	foreach ( $lastmods as $slug => $lastmod ) {
+		echo '<sitemap><loc>' . esc_url( $base . $slug ) . '</loc><lastmod>' . esc_html( $lastmod ) . '</lastmod></sitemap>';
 	}
 	echo '</sitemapindex>';
 }

@@ -4,8 +4,9 @@ import { Card } from '@/components/ui/Card'
 import { Spinner } from '@/components/ui/Spinner'
 import { useAsync, useDialogA11y } from '@/lib/hooks'
 import { api, type ModelCatalogEntry, type ModelPatch, type ModelTestResult } from '@/lib/api'
-import type { ModelConnection } from '@/types/analytics'
+import type { BrainStatsData, ModelConnection } from '@/types/analytics'
 import { cn } from '@/lib/cn'
+import { formatNumber } from '@/lib/format'
 
 const COST_STYLE: Record<ModelConnection['costLevel'], string> = {
   free:   'pill-green',
@@ -161,15 +162,7 @@ export function AIModelsRAGs() {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mt-6">
         <RoutingCard models={rows} />
 
-        <Card title="RAG stores" subtitle="Vector indexes powering agents">
-          <div className="text-sm text-ink-600">
-            No RAG stores are configured yet.
-          </div>
-          <div className="mt-2 text-xs text-ink-500">
-            RAG stores will appear here once a knowledge backend is connected
-            to the g2a-business-api plugin.
-          </div>
-        </Card>
+        <RagStoresCard />
       </div>
 
       {editor && (
@@ -250,6 +243,75 @@ function RoutingCard({ models }: { models: ModelConnection[] }) {
         ))}
       </ul>
     </Card>
+  )
+}
+
+/**
+ * The dashboard already has a fully working RAG backend — g2a-pos-core's
+ * shared AI Brain, bridged in-process by g2a-business-api's Brain_Client
+ * (GET /brain/stats), which reports the real backend (`cloudflare` when
+ * the cloudflare-rag-worker is configured, `local` otherwise) plus real
+ * document/chunk counts. This card used to hardcode "not configured"
+ * regardless of that live state; it now reads it, matching the same
+ * api.brain.stats() surface the AI Agents page already uses.
+ */
+function RagStoresCard() {
+  const stats = useAsync(() => api.brain.stats(), [])
+  const data = stats.data
+
+  return (
+    <Card title="RAG stores" subtitle="Vector indexes powering agents">
+      {stats.loading ? (
+        <Spinner label="Checking knowledge brain…" />
+      ) : !data || !data.ok ? (
+        <div className="text-sm text-ink-600">
+          <div>No RAG stores are configured yet.</div>
+          <div className="mt-2 text-xs text-ink-500">
+            RAG stores will appear here once a knowledge backend is connected
+            to the g2a-business-api plugin.
+          </div>
+        </div>
+      ) : (
+        <RagStatsGrid data={data.results} />
+      )}
+    </Card>
+  )
+}
+
+function RagStatsGrid({ data }: { data: BrainStatsData }) {
+  return (
+    <div>
+      <div className="grid grid-cols-2 gap-3">
+        <MiniStat label="Documents" value={formatNumber(data.documents)} />
+        <MiniStat label="Chunks"    value={formatNumber(data.chunks)} />
+        <MiniStat label="Embedded"  value={`${data.embedded_pct.toFixed(1)}%`} />
+        <MiniStat label="Backend"   value={data.backend === 'cloudflare' ? 'Cloudflare' : 'Local'} />
+      </div>
+      {data.by_source_type.length > 0 && (
+        <div className="mt-4">
+          <div className="text-[11px] uppercase tracking-wide text-ink-500 mb-1.5">By source type</div>
+          <ul className="text-sm space-y-1">
+            {data.by_source_type.map(t => (
+              <li key={t.source_type} className="flex items-center justify-between">
+                <span className="text-ink-700">{t.source_type}</span>
+                <span className="font-medium text-ink-800">
+                  {formatNumber(t.documents)} doc{t.documents === 1 ? '' : 's'} · {formatNumber(t.chunks)} chunk{t.chunks === 1 ? '' : 's'}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+    </div>
+  )
+}
+
+function MiniStat({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="bg-ink-50 rounded-lg px-3 py-2">
+      <div className="text-[11px] uppercase tracking-wide text-ink-500">{label}</div>
+      <div className="text-sm font-semibold text-ink-800 mt-0.5">{value}</div>
+    </div>
   )
 }
 

@@ -28,7 +28,7 @@ final class AuditLogRepository extends Repository {
 	public function verify_chain( int $limit = 5000 ): array {
 		global $wpdb;
 		$t      = $this->table( 'g2a_audit_logs' );
-		$rows   = $wpdb->get_results( "SELECT * FROM {$t} ORDER BY id ASC LIMIT {$limit}", ARRAY_A ) ?: array();
+		$rows   = $wpdb->get_results( $wpdb->prepare( "SELECT * FROM {$t} ORDER BY id ASC LIMIT %d", $limit ), ARRAY_A ) ?: array(); // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
 		$prev   = null;
 		$broken = array();
 		foreach ( $rows as $row ) {

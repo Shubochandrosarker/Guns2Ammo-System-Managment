@@ -58,6 +58,14 @@ export function SystemHealth() {
   const integrations = useAsync(() => api.system.integrations(), [])
   const namespaces = useAsync(() => api.system.namespaces(), [])
   const siteHealth = useAsync(() => api.system.siteHealth(), [])
+
+  function rerunChecks() {
+    q.refresh()
+    integrations.refresh()
+    namespaces.refresh()
+    siteHealth.refresh()
+  }
+
   if (q.loading) return <Spinner />
   const checks = q.data ?? []
   const grouped = new Map<SystemHealthCheck['group'], SystemHealthCheck[]>()
@@ -76,7 +84,7 @@ export function SystemHealth() {
         eyebrow="Operational health"
         title="System Health"
         subtitle="Plugins, APIs, cron, webhooks, messaging, AI, and security — everything the dashboard depends on."
-        actions={<button className="btn-secondary text-sm">Re-run checks</button>}
+        actions={<button className="btn-secondary text-sm" onClick={rerunChecks}>Re-run checks</button>}
       />
 
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">

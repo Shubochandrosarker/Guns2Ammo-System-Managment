@@ -289,11 +289,21 @@ add_action( 'wp_head', function () {
 	echo '<meta property="og:title" content="' . esc_attr( $title ) . '">' . "\n";
 	if ( $desc ) echo '<meta property="og:description" content="' . esc_attr( $desc ) . '">' . "\n";
 	echo '<meta property="og:url" content="' . esc_url( $url ) . '">' . "\n";
-	if ( $image ) echo '<meta property="og:image" content="' . esc_url( $image ) . '">' . "\n";
+	if ( $image ) {
+		echo '<meta property="og:image" content="' . esc_url( $image ) . '">' . "\n";
+		$dims = g2a_seo_image_dimensions( $image );
+		if ( $dims ) {
+			echo '<meta property="og:image:width" content="' . esc_attr( $dims[0] ) . '">' . "\n";
+			echo '<meta property="og:image:height" content="' . esc_attr( $dims[1] ) . '">' . "\n";
+		}
+	}
 	echo '<meta name="twitter:card" content="summary_large_image">' . "\n";
 	echo '<meta name="twitter:title" content="' . esc_attr( $title ) . '">' . "\n";
 	if ( $desc ) echo '<meta name="twitter:description" content="' . esc_attr( $desc ) . '">' . "\n";
-	if ( $image ) echo '<meta name="twitter:image" content="' . esc_url( $image ) . '">' . "\n";
+	if ( $image ) {
+		echo '<meta name="twitter:image" content="' . esc_url( $image ) . '">' . "\n";
+		echo '<meta name="twitter:image:alt" content="' . esc_attr( $title ) . '">' . "\n";
+	}
 }, 5 );
 
 function g2a_current_url() {
@@ -339,6 +349,30 @@ function g2a_seo_image() {
 		return get_the_post_thumbnail_url( null, 'large' );
 	}
 	return get_theme_mod( 'g2a_og_image', '' );
+}
+
+/**
+ * Real pixel width/height for an OG/Twitter image URL, resolved from its
+ * actual Media Library attachment — never a fabricated placeholder size.
+ * Returns null when the URL isn't a local attachment (e.g. an externally
+ * hosted image), so the width/height meta tags are simply omitted rather
+ * than emitting a guess.
+ *
+ * @return array{0:int,1:int}|null
+ */
+function g2a_seo_image_dimensions( $url ) {
+	if ( ! $url ) {
+		return null;
+	}
+	$attachment_id = attachment_url_to_postid( $url );
+	if ( ! $attachment_id ) {
+		return null;
+	}
+	$src = wp_get_attachment_image_src( $attachment_id, 'large' );
+	if ( ! $src || empty( $src[1] ) || empty( $src[2] ) ) {
+		return null;
+	}
+	return [ (int) $src[1], (int) $src[2] ];
 }
 
 /* ---------- JSON-LD: always-on LocalBusiness on every page ---------- */
