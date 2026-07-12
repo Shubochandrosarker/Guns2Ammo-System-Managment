@@ -366,9 +366,9 @@ final class G2AB_Admin {
 		echo '</div></div>';
 		echo '<style>
 			.g2ab-empty{margin:20px 20px 40px 0;}
-			.g2ab-empty__inner{background:linear-gradient(135deg,#0F1115 0%,#1F242C 60%,#2A3038 100%);color:#fff;padding:48px 40px;border-radius:14px;border:1px solid rgba(255,255,255,.06);position:relative;overflow:hidden;}
+			.g2ab-empty__inner{background:linear-gradient(135deg,#1A191E 0%,#1F242C 60%,#2A3038 100%);color:#fff;padding:48px 40px;border-radius:14px;border:1px solid rgba(255,255,255,.06);position:relative;overflow:hidden;}
 			.g2ab-empty__inner::before{content:"";position:absolute;top:-50%;right:-10%;width:50%;height:200%;background:radial-gradient(ellipse at center,rgba(74,93,58,.18) 0%,transparent 60%);pointer-events:none;}
-			.g2ab-empty__eyebrow{position:relative;z-index:1;display:inline-block;font-size:11px;letter-spacing:.18em;font-weight:700;color:#D2691E;margin-bottom:10px;}
+			.g2ab-empty__eyebrow{position:relative;z-index:1;display:inline-block;font-size:11px;letter-spacing:.18em;font-weight:700;color:#E8802F;margin-bottom:10px;}
 			.g2ab-empty__title{position:relative;z-index:1;color:#fff !important;font-size:30px;line-height:1.15;margin:0 0 8px;font-weight:800;letter-spacing:-.01em;font-family:"Inter","Segoe UI",system-ui,-apple-system,sans-serif;padding:0;}
 			.g2ab-empty__sub{position:relative;z-index:1;font-size:14px;color:rgba(255,255,255,.65);margin:0;max-width:540px;line-height:1.55;}
 		</style>';

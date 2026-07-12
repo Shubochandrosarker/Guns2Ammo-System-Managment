@@ -64,7 +64,7 @@ final class G2AB_Frontend_Shortcode_Events_Calendar {
 					'ts'       => G2AB_Events::timestamp( $o->start_at ),
 					'title'    => $ev->title,
 					'url'      => home_url( '/event/' . $ev->slug . '/' ),
-					'color'    => $ev->color ? $ev->color : '#D2691E',
+					'color'    => $ev->color ? $ev->color : '#E8802F',
 					'free'     => $free,
 					'price'    => $free ? 0 : round( (float) $o->price_effective, 2 ),
 					'cat'      => G2AB_Events::category_label( $ev->category ),
@@ -244,7 +244,7 @@ final class G2AB_Frontend_Shortcode_Events_Calendar {
 	private function print_css() {
 		?>
 		<style id="g2ab-ecal-styles">
-		.g2ab-ecal{--bg:#0F1115;--surface:#171B22;--surface2:#1E242E;--border:#2A323D;--text:#E8E8E8;--muted:#8A95A5;--orange:#D2691E;--green:#4CAF50;font-family:'Inter',system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;color:var(--text);margin:24px 0;}
+		.g2ab-ecal{--bg:#1A191E;--surface:#26252C;--surface2:#26252C;--border:#2A323D;--text:#F7F7F9;--muted:#A7A6AE;--orange:#E8802F;--green:#4CAF50;font-family:'Inter',system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;color:var(--text);margin:24px 0;}
 		.g2ab-ecal--light{--bg:#FFFFFF;--surface:#FFFFFF;--surface2:#F4F6FA;--border:#E2E6EE;--text:#1F2733;--muted:#6B7686;}
 		.g2ab-ecal *{box-sizing:border-box;}
 		.g2ab-ecal__heading{font-family:'Inter','Segoe UI',system-ui,-apple-system,sans-serif;font-size:clamp(22px,3vw,30px);letter-spacing:.04em;text-transform:uppercase;text-align:center;margin:0 0 18px;}
@@ -269,8 +269,8 @@ final class G2AB_Frontend_Shortcode_Events_Calendar {
 		.g2ab-ecal__cell.has-ev:hover{border-color:var(--muted);}
 		.g2ab-ecal__num{font-size:12px;color:var(--muted);font-weight:700;align-self:flex-end;}
 		.g2ab-ecal__cell.is-today .g2ab-ecal__num{color:var(--orange);}
-		.g2ab-ecal__pill{display:block;text-decoration:none;background:color-mix(in srgb, var(--p,#D2691E) 16%, var(--surface2));border-left:3px solid var(--p,#D2691E);border-radius:5px;padding:4px 6px;animation:g2ab-ecal-in .3s ease both;}
-		.g2ab-ecal__pill:hover{background:color-mix(in srgb, var(--p,#D2691E) 30%, var(--surface2));}
+		.g2ab-ecal__pill{display:block;text-decoration:none;background:color-mix(in srgb, var(--p,#E8802F) 16%, var(--surface2));border-left:3px solid var(--p,#E8802F);border-radius:5px;padding:4px 6px;animation:g2ab-ecal-in .3s ease both;}
+		.g2ab-ecal__pill:hover{background:color-mix(in srgb, var(--p,#E8802F) 30%, var(--surface2));}
 		.g2ab-ecal__pill.is-out{opacity:.5;}
 		.g2ab-ecal__pill-t{display:block;font-size:10px;color:var(--muted);font-weight:700;}
 		.g2ab-ecal__pill-n{display:block;font-size:12px;color:var(--text);font-weight:600;line-height:1.2;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
@@ -280,10 +280,10 @@ final class G2AB_Frontend_Shortcode_Events_Calendar {
 		.g2ab-ecal__empty{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:var(--muted);font-size:14px;pointer-events:none;}
 		.g2ab-ecal__side{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:18px;}
 		.g2ab-ecal__side-title{font-family:'Inter','Segoe UI',system-ui,-apple-system,sans-serif;font-size:17px;letter-spacing:.04em;text-transform:uppercase;color:var(--text);margin:0 0 14px;}
-		.g2ab-ecal__up{display:flex;gap:12px;text-decoration:none;padding:11px;border-radius:9px;border:1px solid var(--border);border-left:3px solid var(--p,#D2691E);margin-bottom:10px;background:var(--bg);transition:transform .12s ease,border-color .12s ease;animation:g2ab-ecal-in .3s ease both;}
+		.g2ab-ecal__up{display:flex;gap:12px;text-decoration:none;padding:11px;border-radius:9px;border:1px solid var(--border);border-left:3px solid var(--p,#E8802F);margin-bottom:10px;background:var(--bg);transition:transform .12s ease,border-color .12s ease;animation:g2ab-ecal-in .3s ease both;}
 		.g2ab-ecal__up:hover{transform:translateX(2px);border-left-color:var(--orange);}
 		.g2ab-ecal__up-date{text-align:center;min-width:38px;}
-		.g2ab-ecal__up-date b{display:block;font-family:'Inter','Segoe UI',system-ui,-apple-system,sans-serif;font-size:22px;color:var(--p,#D2691E);line-height:1;}
+		.g2ab-ecal__up-date b{display:block;font-family:'Inter','Segoe UI',system-ui,-apple-system,sans-serif;font-size:22px;color:var(--p,#E8802F);line-height:1;}
 		.g2ab-ecal__up-date small{display:block;font-size:9px;color:var(--muted);letter-spacing:.06em;font-weight:700;}
 		.g2ab-ecal__up-body{display:flex;flex-direction:column;gap:2px;min-width:0;}
 		.g2ab-ecal__up-time{font-size:11px;color:var(--muted);}

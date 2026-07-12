@@ -14,7 +14,7 @@
  *     'status'         => 'active',               // active | coming_soon
  *     'category'       => 'notifications',
  *     'icon'           => 'M',
- *     'color'          => '#4A5D3A',
+ *     'color'          => '#E8802F',
  *     'default_active' => true,
  *     'bootstrap'      => 'G2AB_Module_Email_Automation', // class with ::instance()
  *     'configure'      => 'admin.php?page=g2ab-settings&tab=email_automation',
@@ -150,7 +150,7 @@ final class G2AB_Module_Loader {
 				'default_active' => ! empty( $m['default_active'] ),
 				'category'       => isset( $m['category'] ) ? $m['category'] : 'developer',
 				'icon'           => isset( $m['icon'] ) ? $m['icon'] : 'M',
-				'color'          => isset( $m['color'] ) ? $m['color'] : '#4A5D3A',
+				'color'          => isset( $m['color'] ) ? $m['color'] : '#E8802F',
 			);
 			if ( ! empty( $m['configure'] ) ) $registry[ $id ]['configure'] = $m['configure'];
 		}

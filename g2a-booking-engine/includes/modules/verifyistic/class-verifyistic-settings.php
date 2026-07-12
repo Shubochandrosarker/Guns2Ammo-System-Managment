@@ -59,7 +59,7 @@ class G2AB_Verifyistic_Settings {
 			.g2ab-vfy__inline{display:flex;align-items:center;gap:8px;font-weight:500!important;text-transform:none;letter-spacing:0;}
 			.g2ab-vfy__kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;margin-bottom:14px;}
 			.g2ab-vfy__kpi{background:#fff;border:1px solid #d0d4d9;border-top:3px solid #14b8a6;padding:14px 16px;border-radius:6px;}
-			.g2ab-vfy__kpi span{display:block;font-size:11px;color:#8A95A5;letter-spacing:.06em;font-weight:700;text-transform:uppercase;}
+			.g2ab-vfy__kpi span{display:block;font-size:11px;color:#A7A6AE;letter-spacing:.06em;font-weight:700;text-transform:uppercase;}
 			.g2ab-vfy__kpi strong{display:block;font-size:24px;color:#0f2044;font-weight:800;margin-top:6px;}
 			.g2ab-vfy__table{width:100%;border-collapse:collapse;}
 			.g2ab-vfy__table th,.g2ab-vfy__table td{padding:8px 10px;border-bottom:1px solid #f0f1f3;font-size:13px;text-align:left;}

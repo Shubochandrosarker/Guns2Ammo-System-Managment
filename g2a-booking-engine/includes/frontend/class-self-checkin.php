@@ -129,7 +129,7 @@ final class G2AB_Frontend_Self_Checkin {
 		);
 		?>
 		<style id="g2ab-sci-styles">
-		.g2ab-sci{--bg:#0F1115;--surface:#171B22;--border:#2A323D;--text:#EDEFF2;--muted:#9AA4B2;--orange:#D2691E;--green:#36C26B;background:var(--surface);border:1px solid var(--border);border-top:4px solid var(--orange);border-radius:16px;padding:24px;color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;}
+		.g2ab-sci{--bg:#1A191E;--surface:#26252C;--border:#2A323D;--text:#EDEFF2;--muted:#9AA4B2;--orange:#E8802F;--green:#36C26B;background:var(--surface);border:1px solid var(--border);border-top:4px solid var(--orange);border-radius:16px;padding:24px;color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;}
 		.g2ab-sci *{box-sizing:border-box;}
 		.g2ab-sci__eyebrow{display:block;color:var(--orange);font-family:'Inter','Segoe UI',system-ui,-apple-system,sans-serif;font-size:12px;letter-spacing:.2em;font-weight:700;}
 		.g2ab-sci__title{margin:6px 0 4px;color:#fff;font-family:'Inter','Segoe UI',system-ui,-apple-system,sans-serif;font-size:30px;letter-spacing:.02em;text-transform:uppercase;}

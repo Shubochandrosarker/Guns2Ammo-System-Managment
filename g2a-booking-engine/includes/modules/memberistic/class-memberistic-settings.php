@@ -40,7 +40,7 @@ class G2AB_Memberistic_Settings {
 			.g2ab-mst__checks{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:6px 12px;margin-top:8px;}
 			.g2ab-mst__checks label,.g2ab-mst__inline{display:flex;gap:6px;align-items:center;font-weight:400;text-transform:none;letter-spacing:0;}
 			.g2ab-mst__hint{color:#646970;font-size:12px;margin:6px 0 0;}
-			.g2ab-mst__example{background:#f6f7f7;border-left:4px solid #5B7BFF;padding:12px 14px;margin:12px 0 0;}
+			.g2ab-mst__example{background:#f6f7f7;border-left:4px solid #C9A84C;padding:12px 14px;margin:12px 0 0;}
 		</style>
 		<?php echo $msg; // phpcs:ignore ?>
 

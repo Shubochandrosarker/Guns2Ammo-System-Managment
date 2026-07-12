@@ -94,7 +94,7 @@ final class G2AB_Admin_Shortcodes {
 							'id / slug' => __( 'Pick a specific event (otherwise the soonest is used).', 'g2a-booking' ),
 							'category'  => __( 'Pick the soonest event in a category.', 'g2a-booking' ),
 							'countdown' => __( 'yes (default) or no.', 'g2a-booking' ),
-							'accent'    => __( 'Override the accent colour, e.g. #D2691E.', 'g2a-booking' ),
+							'accent'    => __( 'Override the accent colour, e.g. #E8802F.', 'g2a-booking' ),
 							'cta'       => __( 'Button text (default RESERVE A SEAT).', 'g2a-booking' ),
 						),
 					),
@@ -207,7 +207,7 @@ final class G2AB_Admin_Shortcodes {
 	private function print_styles() {
 		?>
 		<style id="g2ab-sc-styles">
-		.g2ab-sc{--bg:#0F1115;--surface:#171B22;--surface2:#1E242E;--border:#2A323D;--text:#E8E8E8;--muted:#8A95A5;--orange:#D2691E;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;}
+		.g2ab-sc{--bg:#1A191E;--surface:#26252C;--surface2:#26252C;--border:#2A323D;--text:#F7F7F9;--muted:#A7A6AE;--orange:#E8802F;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;}
 		.g2ab-sc *{box-sizing:border-box;}
 		.g2ab-sc__header{margin:18px 0 8px;padding-bottom:14px;border-bottom:2px solid var(--border);}
 		.g2ab-sc__stencil{font-family:"Inter","Segoe UI",system-ui,-apple-system,sans-serif;font-size:30px;font-weight:700;letter-spacing:.06em;color:#fff;text-transform:uppercase;}

@@ -631,11 +631,27 @@ Versions after Round 4: g2a-booking-engine → **1.9.9.8**, g2a-pos-core → **3
 messageistic are unchanged this round. Packaged archives are in `releases/` (previous version of each
 retained alongside); `INSTALL.md`'s version table was updated to match.
 
-**Not yet fixed** — every item in this report's ranked improvement list (Part 5, items 1–35) has now
-been implemented across four rounds. The two follow-ups called out in Round 2 remain open (the
-non-atomic rate limiter in business-api/Verifyistic/wpistic-contact-form/Memberistic's checkout limiter;
-~29 files in `g2a-booking-engine` still carrying the pre-re-skin blue/orange as WP option *defaults*) —
-neither was ranked in the consolidated list, so they're tracked here as the actual remaining backlog.
+**Not yet fixed after Round 4** — every item in this report's ranked improvement list (Part 5, items
+1–35) had been implemented across four rounds, but the two follow-ups called out in Round 2 (neither
+ranked in the consolidated list) remained open: the non-atomic rate limiter in
+business-api/Verifyistic/wpistic-contact-form/Memberistic's checkout limiter, and ~29 files in
+`g2a-booking-engine` still carrying the pre-re-skin blue/orange as WP option *defaults*.
+
+### Round 5 — the two Round-2 follow-ups
+
+| # | Fix | Files |
+|---|---|---|
+| Rate limiter | Same fix pattern as messageistic's Round-2 `Pilot_Send_Lock` (a real MySQL `GET_LOCK`/`RELEASE_LOCK` wrapping the read-check-increment-write), applied to the four remaining instances: g2a-business-api's public `/opt-out` endpoint, Verifyistic's failed-attempt counter and per-IP token-mint cap, wpistic-contact-form's submission throttle, and Memberistic's public checkout endpoint. Each fails closed (refuses rather than proceeds) if the lock can't be acquired within a few seconds. Added lock-behavior unit tests to g2a-business-api's `Rate_Limiter` suite (497 tests pass). | `g2a-business-api/includes/ops/class-rate-limiter.php` (+tests), `verifyistic/includes/class-verifyistic-security.php`, `.../class-verifyistic-ajax.php`, `wpistic-contact-form/includes/class-wpcf-spam.php`, `memberistic-membership-solutions/includes/payments/class-stripe-service.php` |
+| Booking-engine re-skin | Investigating the "~29 files" turned up a more consequential bug than the audit's own framing suggested: the booking widget's actual color *defaults* (`class-frontend.php`'s `get_design_tokens()`) still hardcoded the old orange/gold palette, silently **overriding** `assets/css/frontend.css`'s Round-2 `var(--color-brass)` fallback on every install that hadn't touched the Form Customizer — meaning the widget likely never visually re-skinned in practice. Fixed by defaulting the design tokens to `var(--color-brass)`/`var(--color-ember)`/`var(--color-void)`/etc. (extending `sanitize_color()` to accept a narrow, injection-safe `var(--name)` pattern) so the widget now tracks the theme's live tokens, including its light/dark toggle, the same way the CSS file's own fallback does. Also fixed the two genuinely customer-facing surfaces still on the old palette (the Authorize.Net hosted-payment redirect page, and the SEO event-landing-page generator — the latter also had a 3-way category-accent scheme that was collapsed onto the theme's single ember accent, since those pages are never shown side-by-side and the distinction had no real UX value), the admin settings screen's color-picker previews, and a vestigial unused brand-color option pair. A background sweep then closed out the remaining ~29 admin-chrome/settings/module files still on the old palette — collapsed onto the same brass/ember/void/gunmetal/silver token set, admin-only files treated as lower-priority polish rather than brand risk. | `g2a-booking-engine/includes/class-frontend.php`, `class-seo.php`, `payments/class-authnet.php`, `admin/class-settings-pro.php`, `class-admin.php`, `class-activator.php`, `assets/js/frontend.js`, and 25 other admin/module files |
+
+Versions after Round 5: g2a-booking-engine → **1.9.9.9**, verifyistic → **1.4.4**,
+wpistic-contact-form → **1.5.7**, memberistic-membership-solutions → **1.10.5**, g2a-business-api →
+**0.1.1** (internal version only — not part of this repo's release-zip distribution, no `INSTALL.md`
+row). guns2ammo theme, advanced-ffl-checkout, g2a-pos-core, and messageistic are unchanged this round.
+Packaged archives are in `releases/` (previous version of each retained alongside); `INSTALL.md`'s
+version table was updated to match.
+
+**Not yet fixed** — no known open items remain from this report or its Round-2 follow-ups.
 
 ## Appendix — audit scope note
 

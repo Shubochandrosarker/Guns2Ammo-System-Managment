@@ -145,7 +145,7 @@ final class G2AB_Admin_Reports {
 			}
 		}
 		$values = array_column( $days, 'c' );
-		if ( empty( $values ) ) { echo '<p style="color:#8A95A5;">No data for this range.</p>'; return; }
+		if ( empty( $values ) ) { echo '<p style="color:#A7A6AE;">No data for this range.</p>'; return; }
 		$max = max( max( $values ), 1 );
 
 		$w = 720; $h = 180; $pad = 24;
@@ -164,19 +164,19 @@ final class G2AB_Admin_Reports {
 		<svg viewBox="0 0 <?php echo (int) $w; ?> <?php echo (int) $h; ?>" preserveAspectRatio="none" width="100%" height="<?php echo (int) $h; ?>">
 			<defs>
 				<linearGradient id="g2abRpGrad" x1="0" y1="0" x2="0" y2="1">
-					<stop offset="0%" stop-color="#D2691E" stop-opacity="0.4"/>
-					<stop offset="100%" stop-color="#D2691E" stop-opacity="0"/>
+					<stop offset="0%" stop-color="#E8802F" stop-opacity="0.4"/>
+					<stop offset="100%" stop-color="#E8802F" stop-opacity="0"/>
 				</linearGradient>
 			</defs>
 			<path d="<?php echo esc_attr( $area ); ?>" fill="url(#g2abRpGrad)"/>
-			<path d="<?php echo esc_attr( $path ); ?>" fill="none" stroke="#D2691E" stroke-width="2.5" stroke-linejoin="round"/>
+			<path d="<?php echo esc_attr( $path ); ?>" fill="none" stroke="#E8802F" stroke-width="2.5" stroke-linejoin="round"/>
 		</svg>
 		<div class="g2ab-rp__chart-foot"><span><?php echo esc_html( $labels[0] ); ?></span><strong><?php echo array_sum( $values ); ?> bookings · <?php echo $count; ?> days</strong><span><?php echo esc_html( end( $labels ) ); ?></span></div>
 		<?php
 	}
 
 	private function render_status_table( $statuses ) {
-		if ( empty( $statuses ) ) { echo '<p style="color:#8A95A5;">No bookings.</p>'; return; }
+		if ( empty( $statuses ) ) { echo '<p style="color:#A7A6AE;">No bookings.</p>'; return; }
 		$total = 0;
 		foreach ( $statuses as $s ) $total += (int) $s->c;
 		echo '<table class="g2ab-rp__table"><thead><tr><th>STATUS</th><th>COUNT</th><th>%</th></tr></thead><tbody>';
@@ -192,7 +192,7 @@ final class G2AB_Admin_Reports {
 	}
 
 	private function render_table( $rows, $cols ) {
-		if ( empty( $rows ) ) { echo '<p style="color:#8A95A5;">No data.</p>'; return; }
+		if ( empty( $rows ) ) { echo '<p style="color:#A7A6AE;">No data.</p>'; return; }
 		echo '<table class="g2ab-rp__table"><thead><tr>';
 		foreach ( $cols as $label ) echo '<th>' . esc_html( $label ) . '</th>';
 		echo '</tr></thead><tbody>';
@@ -323,32 +323,32 @@ final class G2AB_Admin_Reports {
 	private function print_styles() {
 		echo '<style>
 .g2ab-rp{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;}
-.g2ab-rp__header{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:18px;background:linear-gradient(135deg,#0F1115 0%,#1A1F26 100%);color:#E8E8E8;padding:24px 28px;margin:20px 0 16px;border-left:4px solid #D2691E;}
+.g2ab-rp__header{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:18px;background:linear-gradient(135deg,#1A191E 0%,#26252C 100%);color:#F7F7F9;padding:24px 28px;margin:20px 0 16px;border-left:4px solid #E8802F;}
 .g2ab-rp__stencil{font-family:"Inter","Segoe UI",system-ui,-apple-system,sans-serif;font-size:30px;font-weight:700;letter-spacing:.04em;color:#fff;}
-.g2ab-rp__sub{margin:4px 0 0;color:#8A95A5;font-size:13px;text-transform:uppercase;letter-spacing:.08em;}
+.g2ab-rp__sub{margin:4px 0 0;color:#A7A6AE;font-size:13px;text-transform:uppercase;letter-spacing:.08em;}
 .g2ab-rp__range{display:flex;gap:8px;align-items:center;background:rgba(255,255,255,.06);padding:10px 14px;flex-wrap:wrap;}
-.g2ab-rp__range label{font-size:10px;color:#8A95A5;letter-spacing:.08em;font-weight:700;}
-.g2ab-rp__range input[type="date"]{padding:6px 10px;border:1px solid #2A323D;background:#0F1115;color:#E8E8E8;font-size:13px;border-radius:2px;}
-.g2ab-rp__btn{display:inline-block;background:#D2691E;color:#fff;padding:8px 14px;border:none;font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;cursor:pointer;text-decoration:none;border-radius:2px;}
-.g2ab-rp__btn--alt{background:transparent;border:1px solid #D2691E;}
-.g2ab-rp__btn:hover{background:#fff;color:#D2691E;}
+.g2ab-rp__range label{font-size:10px;color:#A7A6AE;letter-spacing:.08em;font-weight:700;}
+.g2ab-rp__range input[type="date"]{padding:6px 10px;border:1px solid #2A323D;background:#1A191E;color:#F7F7F9;font-size:13px;border-radius:2px;}
+.g2ab-rp__btn{display:inline-block;background:#E8802F;color:#fff;padding:8px 14px;border:none;font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;cursor:pointer;text-decoration:none;border-radius:2px;}
+.g2ab-rp__btn--alt{background:transparent;border:1px solid #E8802F;}
+.g2ab-rp__btn:hover{background:#fff;color:#E8802F;}
 .g2ab-rp__kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px;margin-bottom:16px;}
-.g2ab-rp__kpi{background:#fff;border:1px solid #d0d4d9;padding:16px 18px;border-top:3px solid #D2691E;}
-.g2ab-rp__kpi span{display:block;font-size:10px;color:#8A95A5;letter-spacing:.1em;font-weight:700;}
-.g2ab-rp__kpi strong{display:block;font-family:"Inter","Segoe UI",system-ui,-apple-system,sans-serif;font-size:26px;color:#0F1115;font-weight:700;line-height:1.1;margin-top:6px;}
+.g2ab-rp__kpi{background:#fff;border:1px solid #d0d4d9;padding:16px 18px;border-top:3px solid #E8802F;}
+.g2ab-rp__kpi span{display:block;font-size:10px;color:#A7A6AE;letter-spacing:.1em;font-weight:700;}
+.g2ab-rp__kpi strong{display:block;font-family:"Inter","Segoe UI",system-ui,-apple-system,sans-serif;font-size:26px;color:#1A191E;font-weight:700;line-height:1.1;margin-top:6px;}
 .g2ab-rp__row{display:grid;grid-template-columns:1.4fr 1fr;gap:14px;margin-bottom:14px;}
 @media (max-width:1000px){.g2ab-rp__row{grid-template-columns:1fr;}}
 .g2ab-rp__panel{background:#fff;border:1px solid #d0d4d9;padding:18px 22px;}
-.g2ab-rp__panel h3{font-family:"Inter","Segoe UI",system-ui,-apple-system,sans-serif;font-size:13px;letter-spacing:.12em;color:#D2691E;margin:0 0 14px;font-weight:700;}
-.g2ab-rp__chart-foot{display:flex;justify-content:space-between;font-size:11px;color:#8A95A5;letter-spacing:.04em;margin-top:6px;}
-.g2ab-rp__chart-foot strong{color:#0F1115;}
+.g2ab-rp__panel h3{font-family:"Inter","Segoe UI",system-ui,-apple-system,sans-serif;font-size:13px;letter-spacing:.12em;color:#E8802F;margin:0 0 14px;font-weight:700;}
+.g2ab-rp__chart-foot{display:flex;justify-content:space-between;font-size:11px;color:#A7A6AE;letter-spacing:.04em;margin-top:6px;}
+.g2ab-rp__chart-foot strong{color:#1A191E;}
 .g2ab-rp__table{width:100%;border-collapse:collapse;font-size:13px;}
-.g2ab-rp__table th{text-align:left;padding:8px 10px;color:#8A95A5;font-size:10px;letter-spacing:.06em;border-bottom:2px solid #d0d4d9;}
+.g2ab-rp__table th{text-align:left;padding:8px 10px;color:#A7A6AE;font-size:10px;letter-spacing:.06em;border-bottom:2px solid #d0d4d9;}
 .g2ab-rp__table td{padding:8px 10px;border-bottom:1px solid #f0f1f3;}
-.g2ab-rp__pill{display:inline-block;padding:2px 8px;font-size:9px;letter-spacing:.06em;font-weight:700;border-radius:2px;background:#0F1115;color:#fff;}
+.g2ab-rp__pill{display:inline-block;padding:2px 8px;font-size:9px;letter-spacing:.06em;font-weight:700;border-radius:2px;background:#1A191E;color:#fff;}
 .g2ab-rp__pill--paid,.g2ab-rp__pill--confirmed{background:#4CAF50;}
 .g2ab-rp__pill--cancelled,.g2ab-rp__pill--no_show,.g2ab-rp__pill--refunded{background:#C62828;}
-.g2ab-rp__pill--pending{background:#F9A825;}
+.g2ab-rp__pill--pending{background:#E8802F;}
 </style>';
 	}
 }
