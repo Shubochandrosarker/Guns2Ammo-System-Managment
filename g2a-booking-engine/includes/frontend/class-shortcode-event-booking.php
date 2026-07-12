@@ -243,7 +243,7 @@ final class G2AB_Frontend_Shortcode_Event_Booking {
 	public function print_css() {
 		?>
 		<style id="g2ab-evb-styles">
-		.g2ab-evb{--evb-bg:#0F1115;--evb-surface:#171B22;--evb-surface2:#1E242E;--evb-border:#2A323D;--evb-text:#E8E8E8;--evb-muted:#8A95A5;--evb-orange:#D2691E;--evb-green:#2E9E54;--evb-head:#fff;background:var(--evb-surface);border:1px solid var(--evb-border);border-top:4px solid var(--evb-orange);border-radius:12px;padding:24px;max-width:640px;margin:24px auto;color:var(--evb-text);font-family:'Inter',system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;box-sizing:border-box;box-shadow:0 14px 40px rgba(0,0,0,.18);}
+		.g2ab-evb{--evb-bg:#1A191E;--evb-surface:#26252C;--evb-surface2:#26252C;--evb-border:#2A323D;--evb-text:#F7F7F9;--evb-muted:#A7A6AE;--evb-orange:#E8802F;--evb-green:#2E9E54;--evb-head:#fff;background:var(--evb-surface);border:1px solid var(--evb-border);border-top:4px solid var(--evb-orange);border-radius:12px;padding:24px;max-width:640px;margin:24px auto;color:var(--evb-text);font-family:'Inter',system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;box-sizing:border-box;box-shadow:0 14px 40px rgba(0,0,0,.18);}
 		.g2ab-evb--theme-light{--evb-bg:#FFFFFF;--evb-surface:#FFFFFF;--evb-surface2:#F4F6FA;--evb-border:#E3E8F0;--evb-text:#1C2533;--evb-muted:#697587;--evb-green:#1F9E54;--evb-head:#161B22;}
 		.g2ab-evb *{box-sizing:border-box;}
 		.g2ab-evb--empty{padding:26px;text-align:center;color:var(--evb-muted);}

@@ -93,7 +93,7 @@ final class G2AB_Admin_Events {
 					<?php foreach ( $events as $ev ) :
 						$next  = G2AB_Events::next_occurrence( $ev->id );
 						$count = count( G2AB_Events::get_occurrences( $ev->id, array( 'upcoming_only' => false, 'with_seats' => false, 'limit' => 500 ) ) );
-						$accent = $ev->color ? $ev->color : '#D2691E';
+						$accent = $ev->color ? $ev->color : '#E8802F';
 						?>
 						<article class="g2ab-ev__card <?php echo 'publish' === $ev->status ? '' : 'is-inactive'; ?>" style="--ev-accent:<?php echo esc_attr( $accent ); ?>;">
 							<div class="g2ab-ev__card-tag"><?php echo esc_html( strtoupper( G2AB_Events::category_label( $ev->category ) ) ); ?></div>
@@ -194,7 +194,7 @@ final class G2AB_Admin_Events {
 						<div class="g2ab-ev__field"><label class="g2ab-ev__check"><input type="checkbox" name="members_only" value="1" <?php checked( 1, (int) ( $ev->members_only ?? 0 ) ); ?> /> <?php esc_html_e( 'Members only', 'g2a-booking' ); ?></label></div>
 						<div class="g2ab-ev__field"><label><?php esc_html_e( 'Location', 'g2a-booking' ); ?></label><input type="text" name="location" value="<?php echo esc_attr( $ev->location ?? '' ); ?>" placeholder="<?php esc_attr_e( 'e.g. Main Range', 'g2a-booking' ); ?>" /></div>
 						<div class="g2ab-ev__field"><label><?php esc_html_e( 'Banner image URL', 'g2a-booking' ); ?></label><input type="url" name="image_url" value="<?php echo esc_attr( $ev->image_url ?? '' ); ?>" placeholder="https://…" /></div>
-						<div class="g2ab-ev__field"><label><?php esc_html_e( 'Accent colour', 'g2a-booking' ); ?></label><input type="text" name="color" value="<?php echo esc_attr( $ev->color ?? '#D2691E' ); ?>" placeholder="#D2691E" /></div>
+						<div class="g2ab-ev__field"><label><?php esc_html_e( 'Accent colour', 'g2a-booking' ); ?></label><input type="text" name="color" value="<?php echo esc_attr( $ev->color ?? '#E8802F' ); ?>" placeholder="#E8802F" /></div>
 					</div>
 
 					<div class="g2ab-ev__panel g2ab-ev__panel--wide">
@@ -393,7 +393,7 @@ final class G2AB_Admin_Events {
 	private function print_styles() {
 		?>
 		<style id="g2ab-ev-admin-styles">
-		.g2ab-ev{--ev-bg:#0F1115;--ev-surface:#171B22;--ev-surface2:#1E242E;--ev-border:#2A323D;--ev-text:#E8E8E8;--ev-muted:#8A95A5;--ev-orange:#D2691E;--ev-gold:#F9A825;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;}
+		.g2ab-ev{--ev-bg:#1A191E;--ev-surface:#26252C;--ev-surface2:#26252C;--ev-border:#2A323D;--ev-text:#F7F7F9;--ev-muted:#A7A6AE;--ev-orange:#E8802F;--ev-gold:#E8802F;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;}
 		.g2ab-ev *{box-sizing:border-box;}
 		.g2ab-ev__header{display:flex;justify-content:space-between;align-items:flex-end;gap:20px;margin:18px 0 22px;padding-bottom:16px;border-bottom:2px solid var(--ev-border);}
 		.g2ab-ev__stencil{font-family:"Inter","Segoe UI",system-ui,-apple-system,sans-serif;font-size:30px;font-weight:700;letter-spacing:.06em;color:#fff;text-transform:uppercase;}
@@ -409,9 +409,9 @@ final class G2AB_Admin_Events {
 		.g2ab-ev__notice--ok{background:rgba(76,175,80,.15);color:#7BD389;border:1px solid rgba(76,175,80,.4);}
 		.g2ab-ev__notice--error{background:rgba(198,40,40,.15);color:#F08A8A;border:1px solid rgba(198,40,40,.4);}
 		.g2ab-ev__grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(290px,1fr));gap:16px;}
-		.g2ab-ev__card{position:relative;background:var(--ev-surface);border:1px solid var(--ev-border);border-top:4px solid var(--ev-accent,#D2691E);border-radius:6px;padding:18px 18px 16px;display:flex;flex-direction:column;gap:8px;}
+		.g2ab-ev__card{position:relative;background:var(--ev-surface);border:1px solid var(--ev-border);border-top:4px solid var(--ev-accent,#E8802F);border-radius:6px;padding:18px 18px 16px;display:flex;flex-direction:column;gap:8px;}
 		.g2ab-ev__card.is-inactive{opacity:.6;}
-		.g2ab-ev__card-tag{display:inline-block;align-self:flex-start;background:var(--ev-accent,#D2691E);color:#fff;font-size:9px;font-weight:700;letter-spacing:.1em;padding:3px 8px;border-radius:2px;}
+		.g2ab-ev__card-tag{display:inline-block;align-self:flex-start;background:var(--ev-accent,#E8802F);color:#fff;font-size:9px;font-weight:700;letter-spacing:.1em;padding:3px 8px;border-radius:2px;}
 		.g2ab-ev__card-title{margin:2px 0 0;font-size:18px;color:#fff;font-family:"Inter","Segoe UI",system-ui,-apple-system,sans-serif;letter-spacing:.02em;text-transform:uppercase;line-height:1.15;}
 		.g2ab-ev__card-summary{margin:0;color:var(--ev-muted);font-size:12px;line-height:1.4;}
 		.g2ab-ev__card-price{font-family:"Inter","Segoe UI",system-ui,-apple-system,sans-serif;font-size:24px;font-weight:700;color:var(--ev-orange);line-height:1;display:flex;align-items:baseline;gap:8px;}

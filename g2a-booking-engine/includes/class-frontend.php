@@ -124,17 +124,20 @@ final class G2AB_Frontend {
 	 */
 	private function get_design_tokens() {
 		$tokens = array(
-			// Defaults match the Guns2Ammo dark/orange identity. These are only
-			// fallbacks — any value saved in the Form Customizer still wins.
+			// Defaults track the theme's own live brass/ember/void design
+			// tokens (via var(--color-*)) rather than a hardcoded hex, so the
+			// widget's out-of-box colors follow the site's actual brand and
+			// its light/dark toggle. Any value saved in the Form Customizer
+			// still wins.
 			'theme'           => sanitize_key( get_option( 'g2ab_form_theme', 'midnight' ) ),
 			'layout'          => sanitize_key( get_option( 'g2ab_form_layout', 'split' ) ),
-			'primary'         => $this->sanitize_color( get_option( 'g2ab_form_primary', '#D2691E' ) ),
-			'accent'          => $this->sanitize_color( get_option( 'g2ab_form_accent', '#F9A825' ) ),
-			'bg'              => $this->sanitize_color( get_option( 'g2ab_form_bg', '#0F1115' ) ),
-			'surface'         => $this->sanitize_color( get_option( 'g2ab_form_surface', '#171B22' ) ),
-			'surface2'        => $this->sanitize_color( get_option( 'g2ab_form_surface2', '#1E242E' ) ),
-			'text'            => $this->sanitize_color( get_option( 'g2ab_form_text', '#FFFFFF' ) ),
-			'muted'           => $this->sanitize_color( get_option( 'g2ab_form_muted', '#8A95A5' ) ),
+			'primary'         => $this->sanitize_color( get_option( 'g2ab_form_primary', 'var(--color-brass)' ) ),
+			'accent'          => $this->sanitize_color( get_option( 'g2ab_form_accent', 'var(--color-ember)' ) ),
+			'bg'              => $this->sanitize_color( get_option( 'g2ab_form_bg', 'var(--color-void)' ) ),
+			'surface'         => $this->sanitize_color( get_option( 'g2ab_form_surface', 'var(--color-surface-1)' ) ),
+			'surface2'        => $this->sanitize_color( get_option( 'g2ab_form_surface2', 'var(--color-surface-2)' ) ),
+			'text'            => $this->sanitize_color( get_option( 'g2ab_form_text', 'var(--color-white)' ) ),
+			'muted'           => $this->sanitize_color( get_option( 'g2ab_form_muted', 'var(--color-silver)' ) ),
 			'border'          => $this->sanitize_color( get_option( 'g2ab_form_border', 'rgba(255,255,255,0.10)' ) ),
 			'radius'          => $this->sanitize_radius( get_option( 'g2ab_form_radius', '16' ) ),
 			'radius_pill'     => $this->sanitize_radius( get_option( 'g2ab_form_radius_pill', '999' ) ),
@@ -162,6 +165,16 @@ final class G2AB_Frontend {
 			return $value;
 		}
 		if ( preg_match( '/^rgba?\(\s*\d+\s*,\s*\d+\s*,\s*\d+(\s*,\s*[\d.]+)?\s*\)$/', $value ) ) {
+			return $value;
+		}
+		// A bare CSS var() reference to one of the theme's own design tokens
+		// — used by get_design_tokens()'s own defaults below so the widget's
+		// out-of-box colors track the site's live brass/ember/void palette
+		// (and its light/dark toggle) instead of a hardcoded hex that
+		// silently drifts out of sync with a theme re-skin, the way this
+		// widget's colors previously did. Restricted to var(--name) /
+		// var(--name, #hex) so this can never become a CSS-injection vector.
+		if ( preg_match( '/^var\(--[a-zA-Z0-9-]+(?:,\s*(?:#[0-9a-fA-F]{3,8}|[a-zA-Z]+))?\)$/', $value ) ) {
 			return $value;
 		}
 		return '';

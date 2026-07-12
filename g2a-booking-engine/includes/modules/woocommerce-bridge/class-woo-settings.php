@@ -104,7 +104,7 @@ class G2AB_Woo_Settings {
 			</form>
 		<?php endif; ?>
 
-		<div class="g2ab-wc__panel" style="background:#FFF8F0;border-color:#F9A825;">
+		<div class="g2ab-wc__panel" style="background:#FFF8F0;border-color:#E8802F;">
 			<h3 style="margin-top:0;">How it works</h3>
 			<ol style="line-height:1.8;">
 				<li>Customer fills booking form → clicks Reserve.</li>

@@ -40,20 +40,20 @@ class G2AB_Email_Settings {
 		<style>
 			.g2ab-em__layout{display:grid;grid-template-columns:280px 1fr;gap:24px;}
 			.g2ab-em__sidebar{background:#fff;border:1px solid #d0d4d9;padding:0;}
-			.g2ab-em__event{display:flex;justify-content:space-between;align-items:center;padding:14px 18px;border-bottom:1px solid #eee;text-decoration:none;color:#0F1115;font-size:13px;}
-			.g2ab-em__event.is-active{background:#0F1115;color:#fff;border-left:4px solid #D2691E;}
+			.g2ab-em__event{display:flex;justify-content:space-between;align-items:center;padding:14px 18px;border-bottom:1px solid #eee;text-decoration:none;color:#1A191E;font-size:13px;}
+			.g2ab-em__event.is-active{background:#1A191E;color:#fff;border-left:4px solid #E8802F;}
 			.g2ab-em__event:hover{background:#F4F5F7;}
-			.g2ab-em__event.is-active:hover{background:#0F1115;}
-			.g2ab-em__pill{font-size:10px;padding:2px 8px;border-radius:2px;background:#4A5D3A;color:#fff;}
-			.g2ab-em__pill--off{background:#8A95A5;}
+			.g2ab-em__event.is-active:hover{background:#1A191E;}
+			.g2ab-em__pill{font-size:10px;padding:2px 8px;border-radius:2px;background:#E8802F;color:#fff;}
+			.g2ab-em__pill--off{background:#A7A6AE;}
 			.g2ab-em__panel{background:#fff;border:1px solid #d0d4d9;padding:24px;}
 			.g2ab-em__panel h2{margin-top:0;}
 			.g2ab-em__row{margin-bottom:18px;}
 			.g2ab-em__row label{display:block;font-weight:600;margin-bottom:6px;}
 			.g2ab-em__row input[type=text],.g2ab-em__row textarea{width:100%;}
 			.g2ab-em__row textarea{min-height:280px;font-family:Menlo,monospace;font-size:13px;}
-			.g2ab-em__tags{background:#F4F5F7;padding:12px;border-left:3px solid #D2691E;font-size:12px;margin-bottom:18px;}
-			.g2ab-em__tags code{display:inline-block;margin:2px 4px 2px 0;background:#0F1115;color:#fff;padding:2px 6px;border-radius:2px;}
+			.g2ab-em__tags{background:#F4F5F7;padding:12px;border-left:3px solid #E8802F;font-size:12px;margin-bottom:18px;}
+			.g2ab-em__tags code{display:inline-block;margin:2px 4px 2px 0;background:#1A191E;color:#fff;padding:2px 6px;border-radius:2px;}
 			.g2ab-em__brand-row{display:grid;grid-template-columns:1fr 1fr;gap:18px;margin-bottom:24px;}
 		</style>
 
@@ -79,7 +79,7 @@ class G2AB_Email_Settings {
 				</div>
 				<div class="g2ab-em__row">
 					<label>Brand Color (hex)</label>
-					<input type="text" name="brand_color" value="<?php echo esc_attr( get_option( G2AB_Email_Engine::OPTION_BRAND_HEX, '#4A5D3A' ) ); ?>" />
+					<input type="text" name="brand_color" value="<?php echo esc_attr( get_option( G2AB_Email_Engine::OPTION_BRAND_HEX, '#E8802F' ) ); ?>" />
 				</div>
 			</div>
 			<div class="g2ab-em__row">
@@ -168,7 +168,7 @@ class G2AB_Email_Settings {
 			update_option( G2AB_Email_Engine::OPTION_FROM_NAME, sanitize_text_field( $_POST['from_name'] ?? '' ) );
 			update_option( G2AB_Email_Engine::OPTION_FROM_ADDR, sanitize_email( $_POST['from_addr'] ?? '' ) );
 			update_option( G2AB_Email_Engine::OPTION_LOGO_URL,  esc_url_raw( $_POST['logo_url'] ?? '' ) );
-			update_option( G2AB_Email_Engine::OPTION_BRAND_HEX, sanitize_hex_color( $_POST['brand_color'] ?? '#4A5D3A' ) );
+			update_option( G2AB_Email_Engine::OPTION_BRAND_HEX, sanitize_hex_color( $_POST['brand_color'] ?? '#E8802F' ) );
 			update_option( G2AB_Email_Engine::OPTION_FOOTER,    wp_kses_post( $_POST['footer_html'] ?? '' ) );
 			wp_safe_redirect( add_query_arg( array( 'page' => 'g2ab-settings', 'tab' => 'email_automation', 'saved' => 1 ), admin_url( 'admin.php' ) ) );
 			exit;

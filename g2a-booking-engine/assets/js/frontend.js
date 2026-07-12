@@ -23,8 +23,8 @@
 		var box = document.createElement('div');
 		box.id = 'g2ab-return-notice';
 		box.setAttribute('role', 'status');
-		box.style.cssText = 'position:fixed;top:24px;left:50%;transform:translateX(-50%);z-index:99999;max-width:480px;width:calc(100% - 32px);background:#121833;color:#fff;border:1px solid rgba(255,255,255,.1);border-radius:14px;padding:18px 22px;box-shadow:0 20px 60px rgba(0,0,0,.4);font-family:"Inter","Segoe UI",sans-serif;font-size:14px;line-height:1.5;';
-		if (kind === 'success') box.style.borderColor = '#5B7BFF';
+		box.style.cssText = 'position:fixed;top:24px;left:50%;transform:translateX(-50%);z-index:99999;max-width:480px;width:calc(100% - 32px);background:#26252C;color:#fff;border:1px solid rgba(255,255,255,.1);border-radius:14px;padding:18px 22px;box-shadow:0 20px 60px rgba(0,0,0,.4);font-family:"Inter","Segoe UI",sans-serif;font-size:14px;line-height:1.5;';
+		if (kind === 'success') box.style.borderColor = '#C9A84C';
 		if (kind === 'error') box.style.borderColor = '#FF5577';
 		box.innerHTML = html;
 		document.body.appendChild(box);

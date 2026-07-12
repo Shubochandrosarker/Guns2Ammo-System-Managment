@@ -72,7 +72,7 @@ class G2AB_Invoice_Renderer {
 				'g2ab_invoice_pdf' => $booking->uuid,
 				't'                => $token,
 			), home_url( '/' ) ) );
-			echo '<a href="' . $pdf_url . '" style="position:fixed;top:20px;right:20px;background:#D2691E;color:#fff;padding:12px 24px;text-decoration:none;font-weight:700;letter-spacing:.04em;text-transform:uppercase;font-family:Arial,sans-serif;font-size:12px;box-shadow:0 4px 12px rgba(0,0,0,.2);" onclick="event.preventDefault();window.print();">Download / Print PDF</a>';
+			echo '<a href="' . $pdf_url . '" style="position:fixed;top:20px;right:20px;background:#E8802F;color:#fff;padding:12px 24px;text-decoration:none;font-weight:700;letter-spacing:.04em;text-transform:uppercase;font-family:Arial,sans-serif;font-size:12px;box-shadow:0 4px 12px rgba(0,0,0,.2);" onclick="event.preventDefault();window.print();">Download / Print PDF</a>';
 		}
 		exit;
 	}

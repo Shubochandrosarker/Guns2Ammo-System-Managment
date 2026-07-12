@@ -3,7 +3,7 @@
  * Plugin Name: Verifyistic - Advanced Age Verification
  * Plugin URI:  https://wordpressistic.com/verifyistic
  * Description: Advanced age verification system for firearms, alcohol, cannabis, and adult websites. Modern popup with DOB, Yes/No, and ID & Face verification modes.
- * Version:     1.4.3
+ * Version:     1.4.4
  * Author:      WordPressistic
  * Author URI:  https://wordpressistic.com
  * License:     GPL v2 or later
@@ -19,7 +19,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 
 // ─── Constants ────────────────────────────────────────────────────────────────
-define( 'VERIFYISTIC_VERSION',       '1.4.3' );
+define( 'VERIFYISTIC_VERSION',       '1.4.4' );
 define( 'VERIFYISTIC_PLUGIN_FILE',   __FILE__ );
 define( 'VERIFYISTIC_PLUGIN_DIR',    plugin_dir_path( __FILE__ ) );
 define( 'VERIFYISTIC_PLUGIN_URL',    plugin_dir_url( __FILE__ ) );

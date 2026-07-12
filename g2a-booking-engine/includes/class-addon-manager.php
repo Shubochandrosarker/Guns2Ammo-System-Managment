@@ -86,7 +86,7 @@ final class G2AB_Addon_Manager {
 	private function build_registry() {
 		$a = array();
 		// Payments
-		$a['pay_in_store']  = array( 'name' => 'Pay In Store',         'desc' => 'Customer reserves online, pays at the front desk. Always free, always available.', 'tier' => 'free', 'status' => 'active', 'default_active' => true, 'category' => 'payments', 'icon' => '$', 'color' => '#4A5D3A', 'configure' => 'admin.php?page=g2ab-settings&tab=payments&gw=pay_in_store' );
+		$a['pay_in_store']  = array( 'name' => 'Pay In Store',         'desc' => 'Customer reserves online, pays at the front desk. Always free, always available.', 'tier' => 'free', 'status' => 'active', 'default_active' => true, 'category' => 'payments', 'icon' => '$', 'color' => '#E8802F', 'configure' => 'admin.php?page=g2ab-settings&tab=payments&gw=pay_in_store' );
 		$a['stripe']        = array( 'name' => 'Stripe Payments',      'desc' => 'Credit/debit cards via Stripe Checkout. Industry-standard. 2.9% + 30c.', 'tier' => 'free', 'status' => 'active', 'default_active' => true, 'category' => 'payments', 'icon' => 'S', 'color' => '#635BFF', 'configure' => 'admin.php?page=g2ab-settings&tab=payments&gw=stripe' );
 		$a['paypal']        = array( 'name' => 'PayPal Payments',      'desc' => 'PayPal Smart Buttons + Venmo + Pay Later. Customer-trusted checkout.', 'tier' => 'free', 'status' => 'active', 'default_active' => true, 'category' => 'payments', 'icon' => 'P', 'color' => '#003087', 'configure' => 'admin.php?page=g2ab-settings&tab=payments&gw=paypal' );
 		$a['fortis']        = array( 'name' => 'Fortis Pay',           'desc' => 'Lower card-present rates plus native ACH. Best for retail+services hybrids.', 'tier' => 'pro', 'status' => 'active', 'default_active' => false, 'category' => 'payments', 'icon' => 'F', 'color' => '#0F4C75', 'configure' => 'admin.php?page=g2ab-settings&tab=payments&gw=fortis' );
@@ -96,9 +96,9 @@ final class G2AB_Addon_Manager {
 		$a['sms_twilio']      = array( 'name' => 'SMS Notifications (Twilio)', 'desc' => 'Booking reminders + confirmations via SMS. Requires Twilio account.', 'tier' => 'pro', 'status' => 'coming_soon', 'default_active' => false, 'category' => 'notifications', 'icon' => 'M', 'color' => '#F22F46' );
 		$a['whatsapp']        = array( 'name' => 'WhatsApp Integration', 'desc' => 'Booking confirmations + reminders via WhatsApp Cloud API.', 'tier' => 'pro', 'status' => 'coming_soon', 'default_active' => false, 'category' => 'notifications', 'icon' => 'W', 'color' => '#25D366' );
 		// Booking Features
-		$a['deposit_payments']  = array( 'name' => 'Deposit Payments', 'desc' => 'Charge a deposit at booking, balance at checkout.', 'tier' => 'free', 'status' => 'active', 'default_active' => true, 'category' => 'booking_features', 'icon' => 'D', 'color' => '#4A5D3A' );
-		$a['discount_coupons']  = array( 'name' => 'Discount Coupons', 'desc' => 'Promo codes with % or flat-amount, expiry, usage limits, per-type.', 'tier' => 'free', 'status' => 'coming_soon', 'default_active' => false, 'category' => 'booking_features', 'icon' => '%', 'color' => '#4A5D3A' );
-		$a['service_extras']    = array( 'name' => 'Service Extras', 'desc' => 'Optional paid add-ons: gun rental, ammo, eye/ear protection.', 'tier' => 'free', 'status' => 'coming_soon', 'default_active' => false, 'category' => 'booking_features', 'icon' => '+', 'color' => '#4A5D3A' );
+		$a['deposit_payments']  = array( 'name' => 'Deposit Payments', 'desc' => 'Charge a deposit at booking, balance at checkout.', 'tier' => 'free', 'status' => 'active', 'default_active' => true, 'category' => 'booking_features', 'icon' => 'D', 'color' => '#E8802F' );
+		$a['discount_coupons']  = array( 'name' => 'Discount Coupons', 'desc' => 'Promo codes with % or flat-amount, expiry, usage limits, per-type.', 'tier' => 'free', 'status' => 'coming_soon', 'default_active' => false, 'category' => 'booking_features', 'icon' => '%', 'color' => '#E8802F' );
+		$a['service_extras']    = array( 'name' => 'Service Extras', 'desc' => 'Optional paid add-ons: gun rental, ammo, eye/ear protection.', 'tier' => 'free', 'status' => 'coming_soon', 'default_active' => false, 'category' => 'booking_features', 'icon' => '+', 'color' => '#E8802F' );
 		$a['pricing_by_people'] = array( 'name' => 'Pricing by Number of People', 'desc' => 'Tiered pricing based on party size.', 'tier' => 'pro', 'status' => 'coming_soon', 'default_active' => false, 'category' => 'booking_features', 'icon' => 'N', 'color' => '#0F4C75' );
 		$a['custom_duration']   = array( 'name' => 'Custom Service Duration', 'desc' => 'Customer picks duration at booking with auto-pricing.', 'tier' => 'pro', 'status' => 'coming_soon', 'default_active' => false, 'category' => 'booking_features', 'icon' => 'C', 'color' => '#0F4C75' );
 		$a['waiting_list']      = array( 'name' => 'Event Waiting List', 'desc' => 'Auto-promote on cancellation when classes fill up.', 'tier' => 'pro', 'status' => 'coming_soon', 'default_active' => false, 'category' => 'booking_features', 'icon' => 'L', 'color' => '#0F4C75' );
@@ -106,15 +106,15 @@ final class G2AB_Addon_Manager {
 		$a['cart_page']     = array( 'name' => 'Cart Page',        'desc' => 'Multi-booking checkout in one cart.', 'tier' => 'pro', 'status' => 'coming_soon', 'default_active' => false, 'category' => 'sales', 'icon' => 'C', 'color' => '#1F3864' );
 		$a['event_tickets'] = array( 'name' => 'Event Tickets',    'desc' => 'PDF tickets with QR for door scanning. Mobile wallet ready.', 'tier' => 'pro', 'status' => 'coming_soon', 'default_active' => false, 'category' => 'sales', 'icon' => 'T', 'color' => '#1F3864' );
 		// Developer
-		$a['rest_api'] = array( 'name' => 'REST API',          'desc' => 'Full bookings + availability + resources REST API. Live at /wp-json/g2a-booking/v1/.', 'tier' => 'free', 'status' => 'active', 'default_active' => true, 'category' => 'developer', 'icon' => 'R', 'color' => '#4A5D3A' );
+		$a['rest_api'] = array( 'name' => 'REST API',          'desc' => 'Full bookings + availability + resources REST API. Live at /wp-json/g2a-booking/v1/.', 'tier' => 'free', 'status' => 'active', 'default_active' => true, 'category' => 'developer', 'icon' => 'R', 'color' => '#E8802F' );
 		$a['webhooks'] = array( 'name' => 'Outbound Webhooks',  'desc' => 'POST booking events to Slack, Zapier, custom integrations.', 'tier' => 'pro', 'status' => 'coming_soon', 'default_active' => false, 'category' => 'developer', 'icon' => 'H', 'color' => '#0F4C75' );
 		// Locations
-		$a['unlimited_locations'] = array( 'name' => 'Unlimited Locations', 'desc' => 'Run multiple ranges from one install with per-location resources, hours, staff.', 'tier' => 'free', 'status' => 'active', 'default_active' => true, 'category' => 'locations', 'icon' => 'L', 'color' => '#4A5D3A' );
+		$a['unlimited_locations'] = array( 'name' => 'Unlimited Locations', 'desc' => 'Run multiple ranges from one install with per-location resources, hours, staff.', 'tier' => 'free', 'status' => 'active', 'default_active' => true, 'category' => 'locations', 'icon' => 'L', 'color' => '#E8802F' );
 		// Calendar & CRM
 		$a['calendar_drag']     = array( 'name' => 'Calendar Drag-Reschedule', 'desc' => 'Drag bookings to reschedule, color-coded by resource.', 'tier' => 'pro', 'status' => 'coming_soon', 'default_active' => false, 'category' => 'calendar', 'icon' => 'C', 'color' => '#0F4C75' );
 		$a['customer_profiles'] = array( 'name' => 'Customer Profiles', 'desc' => 'Auto-aggregated booking history, lifetime value, no-show rate.', 'tier' => 'pro', 'status' => 'coming_soon', 'default_active' => false, 'category' => 'calendar', 'icon' => 'P', 'color' => '#0F4C75' );
 		// Templates
-		$a['seo_landing_pages'] = array( 'name' => '6 SEO Landing Page Templates', 'desc' => '/event/{slug}/ landing pages with full JSON-LD schema.', 'tier' => 'free', 'status' => 'active', 'default_active' => true, 'category' => 'templates', 'icon' => 'L', 'color' => '#D2691E' );
+		$a['seo_landing_pages'] = array( 'name' => '6 SEO Landing Page Templates', 'desc' => '/event/{slug}/ landing pages with full JSON-LD schema.', 'tier' => 'free', 'status' => 'active', 'default_active' => true, 'category' => 'templates', 'icon' => 'L', 'color' => '#E8802F' );
 		$a['landing_pack_pro']  = array( 'name' => 'Premium Landing Pages Pack', 'desc' => '12 additional industry-tuned landing templates.', 'tier' => 'pro', 'status' => 'coming_soon', 'default_active' => false, 'category' => 'templates', 'icon' => 'P', 'color' => '#1F3864' );
 		// Page Builders
 		$a['elementor_widgets'] = array( 'name' => 'Elementor Widgets', 'desc' => 'Drag-and-drop booking widgets for Elementor.', 'tier' => 'pro', 'status' => 'coming_soon', 'default_active' => false, 'category' => 'page_builders', 'icon' => 'E', 'color' => '#92003B' );
@@ -266,7 +266,7 @@ final class G2AB_Addon_Manager {
 					$is_active   = $this->is_active( $id );
 					$is_soon     = 'coming_soon' === $a['status'];
 					$is_pro_lock = 'pro' === $a['tier'] && ! $agency && ! $is_soon;
-					$icon_color  = isset( $a['color'] ) ? $a['color'] : '#4A5D3A';
+					$icon_color  = isset( $a['color'] ) ? $a['color'] : '#E8802F';
 				?>
 					<article class="g2ab-ax__card <?php echo $is_active ? 'is-active' : ''; ?> <?php echo $is_soon ? 'is-soon' : ''; ?> <?php echo $is_pro_lock ? 'is-locked' : ''; ?>">
 						<div class="g2ab-ax__card-glow" style="--glow:<?php echo esc_attr( $icon_color ); ?>;"></div>
@@ -278,7 +278,7 @@ final class G2AB_Addon_Manager {
 							<div class="g2ab-ax__pills">
 								<?php if ( $is_soon ) : ?>
 									<span class="g2ab-ax__pill g2ab-ax__pill--soon">
-										<svg width="8" height="8" viewBox="0 0 8 8"><circle cx="4" cy="4" r="3" fill="#F9A825"/></svg>
+										<svg width="8" height="8" viewBox="0 0 8 8"><circle cx="4" cy="4" r="3" fill="#E8802F"/></svg>
 										Soon
 									</span>
 								<?php elseif ( $is_active ) : ?>
@@ -340,17 +340,17 @@ final class G2AB_Addon_Manager {
 
 	private function print_styles() {
 		echo '<style>
-.g2ab-ax{font-family:-apple-system,BlinkMacSystemFont,"Inter","Segoe UI",Roboto,Arial,sans-serif;color:#0F1115;margin:20px 20px 40px 0;}
+.g2ab-ax{font-family:-apple-system,BlinkMacSystemFont,"Inter","Segoe UI",Roboto,Arial,sans-serif;color:#1A191E;margin:20px 20px 40px 0;}
 .g2ab-ax *{box-sizing:border-box;}
 
 /* HERO */
-.g2ab-ax__hero{position:relative;background:linear-gradient(135deg,#0F1115 0%,#1F242C 60%,#2A3038 100%);color:#fff;padding:36px 40px;border-radius:14px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:24px;overflow:hidden;margin-bottom:24px;border:1px solid rgba(255,255,255,.06);}
+.g2ab-ax__hero{position:relative;background:linear-gradient(135deg,#1A191E 0%,#1F242C 60%,#2A3038 100%);color:#fff;padding:36px 40px;border-radius:14px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:24px;overflow:hidden;margin-bottom:24px;border:1px solid rgba(255,255,255,.06);}
 .g2ab-ax__hero::before{content:"";position:absolute;top:-50%;right:-10%;width:50%;height:200%;background:radial-gradient(ellipse at center,rgba(74,93,58,.18) 0%,transparent 60%);pointer-events:none;}
-.g2ab-ax__hero.is-agency{background:linear-gradient(135deg,#1F1208 0%,#3D2412 50%,#0F1115 100%);}
+.g2ab-ax__hero.is-agency{background:linear-gradient(135deg,#1F1208 0%,#3D2412 50%,#1A191E 100%);}
 .g2ab-ax__hero.is-agency::before{background:radial-gradient(ellipse at center,rgba(210,105,30,.32) 0%,transparent 60%);}
 .g2ab-ax__hero-l{position:relative;z-index:1;flex:1;min-width:280px;}
-.g2ab-ax__eyebrow{display:inline-block;font-size:11px;letter-spacing:.18em;font-weight:700;color:#D2691E;margin-bottom:10px;}
-.g2ab-ax__hero.is-agency .g2ab-ax__eyebrow{color:#F9A825;}
+.g2ab-ax__eyebrow{display:inline-block;font-size:11px;letter-spacing:.18em;font-weight:700;color:#E8802F;margin-bottom:10px;}
+.g2ab-ax__hero.is-agency .g2ab-ax__eyebrow{color:#E8802F;}
 .g2ab-ax__hero-title{color:#fff !important;font-size:30px;line-height:1.15;margin:0 0 8px;font-weight:800;letter-spacing:-.01em;font-family:"Inter","Segoe UI",system-ui,-apple-system,sans-serif;padding:0;}
 .g2ab-ax__hero h1.g2ab-ax__hero-title{color:#fff !important;}
 .g2ab-ax__hero-sub{font-size:14px;color:rgba(255,255,255,.65);margin:0;max-width:540px;line-height:1.55;}
@@ -358,9 +358,9 @@ final class G2AB_Addon_Manager {
 .g2ab-ax__stat{background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.08);padding:14px 22px;border-radius:10px;text-align:center;backdrop-filter:blur(10px);min-width:80px;}
 .g2ab-ax__stat-num{display:block;font-size:28px;font-weight:800;line-height:1;color:#fff;font-family:"Inter","Segoe UI",system-ui,-apple-system,sans-serif;}
 .g2ab-ax__stat-label{display:block;font-size:10px;color:rgba(255,255,255,.55);text-transform:uppercase;letter-spacing:.12em;margin-top:6px;}
-.g2ab-ax__stat--soon .g2ab-ax__stat-num{color:#F9A825;}
+.g2ab-ax__stat--soon .g2ab-ax__stat-num{color:#E8802F;}
 .g2ab-ax__hero-form{margin:0;}
-.g2ab-ax__agency-btn{background:linear-gradient(135deg,#D2691E,#F9A825);color:#0F1115;border:0;padding:14px 22px;font-size:11px;letter-spacing:.12em;text-transform:uppercase;font-weight:800;border-radius:8px;cursor:pointer;box-shadow:0 4px 14px rgba(210,105,30,.3);transition:transform .15s ease,box-shadow .15s ease;}
+.g2ab-ax__agency-btn{background:linear-gradient(135deg,#E8802F,#E8802F);color:#1A191E;border:0;padding:14px 22px;font-size:11px;letter-spacing:.12em;text-transform:uppercase;font-weight:800;border-radius:8px;cursor:pointer;box-shadow:0 4px 14px rgba(210,105,30,.3);transition:transform .15s ease,box-shadow .15s ease;}
 .g2ab-ax__agency-btn:hover{transform:translateY(-1px);box-shadow:0 6px 20px rgba(210,105,30,.45);}
 
 /* TOAST */
@@ -371,10 +371,10 @@ final class G2AB_Addon_Manager {
 /* FILTER CHIPS */
 .g2ab-ax__filter{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:24px;padding:10px;background:#fff;border:1px solid #E2E5E9;border-radius:12px;}
 .g2ab-ax__chip{display:inline-flex;align-items:center;gap:8px;padding:9px 16px;background:transparent;color:#5F6772;text-decoration:none;font-size:12px;font-weight:700;letter-spacing:.04em;border-radius:8px;transition:all .15s ease;border:1px solid transparent;}
-.g2ab-ax__chip:hover{background:#F4F5F7;color:#0F1115;}
-.g2ab-ax__chip.is-on{background:#0F1115;color:#fff;}
+.g2ab-ax__chip:hover{background:#F4F5F7;color:#1A191E;}
+.g2ab-ax__chip.is-on{background:#1A191E;color:#fff;}
 .g2ab-ax__chip-c{background:rgba(0,0,0,.08);padding:2px 8px;border-radius:99px;font-size:10px;font-weight:800;}
-.g2ab-ax__chip.is-on .g2ab-ax__chip-c{background:#D2691E;color:#fff;}
+.g2ab-ax__chip.is-on .g2ab-ax__chip-c{background:#E8802F;color:#fff;}
 .g2ab-ax__chip--soon{margin-left:auto;}
 
 /* GRID */
@@ -383,7 +383,7 @@ final class G2AB_Addon_Manager {
 /* CARD */
 .g2ab-ax__card{position:relative;background:#fff;border:1px solid #E2E5E9;border-radius:14px;padding:24px;display:flex;flex-direction:column;transition:all .25s cubic-bezier(.2,.8,.2,1);overflow:hidden;}
 .g2ab-ax__card:hover{transform:translateY(-3px);box-shadow:0 12px 32px rgba(15,17,21,.08);border-color:#D0D4D9;}
-.g2ab-ax__card-glow{position:absolute;top:-40px;right:-40px;width:160px;height:160px;background:radial-gradient(circle,var(--glow,#4A5D3A) 0%,transparent 70%);opacity:0;transition:opacity .3s ease;pointer-events:none;}
+.g2ab-ax__card-glow{position:absolute;top:-40px;right:-40px;width:160px;height:160px;background:radial-gradient(circle,var(--glow,#E8802F) 0%,transparent 70%);opacity:0;transition:opacity .3s ease;pointer-events:none;}
 .g2ab-ax__card:hover .g2ab-ax__card-glow{opacity:.12;}
 .g2ab-ax__card.is-active{border-color:#4CAF50;background:linear-gradient(180deg,#fff 0%,#F1F8E9 200%);}
 .g2ab-ax__card.is-active .g2ab-ax__card-glow{opacity:.08;}
@@ -398,26 +398,26 @@ final class G2AB_Addon_Manager {
 .g2ab-ax__pills{display:flex;flex-direction:column;gap:5px;align-items:flex-end;}
 .g2ab-ax__pill{display:inline-flex;align-items:center;gap:5px;padding:4px 9px;font-size:9.5px;letter-spacing:.1em;font-weight:800;border-radius:99px;text-transform:uppercase;}
 .g2ab-ax__pill--free{background:#E8F5E9;color:#2E7D32;}
-.g2ab-ax__pill--pro{background:linear-gradient(135deg,#D2691E,#F9A825);color:#fff;box-shadow:0 2px 6px rgba(210,105,30,.25);}
+.g2ab-ax__pill--pro{background:linear-gradient(135deg,#E8802F,#E8802F);color:#fff;box-shadow:0 2px 6px rgba(210,105,30,.25);}
 .g2ab-ax__pill--active{background:#E8F5E9;color:#2E7D32;}
 .g2ab-ax__pill--soon{background:#FFF3E0;color:#E65100;}
 
-.g2ab-ax__card-title{font-size:17px;font-weight:700;line-height:1.3;color:#0F1115;margin:0 0 8px;letter-spacing:-.01em;}
+.g2ab-ax__card-title{font-size:17px;font-weight:700;line-height:1.3;color:#1A191E;margin:0 0 8px;letter-spacing:-.01em;}
 .g2ab-ax__card-desc{font-size:13px;line-height:1.55;color:#5F6772;margin:0 0 20px;flex:1;}
 .g2ab-ax__card-actions{display:flex;gap:8px;flex-wrap:wrap;align-items:center;}
 
-.g2ab-ax__btn{display:inline-flex;align-items:center;gap:6px;padding:10px 16px;font-size:11.5px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;border-radius:8px;border:1px solid;cursor:pointer;text-decoration:none;font-family:inherit;transition:all .15s ease;background:#fff;color:#0F1115;border-color:#D0D4D9;}
+.g2ab-ax__btn{display:inline-flex;align-items:center;gap:6px;padding:10px 16px;font-size:11.5px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;border-radius:8px;border:1px solid;cursor:pointer;text-decoration:none;font-family:inherit;transition:all .15s ease;background:#fff;color:#1A191E;border-color:#D0D4D9;}
 .g2ab-ax__btn:hover{transform:translateY(-1px);}
-.g2ab-ax__btn--on{background:#0F1115;color:#fff;border-color:#0F1115;box-shadow:0 4px 12px rgba(15,17,21,.18);}
+.g2ab-ax__btn--on{background:#1A191E;color:#fff;border-color:#1A191E;box-shadow:0 4px 12px rgba(15,17,21,.18);}
 .g2ab-ax__btn--on:hover{background:#1F242C;box-shadow:0 6px 16px rgba(15,17,21,.25);}
 .g2ab-ax__btn--off{background:#fff;color:#5F6772;border-color:#D0D4D9;}
 .g2ab-ax__btn--off:hover{background:#FFEBEE;color:#C62828;border-color:#C62828;}
-.g2ab-ax__btn--upgrade{background:linear-gradient(135deg,#D2691E,#F9A825);color:#fff;border-color:transparent;box-shadow:0 4px 12px rgba(210,105,30,.25);}
+.g2ab-ax__btn--upgrade{background:linear-gradient(135deg,#E8802F,#E8802F);color:#fff;border-color:transparent;box-shadow:0 4px 12px rgba(210,105,30,.25);}
 .g2ab-ax__btn--upgrade:hover{box-shadow:0 6px 18px rgba(210,105,30,.4);}
-.g2ab-ax__btn--ghost{background:transparent;color:#0F1115;border-color:#0F1115;}
-.g2ab-ax__btn--ghost:hover{background:#0F1115;color:#fff;}
+.g2ab-ax__btn--ghost{background:transparent;color:#1A191E;border-color:#1A191E;}
+.g2ab-ax__btn--ghost:hover{background:#1A191E;color:#fff;}
 
-.g2ab-ax__hint{font-size:11.5px;color:#8A95A5;font-style:italic;letter-spacing:.02em;}
+.g2ab-ax__hint{font-size:11.5px;color:#A7A6AE;font-style:italic;letter-spacing:.02em;}
 
 @media (max-width: 782px){
   .g2ab-ax__hero{padding:28px 22px;}

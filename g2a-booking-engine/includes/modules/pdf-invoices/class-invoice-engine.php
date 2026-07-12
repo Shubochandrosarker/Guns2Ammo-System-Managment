@@ -198,8 +198,8 @@ class G2AB_Invoice_Engine {
 	public function render_html( $booking ) {
 		$booking = is_object( $booking ) ? (array) $booking : (array) $booking;
 
-		$brand   = get_option( self::OPT_COLOR, '#0F1115' );
-		$accent  = get_option( self::OPT_ACCENT, '#D2691E' );
+		$brand   = get_option( self::OPT_COLOR, '#1A191E' );
+		$accent  = get_option( self::OPT_ACCENT, '#E8802F' );
 		$logo    = get_option( self::OPT_LOGO, '' );
 		$biz     = get_option( self::OPT_BUSINESS_BLOCK, get_option( 'g2ab_business_name' ) . "\n" . get_option( 'g2ab_business_address' ) . "\n" . get_option( 'g2ab_business_phone' ) );
 		$footer  = get_option( self::OPT_FOOTER, 'Thank you for your business.' );
@@ -236,7 +236,7 @@ class G2AB_Invoice_Engine {
 		$invoice_no = sanitize_key( get_option( self::OPT_PREFIX, 'INV' ) ) . '-' . strtoupper( substr( $booking['uuid'] ?? '', 0, 8 ) );
 		$issued = date_i18n( get_option( 'date_format' ) );
 		$status = $booking['payment_status'] ?? ( $booking['status'] ?? 'paid' );
-		$status_color = in_array( $status, array( 'paid', 'completed' ), true ) ? '#4CAF50' : '#F9A825';
+		$status_color = in_array( $status, array( 'paid', 'completed' ), true ) ? '#4CAF50' : '#E8802F';
 
 		ob_start();
 		?>
@@ -248,7 +248,7 @@ class G2AB_Invoice_Engine {
 <style>
 @page { margin: 24mm 18mm; }
 * { box-sizing: border-box; }
-body { font-family: 'Helvetica', Arial, sans-serif; color: #0F1115; margin: 0; padding: 0; font-size: 13px; line-height: 1.5; }
+body { font-family: 'Helvetica', Arial, sans-serif; color: #1A191E; margin: 0; padding: 0; font-size: 13px; line-height: 1.5; }
 .inv { max-width: 760px; margin: 0 auto; padding: 0; }
 .inv__head { background: <?php echo esc_attr( $brand ); ?>; color: #fff; padding: 28px 32px; border-bottom: 6px solid <?php echo esc_attr( $accent ); ?>; }
 .inv__head-flex { display: table; width: 100%; }
@@ -261,7 +261,7 @@ body { font-family: 'Helvetica', Arial, sans-serif; color: #0F1115; margin: 0; p
 .inv__body { padding: 32px; }
 .inv__row { display: table; width: 100%; margin-bottom: 28px; }
 .inv__col { display: table-cell; vertical-align: top; width: 50%; padding-right: 16px; }
-.inv__col h4 { font-size: 11px; letter-spacing: .08em; color: #8A95A5; text-transform: uppercase; margin: 0 0 6px; font-weight: 700; }
+.inv__col h4 { font-size: 11px; letter-spacing: .08em; color: #A7A6AE; text-transform: uppercase; margin: 0 0 6px; font-weight: 700; }
 .inv__col p { margin: 0; white-space: pre-line; }
 .inv__status { display: inline-block; background: <?php echo esc_attr( $status_color ); ?>; color: #fff; padding: 6px 14px; font-size: 11px; letter-spacing: .08em; text-transform: uppercase; font-weight: 700; }
 table.inv__items { width: 100%; border-collapse: collapse; margin-bottom: 16px; }

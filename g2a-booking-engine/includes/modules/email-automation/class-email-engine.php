@@ -143,7 +143,7 @@ class G2AB_Email_Engine {
 		$biz_name    = get_option( 'g2ab_business_name', get_bloginfo( 'name' ) );
 		$biz_phone   = get_option( 'g2ab_business_phone', '' );
 		$biz_addr    = get_option( 'g2ab_business_address', '' );
-		$brand_color = get_option( self::OPTION_BRAND_HEX, '#4A5D3A' );
+		$brand_color = get_option( self::OPTION_BRAND_HEX, '#E8802F' );
 		$brand_logo  = get_option( self::OPTION_LOGO_URL, '' );
 
 		$uuid = isset( $booking['uuid'] ) ? $booking['uuid'] : '';
@@ -203,12 +203,12 @@ class G2AB_Email_Engine {
 	 * Wrap inner HTML in a tactical-themed responsive shell.
 	 */
 	public function wrap_html( $inner, $subject ) {
-		$brand = esc_attr( get_option( self::OPTION_BRAND_HEX, '#4A5D3A' ) );
+		$brand = esc_attr( get_option( self::OPTION_BRAND_HEX, '#E8802F' ) );
 		$logo  = esc_url( get_option( self::OPTION_LOGO_URL, '' ) );
 		$biz   = esc_html( get_option( 'g2ab_business_name', get_bloginfo( 'name' ) ) );
 		$footer = wp_kses_post( get_option( self::OPTION_FOOTER, '' ) );
 		if ( empty( $footer ) ) {
-			$footer = sprintf( '<p style="margin:0;font-size:12px;color:#8A95A5;">&copy; %d %s. All rights reserved.</p>', date( 'Y' ), $biz );
+			$footer = sprintf( '<p style="margin:0;font-size:12px;color:#A7A6AE;">&copy; %d %s. All rights reserved.</p>', date( 'Y' ), $biz );
 		}
 
 		$logo_html = $logo
@@ -216,12 +216,12 @@ class G2AB_Email_Engine {
 			: sprintf( '<strong style="color:#fff;font-family:Inter,\'Segoe UI\',Arial,sans-serif;font-size:24px;letter-spacing:.06em;">%s</strong>', $biz );
 
 		return '<!doctype html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>' . esc_html( $subject ) . '</title></head>'
-			. '<body style="margin:0;padding:0;background:#F4F5F7;font-family:Arial,Helvetica,sans-serif;color:#0F1115;">'
+			. '<body style="margin:0;padding:0;background:#F4F5F7;font-family:Arial,Helvetica,sans-serif;color:#1A191E;">'
 			. '<table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background:#F4F5F7;padding:32px 16px;">'
 			. '<tr><td align="center">'
 			. '<table role="presentation" width="600" cellspacing="0" cellpadding="0" border="0" style="background:#fff;max-width:600px;width:100%;border-collapse:collapse;border-top:4px solid ' . $brand . ';">'
-			. '<tr><td style="background:#0F1115;padding:24px 32px;">' . $logo_html . '</td></tr>'
-			. '<tr><td style="padding:32px;font-size:15px;line-height:1.6;color:#0F1115;">' . $inner . '</td></tr>'
+			. '<tr><td style="background:#1A191E;padding:24px 32px;">' . $logo_html . '</td></tr>'
+			. '<tr><td style="padding:32px;font-size:15px;line-height:1.6;color:#1A191E;">' . $inner . '</td></tr>'
 			. '<tr><td style="background:#F4F5F7;padding:20px 32px;border-top:1px solid #E2E5E9;">' . $footer . '</td></tr>'
 			. '</table></td></tr></table></body></html>';
 	}

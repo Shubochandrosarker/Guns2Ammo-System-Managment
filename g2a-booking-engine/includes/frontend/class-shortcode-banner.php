@@ -79,7 +79,7 @@ final class G2AB_Frontend_Shortcode_Banner {
 			return '<div class="g2ab-banr g2ab-banr--empty"><p>' . esc_html__( 'No upcoming dates for this event yet.', 'g2a-booking' ) . '</p></div>';
 		}
 
-		$accent = $atts['accent'] ?: ( $event->color ? $event->color : '#D2691E' );
+		$accent = $atts['accent'] ?: ( $event->color ? $event->color : '#E8802F' );
 		$cap    = (int) $occ->seats_total;
 		$booked = (int) $occ->seats_booked;
 		$v = array(
@@ -227,7 +227,7 @@ final class G2AB_Frontend_Shortcode_Banner {
 		$this->printed = true;
 		?>
 		<style id="g2ab-banr-styles">
-		.g2ab-banr{--banr-accent:#D2691E;--banr-bg:#0F1115;--banr-surface:#171B22;--banr-border:#2A323D;--banr-text:#E8E8E8;--banr-muted:#8A95A5;position:relative;color:var(--banr-text);overflow:hidden;margin:24px 0;font-family:'Inter',system-ui,-apple-system,sans-serif;border-radius:12px;animation:g2ab-banr-in .6s cubic-bezier(.16,.8,.3,1) both;}
+		.g2ab-banr{--banr-accent:#E8802F;--banr-bg:#1A191E;--banr-surface:#26252C;--banr-border:#2A323D;--banr-text:#F7F7F9;--banr-muted:#A7A6AE;position:relative;color:var(--banr-text);overflow:hidden;margin:24px 0;font-family:'Inter',system-ui,-apple-system,sans-serif;border-radius:12px;animation:g2ab-banr-in .6s cubic-bezier(.16,.8,.3,1) both;}
 		.g2ab-banr--light{--banr-bg:#fff;--banr-surface:#F4F6FA;--banr-border:#E2E6EE;--banr-text:#1F2733;--banr-muted:#667085;}
 		.g2ab-banr *{box-sizing:border-box;}
 		@keyframes g2ab-banr-in{from{opacity:0;transform:translateY(16px);}to{opacity:1;transform:translateY(0);}}
@@ -235,7 +235,7 @@ final class G2AB_Frontend_Shortcode_Banner {
 		@keyframes g2ab-banr-glow{from{transform:translateX(0);opacity:.7;}to{transform:translateX(40%);opacity:1;}}
 
 		/* ── Spotlight ── */
-		.g2ab-banr--spotlight{background:linear-gradient(135deg,var(--banr-bg) 0%,#1A1F26 60%,var(--banr-bg) 100%);border:1px solid var(--banr-border);}
+		.g2ab-banr--spotlight{background:linear-gradient(135deg,var(--banr-bg) 0%,#26252C 60%,var(--banr-bg) 100%);border:1px solid var(--banr-border);}
 		.g2ab-banr__summary{margin:0 0 16px;color:#B6C0CE;font-size:14px;line-height:1.5;max-width:48ch;}
 		.g2ab-banr__grid{position:absolute;inset:0;background-image:linear-gradient(rgba(74,93,58,.08) 1px,transparent 1px),linear-gradient(90deg,rgba(74,93,58,.08) 1px,transparent 1px);background-size:40px 40px;pointer-events:none;}
 		.g2ab-banr__inner{position:relative;z-index:1;display:grid;grid-template-columns:1.2fr 1fr;gap:40px;padding:40px 48px;max-width:1200px;margin:0 auto;align-items:center;}
@@ -263,10 +263,10 @@ final class G2AB_Frontend_Shortcode_Banner {
 		.g2ab-banr__seats-row{display:flex;justify-content:space-between;font-size:11px;letter-spacing:.1em;color:var(--banr-muted);font-weight:700;margin-bottom:8px;}
 		.g2ab-banr__seats-left{color:#4CAF50;}
 		.g2ab-banr__seats-bar{height:8px;background:var(--banr-bg);overflow:hidden;border:1px solid var(--banr-border);border-radius:999px;}
-		.g2ab-banr__seats-fill{height:100%;background:linear-gradient(90deg,#4A5D3A 0,var(--banr-accent) 70%,#C62828 100%);transition:width .8s cubic-bezier(.16,.8,.3,1);}
+		.g2ab-banr__seats-fill{height:100%;background:linear-gradient(90deg,#E8802F 0,var(--banr-accent) 70%,#C62828 100%);transition:width .8s cubic-bezier(.16,.8,.3,1);}
 
 		/* ── Strip ── */
-		.g2ab-banr--strip{background:linear-gradient(120deg,var(--banr-bg),#1A1F26);border:1px solid var(--banr-border);border-left:4px solid var(--banr-accent);}
+		.g2ab-banr--strip{background:linear-gradient(120deg,var(--banr-bg),#26252C);border:1px solid var(--banr-border);border-left:4px solid var(--banr-accent);}
 		.g2ab-strip__in{position:relative;z-index:1;display:flex;align-items:center;gap:18px;padding:16px 22px;max-width:1200px;margin:0 auto;flex-wrap:wrap;}
 		.g2ab-strip__tag{background:var(--banr-accent);color:#fff;font-family:'Inter','Segoe UI',system-ui,-apple-system,sans-serif;font-size:11px;font-weight:700;letter-spacing:.12em;padding:5px 12px;border-radius:3px;}
 		.g2ab-strip__main{display:flex;flex-direction:column;gap:2px;margin-right:auto;}
@@ -304,7 +304,7 @@ final class G2AB_Frontend_Shortcode_Banner {
 		.g2ab-ticket__cta:hover{transform:translateY(-2px);box-shadow:0 10px 24px color-mix(in srgb,var(--banr-accent) 30%,transparent);}
 		@media (max-width:560px){.g2ab-ticket{flex-direction:column;}.g2ab-ticket__stub{flex-direction:row;gap:10px;flex:none;}.g2ab-ticket__perf{display:none;}}
 
-		.g2ab-banr--empty{padding:30px;background:#1A1F26;color:#8A95A5;text-align:center;border-left:3px solid #D2691E;border-radius:10px;}
+		.g2ab-banr--empty{padding:30px;background:#26252C;color:#A7A6AE;text-align:center;border-left:3px solid #E8802F;border-radius:10px;}
 		@media (prefers-reduced-motion: reduce){.g2ab-banr,.g2ab-banr__glow{animation:none;}}
 		</style>
 		<script id="g2ab-banr-js">

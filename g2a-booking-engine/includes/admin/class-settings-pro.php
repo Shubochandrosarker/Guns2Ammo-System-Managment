@@ -66,7 +66,7 @@ final class G2AB_Admin_Settings_Pro {
 		'fortis'         => array( 'label' => 'Fortis Pay',          'color' => '#0F4C75', 'logo' => 'F' ),
 		'authnet'        => array( 'label' => 'Authorize.net',       'color' => '#1F3864', 'logo' => 'A' ),
 		'woocommerce'    => array( 'label' => 'WooCommerce Payments', 'color' => '#7F54B3', 'logo' => 'W' ),
-		'pay_in_store'   => array( 'label' => 'Pay In Store',        'color' => '#4A5D3A', 'logo' => '$' ),
+		'pay_in_store'   => array( 'label' => 'Pay In Store',        'color' => '#E8802F', 'logo' => '$' ),
 	);
 
 	public static function instance() {
@@ -363,7 +363,7 @@ final class G2AB_Admin_Settings_Pro {
 	private function render_gateway_pay_in_store() {
 		?>
 		<div class="g2ab-set__gw-card-detail">
-			<div class="g2ab-set__gw-detail-head"><span class="g2ab-set__gw-logo g2ab-set__gw-logo--xl" style="background:#4A5D3A;">$</span><div><h2>Pay In Store</h2><p>Customer reserves the slot, staff collects payment at the front desk on arrival.</p></div></div>
+			<div class="g2ab-set__gw-detail-head"><span class="g2ab-set__gw-logo g2ab-set__gw-logo--xl" style="background:#E8802F;">$</span><div><h2>Pay In Store</h2><p>Customer reserves the slot, staff collects payment at the front desk on arrival.</p></div></div>
 			<div class="g2ab-set__field"><label class="g2ab-set__check"><input type="checkbox" name="g2ab_pay_in_store_enabled" value="1" <?php checked( 1, (int) get_option( 'g2ab_pay_in_store_enabled', 1 ) ); ?> /> <?php esc_html_e( 'Enable Pay In Store', 'g2a-booking' ); ?></label></div>
 			<div class="g2ab-set__field"><label><?php esc_html_e( 'Reservation Hold (minutes from booking time)', 'g2a-booking' ); ?></label><input type="number" name="g2ab_pay_in_store_hold_minutes" min="5" max="240" value="<?php echo esc_attr( get_option( 'g2ab_pay_in_store_hold_minutes', 30 ) ); ?>" /><small><?php esc_html_e( 'How long before booking start the slot stays held without payment.', 'g2a-booking' ); ?></small></div>
 			<div class="g2ab-set__field"><label><?php esc_html_e( 'Confirmation message', 'g2a-booking' ); ?></label><textarea name="g2ab_pay_in_store_message" rows="3"><?php echo esc_textarea( get_option( 'g2ab_pay_in_store_message', "Your spot is held. Pay at the front desk on arrival. We hold reservations for 30 minutes past start time." ) ); ?></textarea></div>
@@ -440,8 +440,8 @@ final class G2AB_Admin_Settings_Pro {
 		?>
 		<div class="g2ab-set__panel">
 			<h3><?php esc_html_e( 'COLORS', 'g2a-booking' ); ?></h3>
-			<div class="g2ab-set__field"><label><?php esc_html_e( 'Primary Color', 'g2a-booking' ); ?></label><input type="text" name="g2ab_brand_color_primary" value="<?php echo esc_attr( get_option( 'g2ab_brand_color_primary', '#4A5D3A' ) ); ?>" /></div>
-			<div class="g2ab-set__field"><label><?php esc_html_e( 'Accent Color', 'g2a-booking' ); ?></label><input type="text" name="g2ab_brand_color_accent" value="<?php echo esc_attr( get_option( 'g2ab_brand_color_accent', '#D2691E' ) ); ?>" /></div>
+			<div class="g2ab-set__field"><label><?php esc_html_e( 'Primary Color', 'g2a-booking' ); ?></label><input type="text" name="g2ab_brand_color_primary" value="<?php echo esc_attr( get_option( 'g2ab_brand_color_primary', '#C9A84C' ) ); ?>" /></div>
+			<div class="g2ab-set__field"><label><?php esc_html_e( 'Accent Color', 'g2a-booking' ); ?></label><input type="text" name="g2ab_brand_color_accent" value="<?php echo esc_attr( get_option( 'g2ab_brand_color_accent', '#E8802F' ) ); ?>" /></div>
 		</div>
 		<div class="g2ab-set__panel">
 			<h3><?php esc_html_e( 'BUILD STATUS', 'g2a-booking' ); ?></h3>
@@ -475,13 +475,21 @@ final class G2AB_Admin_Settings_Pro {
 		$theme        = get_option( 'g2ab_form_theme', 'midnight' );
 		$layout       = get_option( 'g2ab_form_layout', 'split' );
 		$font         = get_option( 'g2ab_form_font', 'inter' );
-		$primary      = get_option( 'g2ab_form_primary', '#5B7BFF' );
-		$accent       = get_option( 'g2ab_form_accent', '#7C9CFF' );
-		$bg           = get_option( 'g2ab_form_bg', '#0B1020' );
-		$surface      = get_option( 'g2ab_form_surface', '#121833' );
-		$surface2     = get_option( 'g2ab_form_surface2', '#0E1530' );
-		$text         = get_option( 'g2ab_form_text', '#FFFFFF' );
-		$muted        = get_option( 'g2ab_form_muted', '#8B93B4' );
+		// Defaults are literal hex previews of the theme's live brass/ember/
+		// void tokens (dark mode) — a color-picker swatch can't render a CSS
+		// var() reference, so this mirrors what class-frontend.php's own
+		// var(--color-brass)-style defaults resolve to today. Saving this
+		// form without changing a field writes these hexes explicitly (no
+		// longer inheriting the theme's live tokens across a light/dark
+		// toggle) — a pre-existing tradeoff of a hex-based color picker, not
+		// something this fix introduces.
+		$primary      = get_option( 'g2ab_form_primary', '#C9A84C' );
+		$accent       = get_option( 'g2ab_form_accent', '#E8802F' );
+		$bg           = get_option( 'g2ab_form_bg', '#1A191E' );
+		$surface      = get_option( 'g2ab_form_surface', '#211F26' );
+		$surface2     = get_option( 'g2ab_form_surface2', '#2B2932' );
+		$text         = get_option( 'g2ab_form_text', '#F7F7F9' );
+		$muted        = get_option( 'g2ab_form_muted', '#A7A6AE' );
 		$radius       = get_option( 'g2ab_form_radius', '16' );
 		$title        = get_option( 'g2ab_form_title', '' );
 		$subtitle     = get_option( 'g2ab_form_subtitle', '' );
@@ -496,7 +504,7 @@ final class G2AB_Admin_Settings_Pro {
 			<div class="g2ab-set__field">
 				<label><?php esc_html_e( 'Theme', 'g2a-booking' ); ?></label>
 				<select name="g2ab_form_theme">
-					<option value="midnight" <?php selected( 'midnight', $theme ); ?>><?php esc_html_e( 'Midnight (dark, blue accent)', 'g2a-booking' ); ?></option>
+					<option value="midnight" <?php selected( 'midnight', $theme ); ?>><?php esc_html_e( 'Midnight (dark, brass/ember accent)', 'g2a-booking' ); ?></option>
 					<option value="light" <?php selected( 'light', $theme ); ?>><?php esc_html_e( 'Light (white surface)', 'g2a-booking' ); ?></option>
 					<option value="dark" <?php selected( 'dark', $theme ); ?>><?php esc_html_e( 'Dark (flat dark)', 'g2a-booking' ); ?></option>
 					<option value="custom" <?php selected( 'custom', $theme ); ?>><?php esc_html_e( 'Custom (use colors below)', 'g2a-booking' ); ?></option>
@@ -598,7 +606,7 @@ final class G2AB_Admin_Settings_Pro {
 		<div class="g2ab-set__panel" style="background:#FAFBFD;">
 			<h3><?php esc_html_e( 'PREVIEW', 'g2a-booking' ); ?></h3>
 			<p class="g2ab-set__desc"><?php esc_html_e( 'Place this shortcode on a page to see the customized form:', 'g2a-booking' ); ?></p>
-			<code style="display:block;padding:10px 12px;background:#0F1115;color:#FFD37A;border-radius:4px;font-size:13px;">[g2a_lane_booking]</code>
+			<code style="display:block;padding:10px 12px;background:#1A191E;color:#FFD37A;border-radius:4px;font-size:13px;">[g2a_lane_booking]</code>
 		</div>
 		<?php
 		$this->close_form();
@@ -679,33 +687,33 @@ final class G2AB_Admin_Settings_Pro {
 	private function print_styles() {
 		echo '<style>
 .g2ab-set{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;}
-.g2ab-set__header{background:linear-gradient(135deg,#0F1115 0%,#1A1F26 100%);color:#E8E8E8;padding:24px 28px;margin:20px 0 0;border-left:4px solid #D2691E;}
+.g2ab-set__header{background:linear-gradient(135deg,#1A191E 0%,#26252C 100%);color:#F7F7F9;padding:24px 28px;margin:20px 0 0;border-left:4px solid #E8802F;}
 .g2ab-set__stencil{font-family:"Inter","Segoe UI",system-ui,-apple-system,sans-serif;font-size:30px;font-weight:700;letter-spacing:.04em;color:#fff;}
-.g2ab-set__sub{margin:4px 0 0;color:#8A95A5;font-size:13px;text-transform:uppercase;letter-spacing:.08em;}
+.g2ab-set__sub{margin:4px 0 0;color:#A7A6AE;font-size:13px;text-transform:uppercase;letter-spacing:.08em;}
 .g2ab-set__tabs{background:#fff;border:1px solid #d0d4d9;border-top:none;display:flex;flex-wrap:wrap;}
 .g2ab-set__tabs a{padding:14px 22px;text-decoration:none;color:#3c434a;font-size:12px;font-weight:700;letter-spacing:.08em;border-right:1px solid #f0f1f3;text-transform:uppercase;}
-.g2ab-set__tabs a:hover{background:#f8f9fa;color:#D2691E;}
-.g2ab-set__tabs a.is-active{background:#0F1115;color:#fff;border-right-color:#D2691E;}
+.g2ab-set__tabs a:hover{background:#f8f9fa;color:#E8802F;}
+.g2ab-set__tabs a.is-active{background:#1A191E;color:#fff;border-right-color:#E8802F;}
 .g2ab-set__subtabs{display:flex;gap:6px;flex-wrap:wrap;background:#fff;border:1px solid #d0d4d9;border-top:none;padding:10px 14px;}
 .g2ab-set__subtabs a{display:inline-flex;align-items:center;gap:6px;padding:8px 14px;color:#3c434a;text-decoration:none;font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;border-radius:2px;}
 .g2ab-set__subtabs a:hover{background:#f0f1f3;}
-.g2ab-set__subtabs a.is-active{background:#D2691E;color:#fff;}
+.g2ab-set__subtabs a.is-active{background:#E8802F;color:#fff;}
 .g2ab-set__gw-logo{display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:3px;color:#fff;font-weight:700;font-family:"Inter","Segoe UI",system-ui,-apple-system,sans-serif;font-size:14px;}
 .g2ab-set__gw-logo--lg{width:48px;height:48px;font-size:24px;border-radius:4px;}
 .g2ab-set__gw-logo--xl{width:64px;height:64px;font-size:32px;border-radius:6px;}
 .g2ab-set__content{margin-top:14px;}
 .g2ab-set__panel{background:#fff;border:1px solid #d0d4d9;padding:22px 28px;margin-bottom:14px;}
-.g2ab-set__panel h3{font-family:"Inter","Segoe UI",system-ui,-apple-system,sans-serif;font-size:13px;letter-spacing:.12em;color:#D2691E;margin:0 0 14px;font-weight:700;}
+.g2ab-set__panel h3{font-family:"Inter","Segoe UI",system-ui,-apple-system,sans-serif;font-size:13px;letter-spacing:.12em;color:#E8802F;margin:0 0 14px;font-weight:700;}
 .g2ab-set__field{margin-bottom:14px;}
 .g2ab-set__field label{display:block;font-size:11px;font-weight:700;letter-spacing:.06em;color:#3c434a;text-transform:uppercase;margin-bottom:5px;}
 .g2ab-set__field input[type="text"],.g2ab-set__field input[type="email"],.g2ab-set__field input[type="url"],.g2ab-set__field input[type="number"],.g2ab-set__field input[type="password"],.g2ab-set__field select,.g2ab-set__field textarea{width:100%;max-width:520px;padding:9px 12px;border:1px solid #d0d4d9;border-radius:2px;font-size:13px;font-family:inherit;}
 .g2ab-set__field textarea{font-family:"SF Mono","Monaco",monospace;font-size:12px;}
-.g2ab-set__field input:focus,.g2ab-set__field select:focus,.g2ab-set__field textarea:focus{outline:none;border-color:#D2691E;box-shadow:0 0 0 2px rgba(210,105,30,.15);}
-.g2ab-set__field small{display:block;color:#8A95A5;font-size:12px;margin-top:4px;}
+.g2ab-set__field input:focus,.g2ab-set__field select:focus,.g2ab-set__field textarea:focus{outline:none;border-color:#E8802F;box-shadow:0 0 0 2px rgba(210,105,30,.15);}
+.g2ab-set__field small{display:block;color:#A7A6AE;font-size:12px;margin-top:4px;}
 .g2ab-set__field small code{background:#f0f1f3;padding:1px 6px;border-radius:2px;color:#3c434a;font-size:11px;}
 .g2ab-set__check{display:inline-flex;align-items:center;gap:6px;text-transform:none;letter-spacing:0;font-weight:400;font-size:13px;}
-.g2ab-set__check input{width:16px;height:16px;accent-color:#D2691E;}
-.g2ab-set__desc{color:#8A95A5;font-size:12px;margin:0 0 12px;}
+.g2ab-set__check input{width:16px;height:16px;accent-color:#E8802F;}
+.g2ab-set__desc{color:#A7A6AE;font-size:12px;margin:0 0 12px;}
 .g2ab-set__actions{padding:18px 28px;background:#f8f9fa;border:1px solid #d0d4d9;border-top:none;}
 /* (Old duplicate button rules consolidated below for predictable hover behavior.) */
 .g2ab-set__gw-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:14px;margin-bottom:14px;}
@@ -713,13 +721,13 @@ final class G2AB_Admin_Settings_Pro {
 .g2ab-set__gw-card.is-enabled{border-top:4px solid #4CAF50;}
 .g2ab-set__gw-card:hover{transform:translateY(-2px);box-shadow:0 6px 16px rgba(0,0,0,.08);}
 .g2ab-set__gw-head{display:flex;align-items:center;gap:14px;margin-bottom:10px;}
-.g2ab-set__gw-head h4{margin:0 0 3px;font-size:16px;color:#0F1115;}
-.g2ab-set__gw-status{font-size:10px;letter-spacing:.06em;font-weight:700;color:#8A95A5;}
+.g2ab-set__gw-head h4{margin:0 0 3px;font-size:16px;color:#1A191E;}
+.g2ab-set__gw-status{font-size:10px;letter-spacing:.06em;font-weight:700;color:#A7A6AE;}
 .g2ab-set__gw-status--ok{color:#4CAF50;}
-.g2ab-set__gw-status em{color:#F9A825;font-style:normal;margin-left:4px;}
+.g2ab-set__gw-status em{color:#E8802F;font-style:normal;margin-left:4px;}
 .g2ab-set__gw-desc{color:#3c434a;font-size:12px;margin:0 0 14px;line-height:1.5;}
 .g2ab-set__gw-actions{display:flex;justify-content:space-between;align-items:center;}
-.g2ab-set__pill{display:inline-block;padding:3px 8px;font-size:9px;letter-spacing:.06em;font-weight:700;border-radius:2px;background:#8A95A5;color:#fff;}
+.g2ab-set__pill{display:inline-block;padding:3px 8px;font-size:9px;letter-spacing:.06em;font-weight:700;border-radius:2px;background:#A7A6AE;color:#fff;}
 .g2ab-set__pill--on{background:#4CAF50;}
 /* ---- Buttons (single source of truth) ---- */
 .g2ab-set__btn{display:inline-block;padding:10px 18px;font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;border:1px solid #c8d1e0;border-radius:4px;background:#fff;color:#0f2044;text-decoration:none;cursor:pointer;font-family:inherit;transition:background .15s ease,color .15s ease,border-color .15s ease,box-shadow .15s ease,transform .15s ease;}

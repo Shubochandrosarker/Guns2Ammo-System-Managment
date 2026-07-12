@@ -30,7 +30,7 @@ class G2AB_Invoice_Settings {
 		$has_lite   = true;
 
 		$pdf_status = $has_dompdf ? 'Dompdf' : ( $has_mpdf ? 'mPDF' : ( $has_wkhtml ? 'wkhtmltopdf' : ( $has_lite ? 'Built-in PDF Lite' : 'BROWSER PRINT (fallback)' ) ) );
-		$pdf_color = ( $has_dompdf || $has_mpdf || $has_wkhtml || $has_lite ) ? '#4CAF50' : '#F9A825';
+		$pdf_color = ( $has_dompdf || $has_mpdf || $has_wkhtml || $has_lite ) ? '#4CAF50' : '#E8802F';
 
 		$msg = '';
 		if ( ! empty( $_GET['saved'] ) ) $msg = '<div class="notice notice-success is-dismissible"><p>Saved.</p></div>';
@@ -83,11 +83,11 @@ class G2AB_Invoice_Settings {
 				<div class="g2ab-inv__grid">
 					<div class="g2ab-inv__row">
 						<label>Header Color (hex)</label>
-						<input type="text" name="brand_color" value="<?php echo esc_attr( get_option( G2AB_Invoice_Engine::OPT_COLOR, '#0F1115' ) ); ?>" />
+						<input type="text" name="brand_color" value="<?php echo esc_attr( get_option( G2AB_Invoice_Engine::OPT_COLOR, '#1A191E' ) ); ?>" />
 					</div>
 					<div class="g2ab-inv__row">
 						<label>Accent Color (CTA + border)</label>
-						<input type="text" name="accent_color" value="<?php echo esc_attr( get_option( G2AB_Invoice_Engine::OPT_ACCENT, '#D2691E' ) ); ?>" />
+						<input type="text" name="accent_color" value="<?php echo esc_attr( get_option( G2AB_Invoice_Engine::OPT_ACCENT, '#E8802F' ) ); ?>" />
 					</div>
 				</div>
 				<div class="g2ab-inv__row">
@@ -143,7 +143,7 @@ class G2AB_Invoice_Settings {
 				'status'       => 'paid',
 				'fields'       => json_encode( array( 'name' => 'Sample Customer', 'email' => 'sample@example.com' ) ),
 			);
-			echo '<div style="border:2px solid #D2691E;margin-top:20px;">' . $engine->render_html( $sample ) . '</div>'; // phpcs:ignore
+			echo '<div style="border:2px solid #E8802F;margin-top:20px;">' . $engine->render_html( $sample ) . '</div>'; // phpcs:ignore
 		}
 	}
 
@@ -152,8 +152,8 @@ class G2AB_Invoice_Settings {
 		check_admin_referer( 'g2ab_save_invoice', '_g2ab_nonce' );
 
 		update_option( G2AB_Invoice_Engine::OPT_LOGO,            esc_url_raw( $_POST['logo_url'] ?? '' ) );
-		update_option( G2AB_Invoice_Engine::OPT_COLOR,           sanitize_hex_color( $_POST['brand_color'] ?? '#0F1115' ) );
-		update_option( G2AB_Invoice_Engine::OPT_ACCENT,          sanitize_hex_color( $_POST['accent_color'] ?? '#D2691E' ) );
+		update_option( G2AB_Invoice_Engine::OPT_COLOR,           sanitize_hex_color( $_POST['brand_color'] ?? '#1A191E' ) );
+		update_option( G2AB_Invoice_Engine::OPT_ACCENT,          sanitize_hex_color( $_POST['accent_color'] ?? '#E8802F' ) );
 		update_option( G2AB_Invoice_Engine::OPT_BUSINESS_BLOCK,  sanitize_textarea_field( $_POST['business_block'] ?? '' ) );
 		update_option( G2AB_Invoice_Engine::OPT_FOOTER,          wp_kses_post( wp_unslash( $_POST['footer'] ?? '' ) ) );
 		update_option( G2AB_Invoice_Engine::OPT_PREFIX,          sanitize_key( $_POST['prefix'] ?? 'INV' ) );

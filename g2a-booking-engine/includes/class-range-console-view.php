@@ -229,7 +229,7 @@ final class G2AB_Range_Console_View {
 	private static function print_css() {
 		?>
 		<style id="g2ab-rc-styles">
-		.g2ab-rc{--bg:#0B0D11;--surface:#151A21;--surface2:#1C232C;--border:#2A323D;--text:#EDEFF2;--muted:#8A95A5;--orange:#D2691E;--green:#36C26B;--red:#E5484D;--amber:#F2B33D;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;color:var(--text);background:var(--bg);border-radius:14px;padding:20px;margin-top:14px;}
+		.g2ab-rc{--bg:#0B0D11;--surface:#151A21;--surface2:#1C232C;--border:#2A323D;--text:#EDEFF2;--muted:#A7A6AE;--orange:#E8802F;--green:#36C26B;--red:#E5484D;--amber:#F2B33D;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;color:var(--text);background:var(--bg);border-radius:14px;padding:20px;margin-top:14px;}
 		.g2ab-rc *{box-sizing:border-box;}
 		.g2ab-rc--frontend{max-width:1240px;margin:24px auto;}
 		.g2ab-rc__top{display:flex;flex-wrap:wrap;gap:12px;align-items:center;justify-content:space-between;margin-bottom:16px;}

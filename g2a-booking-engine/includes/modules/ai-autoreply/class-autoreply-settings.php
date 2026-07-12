@@ -204,7 +204,7 @@ class G2AB_AutoReply_Settings {
 				<textarea id="g2ab-ai-test-input" placeholder="Hi, I want to bring my 14-year-old son to try shooting for his birthday. What are your age rules and do you offer beginner instruction?"></textarea>
 			</div>
 			<button class="button button-primary" id="g2ab-ai-test-btn">Generate Draft</button>
-			<div id="g2ab-ai-test-output" style="margin-top:16px;padding:16px;background:#F4F5F7;border-left:3px solid #4A5D3A;display:none;white-space:pre-wrap;"></div>
+			<div id="g2ab-ai-test-output" style="margin-top:16px;padding:16px;background:#F4F5F7;border-left:3px solid #E8802F;display:none;white-space:pre-wrap;"></div>
 		</div>
 
 		<script>

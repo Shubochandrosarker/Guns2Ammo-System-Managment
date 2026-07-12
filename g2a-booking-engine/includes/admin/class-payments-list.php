@@ -199,31 +199,31 @@ final class G2AB_Admin_Payments_List {
 	private function print_styles() {
 		echo '<style>
 .g2ab-pl{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;}
-.g2ab-pl__header{background:linear-gradient(135deg,#0F1115 0%,#1A1F26 100%);color:#E8E8E8;padding:24px 28px;margin:20px 0 16px;border-left:4px solid #D2691E;}
+.g2ab-pl__header{background:linear-gradient(135deg,#1A191E 0%,#26252C 100%);color:#F7F7F9;padding:24px 28px;margin:20px 0 16px;border-left:4px solid #E8802F;}
 .g2ab-pl__stencil{font-family:"Inter","Segoe UI",system-ui,-apple-system,sans-serif;font-size:30px;font-weight:700;letter-spacing:.04em;color:#fff;}
-.g2ab-pl__sub{margin:4px 0 0;color:#8A95A5;font-size:13px;text-transform:uppercase;letter-spacing:.08em;}
+.g2ab-pl__sub{margin:4px 0 0;color:#A7A6AE;font-size:13px;text-transform:uppercase;letter-spacing:.08em;}
 .g2ab-pl__kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px;margin-bottom:16px;}
-.g2ab-pl__kpi{background:#fff;border:1px solid #d0d4d9;padding:16px 18px;border-top:3px solid #D2691E;}
-.g2ab-pl__kpi-lbl{display:block;font-size:10px;color:#8A95A5;letter-spacing:.1em;font-weight:700;}
-.g2ab-pl__kpi-val{display:block;font-family:"Inter","Segoe UI",system-ui,-apple-system,sans-serif;font-size:28px;color:#0F1115;font-weight:700;line-height:1.1;margin-top:6px;}
-.g2ab-pl__notice{background:#fffbe6;border-left:4px solid #D2691E;padding:14px 18px;margin-bottom:14px;}
-.g2ab-pl__notice strong{display:block;font-size:11px;color:#D2691E;letter-spacing:.08em;margin-bottom:4px;}
+.g2ab-pl__kpi{background:#fff;border:1px solid #d0d4d9;padding:16px 18px;border-top:3px solid #E8802F;}
+.g2ab-pl__kpi-lbl{display:block;font-size:10px;color:#A7A6AE;letter-spacing:.1em;font-weight:700;}
+.g2ab-pl__kpi-val{display:block;font-family:"Inter","Segoe UI",system-ui,-apple-system,sans-serif;font-size:28px;color:#1A191E;font-weight:700;line-height:1.1;margin-top:6px;}
+.g2ab-pl__notice{background:#fffbe6;border-left:4px solid #E8802F;padding:14px 18px;margin-bottom:14px;}
+.g2ab-pl__notice strong{display:block;font-size:11px;color:#E8802F;letter-spacing:.08em;margin-bottom:4px;}
 .g2ab-pl__notice p{margin:0;color:#3c434a;font-size:13px;}
 .g2ab-pl__filters{background:#fff;padding:14px 18px;border:1px solid #d0d4d9;display:flex;gap:10px;align-items:center;flex-wrap:wrap;}
 .g2ab-pl__filters select{padding:8px 12px;border:1px solid #ccd0d4;border-radius:3px;font-size:13px;}
 .g2ab-pl__table-wrap{background:#fff;border:1px solid #d0d4d9;border-top:none;}
 .g2ab-pl__table{width:100%;border-collapse:collapse;font-size:13px;}
-.g2ab-pl__table th{text-align:left;padding:12px 14px;background:#f8f9fa;color:#8A95A5;font-size:10px;letter-spacing:.08em;border-bottom:2px solid #d0d4d9;}
+.g2ab-pl__table th{text-align:left;padding:12px 14px;background:#f8f9fa;color:#A7A6AE;font-size:10px;letter-spacing:.08em;border-bottom:2px solid #d0d4d9;}
 .g2ab-pl__table td{padding:12px 14px;border-bottom:1px solid #f0f1f3;}
 .g2ab-pl__table code{background:#f0f1f3;padding:1px 6px;border-radius:2px;color:#3c434a;font-size:11px;}
-.g2ab-pl__pill{display:inline-block;padding:2px 8px;font-size:9px;letter-spacing:.06em;font-weight:700;border-radius:2px;background:#0F1115;color:#fff;}
+.g2ab-pl__pill{display:inline-block;padding:2px 8px;font-size:9px;letter-spacing:.06em;font-weight:700;border-radius:2px;background:#1A191E;color:#fff;}
 .g2ab-pl__pill--succeeded{background:#4CAF50;}
 .g2ab-pl__pill--failed,.g2ab-pl__pill--refunded{background:#C62828;}
-.g2ab-pl__pill--pending{background:#F9A825;}
+.g2ab-pl__pill--pending{background:#E8802F;}
 .g2ab-pl__pill--stripe{background:#635BFF;}
 .g2ab-pl__pill--paypal{background:#003087;}
-.g2ab-pl__pill--pay_in_store{background:#4A5D3A;}
-.g2ab-pl__empty{padding:40px;text-align:center;color:#8A95A5;}
+.g2ab-pl__pill--pay_in_store{background:#E8802F;}
+.g2ab-pl__empty{padding:40px;text-align:center;color:#A7A6AE;}
 </style>';
 	}
 }

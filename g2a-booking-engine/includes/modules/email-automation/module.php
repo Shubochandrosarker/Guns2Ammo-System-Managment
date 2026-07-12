@@ -20,7 +20,7 @@ return array(
 	'status'         => 'active',
 	'category'       => 'notifications',
 	'icon'           => 'M',
-	'color'          => '#4A5D3A',
+	'color'          => '#E8802F',
 	'default_active' => true,
 	'bootstrap'      => 'G2AB_Module_Email_Automation',
 	'configure'      => 'admin.php?page=g2ab-settings&tab=email_automation',

@@ -17,7 +17,7 @@ return array(
 	'status'         => 'active',
 	'category'       => 'integrations',
 	'icon'           => 'M',
-	'color'          => '#5B7BFF',
+	'color'          => '#C9A84C',
 	'default_active' => false,
 	'bootstrap'      => 'G2AB_Module_Memberistic',
 	'configure'      => 'admin.php?page=g2ab-settings&tab=memberistic',
