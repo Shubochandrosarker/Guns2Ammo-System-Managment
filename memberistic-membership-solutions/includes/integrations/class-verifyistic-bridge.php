@@ -9,8 +9,9 @@
  *     membership is created or activated (read from the visitor's
  *     `verifyistic_verified` cookie → wp_verifyistic_logs).
  *   - Exposes the verified status (helper + filter + a line on the verify card).
- *   - Optionally treats verification as required for membership signup (off by
- *     default; surfaced as a filter other code can honor).
+ *   - Treats verification as required for membership signup by default
+ *     (surfaced as a filter other code can honor; set
+ *     integration_verifyistic_require_signup = no to opt out).
  *
  * Entirely gated by the Integrations toggle (integration_verifyistic_enabled)
  * and a no-op unless the Verifyistic plugin is active.
@@ -44,7 +45,7 @@ final class Verifyistic_Bridge {
 		add_action( 'memberistic_verify_card_after', array( self::class, 'render_verified_line' ), 10, 2 );
 
 		// Expose "verification required for signup" as a filterable gate
-		// (default off — set integration_verifyistic_require_signup = yes).
+		// (default ON — set integration_verifyistic_require_signup = no to opt out).
 		add_filter( 'memberistic_signup_requires_verification', array( self::class, 'require_signup_filter' ), 10, 1 );
 	}
 
@@ -185,9 +186,9 @@ final class Verifyistic_Bridge {
 		);
 	}
 
-	/** Filter: require verification for signup (default off). */
+	/** Filter: require verification for signup (default on). */
 	public static function require_signup_filter( $required ) {
-		return 'yes' === memberistic_get_setting( 'integration_verifyistic_require_signup', 'no' ) ? true : $required;
+		return 'no' !== memberistic_get_setting( 'integration_verifyistic_require_signup', 'yes' ) ? true : $required;
 	}
 
 	/**
@@ -206,7 +207,7 @@ final class Verifyistic_Bridge {
 		if ( ! Integrations_Registry::is_enabled( 'verifyistic' ) ) {
 			return false;
 		}
-		$required = 'yes' === memberistic_get_setting( 'integration_verifyistic_require_signup', 'no' );
+		$required = 'no' !== memberistic_get_setting( 'integration_verifyistic_require_signup', 'yes' );
 		$required = (bool) apply_filters( 'memberistic_signup_requires_verification', $required );
 		if ( ! $required ) {
 			return false;

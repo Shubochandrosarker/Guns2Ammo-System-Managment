@@ -53,9 +53,9 @@ class G2AB_AutoReply_Engine {
 	 * Build the system prompt with business identity + KB + tone.
 	 */
 	public function build_system_prompt( $context = array() ) {
-		$biz_name  = get_option( 'g2ab_business_name', get_bloginfo( 'name' ) );
-		$biz_addr  = get_option( 'g2ab_business_address', '' );
-		$biz_phone = get_option( 'g2ab_business_phone', '' );
+		$biz_name  = g2ab_business_name();
+		$biz_addr  = g2ab_business_address();
+		$biz_phone = g2ab_business_phone();
 		$biz_hours = get_option( 'g2ab_business_hours_summary', 'Mon-Sat 9 AM - 9 PM, Sun 10 AM - 6 PM' );
 
 		$tone = get_option( self::OPTION_TONE, 'professional_friendly' );

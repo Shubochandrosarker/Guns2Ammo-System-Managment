@@ -72,12 +72,12 @@
   --text-primary:    #f7f8fa;
   --text-secondary:  #dde1e8;
   --text-muted:      #8b93a3;
-  --text-subtle:     #5b6272;
+  --text-subtle:     #7a818f;
   --text-inverse:    #0b0d13;
 
   --sidebar-bg:      #05070c;
   --sidebar-fg:      #eef0f4;
-  --sidebar-fg-muted:#5b6272;
+  --sidebar-fg-muted:#7a818f;
   --sidebar-hover:   rgba(255, 255, 255, 0.06);
   --sidebar-active:  rgba(255, 127, 26, 0.22);
 

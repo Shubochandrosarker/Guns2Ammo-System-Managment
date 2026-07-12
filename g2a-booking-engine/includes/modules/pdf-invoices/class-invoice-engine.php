@@ -201,7 +201,7 @@ class G2AB_Invoice_Engine {
 		$brand   = get_option( self::OPT_COLOR, '#1A191E' );
 		$accent  = get_option( self::OPT_ACCENT, '#E8802F' );
 		$logo    = get_option( self::OPT_LOGO, '' );
-		$biz     = get_option( self::OPT_BUSINESS_BLOCK, get_option( 'g2ab_business_name' ) . "\n" . get_option( 'g2ab_business_address' ) . "\n" . get_option( 'g2ab_business_phone' ) );
+		$biz     = get_option( self::OPT_BUSINESS_BLOCK, g2ab_business_name() . "\n" . g2ab_business_address() . "\n" . g2ab_business_phone() );
 		$footer  = get_option( self::OPT_FOOTER, 'Thank you for your business.' );
 		$tax_label = get_option( self::OPT_TAX_LABEL, 'Sales Tax' );
 		$tax_rate = (float) get_option( self::OPT_TAX_RATE, 0 );
@@ -284,7 +284,7 @@ table.inv__items td.right { text-align: right; }
 				<?php if ( $logo ) : ?>
 					<img src="<?php echo esc_url( $logo ); ?>" alt="" class="inv__logo" />
 				<?php else : ?>
-					<div class="inv__brand-text"><?php echo esc_html( get_option( 'g2ab_business_name', get_bloginfo( 'name' ) ) ); ?></div>
+					<div class="inv__brand-text"><?php echo esc_html( g2ab_business_name() ); ?></div>
 				<?php endif; ?>
 			</div>
 			<div class="inv__head-r">

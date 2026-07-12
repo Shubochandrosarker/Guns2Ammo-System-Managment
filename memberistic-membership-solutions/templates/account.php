@@ -641,7 +641,7 @@ $lane_url    = home_url( '/book-a-lane/' );
 </div>
 
 <style>
-.memberistic-acct{--ma-card:#26252C;--ma-line:rgba(255,255,255,.09);--ma-line2:rgba(255,255,255,.17);--ma-brass:#C9A84C;--ma-brass2:#E3C06A;--ma-ember:#E8802F;--ma-white:#F4F4F6;--ma-fog:#CBCAD2;--ma-silver:#8E8D96;
+.memberistic-acct{--ma-card:#26252C;--ma-line:rgba(255,255,255,.09);--ma-line2:rgba(255,255,255,.17);--ma-brass:#C9A84C;--ma-brass2:#E3C06A;--ma-ember:#E8802F;--ma-white:#F4F4F6;--ma-fog:#CBCAD2;--ma-silver:#A7A6AE;
 	font-family:var(--font-body,"DM Sans",-apple-system,Segoe UI,sans-serif);}
 .memberistic-acct *{box-sizing:border-box;}
 .memberistic-acct .memberistic-acct-statusbar{margin:0 0 22px;}
@@ -731,7 +731,7 @@ $lane_url    = home_url( '/book-a-lane/' );
 .memberistic-acct-cta{display:inline-block;padding:13px 22px;border-radius:2px;text-decoration:none;cursor:pointer;
 	font-family:var(--font-condensed,"Barlow Condensed",sans-serif)!important;font-weight:600;font-size:13px;
 	letter-spacing:.1em;text-transform:uppercase;border:1px solid transparent;}
-.memberistic-acct-cta--primary{background:var(--ma-ember)!important;color:#fff!important;}
+.memberistic-acct-cta--primary{background:var(--ma-ember)!important;color:#1A191E!important;}
 .memberistic-acct-cta--primary:hover{background:#F4933F!important;}
 .memberistic-acct-cta--ghost{background:transparent!important;border-color:var(--ma-brass)!important;color:var(--ma-brass2)!important;}
 .memberistic-acct-cta--ghost:hover{background:rgba(201,168,76,.08)!important;color:var(--ma-white)!important;}

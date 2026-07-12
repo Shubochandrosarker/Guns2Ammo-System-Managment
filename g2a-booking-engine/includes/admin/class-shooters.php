@@ -85,7 +85,7 @@ final class G2AB_Admin_Shooters {
 		$lapsed  = $this->lapsed_list( 6 );
 		$nonce   = wp_create_nonce( 'wp_rest' );
 		$rest    = esc_url_raw( rest_url( G2AB_REST_NAMESPACE . '/shooters' ) );
-		$biz     = get_option( 'g2ab_business_name', get_bloginfo( 'name' ) );
+		$biz     = g2ab_business_name();
 
 		$this->print_styles();
 		?>

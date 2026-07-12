@@ -86,9 +86,15 @@ final class G2AB_Activator {
 			'g2ab_stripe_webhook_secret'    => '',
 			'g2ab_brand_color_primary'      => '#C9A84C',
 			'g2ab_brand_color_accent'       => '#E8802F',
-			'g2ab_business_name'            => 'Guns 2 Ammo',
+			// Left empty rather than seeded with a placeholder — the actual
+			// business name/phone/address live in the theme's Business Info
+			// settings (guns2ammo/inc/business-info.php's g2a_biz()), and
+			// g2ab_business_name()/_phone()/_address() (includes/helpers/
+			// functions.php) fall back to that live source whenever these
+			// options are empty. An explicit value saved here always wins.
+			'g2ab_business_name'            => '',
 			'g2ab_business_phone'           => '',
-			'g2ab_business_address'         => 'Mesa, Arizona',
+			'g2ab_business_address'         => '',
 		);
 		foreach ( $defaults as $key => $value ) {
 			add_option( $key, $value );

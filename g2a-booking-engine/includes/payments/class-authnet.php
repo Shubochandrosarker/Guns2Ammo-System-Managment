@@ -96,7 +96,7 @@ final class G2AB_Gateway_Authnet {
 					'amount'          => number_format( $amount, 2, '.', '' ),
 					'order'           => array(
 						'invoiceNumber' => substr( $booking->uuid, 0, 20 ),
-						'description'   => sprintf( '%s booking', get_option( 'g2ab_business_name', 'Range' ) ),
+						'description'   => sprintf( '%s booking', g2ab_business_name() ),
 					),
 					'customer' => array( 'email' => $customer_email ),
 				),
@@ -134,7 +134,7 @@ final class G2AB_Gateway_Authnet {
 						),
 						array(
 							'settingName'  => 'hostedPaymentOrderOptions',
-							'settingValue' => wp_json_encode( array( 'show' => true, 'merchantName' => get_option( 'g2ab_business_name', 'Range' ) ) ),
+							'settingValue' => wp_json_encode( array( 'show' => true, 'merchantName' => g2ab_business_name() ) ),
 						),
 					),
 				),

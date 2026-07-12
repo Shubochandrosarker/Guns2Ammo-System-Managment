@@ -92,7 +92,7 @@ class G2AB_Invoice_Settings {
 				</div>
 				<div class="g2ab-inv__row">
 					<label>Business Block (multi-line — appears under "From")</label>
-					<textarea name="business_block"><?php echo esc_textarea( get_option( G2AB_Invoice_Engine::OPT_BUSINESS_BLOCK, get_option( 'g2ab_business_name' ) . "\n" . get_option( 'g2ab_business_address' ) . "\n" . get_option( 'g2ab_business_phone' ) ) ); ?></textarea>
+					<textarea name="business_block"><?php echo esc_textarea( get_option( G2AB_Invoice_Engine::OPT_BUSINESS_BLOCK, g2ab_business_name() . "\n" . g2ab_business_address() . "\n" . g2ab_business_phone() ) ); ?></textarea>
 				</div>
 				<div class="g2ab-inv__row">
 					<label>Invoice Footer (HTML allowed — terms, refund policy, etc.)</label>

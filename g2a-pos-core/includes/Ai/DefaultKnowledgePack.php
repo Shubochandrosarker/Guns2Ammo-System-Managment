@@ -24,17 +24,29 @@ final class DefaultKnowledgePack {
 	 * @return array<int,array{label:string,body:string,tags:string,scope:string}>
 	 */
 	public static function documents(): array {
+		$name  = \function_exists( 'g2a_biz' ) ? (string) ( \g2a_biz()['name'] ?? '' ) : '';
+		$addr  = \function_exists( 'g2a_biz_addr_line' ) ? (string) \g2a_biz_addr_line() : '';
+		$phone = \function_exists( 'g2a_biz_phone' ) ? (string) \g2a_biz_phone() : '';
+		$email = \function_exists( 'g2a_biz_email' ) ? (string) \g2a_biz_email() : '';
+		$year  = \function_exists( 'g2a_biz' ) ? (string) ( \g2a_biz()['founded_year'] ?? '' ) : '';
+
+		$name  = '' !== $name ? $name : 'Guns 2 Ammo';
+		$addr  = '' !== $addr ? $addr : '6030 E Main St, Suite 103, Mesa, AZ 85205, US';
+		$phone = '' !== $phone ? $phone : '(602) 715-2677';
+		$email = '' !== $email ? $email : 'sales@guns2ammo.com';
+		$year  = '' !== $year ? $year : '2014';
+
 		return array(
 			array(
 				'label' => 'Guns 2 Ammo — business identity, location and hours',
 				'tags'  => self::TAG . ',identity,hours,contact',
 				'scope' => 'public',
 				'body'  =>
-					"Guns 2 Ammo is an Arizona shooting range: Mesa's most-trusted indoor shooting range, "
-					. "FFL-licensed firearm store, and NRA-certified training facility, serving the East Valley since 2014.\n"
-					. "Address: 6030 E Main St, Suite 103, Mesa, AZ 85205, US.\n"
-					. "Phone: (602) 715-2677. Email: sales@guns2ammo.com.\n"
-					. "Founded: 2014. Customer rating: 4.7 stars from 556 Google reviews.\n"
+					"{$name} is an Arizona shooting range: Mesa's most-trusted indoor shooting range, "
+					. "FFL-licensed firearm store, and NRA-certified training facility, serving the East Valley since {$year}.\n"
+					. "Address: {$addr}.\n"
+					. "Phone: {$phone}. Email: {$email}.\n"
+					. "Founded: {$year}. Customer rating: 4.7 stars from 556 Google reviews.\n"
 					. 'Hours (Arizona time, America/Phoenix — no daylight saving): '
 					. "Sunday 12pm–6pm; Monday–Thursday 10am–6pm; Friday 10am–7pm; Saturday 10am–7pm.\n"
 					. 'The facility has 6 indoor shooting lanes. Walk-ins are welcome and lanes can be booked online.',

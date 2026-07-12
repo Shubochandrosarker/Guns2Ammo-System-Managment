@@ -97,7 +97,7 @@ final class G2AB_Gateway_Paypal {
 			'application_context' => array(
 				'return_url' => $success,
 				'cancel_url' => $cancel,
-				'brand_name' => get_option( 'g2ab_business_name', 'G2A Booking' ),
+				'brand_name' => g2ab_business_name(),
 				'user_action' => 'PAY_NOW',
 				'shipping_preference' => 'NO_SHIPPING',
 			),

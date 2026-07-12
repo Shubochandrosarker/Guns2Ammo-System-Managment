@@ -157,9 +157,11 @@ final class G2AB_Admin_Settings_Pro {
 		?>
 		<div class="g2ab-set__panel">
 			<h3><?php esc_html_e( 'BUSINESS', 'g2a-booking' ); ?></h3>
-			<div class="g2ab-set__field"><label><?php esc_html_e( 'Business Name', 'g2a-booking' ); ?></label><input type="text" name="g2ab_business_name" value="<?php echo esc_attr( get_option( 'g2ab_business_name', '' ) ); ?>" /></div>
-			<div class="g2ab-set__field"><label><?php esc_html_e( 'Phone', 'g2a-booking' ); ?></label><input type="text" name="g2ab_business_phone" value="<?php echo esc_attr( get_option( 'g2ab_business_phone', '' ) ); ?>" /></div>
-			<div class="g2ab-set__field"><label><?php esc_html_e( 'Address', 'g2a-booking' ); ?></label><input type="text" name="g2ab_business_address" value="<?php echo esc_attr( get_option( 'g2ab_business_address', '' ) ); ?>" /></div>
+			<div class="g2ab-set__field"><label><?php esc_html_e( 'Business Name', 'g2a-booking' ); ?></label><input type="text" name="g2ab_business_name" value="<?php echo esc_attr( g2ab_business_name() ); ?>" /></div>
+			<div class="g2ab-set__field"><label><?php esc_html_e( 'Phone', 'g2a-booking' ); ?></label><input type="text" name="g2ab_business_phone" value="<?php echo esc_attr( g2ab_business_phone() ); ?>" /></div>
+			<div class="g2ab-set__field"><label><?php esc_html_e( 'Address', 'g2a-booking' ); ?></label><input type="text" name="g2ab_business_address" value="<?php echo esc_attr( g2ab_business_address() ); ?>" />
+				<small><?php esc_html_e( 'Pulled from the theme\'s Business Info settings (Customizer) until you save a value here explicitly.', 'g2a-booking' ); ?></small>
+			</div>
 			<div class="g2ab-set__field"><label><?php esc_html_e( 'Currency', 'g2a-booking' ); ?></label>
 				<select name="g2ab_currency"><?php $cur = get_option( 'g2ab_currency', 'USD' );
 					foreach ( array( 'USD','CAD','EUR','GBP','AUD' ) as $c ) printf( '<option value="%1$s" %2$s>%1$s</option>', esc_attr( $c ), selected( $cur, $c, false ) ); ?></select>
@@ -414,7 +416,7 @@ final class G2AB_Admin_Settings_Pro {
 		<div class="g2ab-set__panel">
 			<h3><?php esc_html_e( 'EMAIL', 'g2a-booking' ); ?></h3>
 			<div class="g2ab-set__field"><label><?php esc_html_e( 'Admin Notification Email', 'g2a-booking' ); ?></label><input type="email" name="g2ab_admin_notification_email" value="<?php echo esc_attr( get_option( 'g2ab_admin_notification_email', get_option( 'admin_email' ) ) ); ?>" /></div>
-			<div class="g2ab-set__field"><label><?php esc_html_e( 'From Name', 'g2a-booking' ); ?></label><input type="text" name="g2ab_email_from_name" value="<?php echo esc_attr( get_option( 'g2ab_email_from_name', get_option( 'g2ab_business_name', 'Guns 2 Ammo' ) ) ); ?>" /></div>
+			<div class="g2ab-set__field"><label><?php esc_html_e( 'From Name', 'g2a-booking' ); ?></label><input type="text" name="g2ab_email_from_name" value="<?php echo esc_attr( get_option( 'g2ab_email_from_name', g2ab_business_name() ) ); ?>" /></div>
 			<div class="g2ab-set__field"><label><?php esc_html_e( 'From Email', 'g2a-booking' ); ?></label><input type="email" name="g2ab_email_from_address" value="<?php echo esc_attr( get_option( 'g2ab_email_from_address', '' ) ); ?>" /></div>
 			<div class="g2ab-set__field"><label class="g2ab-set__check"><input type="checkbox" name="g2ab_send_confirmation_email" value="1" <?php checked( 1, (int) get_option( 'g2ab_send_confirmation_email', 1 ) ); ?> /> <?php esc_html_e( 'Send booking confirmation email', 'g2a-booking' ); ?></label></div>
 			<div class="g2ab-set__field"><label class="g2ab-set__check"><input type="checkbox" name="g2ab_send_reminder_email" value="1" <?php checked( 1, (int) get_option( 'g2ab_send_reminder_email', 1 ) ); ?> /> <?php esc_html_e( 'Send reminder email', 'g2a-booking' ); ?></label></div>
