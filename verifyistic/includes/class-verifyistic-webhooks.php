@@ -40,7 +40,7 @@ class Verifyistic_Webhooks {
 		$table           = $wpdb->prefix . self::TABLE;
 		$charset_collate = $wpdb->get_charset_collate();
 
-		$sql = "CREATE TABLE IF NOT EXISTS {$table} (
+		$sql = "CREATE TABLE {$table} (
 			id             BIGINT(20) UNSIGNED NOT NULL AUTO_INCREMENT,
 			connection_id  VARCHAR(40)  NOT NULL DEFAULT '',
 			connection_name VARCHAR(120) NOT NULL DEFAULT '',

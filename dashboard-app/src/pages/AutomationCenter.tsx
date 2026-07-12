@@ -1,8 +1,8 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { PageHeader } from '@/components/ui/PageHeader'
 import { Card } from '@/components/ui/Card'
 import { Spinner } from '@/components/ui/Spinner'
-import { useAsync } from '@/lib/hooks'
+import { useAsync, useDialogA11y } from '@/lib/hooks'
 import { api, type AutomationInterval } from '@/lib/api'
 import type { Automation } from '@/types/analytics'
 import { cn } from '@/lib/cn'
@@ -31,6 +31,7 @@ export function AutomationCenter() {
   const [filter, setFilter] = useState<Automation['category'] | 'all'>('all')
   const [list, setList] = useState<Automation[] | null>(null)
   const [busy, setBusy] = useState<string | null>(null)
+  const [requestOpen, setRequestOpen] = useState(false)
 
   if (q.loading && !list) return <Spinner />
   const rows = list ?? q.data ?? []
@@ -54,7 +55,7 @@ export function AutomationCenter() {
         eyebrow="Automations"
         title="Automation Center"
         subtitle="All triggers and actions that run without a human. Change the recurrence, toggle on/off, and inspect last-run state."
-        actions={<button className="btn-primary text-sm">+ New automation</button>}
+        actions={<button className="btn-primary text-sm" onClick={() => setRequestOpen(true)}>+ New automation</button>}
       />
 
       <div className="flex flex-wrap gap-2 mb-4">
@@ -116,6 +117,130 @@ export function AutomationCenter() {
             </div>
           </Card>
         ))}
+      </div>
+
+      {requestOpen && <NewAutomationDrawer onClose={() => setRequestOpen(false)} />}
+    </div>
+  )
+}
+
+/**
+ * Automations here are a fixed, developer-implemented catalog (each is
+ * wired to a real WP-Cron handler) — there's no generic no-code builder to
+ * open. "+ New automation" is honestly wired to what actually exists: it
+ * files a real staff task (the same Tasks system used elsewhere in this
+ * dashboard) describing the requested automation, rather than silently
+ * doing nothing or faking a builder the backend can't run.
+ */
+function NewAutomationDrawer({ onClose }: { onClose: () => void }) {
+  const [name, setName] = useState('')
+  const [details, setDetails] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [status, setStatus] = useState<{ ok: boolean; msg: string } | null>(null)
+  const dialogRef = useRef<HTMLDivElement>(null)
+  useDialogA11y(dialogRef, onClose)
+
+  async function submit() {
+    if (!name.trim()) return
+    setBusy(true)
+    setStatus(null)
+    try {
+      await api.tasks.create(`New automation request: ${name.trim()}`, details.trim(), 'automation-center')
+      setStatus({ ok: true, msg: 'Request filed — the team will follow up in Tasks.' })
+      setName('')
+      setDetails('')
+    } catch (err) {
+      setStatus({ ok: false, msg: err instanceof Error ? err.message : String(err) })
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <div
+      className="fixed inset-0 z-30"
+      style={{ backgroundColor: 'var(--bg-overlay)' }}
+      onClick={onClose}
+    >
+      <div
+        ref={dialogRef}
+        role="dialog"
+        aria-modal="true"
+        aria-label="Request a new automation"
+        tabIndex={-1}
+        className={cn(
+          'absolute inset-y-0 right-0 shadow-xl',
+          'w-full sm:max-w-lg overflow-y-auto',
+        )}
+        style={{ backgroundColor: 'var(--bg-surface)' }}
+        onClick={e => e.stopPropagation()}
+      >
+        <div
+          className="sticky top-0 px-4 sm:px-5 py-3 flex items-center justify-between"
+          style={{ backgroundColor: 'var(--bg-surface)', borderBottom: '1px solid var(--border-subtle)' }}
+        >
+          <div>
+            <div className="text-[11px] uppercase tracking-wide text-ink-500">Automation Center</div>
+            <div className="font-semibold text-ink-800">Request a new automation</div>
+          </div>
+          <button onClick={onClose} className="btn-ghost !px-2">✕</button>
+        </div>
+
+        <div className="p-4 sm:p-5 space-y-4">
+          <p className="text-sm text-ink-600">
+            Every automation here runs real, developer-wired code — there&apos;s no
+            drag-and-drop builder to create one on the fly. Describe what you
+            want automated and it&apos;ll land in Tasks for the team to scope and
+            build.
+          </p>
+
+          <div>
+            <label className="text-[11px] uppercase tracking-wide text-ink-500" htmlFor="g2a-auto-req-name">
+              What should it do?
+            </label>
+            <input
+              id="g2a-auto-req-name"
+              className="input mt-1 text-sm w-full"
+              value={name}
+              onChange={e => setName(e.target.value)}
+              placeholder="e.g. Email a manager when a rental firearm is overdue"
+              disabled={busy}
+            />
+          </div>
+
+          <div>
+            <label className="text-[11px] uppercase tracking-wide text-ink-500" htmlFor="g2a-auto-req-details">
+              Trigger / details (optional)
+            </label>
+            <textarea
+              id="g2a-auto-req-details"
+              className="input mt-1 text-sm w-full"
+              rows={4}
+              value={details}
+              onChange={e => setDetails(e.target.value)}
+              placeholder="When should it fire, and what should happen?"
+              disabled={busy}
+            />
+          </div>
+
+          {status && (
+            <div
+              className="text-sm rounded-lg px-3 py-2"
+              style={status.ok
+                ? { background: 'var(--success-soft, #ecfdf5)', color: 'var(--success, #047857)' }
+                : { background: 'var(--danger-soft)', color: 'var(--danger)' }}
+            >
+              {status.msg}
+            </div>
+          )}
+
+          <div className="flex items-center gap-2">
+            <button className="btn-primary text-sm" disabled={busy || !name.trim()} onClick={() => void submit()}>
+              {busy ? 'Filing…' : 'File request'}
+            </button>
+            <button className="btn-ghost text-sm" onClick={onClose} disabled={busy}>Cancel</button>
+          </div>
+        </div>
       </div>
     </div>
   )

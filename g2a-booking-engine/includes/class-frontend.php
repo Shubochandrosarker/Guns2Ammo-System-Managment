@@ -519,12 +519,30 @@ final class G2AB_Frontend {
 					     ───────────────────────────────────────────────── -->
 					<section class="g2ab-stage__panel" data-stage="done">
 						<div class="g2ab-done">
+							<div class="g2ab-done__confetti" data-done-confetti aria-hidden="true"></div>
 							<div class="g2ab-done__check" aria-hidden="true">
 								<svg viewBox="0 0 64 64" width="64" height="64"><circle cx="32" cy="32" r="30" fill="none" stroke="currentColor" stroke-width="3"/><path d="M20 33 L29 42 L45 24" fill="none" stroke="currentColor" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/></svg>
 							</div>
 							<h3 class="g2ab-done__title"><?php esc_html_e( 'Booking confirmed', 'g2a-booking' ); ?></h3>
 							<p class="g2ab-done__msg" data-done-msg></p>
+							<div class="g2ab-done__recap" data-done-recap hidden>
+								<div class="g2ab-done__recap-row">
+									<span class="g2ab-done__recap-label"><?php esc_html_e( 'Resource', 'g2a-booking' ); ?></span>
+									<span data-done-recap-resource></span>
+								</div>
+								<div class="g2ab-done__recap-row">
+									<span class="g2ab-done__recap-label"><?php esc_html_e( 'When', 'g2a-booking' ); ?></span>
+									<span data-done-recap-when></span>
+								</div>
+								<div class="g2ab-done__recap-row" data-done-recap-party-row hidden>
+									<span class="g2ab-done__recap-label"><?php esc_html_e( 'Party size', 'g2a-booking' ); ?></span>
+									<span data-done-recap-party></span>
+								</div>
+							</div>
 							<p class="g2ab-done__id"><?php esc_html_e( 'Confirmation:', 'g2a-booking' ); ?> <code data-done-uuid></code></p>
+							<button type="button" class="g2ab-btn g2ab-btn--primary g2ab-done__again" data-book-another>
+								<?php echo esc_html( sprintf( /* translators: %s resource label, e.g. "Lane" */ __( 'Book Another %s', 'g2a-booking' ), $resource_label ) ); ?>
+							</button>
 						</div>
 					</section>
 
@@ -826,6 +844,58 @@ final class G2AB_Frontend {
 				});
 			}
 
+			// ── done-stage recap + confetti ─────────────────────────
+			// Recap is built entirely from what the visitor already picked
+			// (state.resourceName / state.slot / party size) — the server
+			// doesn't need to echo it back.
+			function fillDoneRecap(partySize){
+				var recap = $('[data-done-recap]');
+				if (!recap) return;
+				var resourceEl = $('[data-done-recap-resource]');
+				var whenEl = $('[data-done-recap-when]');
+				var partyRow = $('[data-done-recap-party-row]');
+				var partyEl = $('[data-done-recap-party]');
+				if (resourceEl) resourceEl.textContent = state.resourceName || '';
+				if (whenEl && state.slot) {
+					var human = state.slot.start;
+					try {
+						var dt = new Date(state.slot.start.replace(' ', 'T'));
+						human = dt.toLocaleDateString(undefined, { weekday: 'long', month: 'short', day: 'numeric' }) + ' · ' + state.slot.label;
+					} catch (e) { /* keep raw start_at */ }
+					whenEl.textContent = human;
+				}
+				var party = parseInt(partySize, 10);
+				if (partyRow && partyEl && party > 0) {
+					partyEl.textContent = String(party);
+					partyRow.hidden = false;
+				} else if (partyRow) {
+					partyRow.hidden = true;
+				}
+				recap.hidden = false;
+			}
+
+			// Purely decorative — never blocks or delays the confirmation
+			// itself, and is a no-op for prefers-reduced-motion (the CSS
+			// hides the container; this skips spawning pieces entirely so
+			// there's no work to do either).
+			function burstConfetti(container){
+				if (!container) return;
+				if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+				var colors = ['var(--g2ab-primary)', 'var(--g2ab-accent)', '#FFFFFF'];
+				var pieceCount = 28;
+				for (var i = 0; i < pieceCount; i++) {
+					var piece = document.createElement('span');
+					piece.className = 'g2ab-done__confetti-piece';
+					piece.style.left = (Math.random() * 100) + '%';
+					piece.style.background = colors[i % colors.length];
+					piece.style.animationDuration = (900 + Math.random() * 700) + 'ms';
+					piece.style.animationDelay = (Math.random() * 250) + 'ms';
+					piece.style.transform = 'rotate(' + Math.floor(Math.random() * 360) + 'deg)';
+					container.appendChild(piece);
+				}
+				window.setTimeout(function(){ container.innerHTML = ''; }, 2200);
+			}
+
 			// ── calendar render ─────────────────────────────────────
 			function renderCalendar(){
 				var grid = $('[data-cal-grid]');
@@ -978,6 +1048,22 @@ final class G2AB_Frontend {
 				b.addEventListener('click', function(){ showStage('time'); });
 			});
 
+			// "Book Another Lane" from the done stage → reset the slot/date
+			// (keep the chosen resource) and re-render a fresh calendar.
+			var againBtn = $('[data-book-another]');
+			if (againBtn) againBtn.addEventListener('click', function(){
+				state.date = '';
+				state.slot = null;
+				var recap = $('[data-done-recap]');
+				if (recap) recap.hidden = true;
+				var go = $('[data-go-form]');
+				if (go) go.disabled = true;
+				var form = $('.g2ab-form');
+				if (form) form.reset();
+				renderCalendar();
+				showStage('time');
+			});
+
 			// Submit form
 			var form = $('.g2ab-form');
 			if (form) {
@@ -1046,7 +1132,9 @@ final class G2AB_Frontend {
 						var msgEl = $('[data-done-msg]'); var uuidEl = $('[data-done-uuid]');
 						if (msgEl) msgEl.textContent = data.message || '';
 						if (uuidEl) uuidEl.textContent = data.uuid || '';
+						fillDoneRecap(fields.party_size);
 						showStage('done');
+						burstConfetti($('[data-done-confetti]'));
 					})
 					.catch(function(err){
 						if (errEl) { errEl.textContent = err.message || config.i18n.failed; errEl.hidden = false; }

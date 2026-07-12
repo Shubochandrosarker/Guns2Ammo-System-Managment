@@ -474,6 +474,7 @@
 
 /* ===== Done stage ======================================================== */
 .g2ab-done {
+	position: relative;
 	display: flex; flex-direction: column; align-items: center;
 	text-align: center;
 	gap: 12px;
@@ -506,6 +507,61 @@
 	font-family: var(--font-mono);
 	font-size: 12px;
 	color: var(--g2ab-text);
+}
+.g2ab-done__recap {
+	width: 100%;
+	max-width: 360px;
+	background: var(--g2ab-surface2);
+	border: 1px solid var(--g2ab-border);
+	border-radius: 12px;
+	padding: 14px 18px;
+	text-align: left;
+}
+.g2ab-done__recap-row {
+	display: flex;
+	align-items: baseline;
+	justify-content: space-between;
+	gap: 12px;
+	padding: 6px 0;
+}
+.g2ab-done__recap-row + .g2ab-done__recap-row {
+	border-top: 1px solid var(--g2ab-border);
+}
+.g2ab-done__recap-label {
+	font-size: 11px;
+	letter-spacing: 0.06em;
+	text-transform: uppercase;
+	color: var(--g2ab-muted);
+}
+.g2ab-done__again {
+	margin-top: 8px;
+}
+/* Lightweight, dependency-free confetti burst — a handful of absolutely
+   positioned pieces fall + rotate then remove themselves via JS. Purely
+   decorative (aria-hidden), so it's safe to skip entirely for
+   prefers-reduced-motion rather than render static specks. */
+.g2ab-done__confetti {
+	position: absolute;
+	inset: 0;
+	pointer-events: none;
+	overflow: hidden;
+}
+.g2ab-done__confetti-piece {
+	position: absolute;
+	top: -12px;
+	width: 8px;
+	height: 14px;
+	opacity: 0;
+	animation-name: g2ab-confetti-fall;
+	animation-timing-function: cubic-bezier(.35,.75,.55,1);
+	animation-fill-mode: forwards;
+}
+@keyframes g2ab-confetti-fall {
+	0%   { opacity: 1; transform: translateY(0) rotate(0deg); }
+	100% { opacity: 0; transform: translateY(220px) rotate(360deg); }
+}
+@media (prefers-reduced-motion: reduce) {
+	.g2ab-done__confetti { display: none; }
 }
 
 /* ===== Error fallback ==================================================== */

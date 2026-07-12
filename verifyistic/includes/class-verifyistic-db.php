@@ -13,7 +13,7 @@ class Verifyistic_DB {
         $table      = $wpdb->prefix . self::TABLE;
         $charset_collate = $wpdb->get_charset_collate();
 
-        $sql = "CREATE TABLE IF NOT EXISTS {$table} (
+        $sql = "CREATE TABLE {$table} (
             id            BIGINT(20) UNSIGNED NOT NULL AUTO_INCREMENT,
             verify_token  VARCHAR(64)  NOT NULL DEFAULT '',
             verify_type   VARCHAR(20)  NOT NULL DEFAULT 'dob',

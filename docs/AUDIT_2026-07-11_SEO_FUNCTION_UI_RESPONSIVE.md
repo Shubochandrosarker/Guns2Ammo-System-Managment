@@ -529,13 +529,13 @@ Ranked across all four audits, grouped by what kind of attention each needs.
 29. ✅ Finish the NAP/pricing sweep (now 27 + 11 files) before the next time hours or prices change. *(SEO #6)*
 30. ✅ Replace Memberistic's fixed grace-period "reconciliation" with a real Stripe-state poll. *(Functional #18)*
 
-### Low priority / hygiene, batch together
+### Low priority / hygiene, batch together — ✅ ALL FIXED 2026-07-12 (see "Fixes shipped" Round 4 below)
 
-31. Clean up the dead `inc/aeo.php` sitemap/robots handlers and merge its richer AI-bot allowlist into the live file. *(SEO)*
-32. Add missing `hasMerchantReturnPolicy`/OG image dimensions/table freshness signals. *(SEO)*
-33. Fix the two Verifyistic tables using `CREATE TABLE IF NOT EXISTS` with `dbDelta()`, and close the string-interpolated `LIMIT` clauses in POS-core with `prepare()`. *(Functional)*
-34. Wire up the dashboard-app's two remaining stub buttons (New Automation, Re-run Checks) and connect the already-working `cloudflare-rag-worker` to the AI Models page instead of leaving it "not configured." *(Functional)*
-35. Reconcile the confetti/recap-card claim in `FEATURES.md` against actual code — build it or correct the doc. *(UI)*
+31. ✅ Clean up the dead `inc/aeo.php` sitemap/robots handlers and merge its richer AI-bot allowlist into the live file. *(SEO)*
+32. ✅ Add missing `hasMerchantReturnPolicy`/OG image dimensions/table freshness signals. *(SEO)*
+33. ✅ Fix the two Verifyistic tables using `CREATE TABLE IF NOT EXISTS` with `dbDelta()`, and close the string-interpolated `LIMIT` clauses in POS-core with `prepare()`. *(Functional)*
+34. ✅ Wire up the dashboard-app's two remaining stub buttons (New Automation, Re-run Checks) and connect the already-working `cloudflare-rag-worker` to the AI Models page instead of leaving it "not configured." *(Functional)*
+35. ✅ Reconcile the confetti/recap-card claim in `FEATURES.md` against actual code — build it or correct the doc. *(UI)*
 
 ---
 
@@ -611,9 +611,31 @@ archives are in `releases/` (previous version of each retained alongside, per th
 `INSTALL.md`'s version table was updated to match. `dashboard-app` has no plugin-zip release artifact
 (it's deployed separately per `DEPLOYMENT.md`) — its changes are committed and ready for the next deploy.
 
-**Not yet fixed** — only the "Low priority / hygiene" tier (Part 5, items 31-35) remains open, along
-with the two follow-ups called out in Round 2 (the non-atomic rate limiter in four other plugins; ~29
-files still carrying the pre-re-skin blue/orange as option defaults in g2a-booking-engine).
+**Not yet fixed after Round 3** — only the "Low priority / hygiene" tier (Part 5, items 31-35) remained
+open, along with the two follow-ups called out in Round 2 (the non-atomic rate limiter in four other
+plugins; ~29 files still carrying the pre-re-skin blue/orange as option defaults in
+g2a-booking-engine — both still open after Round 4 below, as neither was in the hygiene tier's scope).
+
+### Round 4 — the "Low priority / hygiene" tier (Part 5, items 31–35)
+
+| # | Fix | Files |
+|---|---|---|
+| 31 | Removed `inc/aeo.php`'s dead `init`-hooked `/sitemap.xml` handler and dead `robots_txt` filter (both fully superseded by `inc/sitemap.php`/`inc/robots.php`'s `parse_request`-priority-0 intercepts, so neither ever actually ran) — the file now holds only its Organization/WebSite JSON-LD block. Merged its richer AI-bot allowlist (Amazonbot, cohere-ai, Bytespider, Meta-ExternalAgent, Perplexity-User, DuckDuckBot, YandexBot) into the live `inc/robots.php`. | `guns2ammo/inc/aeo.php`, `inc/robots.php` |
+| 32 | Product `Offer` now carries a real `hasMerchantReturnPolicy` (sourced from the actual `/refund-and-returns-policy/` page: firearms are `MerchantReturnNotPermitted` via the `_wpistic_ffl_required` product-meta flag, everything else gets the real 14-day window — also fixed a stale "30 days" in the FAQ answer to match), a `priceValidUntil`, and `shippingDetails` built from the store's actually-configured WooCommerce shipping zones (never a fabricated rate; omitted entirely for firearms, which don't ship direct-to-consumer). OG/Twitter image tags now include real `og:image:width/height` (resolved from the actual Media Library attachment) and `twitter:image:alt`. The sitemap index's `lastmod` per sub-sitemap now reflects the real most-recently-modified page/post/product instead of stamping every slice with the current request time regardless of whether it changed. | `guns2ammo/inc/woocommerce.php`, `inc/seo.php`, `inc/faqs.php`, `inc/sitemap.php` |
+| 33 | Both Verifyistic tables' `CREATE TABLE IF NOT EXISTS` (which breaks `dbDelta()`'s own column-diffing) changed to plain `CREATE TABLE`, restoring dbDelta's ability to apply future schema changes to already-installed sites. POS-core's two audit-chain `verify_chain()` endpoints now build their `LIMIT` clause with `$wpdb->prepare( ..., %d )` instead of string interpolation (not exploitable today — `$limit` was already PHP `int`-typed — but no longer relies on that alone). | `verifyistic/includes/class-verifyistic-db.php`, `.../class-verifyistic-webhooks.php`; `g2a-pos-core/includes/Database/AuditLogRepository.php`, `.../BoundBookRepository.php` |
+| 34 | Automation Center's "+ New automation" now opens a real dialog that files a genuine staff task through the existing Tasks system (`POST /tasks`) — automations here are a fixed, developer-wired catalog with no no-code builder to open, so this is an honest "request it" flow rather than a fake builder or a silent no-op. System Health's "Re-run checks" now actually re-fetches all four health queries (checks, integrations, namespaces, site health). The AI Models page's "RAG stores" card, which hardcoded "not configured" regardless of real state, now reads the same already-working `GET /brain/stats` endpoint the AI Agents page uses — showing the real backend (`cloudflare` when the `cloudflare-rag-worker` is configured, `local` otherwise) and real document/chunk counts. | `dashboard-app/src/pages/AutomationCenter.tsx`, `SystemHealth.tsx`, `AIModels.tsx` |
+| 35 | Built the "Book Another Lane" CTA + confetti + recap card on the lane-booking confirmation screen that `FEATURES.md` already claimed existed. The recap (resource, date/time, party size) is assembled entirely from what the visitor already picked client-side — no backend change needed. Confetti is a small dependency-free DOM-based burst that respects `prefers-reduced-motion` (skipped entirely, not just visually muted). "Book Another Lane" resets the widget back to the calendar stage without a full page reload. | `g2a-booking-engine/includes/class-frontend.php`, `assets/css/frontend.css` |
+
+Versions after Round 4: g2a-booking-engine → **1.9.9.8**, g2a-pos-core → **3.1.8**, verifyistic →
+**1.4.3**, guns2ammo theme → **1.27.12**. advanced-ffl-checkout, memberistic-membership-solutions, and
+messageistic are unchanged this round. Packaged archives are in `releases/` (previous version of each
+retained alongside); `INSTALL.md`'s version table was updated to match.
+
+**Not yet fixed** — every item in this report's ranked improvement list (Part 5, items 1–35) has now
+been implemented across four rounds. The two follow-ups called out in Round 2 remain open (the
+non-atomic rate limiter in business-api/Verifyistic/wpistic-contact-form/Memberistic's checkout limiter;
+~29 files in `g2a-booking-engine` still carrying the pre-re-skin blue/orange as WP option *defaults*) —
+neither was ranked in the consolidated list, so they're tracked here as the actual remaining backlog.
 
 ## Appendix — audit scope note
 
