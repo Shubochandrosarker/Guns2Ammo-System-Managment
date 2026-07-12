@@ -255,6 +255,11 @@ class Wpistic_Formistic_Spam {
 	/**
 	 * Rate-limit check; also increments the counter when within budget.
 	 *
+	 * Wrapped in a MySQL advisory lock so a scripted concurrent burst from
+	 * one IP can't have two requests both read the same stale count and both
+	 * slip through — without the lock, that lost-update race lets a burst
+	 * exceed `$max` regardless of what it's configured to.
+	 *
 	 * @param string $ip Client IP.
 	 * @return bool True if allowed, false if exceeded.
 	 */
@@ -265,12 +270,42 @@ class Wpistic_Formistic_Spam {
 		$max    = max( 1, (int) get_option( 'wpistic_formistic_spam_rate_limit_max', 3 ) );
 		$window = max( 60, (int) get_option( 'wpistic_formistic_spam_rate_limit_window', 3600 ) );
 		$key    = 'wpistic_formistic_rl_' . hash_hmac( 'sha256', $ip, wp_salt( 'nonce' ) );
-		$count  = (int) get_transient( $key );
-		if ( $count >= $max ) {
+
+		if ( ! self::acquire_lock( $key ) ) {
+			// Fail closed: refuse rather than risk an unguarded read-modify-write.
 			return false;
 		}
-		set_transient( $key, $count + 1, $window );
-		return true;
+		try {
+			$count = (int) get_transient( $key );
+			if ( $count >= $max ) {
+				return false;
+			}
+			set_transient( $key, $count + 1, $window );
+			return true;
+		} finally {
+			self::release_lock( $key );
+		}
+	}
+
+	/**
+	 * MySQL advisory lock. Duck-types `$wpdb` (rather than requiring the
+	 * real `wpdb` class) so it silently no-ops if a request context somehow
+	 * lacks it; every real WordPress request has `$wpdb`.
+	 */
+	private static function acquire_lock( $key, $timeout = 3 ) {
+		global $wpdb;
+		if ( ! is_object( $wpdb ) || ! method_exists( $wpdb, 'get_var' ) ) {
+			return true;
+		}
+		return 1 === (int) $wpdb->get_var( $wpdb->prepare( 'SELECT GET_LOCK(%s, %d)', 'formistic_rl_lock_' . $key, max( 0, $timeout ) ) );
+	}
+
+	private static function release_lock( $key ) {
+		global $wpdb;
+		if ( ! is_object( $wpdb ) || ! method_exists( $wpdb, 'get_var' ) ) {
+			return;
+		}
+		$wpdb->get_var( $wpdb->prepare( 'SELECT RELEASE_LOCK(%s)', 'formistic_rl_lock_' . $key ) );
 	}
 
 	/**

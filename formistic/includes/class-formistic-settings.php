@@ -127,6 +127,11 @@ class Wpistic_Formistic_Settings {
 		// Safety — staging / dev controls.
 		register_setting( self::GROUP, 'wpistic_formistic_emails_disabled', [ 'sanitize_callback' => $bool, 'default' => '0' ] );
 
+		// Newsletter — welcome/confirmation email.
+		register_setting( self::GROUP, 'wpistic_formistic_newsletter_confirm_enabled', [ 'sanitize_callback' => $bool, 'default' => '1' ] );
+		register_setting( self::GROUP, 'wpistic_formistic_newsletter_confirm_subject', [ 'sanitize_callback' => 'sanitize_text_field', 'default' => __( "You're on the list", 'formistic' ) . ' — {site_name}' ] );
+		register_setting( self::GROUP, 'wpistic_formistic_newsletter_confirm_intro',   [ 'sanitize_callback' => 'sanitize_textarea_field', 'default' => __( "You're officially on the list. From now on, the good stuff lands in your inbox first.", 'formistic' ) ] );
+
 		// Trusted proxies — comma-separated IPs or CIDR ranges. When the
 		// HTTP peer (REMOTE_ADDR) matches any entry, X-Forwarded-For /
 		// CF-Connecting-IP are honored. Default empty = never trust
@@ -412,7 +417,8 @@ class Wpistic_Formistic_Settings {
 		<h2 style="margin-top:32px;"><?php esc_html_e( 'Safety (staging / dev)', 'formistic' ); ?></h2>
 		<p class="description"><?php esc_html_e( 'Use these to prevent auto-responder emails from going to real customers after restoring a production database to staging. Overridden by the matching wp-config.php constant if defined.', 'formistic' ); ?></p>
 		<?php
-		$emails_disabled_const = defined( 'WPISTIC_FORMISTIC_EMAIL_DISABLED' ) && WPISTIC_FORMISTIC_EMAIL_DISABLED;
+		$emails_disabled_const     = defined( 'WPISTIC_FORMISTIC_EMAIL_DISABLED' ) && WPISTIC_FORMISTIC_EMAIL_DISABLED;
+		$emails_disabled_const_old = defined( 'WPCF_EMAIL_DISABLED' ) && WPCF_EMAIL_DISABLED;
 		?>
 		<table class="form-table" role="presentation">
 			<tr>
@@ -420,11 +426,13 @@ class Wpistic_Formistic_Settings {
 				<td>
 					<input type="hidden" name="wpistic_formistic_emails_disabled" value="0">
 					<label>
-						<input type="checkbox" name="wpistic_formistic_emails_disabled" value="1" <?php checked( get_option( 'wpistic_formistic_emails_disabled', '0' ), '1' ); ?> <?php disabled( $emails_disabled_const ); ?>>
+						<input type="checkbox" name="wpistic_formistic_emails_disabled" value="1" <?php checked( get_option( 'wpistic_formistic_emails_disabled', '0' ), '1' ); ?> <?php disabled( $emails_disabled_const || $emails_disabled_const_old ); ?>>
 						<?php esc_html_e( 'Suppress every auto-responder email and replay-from-dashboard send', 'formistic' ); ?>
 					</label>
 					<?php if ( $emails_disabled_const ) : ?>
 						<p class="description" style="color:#b32d2e;"><?php esc_html_e( 'Locked: WPISTIC_FORMISTIC_EMAIL_DISABLED constant is set in wp-config.php.', 'formistic' ); ?></p>
+					<?php elseif ( $emails_disabled_const_old ) : ?>
+						<p class="description" style="color:#b32d2e;"><?php esc_html_e( 'Locked: the legacy WPCF_EMAIL_DISABLED constant is set in wp-config.php — rename it to WPISTIC_FORMISTIC_EMAIL_DISABLED when convenient.', 'formistic' ); ?></p>
 					<?php endif; ?>
 				</td>
 			</tr>
