@@ -55,15 +55,21 @@ class WPISTIC_CF_Emails {
 	 * @return string
 	 */
 	public static function business_line() {
+		$name  = function_exists( 'g2a_biz' ) ? (string) ( g2a_biz()['name'] ?? '' ) : '';
+		$addr  = function_exists( 'g2a_biz_addr_line' ) ? (string) g2a_biz_addr_line() : '';
+		$phone = function_exists( 'g2a_biz_phone' ) ? (string) g2a_biz_phone() : '';
+
+		$parts = array_filter( array( $name, $addr, $phone ) );
+		$line  = ! empty( $parts )
+			? implode( ' &middot; ', $parts )
+			: 'Guns 2 Ammo &middot; 6030 E Main St, Ste 103, Mesa, AZ 85205 &middot; (602) 715-2677';
+
 		/**
 		 * Filter the footer business line of branded emails.
 		 *
 		 * @param string $line Plain-text business line.
 		 */
-		return apply_filters(
-			'wpcf_email_business_line',
-			'Guns 2 Ammo &middot; 6030 E Main St, Ste 103, Mesa, AZ 85205 &middot; (602) 715-2677'
-		);
+		return apply_filters( 'wpcf_email_business_line', $line );
 	}
 
 	/**

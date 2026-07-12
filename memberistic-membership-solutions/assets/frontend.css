@@ -37,12 +37,12 @@
 }
 
 .memberistic-billing-toggle button.is-active {
-	/* Solid brand fill: use the CTA (ember) token, not brass — brass
-	   fills pair with dark ink text elsewhere in the theme, ember
-	   fills pair with light text (see tokens.css .btn-ember). */
+	/* Solid brand fill: use the CTA (ember) token, not brass. White text on
+	   solid ember only computes to ~2.6:1 contrast (fails AA), so this pairs
+	   with the same dark ink used on brass/bright-success fills. */
 	background: var(--memberistic-cta);
 	border-color: var(--memberistic-cta);
-	color: var(--memberistic-text);
+	color: var(--memberistic-primary-ink);
 }
 
 .memberistic-plan-grid {
@@ -174,7 +174,7 @@
 	background: var(--memberistic-cta) !important;
 	border: 1px solid var(--memberistic-cta) !important;
 	border-radius: 6px;
-	color: var(--memberistic-text) !important;
+	color: var(--memberistic-primary-ink) !important;
 	cursor: pointer;
 	display: block;
 	font-family: var(--memberistic-font-condensed);
@@ -233,7 +233,7 @@
 .memberistic-account-nav a {
 	background: var(--memberistic-cta);
 	border-radius: 6px;
-	color: var(--memberistic-text);
+	color: var(--memberistic-primary-ink);
 	font-weight: 800;
 	padding: 9px 12px;
 	text-decoration: none;
@@ -347,7 +347,7 @@
 	align-items: center;
 	background: var(--memberistic-cta);
 	border-radius: 8px;
-	color: var(--memberistic-text);
+	color: var(--memberistic-primary-ink);
 	display: inline-flex;
 	font-weight: 900;
 	height: 48px;
@@ -395,7 +395,7 @@
 	background: var(--memberistic-cta) !important;
 	border: 0 !important;
 	border-radius: 6px !important;
-	color: var(--memberistic-text) !important;
+	color: var(--memberistic-primary-ink) !important;
 	cursor: pointer;
 	font-weight: 800;
 	min-height: 44px;
@@ -434,7 +434,7 @@
 	   uses for plain accent text/borders below. */
 	background: var(--memberistic-cta);
 	border-radius: 8px;
-	color: var(--memberistic-text);
+	color: var(--memberistic-primary-ink);
 	display: flex;
 	justify-content: space-between;
 	margin-bottom: 18px;
@@ -442,7 +442,11 @@
 }
 
 .memberistic-staff-header p {
-	color: var(--memberistic-success);
+	/* Was --memberistic-success (bright green) on the ember-filled header —
+	   green-on-orange computed to ~1.6:1 contrast, essentially illegible.
+	   The header background is already the accent color, so the eyebrow
+	   label just needs the header's own light text color. */
+	color: var(--memberistic-text);
 	font-family: var(--memberistic-font-mono);
 	font-weight: 800;
 	letter-spacing: 0;
@@ -587,7 +591,7 @@
 	background: var(--memberistic-cta);
 	border: 0;
 	border-radius: 6px;
-	color: var(--memberistic-text);
+	color: var(--memberistic-primary-ink);
 	cursor: pointer;
 	font-weight: 800;
 	min-height: 42px;
@@ -705,7 +709,7 @@
 	background: var(--memberistic-cta);
 	border: 0;
 	border-radius: 6px;
-	color: var(--memberistic-text);
+	color: var(--memberistic-primary-ink);
 	cursor: pointer;
 	font-weight: 800;
 	padding: 9px 12px;
@@ -1013,7 +1017,7 @@
 .memberistic-auth-btn--primary {
 	background: var(--memberistic-cta);
 	border-color: var(--memberistic-cta);
-	color: var(--memberistic-text);
+	color: var(--memberistic-primary-ink);
 }
 
 .memberistic-auth-btn--primary:hover {

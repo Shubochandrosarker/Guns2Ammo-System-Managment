@@ -28,6 +28,28 @@ class Wpistic_Formistic_G2A_Defaults {
 	const CAP = 'manage_options';
 
 	/**
+	 * Live business NAP, sourced from the theme's single source of truth
+	 * (guns2ammo/inc/business-info.php) so these one-time seed defaults never
+	 * drift from the real, Customizer-editable business facts. Falls back to
+	 * the verified Guns 2 Ammo values if the theme helpers aren't available.
+	 *
+	 * @return array{name:string,addr:string,phone:string,email:string}
+	 */
+	protected static function biz() {
+		$name  = function_exists( 'g2a_biz' ) ? (string) ( g2a_biz()['name'] ?? '' ) : '';
+		$addr  = function_exists( 'g2a_biz_addr_line' ) ? (string) g2a_biz_addr_line() : '';
+		$phone = function_exists( 'g2a_biz_phone' ) ? (string) g2a_biz_phone() : '';
+		$email = function_exists( 'g2a_biz_email' ) ? (string) g2a_biz_email() : '';
+
+		return array(
+			'name'  => '' !== $name ? $name : 'Guns 2 Ammo',
+			'addr'  => '' !== $addr ? $addr : '6030 E Main St, Suite 103, Mesa, AZ 85205',
+			'phone' => '' !== $phone ? $phone : '(602) 715-2677',
+			'email' => '' !== $email ? $email : 'sales@guns2ammo.com',
+		);
+	}
+
+	/**
 	 * Register the admin-triggered seed action.
 	 */
 	public function register() {
@@ -108,9 +130,10 @@ class Wpistic_Formistic_G2A_Defaults {
 	 */
 	public static function default_faq_text() {
 		$site = home_url( '/' );
+		$biz  = self::biz();
 		return <<<TEXT
 Q: Where is Guns 2 Ammo located?
-A: 6030 E Main St, Suite 103, Mesa, AZ 85205 (US). Phone (602) 715-2677, email sales@guns2ammo.com. Serving the East Valley since 2014.
+A: {$biz['addr']} (US). Phone {$biz['phone']}, email {$biz['email']}. Serving the East Valley since 2014.
 
 Q: What are your hours?
 A: Sunday 12pm-6pm, Monday-Thursday 10am-6pm, Friday 10am-7pm, Saturday 10am-7pm. All times are Arizona time (America/Phoenix — Arizona does not observe daylight saving).
@@ -149,10 +172,11 @@ TEXT;
 	 */
 	public static function default_kb_text() {
 		$site = home_url( '/' );
+		$biz  = self::biz();
 		return <<<TEXT
-BUSINESS: Guns 2 Ammo — Arizona Shooting Range. Mesa's most-trusted indoor shooting range, FFL firearm store, and NRA-certified training facility. In business since 2014. Google rating 4.7 stars (556 reviews).
+BUSINESS: {$biz['name']} — Arizona Shooting Range. Mesa's most-trusted indoor shooting range, FFL firearm store, and NRA-certified training facility. In business since 2014. Google rating 4.7 stars (556 reviews).
 
-CONTACT: 6030 E Main St, Suite 103, Mesa, AZ 85205, US. Phone: (602) 715-2677. Email: sales@guns2ammo.com. Website: {$site}
+CONTACT: {$biz['addr']}, US. Phone: {$biz['phone']}. Email: {$biz['email']}. Website: {$site}
 
 HOURS (America/Phoenix, no daylight saving): Sun 12pm-6pm; Mon-Thu 10am-6pm; Fri 10am-7pm; Sat 10am-7pm.
 
@@ -177,7 +201,7 @@ STORE SERVICES:
 - FFL transfers: \$35 per firearm.
 - NFA transfer services (suppressors, SBRs, etc.): \$95 or \$295 depending on transfer type — confirm by phone.
 
-TONE FOR REPLIES: warm, professional, safety-first. Always include the phone number (602) 715-2677 for anything that needs scheduling or legal specifics. Never give legal advice beyond pointing to A.R.S. §13-3112 and the CCW course.
+TONE FOR REPLIES: warm, professional, safety-first. Always include the phone number {$biz['phone']} for anything that needs scheduling or legal specifics. Never give legal advice beyond pointing to A.R.S. §13-3112 and the CCW course.
 TEXT;
 	}
 
@@ -217,13 +241,16 @@ TEXT;
 	 * @return string
 	 */
 	public static function default_auto_reply_rules() {
-		$ccw        = 'Hi {name}, thanks for reaching out to {site_name}! Our Arizona CCW classroom course is $85 (about 4 hours, no live fire) and our CCW course with live fire is $149.99 (about 5 hours). Both are taught by our NRA-certified instructors — Alen Olson (retired Mesa PD firearms instructor) and Nicholas Steigert (USMC veteran, 3rd Bn 7th Marines). See upcoming dates at {site_url} or call (602) 715-2677 to reserve your seat. — The Guns 2 Ammo Team';
-		$nfa        = 'Hi {name}, thanks for contacting {site_name}! We handle NFA items (suppressors, SBRs, and more) — our NFA transfer service is $95 or $295 depending on the transfer type. Call (602) 715-2677 or reply with the details of your item and we\'ll walk you through the whole process. — The Guns 2 Ammo Team';
-		$ffl        = 'Hi {name}, thanks for contacting {site_name}! FFL transfers are $35 per firearm. Have your seller ship to our shop at 6030 E Main St, Suite 103, Mesa, AZ 85205 — we\'ll email you as soon as it arrives so you can complete the background check in store. Questions? Call (602) 715-2677. — The Guns 2 Ammo Team';
+		$biz        = self::biz();
+		$phone      = $biz['phone'];
+		$addr       = $biz['addr'];
+		$ccw        = "Hi {name}, thanks for reaching out to {site_name}! Our Arizona CCW classroom course is \$85 (about 4 hours, no live fire) and our CCW course with live fire is \$149.99 (about 5 hours). Both are taught by our NRA-certified instructors — Alen Olson (retired Mesa PD firearms instructor) and Nicholas Steigert (USMC veteran, 3rd Bn 7th Marines). See upcoming dates at {site_url} or call {$phone} to reserve your seat. — The Guns 2 Ammo Team";
+		$nfa        = "Hi {name}, thanks for contacting {site_name}! We handle NFA items (suppressors, SBRs, and more) — our NFA transfer service is \$95 or \$295 depending on the transfer type. Call {$phone} or reply with the details of your item and we'll walk you through the whole process. — The Guns 2 Ammo Team";
+		$ffl        = "Hi {name}, thanks for contacting {site_name}! FFL transfers are \$35 per firearm. Have your seller ship to our shop at {$addr} — we'll email you as soon as it arrives so you can complete the background check in store. Questions? Call {$phone}. — The Guns 2 Ammo Team";
 		$membership = 'Hi {name}, thanks for your interest in a {site_name} membership! Defender is $29.99/mo or $299.99/yr (1 person), Patriot is $39.99/mo or $449.99/yr (2 people), and Guardian is $59.99/mo or $649.99/yr (4 people). Every tier includes unlimited range time and online lane reservations — no contracts, cancel anytime. Join online at {site_url} or stop by the shop. — The Guns 2 Ammo Team';
-		$booking    = 'Hi {name}, thanks for reaching out to {site_name}! You can book one of our 6 indoor lanes online at {site_url} — pick your time, pay securely, and check in with the QR code we email you. Prefer to talk to a person? Call (602) 715-2677 and we\'ll set you up. — The Guns 2 Ammo Team';
-		$training   = 'Hi {name}, thanks for your interest in training at {site_name}! We run Arizona CCW courses ($85 classroom / $149.99 with live fire) plus defensive handgun, marksmanship, and new-shooter instruction with NRA-certified instructors. See the schedule at {site_url} or call (602) 715-2677. — The Guns 2 Ammo Team';
-		$hours      = 'Hi {name}, thanks for contacting {site_name}! We\'re at 6030 E Main St, Suite 103, Mesa, AZ 85205 — open Sun 12pm-6pm, Mon-Thu 10am-6pm, and Fri-Sat 10am-7pm (Arizona time). Call (602) 715-2677 if you need anything before your visit. — The Guns 2 Ammo Team';
+		$booking    = "Hi {name}, thanks for reaching out to {site_name}! You can book one of our 6 indoor lanes online at {site_url} — pick your time, pay securely, and check in with the QR code we email you. Prefer to talk to a person? Call {$phone} and we'll set you up. — The Guns 2 Ammo Team";
+		$training   = "Hi {name}, thanks for your interest in training at {site_name}! We run Arizona CCW courses (\$85 classroom / \$149.99 with live fire) plus defensive handgun, marksmanship, and new-shooter instruction with NRA-certified instructors. See the schedule at {site_url} or call {$phone}. — The Guns 2 Ammo Team";
+		$hours      = "Hi {name}, thanks for contacting {site_name}! We're at {$addr} — open Sun 12pm-6pm, Mon-Thu 10am-6pm, and Fri-Sat 10am-7pm (Arizona time). Call {$phone} if you need anything before your visit. — The Guns 2 Ammo Team";
 
 		$rules = [
 			'ccw => '            . $ccw,

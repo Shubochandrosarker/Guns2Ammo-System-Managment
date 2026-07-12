@@ -256,9 +256,9 @@ final class G2AB_REST_Frontdesk_Controller {
 			return new WP_Error( 'g2ab_not_found', __( 'Booking not found.', 'g2a-booking' ), array( 'status' => 404 ) );
 		}
 
-		$biz_name  = get_option( 'g2ab_business_name', get_bloginfo( 'name' ) );
-		$biz_phone = get_option( 'g2ab_business_phone', '' );
-		$biz_addr  = get_option( 'g2ab_business_address', '' );
+		$biz_name  = g2ab_business_name();
+		$biz_phone = g2ab_business_phone();
+		$biz_addr  = g2ab_business_address();
 		$currency  = $row->currency ?: get_option( 'g2ab_currency', 'USD' );
 		$dt_format = get_option( 'date_format' ) . ' \a\t ' . get_option( 'time_format' );
 		$balance   = max( 0, (float) $row->total_amount - (float) $row->paid_amount );

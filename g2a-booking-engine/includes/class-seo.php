@@ -381,7 +381,7 @@ final class G2AB_Seo {
 		echo '<meta property="og:url" content="' . esc_url( $url ) . '" />' . "\n";
 		echo '<meta property="og:title" content="' . esc_attr( $copy['meta_title'] ) . '" />' . "\n";
 		echo '<meta property="og:description" content="' . esc_attr( $copy['meta_desc'] ) . '" />' . "\n";
-		echo '<meta property="og:site_name" content="' . esc_attr( get_option( 'g2ab_business_name', get_bloginfo( 'name' ) ) ) . '" />' . "\n";
+		echo '<meta property="og:site_name" content="' . esc_attr( g2ab_business_name() ) . '" />' . "\n";
 		echo '<meta name="twitter:card" content="summary_large_image" />' . "\n";
 		echo '<meta name="twitter:title" content="' . esc_attr( $copy['meta_title'] ) . '" />' . "\n";
 		echo '<meta name="twitter:description" content="' . esc_attr( $copy['meta_desc'] ) . '" />' . "\n";
@@ -392,9 +392,9 @@ final class G2AB_Seo {
 	}
 
 	private function build_schema( $type, $copy, $tpl_id, $url ) {
-		$biz_name = get_option( 'g2ab_business_name', get_bloginfo( 'name' ) );
-		$biz_addr = get_option( 'g2ab_business_address', '' );
-		$biz_phone = get_option( 'g2ab_business_phone', '' );
+		$biz_name = g2ab_business_name();
+		$biz_addr = g2ab_business_address();
+		$biz_phone = g2ab_business_phone();
 		$next_start = $this->next_session( $type->id );
 		$next_end = $next_start ? gmdate( 'c', strtotime( $next_start ) + ( (int) $type->duration_min * 60 ) ) : '';
 
@@ -524,8 +524,8 @@ final class G2AB_Seo {
 	/*  COPY GENERATORS — defaults per template, overridable later  */
 	/* ============================================================ */
 	private function copy_for_template( $tpl_id, $type ) {
-		$biz = get_option( 'g2ab_business_name', 'Our Range' );
-		$city_state = get_option( 'g2ab_business_address', 'your city' );
+		$biz = g2ab_business_name();
+		$city_state = g2ab_business_address();
 		$price = number_format( (float) $type->base_price, 2 );
 		$mins = (int) $type->duration_min;
 

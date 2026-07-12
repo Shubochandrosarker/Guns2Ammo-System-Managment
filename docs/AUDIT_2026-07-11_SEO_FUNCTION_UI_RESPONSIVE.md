@@ -653,6 +653,52 @@ version table was updated to match.
 
 **Not yet fixed** — no known open items remain from this report or its Round-2 follow-ups.
 
+### Round 6 — fresh from-scratch audit (email/NAP focus, dark + light UI, functional, SEO, responsive)
+
+Requested as a brand-new audit rather than a re-verification pass, specifically flagging a suspected
+wrong business address in automated emails. Five parallel research agents covered email/notification
+address accuracy, functional/business-logic/compliance, SEO/AEO, dark-UI contrast, and light-UI
+contrast + responsive/mobile, each blind to the others' findings. Root cause of the reported bug:
+`g2a-booking-engine` maintained its own `g2ab_business_address` option, seeded at activation with a
+placeholder (`"Mesa, Arizona"` — no street/suite/zip), fully disconnected from the theme's
+`g2a_biz()` single source of truth. The same "plugin keeps its own stale copy of NAP" pattern turned up
+independently in three more plugins.
+
+| # | Fix | Files |
+|---|---|---|
+| 1 | Added `g2ab_business_name()`/`_phone()`/`_address()` fallback helpers: prefer an explicit plugin-level option override, else fall through to the theme's live `g2a_biz()` data — treating the known `"Mesa, Arizona"` placeholder as invalid so already-activated sites are fixed retroactively (an `add_option()`-seeded value can't be corrected just by changing the code's default parameter). Rolled out across every consumer: email automation (tags, from-name, footer), PDF invoices, front-desk receipts, AI autoreply system prompt, SEO/JSON-LD, Authorize.Net/PayPal redirect pages, and all admin settings screens. | `g2a-booking-engine/includes/helpers/functions.php` (new helpers), `class-activator.php`, `modules/email-automation/class-email-engine.php`, `modules/ai-autoreply/class-autoreply-engine.php`, `modules/pdf-invoices/class-invoice-engine.php` + `class-invoice-settings.php`, `rest/class-frontdesk-controller.php`, `admin/class-settings-pro.php`, `class-admin.php`, `admin/class-shooters.php`, `frontend/class-self-checkin.php`, `class-seo.php`, `payments/class-authnet.php` + `class-paypal.php`, `modules/email-automation/class-email-settings.php` |
+| 2 | Modernized the booking-engine's transactional email UI: `wrap_html()`'s shell now uses a rounded 16px card, soft shadow, void header with a brand-color underline, warm neutral background tones, and an Inter font stack; the default footer fallback now shows full NAP (name, then address · phone, then copyright) instead of copyright alone. All 8 templates (`booking_created` → `booking_completed`) redesigned with sentence-case rounded CTA buttons, a shared label/value detail-row component, and a modernized monospace confirmation-code box. | `g2a-booking-engine/includes/modules/email-automation/class-email-engine.php` |
+| 3 | De-hardcoded the same NAP literal from three more plugins that had it correct today but brittle against the next Customizer address change: `wpistic-contact-form`'s branded-email footer line, Formistic's AI knowledge-base seed text + keyword auto-reply rules (FFL/hours/booking templates), and `g2a-pos-core`'s `DefaultKnowledgePack` (the site's own AI/RAG answer engine) — the latter had been running a fully static identity document nightly alongside a separately-correct dynamic ingestion path, a real dual-source contradiction risk. | `wpistic-contact-form/includes/class-wpcf-emails.php`, `formistic/includes/class-formistic-g2a-defaults.php`, `g2a-pos-core/includes/Ai/DefaultKnowledgePack.php` |
+| 4 | Fixed `advanced-ffl-checkout`'s dealer-portal theming defaults reading theme_mod keys that don't exist (`g2a_business_email`/`g2a_business_phone` instead of the real `g2a_email`/`g2a_phone`) — the FFL transfer-status email support-contact fields had never actually read the live Customizer values, always falling back to `admin_email` and an empty phone. | `advanced-ffl-checkout/includes/class-wpistic-ffl-theming.php` |
+| 5 | Fixed 3 real dark-mode/light-surface contrast failures surfaced by the parallel color audits: Memberistic's "FRONT DESK" staff-header eyebrow label (bright green on solid ember, ~1.6:1) now uses the header's own light text; the systemic white-text-on-solid-ember CTA pattern across ~9 Memberistic buttons/pills (~2.6:1, including the plan-purchase button) now pairs with dark ink text (~6.8:1) instead, matching the "brass/bright fills pair with dark text" rule already documented elsewhere in the same token bridge; the account dashboard's stale copy-pasted `--ma-silver` hex was brought back in sync with the live token. | `memberistic-membership-solutions/assets/frontend.css`, `templates/account.php` |
+| 6 | Fixed dashboard-app's dark-mode `--text-subtle`/`--sidebar-fg-muted` token (was `#5b6272`, computed to 2.99–3.30:1 against the app's own dark surfaces — real informational text in Login/WebsiteContent/Reports/Leads/Sidebar) and two raw Tailwind `rose-600` usages (dashboard error banner, AI Models delete button) that bypassed the app's own tuned `--danger` token — both now compute above 4.5:1. | `dashboard-app/src/styles/index.css`, `src/pages/DashboardHome.tsx`, `src/pages/AIModels.tsx` |
+| 7 | Closed a real compliance gap in Memberistic's own Stripe-Checkout membership-signup flow: age verification was gated on a setting (`integration_verifyistic_require_signup`) that defaulted to `no` in three separate places (the filter, the authoritative `signup_blocked()` gate, and the settings-save allowlist fallback) — meaning a fresh install, or one where an admin never opened Integrations → Verifyistic, let anyone buy a paid range membership online with zero age check. All three now default to fail-safe (on). | `memberistic-membership-solutions/includes/integrations/class-verifyistic-bridge.php`, `includes/admin/class-settings-page.php`, `includes/admin/class-admin-menu.php` |
+| 8 | Added the missing server-side re-validation to the corporate/staff QR check-in write path: `Corporate_Checkin::maybe_record()` only checked capability + nonce, never re-checking membership eligibility — the "Check In Now" button's disabled state was a client-side cue only, so a direct POST could record range access for an expired/inactive membership. Now hard-blocks on ineligible status server-side (mirroring the panel's own `$eligible` logic); a missing/expired waiver stays staff discretion (as designed — the UI already treats it as a warning, not a hard stop) but is now stamped into the check-in's notes so the audit trail reflects reality. | `memberistic-membership-solutions/includes/corporate/class-corporate-module.php` |
+| 9 | Fixed the Fortis Pay refund webhook: `mark_booking_refunded()` only flipped the booking's own status, never touching the `g2ab_payments` ledger row (Stripe's and PayPal's equivalent handlers already did) — meaning a Fortis-paid booking showed "refunded" everywhere in the UI while its underlying payment row permanently still read `succeeded`, silently overstating revenue in any report built off that table. Also added the idempotency guard the paid-path already had, so a webhook retry can't double-process the same refund. | `g2a-booking-engine/includes/payments/class-fortis.php` |
+
+**Not fixed this round — logged for a future pass** (lower severity, or requires a product decision):
+Memberistic's Stripe webhook idempotency check is a non-atomic check-then-act (a real `GET_LOCK`
+already exists two dozen lines away in the same class for the checkout rate limiter but isn't applied
+here), so a redelivered webhook can double-fire duplicate customer emails and downstream hook
+listeners; Messageistic's kiosk-integration bridge listens for two hooks (`g2a_kiosk_checkin_completed`,
+`g2a_waiver_incomplete`) that nothing in the repo ever fires, so those automation triggers are
+permanently inert; `g2a-booking-engine`'s admin CRUD screens and its light-theme shortcode/SEO badges
+carry the dark-mode `--color-silver`/gold hex literally onto white admin/light surfaces (real contrast
+failures, but a WP-admin/opt-in-light-theme surface rather than the site's own dark mode); a handful of
+previously-reported-fixed items the functional agent re-verified were never actually fixed (duplicate
+`<h1>` on WooCommerce archives, disconnected Organization/LocalBusiness/Article JSON-LD, "Founded 2014"
+hardcoded in 3 places instead of reading `founded_year`, the dashboard-app mobile nav drawer's
+`overflow:hidden` scroll-lock still broken on iOS, a few theme 3-column grids missing a tablet
+breakpoint step).
+
+Versions after Round 6: g2a-booking-engine → **1.9.9.10**, memberistic-membership-solutions →
+**1.10.6**, wpistic-contact-form → **1.5.8**, advanced-ffl-checkout → **1.9.4**, g2a-pos-core →
+**3.1.9**, Formistic → **2.0.7** (its first appearance in this repo's release-zip pipeline —
+`scripts/build-release-zips.sh` and `INSTALL.md` now include it). guns2ammo theme, verifyistic, and
+messageistic are unchanged this round. `dashboard-app` has no plugin-zip release artifact (deployed
+separately per `DEPLOYMENT.md`). Packaged archives are in `releases/` (previous version of each
+retained alongside); `INSTALL.md`'s version table was updated to match.
+
 ## Appendix — audit scope note
 
 This is a source-code audit, not a live-site crawl or a running-instance security test — the environment

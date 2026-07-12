@@ -155,7 +155,9 @@ final class Settings_Page {
 		// Integration sub-options + known keys that were missing from the
 		// allowlist (and therefore wiped on each save).
 		$output['integration_verifyistic_autostamp']     = memberistic_sanitize_yes_no( $settings['integration_verifyistic_autostamp'] ?? ( $existing['integration_verifyistic_autostamp'] ?? 'yes' ) );
-		$output['integration_verifyistic_require_signup'] = memberistic_sanitize_yes_no( $settings['integration_verifyistic_require_signup'] ?? ( $existing['integration_verifyistic_require_signup'] ?? 'no' ) );
+		// Default ON — signup age verification should fail safe, not silently
+		// off just because an admin never visited this checkbox.
+		$output['integration_verifyistic_require_signup'] = memberistic_sanitize_yes_no( $settings['integration_verifyistic_require_signup'] ?? ( $existing['integration_verifyistic_require_signup'] ?? 'yes' ) );
 		$output['email_reply_to_address']                 = sanitize_email( (string) ( $settings['email_reply_to_address'] ?? ( $existing['email_reply_to_address'] ?? '' ) ) );
 		// Branded HTML email layout toggle — defaults to on; "no" falls all
 		// transactional mail back to plain text (see Email_Service).

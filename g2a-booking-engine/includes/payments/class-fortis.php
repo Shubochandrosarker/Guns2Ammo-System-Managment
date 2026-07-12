@@ -318,8 +318,36 @@ final class G2AB_Gateway_Fortis {
 		$bt = $wpdb->prefix . 'g2ab_bookings';
 		$booking = $wpdb->get_row( $wpdb->prepare( "SELECT * FROM {$bt} WHERE uuid = %s", $uuid ) );
 		if ( ! $booking ) return array( 'handled' => false );
+
+		// Idempotent — a webhook retry must not double-process the same refund.
+		if ( 'refunded' === $booking->status ) {
+			return array( 'handled' => true, 'booking_id' => $booking->id, 'status' => 'refunded', 'reason' => 'already_refunded' );
+		}
+
+		$refund_amount = isset( $tx['transaction_amount'] ) ? ( (int) $tx['transaction_amount'] ) / 100.0 : (float) $booking->paid_amount;
+
 		$wpdb->update( $bt, array( 'status' => 'refunded', 'updated_at' => current_time( 'mysql' ) ), array( 'id' => $booking->id ), array( '%s', '%s' ), array( '%d' ) );
-		do_action( 'g2ab_payment_refunded', $booking->id, (float) ( $tx['transaction_amount'] ?? 0 ) / 100.0 );
+
+		// Keep the payments ledger in sync — mirrors Stripe/PayPal's refund handling
+		// so revenue/reconciliation reports built off g2ab_payments don't overstate
+		// revenue for Fortis-paid bookings that were later refunded.
+		$pt = $wpdb->prefix . 'g2ab_payments';
+		$payment = $wpdb->get_row( $wpdb->prepare( "SELECT id FROM {$pt} WHERE booking_id = %d AND gateway = 'fortis' ORDER BY id DESC LIMIT 1", $booking->id ) );
+		if ( $payment ) {
+			$wpdb->update( $pt, array(
+				'status'        => 'refunded',
+				'refund_amount' => $refund_amount,
+			), array( 'id' => $payment->id ), array( '%s', '%f' ), array( '%d' ) );
+		}
+
+		$wpdb->insert( $wpdb->prefix . 'g2ab_logs', array(
+			'booking_id' => $booking->id, 'event_type' => 'payment_refunded', 'severity' => 'info',
+			'message' => sprintf( 'Fortis Pay refund processed: $%s', number_format( $refund_amount, 2 ) ),
+			'context' => wp_json_encode( array( 'transaction_id' => $tx['id'] ?? '' ) ),
+			'created_at' => current_time( 'mysql' ),
+		) );
+
+		do_action( 'g2ab_payment_refunded', $booking->id, $refund_amount );
 		return array( 'handled' => true, 'booking_id' => $booking->id, 'status' => 'refunded' );
 	}
 

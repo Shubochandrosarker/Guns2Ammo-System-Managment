@@ -143,9 +143,9 @@ final class G2AB_Admin {
 				<input type="hidden" name="action" value="g2ab_save_settings" />
 				<div class="g2ab-card"><h2><?php esc_html_e( 'Business', 'g2a-booking' ); ?></h2>
 					<table class="form-table">
-						<tr><th><?php esc_html_e( 'Business Name', 'g2a-booking' ); ?></th><td><input name="g2ab_business_name" type="text" class="regular-text" value="<?php echo esc_attr( get_option( 'g2ab_business_name', '' ) ); ?>" /></td></tr>
-						<tr><th><?php esc_html_e( 'Phone', 'g2a-booking' ); ?></th><td><input name="g2ab_business_phone" type="text" class="regular-text" value="<?php echo esc_attr( get_option( 'g2ab_business_phone', '' ) ); ?>" /></td></tr>
-						<tr><th><?php esc_html_e( 'Address', 'g2a-booking' ); ?></th><td><input name="g2ab_business_address" type="text" class="regular-text" value="<?php echo esc_attr( get_option( 'g2ab_business_address', '' ) ); ?>" /></td></tr>
+						<tr><th><?php esc_html_e( 'Business Name', 'g2a-booking' ); ?></th><td><input name="g2ab_business_name" type="text" class="regular-text" value="<?php echo esc_attr( g2ab_business_name() ); ?>" /></td></tr>
+						<tr><th><?php esc_html_e( 'Phone', 'g2a-booking' ); ?></th><td><input name="g2ab_business_phone" type="text" class="regular-text" value="<?php echo esc_attr( g2ab_business_phone() ); ?>" /></td></tr>
+						<tr><th><?php esc_html_e( 'Address', 'g2a-booking' ); ?></th><td><input name="g2ab_business_address" type="text" class="regular-text" value="<?php echo esc_attr( g2ab_business_address() ); ?>" /><br><small><?php esc_html_e( 'Pulled from the theme\'s Business Info settings (Customizer) until you save a value here explicitly.', 'g2a-booking' ); ?></small></td></tr>
 						<tr><th><?php esc_html_e( 'Currency', 'g2a-booking' ); ?></th><td><select name="g2ab_currency"><?php $cur = get_option( 'g2ab_currency', 'USD' ); foreach ( array( 'USD','CAD','EUR','GBP','AUD' ) as $c ) printf( '<option value="%1$s" %2$s>%1$s</option>', esc_attr( $c ), selected( $cur, $c, false ) ); ?></select></td></tr>
 					</table>
 				</div>

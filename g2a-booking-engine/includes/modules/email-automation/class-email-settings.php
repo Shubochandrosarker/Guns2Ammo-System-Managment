@@ -67,7 +67,7 @@ class G2AB_Email_Settings {
 			<div class="g2ab-em__brand-row">
 				<div class="g2ab-em__row">
 					<label>From Name</label>
-					<input type="text" name="from_name" value="<?php echo esc_attr( get_option( G2AB_Email_Engine::OPTION_FROM_NAME, get_option( 'g2ab_business_name' ) ) ); ?>" />
+					<input type="text" name="from_name" value="<?php echo esc_attr( get_option( G2AB_Email_Engine::OPTION_FROM_NAME, g2ab_business_name() ) ); ?>" />
 				</div>
 				<div class="g2ab-em__row">
 					<label>From Email</label>

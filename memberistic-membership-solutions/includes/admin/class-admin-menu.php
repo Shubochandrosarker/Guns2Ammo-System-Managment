@@ -136,7 +136,7 @@ final class Admin_Menu {
 										<?php esc_html_e( 'Auto-stamp member records with verified age/DOB', 'memberistic' ); ?>
 									</label>
 									<label>
-										<input type="checkbox" name="memberistic_verifyistic_require_signup" value="1" <?php checked( 'yes' === memberistic_get_setting( 'integration_verifyistic_require_signup', 'no' ) ); ?> />
+										<input type="checkbox" name="memberistic_verifyistic_require_signup" value="1" <?php checked( 'no' !== memberistic_get_setting( 'integration_verifyistic_require_signup', 'yes' ) ); ?> />
 										<?php esc_html_e( 'Require age verification before membership signup', 'memberistic' ); ?>
 									</label>
 								</div>

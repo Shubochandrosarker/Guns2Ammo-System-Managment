@@ -55,7 +55,7 @@ final class G2AB_Frontend_Self_Checkin {
 
 	private function markup() {
 		$this->enqueue();
-		$biz = get_option( 'g2ab_business_name', get_bloginfo( 'name' ) );
+		$biz = g2ab_business_name();
 		ob_start();
 		?>
 		<div class="g2ab-sci" id="g2ab-sci">

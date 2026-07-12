@@ -143,7 +143,8 @@ export function AIModelsRAGs() {
                           Edit
                         </button>
                         <button
-                          className="btn-ghost text-xs text-rose-600"
+                          className="btn-ghost text-xs"
+                          style={{ color: 'var(--danger)' }}
                           onClick={() => void del(m)}
                           disabled={busyDelete === m.id}
                         >

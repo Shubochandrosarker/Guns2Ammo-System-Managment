@@ -2929,16 +2929,38 @@ final class Corporate_Checkin {
 		if ( ! is_array( $membership ) || empty( $membership['id'] ) ) {
 			return;
 		}
+
+		// Server-side re-validation — mirrors staff_panel()'s $eligible gate.
+		// The rendered panel disables the submit button for an ineligible
+		// membership, but that's a client-side cue only; a direct POST (once
+		// a valid nonce for this token is in hand) must not be allowed to
+		// record range access for an expired/inactive membership.
+		$status = (string) ( $membership['status'] ?? '' );
+		if ( ! in_array( $status, array( 'active', 'comped', 'trial', 'guest' ), true ) ) {
+			return;
+		}
+
 		$person = \WordPressistic\Memberistic\Database\People_Repository::get_primary_by_membership( (int) $membership['id'] );
 		if ( ! $person ) {
 			return;
 		}
+
+		// Waiver-missing/expired is shown as a warning (not a hard block) so
+		// staff can still check someone in while collecting a waiver in
+		// person — but record the waiver status at check-in time so the
+		// audit trail reflects reality rather than silently omitting it.
+		$waiver = ! empty( $person['waiver_status'] ) ? (string) $person['waiver_status'] : 'missing';
+		$notes  = sanitize_text_field( wp_unslash( $_POST['checkin_notes'] ?? '' ) );
+		if ( 'signed' !== $waiver ) {
+			$notes = trim( sprintf( '[waiver: %s] ', $waiver ) . $notes );
+		}
+
 		\WordPressistic\Memberistic\Database\Checkins_Repository::create( array(
 			'membership_id' => (int) $membership['id'],
 			'person_id'     => (int) $person['id'],
 			'checkin_type'  => 'qr_scan',
 			'status'        => 'checked_in',
-			'notes'         => sanitize_text_field( wp_unslash( $_POST['checkin_notes'] ?? '' ) ),
+			'notes'         => $notes,
 		) );
 		\WordPressistic\Memberistic\Database\Activity_Repository::log( array(
 			'membership_id'       => (int) $membership['id'],

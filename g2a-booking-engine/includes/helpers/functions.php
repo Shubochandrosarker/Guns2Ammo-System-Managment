@@ -57,6 +57,55 @@ function g2ab_table( $name ) {
 }
 
 /**
+ * Business NAP (name/address/phone) for outbound emails, PDFs, front-desk
+ * screens, and the AI autoreply engine.
+ *
+ * This plugin has always kept its own separate `g2ab_business_*` options,
+ * disconnected from the theme's single source of truth
+ * (guns2ammo/inc/business-info.php's g2a_biz()). The activator seeded
+ * `g2ab_business_address` to the placeholder "Mesa, Arizona" — never a real
+ * street address — so on every site that never visited this plugin's own
+ * settings screen to fill it in by hand, every automated email footer, PDF
+ * invoice, and front-desk screen has been showing that placeholder instead
+ * of the real address (currently 6030 E Main St, Suite 103, Mesa, AZ 85205).
+ *
+ * These helpers prefer an explicit value saved in this plugin's own
+ * settings (so a site owner who deliberately typed something different here
+ * — e.g. running this plugin without the guns2ammo theme — keeps it), and
+ * otherwise fall through to the theme's live NAP data. The stored
+ * "Mesa, Arizona" placeholder is treated as "not configured" (not as a
+ * deliberate value) so already-activated sites get upgraded automatically,
+ * without needing anyone to notice and re-save the settings page.
+ */
+function g2ab_business_name() {
+	$v = trim( (string) get_option( 'g2ab_business_name', '' ) );
+	if ( '' === $v && function_exists( 'g2a_biz' ) ) {
+		$biz = g2a_biz();
+		$v   = (string) ( $biz['name'] ?? '' );
+	}
+	return '' !== $v ? $v : get_bloginfo( 'name' );
+}
+
+function g2ab_business_phone() {
+	$v = trim( (string) get_option( 'g2ab_business_phone', '' ) );
+	if ( '' === $v && function_exists( 'g2a_biz_phone' ) ) {
+		$v = (string) g2a_biz_phone();
+	}
+	return $v;
+}
+
+function g2ab_business_address() {
+	$v = trim( (string) get_option( 'g2ab_business_address', '' ) );
+	if ( ( '' === $v || 'Mesa, Arizona' === $v ) && function_exists( 'g2a_biz_addr_line' ) ) {
+		$theme_addr = trim( (string) g2a_biz_addr_line() );
+		if ( '' !== $theme_addr ) {
+			return $theme_addr;
+		}
+	}
+	return $v;
+}
+
+/**
  * Get a plugin option with a default fallback.
  *
  * @param string $key     Option key (without prefix — auto-prefixed with g2ab_).

@@ -23,7 +23,7 @@ export function DashboardHome() {
   if (revenue.error || !revenue.data || !bookings.data || !memberships.data || !seo.data) {
     return (
       <Card title="Failed to load dashboard">
-        <div className="text-rose-600 text-sm">{revenue.error || 'Unknown error'}</div>
+        <div className="text-sm" style={{ color: 'var(--danger)' }}>{revenue.error || 'Unknown error'}</div>
       </Card>
     )
   }
