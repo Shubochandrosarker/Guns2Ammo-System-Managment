@@ -32,7 +32,8 @@
 .weapons-head { max-width:1280px; margin:0 auto 48px; display:flex; justify-content:space-between; align-items:end; gap:32px; flex-wrap:wrap; }
 .weapons-head h2 { font-family: var(--font-display); font-size: clamp(40px, 6vw, 80px); line-height:0.95; }
 .weapons-grid { max-width:1280px; margin:0 auto; display:grid; grid-template-columns: repeat(3, 1fr); gap:16px; }
-@media (max-width:900px){ .weapons-grid { grid-template-columns:1fr; } }
+@media (max-width:900px){ .weapons-grid { grid-template-columns:1fr 1fr; } }
+@media (max-width:600px){ .weapons-grid { grid-template-columns:1fr; } }
 .weapon { padding: 32px; background: var(--color-gunmetal); border:1px solid var(--color-hairline); position:relative; overflow:hidden; min-height: 320px; display:flex; flex-direction:column; justify-content:space-between; transition: transform 250ms var(--ease-std), border-color 250ms var(--ease-std); }
 .weapon:hover { transform: translateY(-4px); border-color: var(--color-hairline-bright); }
 .weapon::before { content:""; position:absolute; right:-40px; top:-40px; width:240px; height:240px; background-image: repeating-linear-gradient(45deg, rgba(201,168,76,0.04) 0 2px, transparent 2px 14px); transform: rotate(-15deg); }
@@ -46,7 +47,8 @@
 
 .tiers { padding: 100px 32px; background: var(--color-gunmetal); }
 .tiers-grid { max-width:1280px; margin:0 auto; display:grid; grid-template-columns: repeat(3, 1fr); gap:16px; }
-@media (max-width:900px){ .tiers-grid { grid-template-columns:1fr; } }
+@media (max-width:900px){ .tiers-grid { grid-template-columns:1fr 1fr; } }
+@media (max-width:600px){ .tiers-grid { grid-template-columns:1fr; } }
 .tier { padding: 36px 28px; background: var(--color-void); border:1px solid var(--color-hairline); position:relative; }
 .tier.popular { border-color: var(--color-brass); transform: translateY(-12px); }
 .tier .pop { position:absolute; top:-14px; left:50%; transform:translateX(-50%); padding: 5px 14px; background: var(--color-brass); color:#111; font-family: var(--font-mono); font-size:10px; letter-spacing:0.24em; text-transform: uppercase; }

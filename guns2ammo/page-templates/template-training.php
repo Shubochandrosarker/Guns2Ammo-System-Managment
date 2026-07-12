@@ -76,7 +76,8 @@ get_header();
   .instructors { padding: 100px 32px; background: var(--color-void); border-top:1px solid var(--color-hairline); }
   .instructors .c { max-width: 1280px; margin:0 auto; }
   .ig { display:grid; grid-template-columns: repeat(3, 1fr); gap: 18px; margin-top: 36px; }
-  @media (max-width: 900px) { .ig { grid-template-columns: 1fr; } }
+  @media (max-width: 900px) { .ig { grid-template-columns: 1fr 1fr; } }
+  @media (max-width: 600px) { .ig { grid-template-columns: 1fr; } }
   .inst { padding: 28px; background: var(--color-gunmetal); border:1px solid var(--color-hairline); }
   .inst .av { width: 64px; height: 64px; border-radius: 50%; background: linear-gradient(135deg, var(--color-brass), var(--color-brass-dim)); display:grid; place-items:center; font-family: var(--font-display); font-size: 26px; color: var(--color-void); margin-bottom: 18px; }
   .inst .nm { font-family: var(--font-display); font-size: 26px; color: var(--color-white); letter-spacing: 0.04em; line-height: 1; }

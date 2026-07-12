@@ -90,7 +90,7 @@ $g2a_biz = function_exists( 'g2a_biz' ) ? g2a_biz() : array();
 .cta-final h2 { font-family: var(--font-display); font-size: clamp(48px, 8vw, 112px); line-height:0.92; }</style>
 <header class="hero">
   <div class="c">
-    <span class="eyebrow"> Since 2014  Mesa, AZ</span>
+    <span class="eyebrow"> <?php echo esc_html( $g2a_biz['founded'] ?? 'Since 2014' ); ?>  Mesa, AZ</span>
     <h1 style="margin-top: 22px;">MORE THAN<br>A RANGE.<br>A TRAINING <span class="a">INSTITUTION.</span></h1>
     <p><?php echo g2a_content( // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- esc_html applied inside g2a_content().
       'about_story',
@@ -123,7 +123,7 @@ $g2a_biz = function_exists( 'g2a_biz' ) ? g2a_biz() : array();
       <div class="cred">
         <div class="ic"><span></span></div>
         <h4>FFL LICENSED</h4>
-        <p>Federal Firearms License since 2014. Full retail, transfer, and NFA capability on-site.</p>
+        <p>Federal Firearms License since <?php echo esc_html( $g2a_biz['founded_year'] ?? 2014 ); ?>. Full retail, transfer, and NFA capability on-site.</p>
         <div class="meta">ATF  9-86-013-00-0J</div>
       </div>
       <div class="cred">
@@ -140,9 +140,9 @@ $g2a_biz = function_exists( 'g2a_biz' ) ? g2a_biz() : array();
       </div>
       <div class="cred">
         <div class="ic"><span></span></div>
-        <h4>12+ YEARS</h4>
-        <p>Operating in Mesa since 2014. Same family. Same building. Same standard.</p>
-        <div class="meta">Est. October 2014</div>
+        <h4><?php echo esc_html( max( 1, (int) gmdate( 'Y' ) - (int) ( $g2a_biz['founded_year'] ?? 2014 ) ) ); ?>+ YEARS</h4>
+        <p>Operating in Mesa since <?php echo esc_html( $g2a_biz['founded_year'] ?? 2014 ); ?>. Same family. Same building. Same standard.</p>
+        <div class="meta">Est. October <?php echo esc_html( $g2a_biz['founded_year'] ?? 2014 ); ?></div>
       </div>
       <div class="cred">
         <div class="ic"><span></span></div>
@@ -318,7 +318,7 @@ $g2a_biz = function_exists( 'g2a_biz' ) ? g2a_biz() : array();
 <section class="cta-final">
   <span class="eyebrow" style="justify-content:center;"> Ready When You Are</span>
   <h2 style="margin-top: 18px;">VISIT THE RANGE.</h2>
-  <p style="color: var(--color-fog); max-width: 500px; margin: 22px auto 32px;">Come see for yourself why Mesa's been training with us since 2014.</p>
+  <p style="color: var(--color-fog); max-width: 500px; margin: 22px auto 32px;">Come see for yourself why Mesa's been training with us since <?php echo esc_html( $g2a_biz['founded_year'] ?? 2014 ); ?>.</p>
   <div style="display:inline-flex; gap:14px; flex-wrap:wrap;">
     <a class="btn btn-ember btn-lg" href="<?php echo esc_url( home_url( "/book-a-lane/" ) ); ?>">Book A Lane </a>
     <a class="btn btn-brass btn-lg" href="<?php echo esc_url( home_url( "/contact/" ) ); ?>">Get Directions</a>

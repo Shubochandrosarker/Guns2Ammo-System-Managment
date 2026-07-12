@@ -76,7 +76,8 @@ if ( function_exists( 'g2a_faq_schema' ) && function_exists( 'g2a_emit_jsonld' )
 .sg-step .t { font-family: var(--font-condensed); font-weight:600; font-size:18px; text-transform:uppercase; letter-spacing:0.03em; color: var(--color-white); margin-top:8px; }
 .sg-step .d { color: var(--color-fog); font-size:14px; line-height:1.7; margin-top:8px; }
 .sg-cards { display:grid; grid-template-columns: repeat(3,1fr); gap:14px; margin-top:32px; }
-@media (max-width:820px){ .sg-cards { grid-template-columns:1fr; } }
+@media (max-width:820px){ .sg-cards { grid-template-columns:1fr 1fr; } }
+@media (max-width:560px){ .sg-cards { grid-template-columns:1fr; } }
 .sg-card { padding:26px; background: var(--color-gunmetal); border:1px solid var(--color-hairline); }
 .sg-card .t { font-family: var(--font-condensed); font-weight:600; font-size:18px; text-transform:uppercase; letter-spacing:0.03em; color: var(--color-white); }
 .sg-card .d { color: var(--color-fog); font-size:14px; line-height:1.7; margin-top:8px; }

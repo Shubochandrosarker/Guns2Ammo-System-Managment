@@ -56,7 +56,8 @@ function g2a_llms_short() {
 	$g2a_guardian_a = $g2a_has_pricing_helper ? g2a_plan_price_fmt( 'guardian', 'annual' ) : '$649.99';
 
 	$out  = "# Guns 2 Ammo — Arizona Shooting Range\n\n";
-	$out .= "> Mesa's premier indoor shooting range, FFL-licensed firearms store, and NRA-certified training facility. Founded 2014. Serving the East Valley: Mesa, Phoenix, Gilbert, Tempe, Chandler, Scottsdale, Apache Junction, Queen Creek.\n\n";
+	$founded_year = (int) ( $g2a_biz['founded_year'] ?? 2014 );
+	$out .= "> Mesa's premier indoor shooting range, FFL-licensed firearms store, and NRA-certified training facility. Founded {$founded_year}. Serving the East Valley: Mesa, Phoenix, Gilbert, Tempe, Chandler, Scottsdale, Apache Junction, Queen Creek.\n\n";
 	$out .= "## Business\n";
 	$out .= "- Address: {$addr1}, {$addr2}\n";
 	$out .= "- Phone: {$phone}\n";

@@ -100,7 +100,9 @@ function g2a_render_instructors() {
 			'@type'     => 'Person',
 			'name'      => $i['name'],
 			'jobTitle'  => $i['role'] ?? 'Firearms Instructor',
-			'worksFor'  => array( '@type' => 'Organization', 'name' => 'Guns 2 Ammo' ),
+			// References the single Organization node (inc/aeo.php) by @id
+			// instead of inlining a fresh, disconnected duplicate.
+			'worksFor'  => array( '@id' => home_url( '/#organization' ) ),
 			'description' => $i['bio'] ?? '',
 			'knowsAbout'  => array_values( (array) ( $i['focuses'] ?? array() ) ),
 		);

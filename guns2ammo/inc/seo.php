@@ -37,6 +37,7 @@ function g2a_seo_page_meta_map() {
 		$g2a_seo_phone = $g2a_biz['phone'] ?? '(602) 715-2677';
 		$g2a_seo_addr1 = $g2a_biz['addr1'] ?? '6030 E Main St, Suite 103';
 		$g2a_seo_addr2 = $g2a_biz['addr2'] ?? 'Mesa, AZ 85205';
+		$g2a_seo_founded_year = (int) ( $g2a_biz['founded_year'] ?? 2014 );
 		// Single source of truth for membership pricing — see inc/pricing.php.
 		$g2a_seo_from_price = function_exists( 'g2a_plan_price_from_fmt' ) ? g2a_plan_price_from_fmt() : '$29.99';
 		$map = [
@@ -98,8 +99,8 @@ function g2a_seo_page_meta_map() {
 				'desc'  => 'Transparent range pricing at Guns 2 Ammo Mesa: lanes $20/hr, rentals from $15, eye & ear $3, 9mm from $22/box. Member discounts up to 25%. See the full table.',
 			],
 			'/about/' => [
-				'title' => 'About Guns 2 Ammo — Mesa\'s Range Since 2014 | G2A',
-				'desc'  => 'Veteran- and family-owned. Guns 2 Ammo has run Mesa\'s most-trusted indoor range, gun store & training academy since 2014. Meet the team & tour the facility.',
+				'title' => 'About Guns 2 Ammo — Mesa\'s Range Since ' . $g2a_seo_founded_year . ' | G2A',
+				'desc'  => 'Veteran- and family-owned. Guns 2 Ammo has run Mesa\'s most-trusted indoor range, gun store & training academy since ' . $g2a_seo_founded_year . '. Meet the team & tour the facility.',
 			],
 			'/contact/' => [
 				'title' => 'Contact Guns 2 Ammo — Mesa, AZ | ' . $g2a_seo_phone,
@@ -409,7 +410,12 @@ add_action( 'wp_head', function () {
 	$ld = [
 		'@context' => 'https://schema.org',
 		'@type'    => [ 'LocalBusiness', 'SportsActivityLocation', 'Store' ],
-		'@id'      => home_url( '/#business' ),
+		// Same @id as inc/aeo.php's Organization node — this is the richer
+		// LocalBusiness view of the SAME real-world entity (hours, geo,
+		// offers), not a second, disconnected business. Sharing the @id
+		// lets search engines resolve every reference to one node instead
+		// of two unlinked ones.
+		'@id'      => home_url( '/#organization' ),
 		'name'     => $biz['name'] ?? get_bloginfo( 'name' ),
 		'image'    => g2a_seo_image() ?: home_url( '/wp-content/uploads/g2a-storefront.jpg' ),
 		'url'      => home_url( '/' ),
@@ -518,12 +524,11 @@ add_action( 'wp_head', function () {
 			'datePublished' => get_the_date( DATE_W3C, $p ),
 			'dateModified'  => get_the_modified_date( DATE_W3C, $p ),
 			// Brand byline — never expose a personal developer/admin login name.
-			'author'        => [ '@type' => 'Organization', 'name' => 'Guns 2 Ammo', 'url' => home_url( '/' ) ],
-			'publisher'     => [
-				'@type' => 'Organization',
-				'name'  => get_bloginfo( 'name' ),
-				'logo'  => [ '@type' => 'ImageObject', 'url' => g2a_seo_image() ?: home_url( '/wp-content/uploads/g2a-logo.png' ) ],
-			],
+			// Reference the single Organization node (inc/aeo.php) by @id
+			// instead of inlining a fresh, disconnected duplicate — every
+			// Article on the site now points at the same canonical entity.
+			'author'        => [ '@id' => home_url( '/#organization' ) ],
+			'publisher'     => [ '@id' => home_url( '/#organization' ) ],
 		] );
 	}
 }, 9 );

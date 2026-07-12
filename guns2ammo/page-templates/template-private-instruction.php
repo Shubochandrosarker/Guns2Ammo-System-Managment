@@ -36,7 +36,8 @@ if ( function_exists( 'g2a_faq_schema' ) && function_exists( 'g2a_emit_jsonld' )
 .pi-sec { max-width:1180px; margin:0 auto; padding:72px 32px; }
 .pi-sec h2 { font-family: var(--font-display); font-size: clamp(34px,5vw,60px); color: var(--color-white); letter-spacing:0.01em; }
 .pi-grid { display:grid; grid-template-columns: repeat(3,1fr); gap:14px; margin-top:30px; }
-@media (max-width:820px){ .pi-grid { grid-template-columns:1fr; } }
+@media (max-width:820px){ .pi-grid { grid-template-columns:1fr 1fr; } }
+@media (max-width:560px){ .pi-grid { grid-template-columns:1fr; } }
 .pi-card { padding:26px; background: var(--color-gunmetal); border:1px solid var(--color-hairline); }
 .pi-card .n { font-family: var(--font-display); font-size:38px; color: var(--color-brass-bright); line-height:1; }
 .pi-card .t { font-family: var(--font-condensed); font-weight:600; font-size:18px; text-transform:uppercase; color: var(--color-white); margin-top:8px; }

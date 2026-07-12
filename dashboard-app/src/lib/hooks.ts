@@ -96,3 +96,37 @@ export function useDialogA11y<T extends HTMLElement>(containerRef: RefObject<T>,
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 }
+
+// Locks page scroll behind an open modal/drawer. A plain `overflow: hidden`
+// on <body> does NOT reliably stop background scroll on iOS Safari — the
+// page can still rubber-band/scroll underneath because Safari's compositor
+// doesn't fully respect overflow on the layout viewport during touch
+// scrolling. Pinning the body with `position: fixed` (and restoring the
+// scroll position on close) is the standard cross-browser-reliable fix.
+export function useBodyScrollLock(locked: boolean): void {
+  useEffect(() => {
+    if (!locked) return
+    const scrollY = window.scrollY
+    const { body } = document
+    const prev = {
+      position: body.style.position,
+      top: body.style.top,
+      left: body.style.left,
+      right: body.style.right,
+      width: body.style.width,
+    }
+    body.style.position = 'fixed'
+    body.style.top = `-${scrollY}px`
+    body.style.left = '0'
+    body.style.right = '0'
+    body.style.width = '100%'
+    return () => {
+      body.style.position = prev.position
+      body.style.top = prev.top
+      body.style.left = prev.left
+      body.style.right = prev.right
+      body.style.width = prev.width
+      window.scrollTo(0, scrollY)
+    }
+  }, [locked])
+}
