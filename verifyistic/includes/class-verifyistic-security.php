@@ -135,15 +135,80 @@ class Verifyistic_Security {
 
 	/**
 	 * Record a failed/declined attempt against an IP.
+	 *
+	 * Wrapped in a MySQL advisory lock so two concurrent failed attempts
+	 * (a scripted age-guessing burst) can't both read the same stale count
+	 * and both write back the same incremented value — a lost update here
+	 * would silently make the effective cap weaker than `RL_MAX` under
+	 * concurrency, on an endpoint that exists specifically to blunt that
+	 * kind of automated abuse.
 	 */
 	public static function register_attempt( $ip ) {
-		$key   = self::rl_key( $ip );
-		$count = (int) get_transient( $key );
-		set_transient( $key, $count + 1, self::RL_WINDOW );
+		self::atomic_increment( self::rl_key( $ip ), self::RL_WINDOW );
 	}
 
 	private static function rl_key( $ip ) {
 		return 'vfy_rl_' . md5( (string) $ip );
+	}
+
+	/**
+	 * Atomically read-increment-write a transient counter.
+	 */
+	public static function atomic_increment( $key, $ttl ) {
+		if ( ! self::acquire_lock( $key ) ) {
+			return;
+		}
+		try {
+			$count = (int) get_transient( $key );
+			set_transient( $key, $count + 1, $ttl );
+		} finally {
+			self::release_lock( $key );
+		}
+	}
+
+	/**
+	 * Atomic "still under cap? then charge one" — for counters where the
+	 * check and the increment must happen as a single step (no work runs
+	 * between them, unlike the failed-attempt counter above).
+	 *
+	 * @return bool True when the counter was under `$max` and got charged.
+	 */
+	public static function atomic_check_and_increment( $key, $max, $ttl ) {
+		if ( ! self::acquire_lock( $key ) ) {
+			// Fail closed: refuse rather than risk an unguarded read-modify-write.
+			return false;
+		}
+		try {
+			$count = (int) get_transient( $key );
+			if ( $count >= $max ) {
+				return false;
+			}
+			set_transient( $key, $count + 1, $ttl );
+			return true;
+		} finally {
+			self::release_lock( $key );
+		}
+	}
+
+	/**
+	 * MySQL advisory lock. Duck-types `$wpdb` (rather than requiring the
+	 * real `wpdb` class) so it silently no-ops in the plugin's lightweight
+	 * PHP-only test bootstrap; every real WordPress request has `$wpdb`.
+	 */
+	private static function acquire_lock( $key, $timeout = 3 ) {
+		global $wpdb;
+		if ( ! is_object( $wpdb ) || ! method_exists( $wpdb, 'get_var' ) ) {
+			return true;
+		}
+		return 1 === (int) $wpdb->get_var( $wpdb->prepare( 'SELECT GET_LOCK(%s, %d)', 'vfy_lock_' . $key, max( 0, $timeout ) ) );
+	}
+
+	private static function release_lock( $key ) {
+		global $wpdb;
+		if ( ! is_object( $wpdb ) || ! method_exists( $wpdb, 'get_var' ) ) {
+			return;
+		}
+		$wpdb->get_var( $wpdb->prepare( 'SELECT RELEASE_LOCK(%s)', 'vfy_lock_' . $key ) );
 	}
 
 	/* ------------------------------------------------------------------ */

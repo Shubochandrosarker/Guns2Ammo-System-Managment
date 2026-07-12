@@ -39,14 +39,15 @@ class Verifyistic_Ajax {
         }
 
         // Generous per-IP mint cap (separate bucket from failed attempts):
-        // a real visitor mints once on popup show + once per retry.
+        // a real visitor mints once on popup show + once per retry. Checked
+        // and charged as one atomic step so a concurrent burst can't slip
+        // past the cap via the same lost-update race as the failed-attempt
+        // counter.
         $mint_key = 'vfy_mint_' . md5( $ip );
-        $mints    = (int) get_transient( $mint_key );
-        if ( $mints >= 30 ) {
+        if ( ! Verifyistic_Security::atomic_check_and_increment( $mint_key, 30, 15 * MINUTE_IN_SECONDS ) ) {
             wp_send_json_error( array( 'message' => __( 'Too many attempts. Please wait a few minutes and try again.', 'verifyistic' ) ), 429 );
             return;
         }
-        set_transient( $mint_key, $mints + 1, 15 * MINUTE_IN_SECONDS );
 
         wp_send_json_success( array(
             'token' => Verifyistic_Security::issue_form_token(),

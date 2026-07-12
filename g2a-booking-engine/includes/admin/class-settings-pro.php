@@ -440,8 +440,8 @@ final class G2AB_Admin_Settings_Pro {
 		?>
 		<div class="g2ab-set__panel">
 			<h3><?php esc_html_e( 'COLORS', 'g2a-booking' ); ?></h3>
-			<div class="g2ab-set__field"><label><?php esc_html_e( 'Primary Color', 'g2a-booking' ); ?></label><input type="text" name="g2ab_brand_color_primary" value="<?php echo esc_attr( get_option( 'g2ab_brand_color_primary', '#4A5D3A' ) ); ?>" /></div>
-			<div class="g2ab-set__field"><label><?php esc_html_e( 'Accent Color', 'g2a-booking' ); ?></label><input type="text" name="g2ab_brand_color_accent" value="<?php echo esc_attr( get_option( 'g2ab_brand_color_accent', '#D2691E' ) ); ?>" /></div>
+			<div class="g2ab-set__field"><label><?php esc_html_e( 'Primary Color', 'g2a-booking' ); ?></label><input type="text" name="g2ab_brand_color_primary" value="<?php echo esc_attr( get_option( 'g2ab_brand_color_primary', '#C9A84C' ) ); ?>" /></div>
+			<div class="g2ab-set__field"><label><?php esc_html_e( 'Accent Color', 'g2a-booking' ); ?></label><input type="text" name="g2ab_brand_color_accent" value="<?php echo esc_attr( get_option( 'g2ab_brand_color_accent', '#E8802F' ) ); ?>" /></div>
 		</div>
 		<div class="g2ab-set__panel">
 			<h3><?php esc_html_e( 'BUILD STATUS', 'g2a-booking' ); ?></h3>
@@ -475,13 +475,21 @@ final class G2AB_Admin_Settings_Pro {
 		$theme        = get_option( 'g2ab_form_theme', 'midnight' );
 		$layout       = get_option( 'g2ab_form_layout', 'split' );
 		$font         = get_option( 'g2ab_form_font', 'inter' );
-		$primary      = get_option( 'g2ab_form_primary', '#5B7BFF' );
-		$accent       = get_option( 'g2ab_form_accent', '#7C9CFF' );
-		$bg           = get_option( 'g2ab_form_bg', '#0B1020' );
-		$surface      = get_option( 'g2ab_form_surface', '#121833' );
-		$surface2     = get_option( 'g2ab_form_surface2', '#0E1530' );
-		$text         = get_option( 'g2ab_form_text', '#FFFFFF' );
-		$muted        = get_option( 'g2ab_form_muted', '#8B93B4' );
+		// Defaults are literal hex previews of the theme's live brass/ember/
+		// void tokens (dark mode) — a color-picker swatch can't render a CSS
+		// var() reference, so this mirrors what class-frontend.php's own
+		// var(--color-brass)-style defaults resolve to today. Saving this
+		// form without changing a field writes these hexes explicitly (no
+		// longer inheriting the theme's live tokens across a light/dark
+		// toggle) — a pre-existing tradeoff of a hex-based color picker, not
+		// something this fix introduces.
+		$primary      = get_option( 'g2ab_form_primary', '#C9A84C' );
+		$accent       = get_option( 'g2ab_form_accent', '#E8802F' );
+		$bg           = get_option( 'g2ab_form_bg', '#1A191E' );
+		$surface      = get_option( 'g2ab_form_surface', '#211F26' );
+		$surface2     = get_option( 'g2ab_form_surface2', '#2B2932' );
+		$text         = get_option( 'g2ab_form_text', '#F7F7F9' );
+		$muted        = get_option( 'g2ab_form_muted', '#A7A6AE' );
 		$radius       = get_option( 'g2ab_form_radius', '16' );
 		$title        = get_option( 'g2ab_form_title', '' );
 		$subtitle     = get_option( 'g2ab_form_subtitle', '' );
@@ -496,7 +504,7 @@ final class G2AB_Admin_Settings_Pro {
 			<div class="g2ab-set__field">
 				<label><?php esc_html_e( 'Theme', 'g2a-booking' ); ?></label>
 				<select name="g2ab_form_theme">
-					<option value="midnight" <?php selected( 'midnight', $theme ); ?>><?php esc_html_e( 'Midnight (dark, blue accent)', 'g2a-booking' ); ?></option>
+					<option value="midnight" <?php selected( 'midnight', $theme ); ?>><?php esc_html_e( 'Midnight (dark, brass/ember accent)', 'g2a-booking' ); ?></option>
 					<option value="light" <?php selected( 'light', $theme ); ?>><?php esc_html_e( 'Light (white surface)', 'g2a-booking' ); ?></option>
 					<option value="dark" <?php selected( 'dark', $theme ); ?>><?php esc_html_e( 'Dark (flat dark)', 'g2a-booking' ); ?></option>
 					<option value="custom" <?php selected( 'custom', $theme ); ?>><?php esc_html_e( 'Custom (use colors below)', 'g2a-booking' ); ?></option>

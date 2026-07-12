@@ -175,8 +175,8 @@ final class G2AB_Admin {
 				</div>
 				<div class="g2ab-card"><h2><?php esc_html_e( 'Branding', 'g2a-booking' ); ?></h2>
 					<table class="form-table">
-						<tr><th><?php esc_html_e( 'Primary Color', 'g2a-booking' ); ?></th><td><input name="g2ab_brand_color_primary" type="text" class="regular-text" value="<?php echo esc_attr( get_option( 'g2ab_brand_color_primary', '#4A5D3A' ) ); ?>" /></td></tr>
-						<tr><th><?php esc_html_e( 'Accent Color', 'g2a-booking' ); ?></th><td><input name="g2ab_brand_color_accent" type="text" class="regular-text" value="<?php echo esc_attr( get_option( 'g2ab_brand_color_accent', '#D2691E' ) ); ?>" /></td></tr>
+						<tr><th><?php esc_html_e( 'Primary Color', 'g2a-booking' ); ?></th><td><input name="g2ab_brand_color_primary" type="text" class="regular-text" value="<?php echo esc_attr( get_option( 'g2ab_brand_color_primary', '#C9A84C' ) ); ?>" /></td></tr>
+						<tr><th><?php esc_html_e( 'Accent Color', 'g2a-booking' ); ?></th><td><input name="g2ab_brand_color_accent" type="text" class="regular-text" value="<?php echo esc_attr( get_option( 'g2ab_brand_color_accent', '#E8802F' ) ); ?>" /></td></tr>
 					</table>
 				</div>
 				<div class="g2ab-card"><h2><?php esc_html_e( 'Danger Zone', 'g2a-booking' ); ?></h2>

@@ -286,19 +286,21 @@ final class Stripe_Service {
 		// rendered on a public page (identical for all logged-out visitors),
 		// so without this a script could seed pending memberships and fire
 		// 'membership_created' mail to arbitrary addresses. 8 attempts / 10 min.
+		// Checked and charged as one atomic step (MySQL advisory lock) so a
+		// scripted concurrent burst can't have two requests both read the
+		// same stale count and both slip through — the lost-update race
+		// that plain get_transient()-then-set_transient() is exposed to.
 		$mem_ip  = isset( $_SERVER['HTTP_CF_CONNECTING_IP'] ) && filter_var( wp_unslash( $_SERVER['HTTP_CF_CONNECTING_IP'] ), FILTER_VALIDATE_IP )
 			? sanitize_text_field( wp_unslash( $_SERVER['HTTP_CF_CONNECTING_IP'] ) )
 			: ( isset( $_SERVER['REMOTE_ADDR'] ) ? sanitize_text_field( wp_unslash( $_SERVER['REMOTE_ADDR'] ) ) : '0.0.0.0' );
 		$mem_rl_key = 'memberistic_checkout_rl_' . md5( $mem_ip );
-		$mem_hits   = (int) get_transient( $mem_rl_key );
-		if ( $mem_hits >= (int) apply_filters( 'memberistic_checkout_rate_limit', 8 ) ) {
+		if ( ! self::atomic_check_and_increment( $mem_rl_key, (int) apply_filters( 'memberistic_checkout_rate_limit', 8 ), 10 * MINUTE_IN_SECONDS ) ) {
 			wp_die(
 				esc_html__( 'Too many checkout attempts. Please wait a few minutes and try again.', 'memberistic' ),
 				esc_html__( 'Slow down', 'memberistic' ),
 				array( 'response' => 429 )
 			);
 		}
-		set_transient( $mem_rl_key, $mem_hits + 1, 10 * MINUTE_IN_SECONDS );
 
 		$plan_id       = isset( $_POST['plan_id'] ) ? absint( $_POST['plan_id'] ) : 0;
 		$billing_cycle = isset( $_POST['billing_cycle'] ) ? sanitize_key( wp_unslash( $_POST['billing_cycle'] ) ) : 'monthly';
@@ -973,5 +975,51 @@ final class Stripe_Service {
 		Email_Service::send_membership_email( (int) $membership['id'], 'payment_failed' );
 
 		return true;
+	}
+
+	/**
+	 * Atomic "still under cap? then charge one" for a transient-backed
+	 * counter — the check and the increment happen as a single step (via a
+	 * MySQL advisory lock) so a scripted concurrent burst can't have two
+	 * requests both read the same stale count and both slip through.
+	 *
+	 * @return bool True when the counter was under `$max` and got charged.
+	 */
+	private static function atomic_check_and_increment( $key, $max, $ttl ) {
+		if ( ! self::acquire_lock( $key ) ) {
+			// Fail closed: refuse rather than risk an unguarded read-modify-write.
+			return false;
+		}
+		try {
+			$count = (int) get_transient( $key );
+			if ( $count >= $max ) {
+				return false;
+			}
+			set_transient( $key, $count + 1, $ttl );
+			return true;
+		} finally {
+			self::release_lock( $key );
+		}
+	}
+
+	/**
+	 * MySQL advisory lock. Duck-types `$wpdb` (rather than requiring the
+	 * real `wpdb` class) so it silently no-ops if a request context somehow
+	 * lacks it; every real WordPress request has `$wpdb`.
+	 */
+	private static function acquire_lock( $key, $timeout = 3 ) {
+		global $wpdb;
+		if ( ! is_object( $wpdb ) || ! method_exists( $wpdb, 'get_var' ) ) {
+			return true;
+		}
+		return 1 === (int) $wpdb->get_var( $wpdb->prepare( 'SELECT GET_LOCK(%s, %d)', 'memberistic_rl_lock_' . $key, max( 0, $timeout ) ) );
+	}
+
+	private static function release_lock( $key ) {
+		global $wpdb;
+		if ( ! is_object( $wpdb ) || ! method_exists( $wpdb, 'get_var' ) ) {
+			return;
+		}
+		$wpdb->get_var( $wpdb->prepare( 'SELECT RELEASE_LOCK(%s)', 'memberistic_rl_lock_' . $key ) );
 	}
 }

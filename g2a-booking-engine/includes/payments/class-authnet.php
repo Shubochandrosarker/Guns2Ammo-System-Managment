@@ -600,13 +600,13 @@ add_action( 'init', function () {
 
 	?><!doctype html>
 <html><head><meta charset="utf-8"><title>Redirecting to secure payment...</title>
-<style>body{font-family:Arial,sans-serif;background:#0F1115;color:#E8E8E8;padding:60px 20px;text-align:center;}h1{font-family:'Inter','Segoe UI',sans-serif;letter-spacing:.06em;}.s{margin-top:30px;color:#8A95A5;font-size:13px;}</style></head>
+<style>body{font-family:Arial,sans-serif;background:#1A191E;color:#F7F7F9;padding:60px 20px;text-align:center;}h1{font-family:'Inter','Segoe UI',sans-serif;letter-spacing:.06em;}.s{margin-top:30px;color:#A7A6AE;font-size:13px;}</style></head>
 <body>
 <h1>REDIRECTING TO SECURE PAYMENT</h1>
 <p class="s">If you are not redirected within 3 seconds, click below.</p>
 <form id="f" method="post" action="<?php echo esc_url( $action ); ?>">
 	<input type="hidden" name="token" value="<?php echo esc_attr( $token ); ?>" />
-	<button type="submit" style="margin-top:20px;background:#D2691E;color:#fff;border:0;padding:14px 28px;font-weight:bold;text-transform:uppercase;letter-spacing:.06em;cursor:pointer;">Continue to Payment</button>
+	<button type="submit" style="margin-top:20px;background:#C9A84C;color:#1A191E;border:0;padding:14px 28px;font-weight:bold;text-transform:uppercase;letter-spacing:.06em;cursor:pointer;">Continue to Payment</button>
 </form>
 <script>document.getElementById('f').submit();</script>
 </body></html><?php
