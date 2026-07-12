@@ -144,19 +144,40 @@ auditors, or new developers in 10 minutes.
 - Reminder cron TZ math fix; cron unscheduled on deactivation.
 - Schema migration v1.5.0 collapses pre-existing duplicate rows.
 
-## 4. WPistic Contact Form (1.5.0, DB 1.2.0)
+## 4. Formistic — contact forms, inbox, newsletter, AI auto-reply (2.1.0, DB 1.3.0)
 
-- Contact form capture with branded admin inbox.
-- Auto-responder with 1-hour-per-recipient transient throttle.
-- Email kill-switch (`WPCF_EMAIL_DISABLED`).
-- **Newsletter system**: dedicated subscribers table, public AJAX
-  + REST + `[wpcf_newsletter]` shortcode. Admin "Newsletter" tab
-  with search, Active/Unsubscribed filter, per-row unsubscribe,
-  CSV export. Contact-form opt-in checkbox auto-subscribes.
-  60-second per-IP throttle. Resubscribe re-activates instead of
-  erroring.
-- Footer "GET RANGE UPDATES" + blog "Range Brief" forms wired
-  live (were dead `onsubmit` placeholders).
+The site's sole contact-form/inbox/newsletter solution (the older "WPistic
+Contact Form" plugin has been retired and removed — see
+`docs/FORMISTIC_G2A_SETUP.md`).
+
+- Fixed-field contact form (`[wpistic_contact_form]`) and a full drag-free
+  visual form builder (`[wpistic_form id="N"]`, 13 field types) with a
+  branded admin inbox, unified per-sender "Threads" view, and reply
+  templates.
+- Auto-responder with a 1-hour-per-recipient transient throttle, now sent
+  as a branded HTML email (rounded card, brand-underlined header, full NAP
+  footer) instead of plain text.
+- Email kill-switch (`WPISTIC_FORMISTIC_EMAIL_DISABLED`).
+- Spam stack: honeypot, reCAPTCHA v3, Cloudflare Turnstile, Akismet, IP
+  blocklist, and a MySQL-advisory-lock-guarded per-IP rate limiter (closes
+  the lost-update race a plain transient counter has under a concurrent
+  burst).
+- GDPR consent capture/export/eraser + auto-purge, webhooks with HMAC
+  signing, CSV/JSON export with CSV-injection neutralization, upload
+  attachments with a double-extension smuggling guard.
+- **Newsletter system**: dedicated subscribers table, public AJAX + REST +
+  `[wpistic_formistic_newsletter]` shortcode. Admin "Newsletter" tab with
+  search, Active/Unsubscribed filter, per-row unsubscribe, CSV export.
+  Contact-form opt-in checkbox auto-subscribes. 60-second per-IP throttle.
+  Resubscribe re-activates instead of erroring. A branded welcome/
+  confirmation email is sent on subscribe, with a stateless HMAC one-click
+  unsubscribe link and RFC 2369/8058 `List-Unsubscribe` headers (Gmail/
+  Yahoo native unsubscribe affordance).
+- Footer "GET RANGE UPDATES" + blog "Range Brief" forms wired live.
+- AI layer: FAQ/knowledge-base seeding from the theme's live business facts,
+  keyword auto-reply rules, smart-reply drafts + spam scoring + tagging via
+  OpenRouter (with an SSRF-guarded URL text-source fetcher and a local
+  rule-based fallback if the provider call fails).
 - AI moderation hooks for spam.
 
 ## 5. G2A Theme Control

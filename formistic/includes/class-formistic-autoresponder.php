@@ -34,8 +34,12 @@ class Wpistic_Formistic_Autoresponder {
 	public function maybe_send( $submission_id, $form_name, $fields ) {
 		// Global kill-switch. Set WPISTIC_FORMISTIC_EMAIL_DISABLED in wp-config.php on
 		// staging/dev to suppress all outbound auto-responders without
-		// touching the per-form admin toggle.
+		// touching the per-form admin toggle. WPCF_EMAIL_DISABLED (the old
+		// WPistic Contact Form constant name) is also honored for a grace
+		// period, so a wp-config.php that hasn't been updated yet doesn't
+		// silently lose its staging safety switch.
 		if ( ( defined( 'WPISTIC_FORMISTIC_EMAIL_DISABLED' ) && WPISTIC_FORMISTIC_EMAIL_DISABLED )
+			|| ( defined( 'WPCF_EMAIL_DISABLED' ) && WPCF_EMAIL_DISABLED )
 			|| (bool) get_option( 'wpistic_formistic_emails_disabled', false ) ) {
 			return;
 		}
@@ -66,15 +70,21 @@ class Wpistic_Formistic_Autoresponder {
 			'{date}'      => date_i18n( get_option( 'date_format' ) . ' ' . get_option( 'time_format' ) ),
 		];
 
-		$subject = strtr( (string) get_option( 'wpistic_formistic_ar_subject', '' ), $placeholders );
-		$body    = strtr( (string) get_option( 'wpistic_formistic_ar_body', '' ), $placeholders );
-		if ( '' === trim( $subject ) || '' === trim( $body ) ) {
+		$subject   = strtr( (string) get_option( 'wpistic_formistic_ar_subject', '' ), $placeholders );
+		$body_text = strtr( (string) get_option( 'wpistic_formistic_ar_body', '' ), $placeholders );
+		if ( '' === trim( $subject ) || '' === trim( $body_text ) ) {
 			return;
 		}
 
+		$inner = '<div>' . nl2br( esc_html( $body_text ) ) . '</div>';
+		$body  = Wpistic_Formistic_Emails::wrap( $inner, [
+			'preheader' => wp_trim_words( $body_text, 20, '…' ),
+			'title'     => $subject,
+		] );
+
 		$from_name  = get_option( 'wpistic_formistic_reply_from_name', get_bloginfo( 'name' ) );
 		$from_email = get_option( 'wpistic_formistic_reply_from_email', get_option( 'admin_email' ) );
-		$headers    = [];
+		$headers    = [ 'Content-Type: text/html; charset=UTF-8' ];
 		if ( is_email( $from_email ) ) {
 			$headers[] = sprintf( 'From: %s <%s>', $from_name, $from_email );
 			$headers[] = 'Reply-To: ' . $from_email;

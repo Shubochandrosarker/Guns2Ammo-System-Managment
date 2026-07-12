@@ -11,13 +11,19 @@ All zips are at the repo root and can be uploaded directly via **WP Admin → Pl
 | Theme | `WPistic-Theme-For-G2A-Version-1.8.9.zip` *(also in `releases/`, current archive `WPistic-Theme-For-G2A-Version-1.27.12.zip`)* | **1.27.12** |
 | Booking Engine plugin | `g2a-booking-engine.zip` (current archive `g2a-booking-engine-1.9.9.10.zip`) | **1.9.9.10** (DB schema 1.5.2) |
 | Memberistic Membership Solutions plugin | `memberistic-membership-solutions.zip` (current archive `memberistic-membership-solutions-1.10.6.zip`) | **1.10.6** |
-| WPistic Contact Form plugin | `wpistic-contact-form.zip` (current archive `wpistic-contact-form-1.5.8.zip`) | **1.5.8** (DB schema 1.2.0) |
 | G2A Theme Control plugin | `g2a-theme-control.zip` | **1.0.0** |
 | Verifyistic (age verification) plugin | `verifyistic.zip` (current archive `verifyistic-1.4.4.zip`) | **1.4.4** |
 | Advanced FFL Checkout (G2A Edition) plugin | `advanced-ffl-checkout.zip` (current archive `advanced-ffl-checkout-1.9.4.zip`) | **1.9.4** (DB schema 1.4.1) |
 | Messageistic (SMS / local gateway) plugin | `messageistic.zip` (current archive `messageistic-0.5.3.zip`) | **0.5.3** |
 | G2A POS Core plugin | `g2a-pos-core.zip` (current archive `g2a-pos-core-3.1.9.zip`) | **3.1.9** (PHP 8.1+, vendors included) |
-| Formistic (forms + AI auto-reply) plugin | `formistic.zip` (current archive `formistic-2.0.7.zip`) | **2.0.7** (DB schema 1.3.0) |
+| Formistic (contact forms, inbox, newsletter, AI auto-reply) plugin | `formistic.zip` (current archive `formistic-2.1.0.zip`) | **2.1.0** (DB schema 1.3.0) |
+
+> **Formistic is the site's sole contact-form/inbox/newsletter solution.** The
+> older "WPistic Contact Form" plugin has been retired and removed from this
+> repo — its full feature set (branded auto-responder emails, one-click
+> newsletter unsubscribe, spam/rate-limiting hardening) now lives in
+> Formistic. See `docs/FORMISTIC_G2A_SETUP.md` for the migration runbook if
+> a live site still has the old plugin active.
 
 > The root `WPistic-Theme-For-G2A-Version-1.8.9.zip` filename is preserved so the WP "Replace existing theme" flow recognises the upgrade. The `style.css` header inside reads `Version: 1.27.0` so WP treats it as an update, not a downgrade.
 >
@@ -30,7 +36,7 @@ Plugins first, theme last, so the theme activation can see the plugins.
 1. **G2A Theme Control** — meta-box plugin used by the theme. Upload, activate.
 2. **G2A Booking Engine** — bookings + payments + reminders. Upload, activate. Confirm DB schema v1.6.1. Visit `Booking Engine → Resources` and `Booking Types` for seed data.
 3. **Memberistic Membership Solutions** — plans, member portal, content restriction. Upload, activate. Visit `Memberistic → Settings → Pages` to wire the linked pages.
-4. **WPistic Contact Form** — contact form + auto-responder. Upload, activate.
+4. **Formistic** — contact forms, form builder, inbox, newsletter, spam protection, and AI auto-reply. Upload, activate. Visit `Formistic → Addons` to enable Newsletter/Auto-Responder/AI Automation, then `Formistic → Settings → AI & Automation → Seed Guns 2 Ammo defaults` (see `docs/FORMISTIC_G2A_SETUP.md`).
 5. **Verifyistic** — age verification popup + multi-webhook delivery. Upload, activate. Then `Verifyistic → Settings` (see `docs/VERIFYISTIC_SETUP_G2A.md`). Replaces Ottertext — see `docs/OTTERTEXT_REMOVAL.md`.
 6. **Advanced FFL Checkout (G2A Edition)** — FFL dealer search at checkout, transfer lifecycle, dealer confirmation portal, customer "My FFL Transfers" tab, NICS 3-day automation, WC↔transfer status bridge, SMS via Verifyistic. Upload `advanced-ffl-checkout.zip`, activate. Watch `Advanced FFL → Dashboard` for the auto-started ZIP centroid + ATF dealer sync. Mark firearm products **FFL Transfer Required** in their general product data. Optional: define `WPISTIC_FFL_TOKEN_SECRET` in `wp-config.php` for the strongest portal token security. Optional: define `wpistic_ffl_trusted_proxies` filter for accurate IPs behind Cloudflare/LB.
 7. **Messageistic** — SMS engine (local Android gateway / Jasmin / Twilio / OtterText). Upload, activate. Pick the provider under `Messageistic → Settings`, then enable the **SMS Notifications (Messageistic)** module in `Memberistic → Integrations` to turn on membership + booking texts.
@@ -136,21 +142,22 @@ Each plan card lists "Bring friends: $X / extra shooter / hour" inline so the va
 
 ### 8. Newsletter signup + subscriber list (NEW in v1.5.0)
 
-The footer "GET RANGE UPDATES" form and the blog page's "Range Brief" form are now live — they post to **WPistic Contact Form** and write to a dedicated subscribers table.
+The footer "GET RANGE UPDATES" form and the blog page's "Range Brief" form post to **Formistic** and write to a dedicated subscribers table.
 
 **Where to manage subscribers:**
-- WP Admin → **WPistic Contact → Newsletter**
+- WP Admin → **Formistic → Newsletter**
 - See full list with email, source (`footer` / `blog` / `contact-form:<form-name>`), source URL, IP, subscribed date.
 - Filter by **Active** / **Unsubscribed** and search by email or source.
 - **"Export CSV"** button — downloads the filtered list as `newsletter-subscribers-active-YYYY-MM-DD.csv`.
 - Click **Unsubscribe** on any row to manually opt the email out.
+- **Confirmation email** — a branded welcome email with a one-click unsubscribe link is sent on every subscribe/resubscribe; toggle and edit the copy right on the Newsletter admin page.
 
 **How visitors subscribe:**
-1. Footer form on every page → POST `admin-ajax.php?action=wpcf_newsletter_subscribe`.
+1. Footer form on every page → POST `admin-ajax.php?action=wpistic_formistic_newsletter_subscribe`.
 2. Blog page "Range Brief" form → same endpoint, `source=blog`.
 3. Contact form has a "Subscribe to monthly range update newsletter" checkbox — if checked, the contact submission **also** subscribes the sender's email automatically (`source=contact-form:<form-name>`).
-4. REST mirror: `POST /wp-json/wpcf/v1/newsletter` with `{ email, source }`.
-5. Shortcode: `[wpcf_newsletter source="custom-page"]` for in-content placement.
+4. REST mirror: `POST /wp-json/formistic/v1/newsletter` with `{ email, source }`.
+5. Shortcode: `[wpistic_formistic_newsletter source="custom-page"]` for in-content placement.
 
 **Built-in protections:**
 - 60-second per-IP throttle prevents spam floods.
@@ -170,9 +177,9 @@ Footer columns (Quick Links, Hours, Contact) are theme-driven; edit copy via **A
 To prevent customer-facing emails firing from a staging copy of the prod DB:
 
 ```php
-define( 'G2AB_EMAIL_DISABLED',          true );
-define( 'MEMBERISTIC_EMAIL_DISABLED',   true );
-define( 'WPCF_EMAIL_DISABLED',          true );
+define( 'G2AB_EMAIL_DISABLED',              true );
+define( 'MEMBERISTIC_EMAIL_DISABLED',       true );
+define( 'WPISTIC_FORMISTIC_EMAIL_DISABLED', true );
 
 // OR — keep flows visible by rerouting every outbound email to a single
 // staging inbox. Original recipient is preserved in the subject prefix.
@@ -193,7 +200,7 @@ define( 'WPCF_EMAIL_DISABLED',          true );
 2. **Memberistic → Settings → Pages** — point at your /account/, /checkout/, /thank-you/ pages.
 3. **Booking Engine → Resources** — confirm lane / range resources exist with the right capacity. DB schema should read **v1.6.1** under Booking Engine → Build Status.
 4. **Pages → Machine Gun** — add your 20+ weapons via the inventory repeater.
-5. **WPistic Contact Form → Settings** — point auto-responder at the right inbox.
+5. **Formistic → Settings → Auto-Responder** — point the auto-responder at the right inbox.
 
 ---
 
@@ -245,4 +252,4 @@ Every change lives in a separate commit on `claude/practical-hawking-LQW9g`. To 
 
 ## Source diffs
 
-The repo tracks extracted source under `guns2ammo/`, `g2a-booking-engine/`, `memberistic-membership-solutions/`, `wpistic-contact-form/`, `g2a-theme-control/`. Those mirror what's inside the zips. Future edits should land in the source dirs; rebuild the zips before releasing.
+The repo tracks extracted source under `guns2ammo/`, `g2a-booking-engine/`, `memberistic-membership-solutions/`, `formistic/`, `g2a-theme-control/`. Those mirror what's inside the zips. Future edits should land in the source dirs; rebuild the zips before releasing.

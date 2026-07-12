@@ -50,6 +50,11 @@ class Wpistic_Formistic_Newsletter {
 		// REST mirror — themes can also POST here from JS that already
 		// uses the WP REST nonce (works alongside ajax-url path).
 		add_action( 'rest_api_init', [ __CLASS__, 'register_rest' ] );
+		add_action( 'rest_api_init', [ __CLASS__, 'register_unsubscribe_rest' ] );
+
+		// Welcome/confirmation email on subscribe or resubscribe.
+		add_action( 'wpistic_formistic_newsletter_subscribed',   [ __CLASS__, 'send_confirmation' ], 10, 2 );
+		add_action( 'wpistic_formistic_newsletter_resubscribed', [ __CLASS__, 'send_confirmation' ], 10, 2 );
 
 		// Shortcode for in-content placement, e.g. [wpistic_formistic_newsletter].
 		add_shortcode( 'wpistic_formistic_newsletter', [ __CLASS__, 'shortcode' ] );
@@ -455,6 +460,32 @@ class Wpistic_Formistic_Newsletter {
 				<a href="<?php echo esc_url( $export_url ); ?>" class="page-title-action"><?php esc_html_e( 'Export CSV', 'formistic' ); ?></a>
 			</h1>
 
+			<div class="wistic-formistic-panel" style="background:#fff;border:1px solid #dcdcde;padding:16px 20px;margin:16px 0;max-width:720px;">
+				<h2 style="margin-top:0;"><?php esc_html_e( 'Confirmation Email', 'formistic' ); ?></h2>
+				<p class="description"><?php esc_html_e( 'A branded welcome email sent to every new (or resubscribing) address, with a one-click unsubscribe link.', 'formistic' ); ?></p>
+				<form method="post" action="options.php">
+					<?php settings_fields( Wpistic_Formistic_Settings::GROUP ); ?>
+					<table class="form-table">
+						<tr>
+							<th scope="row"><label for="wpistic_formistic_newsletter_confirm_enabled"><?php esc_html_e( 'Send confirmation email', 'formistic' ); ?></label></th>
+							<td><label><input type="checkbox" id="wpistic_formistic_newsletter_confirm_enabled" name="wpistic_formistic_newsletter_confirm_enabled" value="1" <?php checked( '1', get_option( 'wpistic_formistic_newsletter_confirm_enabled', '1' ) ); ?>> <?php esc_html_e( 'Enabled', 'formistic' ); ?></label></td>
+						</tr>
+						<tr>
+							<th scope="row"><label for="wpistic_formistic_newsletter_confirm_subject"><?php esc_html_e( 'Subject', 'formistic' ); ?></label></th>
+							<td><input type="text" class="regular-text" id="wpistic_formistic_newsletter_confirm_subject" name="wpistic_formistic_newsletter_confirm_subject" value="<?php echo esc_attr( get_option( 'wpistic_formistic_newsletter_confirm_subject', '' ) ); ?>"></td>
+						</tr>
+						<tr>
+							<th scope="row"><label for="wpistic_formistic_newsletter_confirm_intro"><?php esc_html_e( 'Intro text', 'formistic' ); ?></label></th>
+							<td>
+								<textarea class="large-text" rows="3" id="wpistic_formistic_newsletter_confirm_intro" name="wpistic_formistic_newsletter_confirm_intro"><?php echo esc_textarea( get_option( 'wpistic_formistic_newsletter_confirm_intro', '' ) ); ?></textarea>
+								<p class="description"><?php esc_html_e( 'Placeholder:', 'formistic' ); ?> <code>{site_name}</code></p>
+							</td>
+						</tr>
+					</table>
+					<?php submit_button( __( 'Save', 'formistic' ) ); ?>
+				</form>
+			</div>
+
 			<ul class="subsubsub">
 				<li><a href="<?php echo esc_url( add_query_arg( 'status', 'active', $base_url ) ); ?>" class="<?php echo 'active' === $status ? 'current' : ''; ?>"><?php esc_html_e( 'Active', 'formistic' ); ?> <span class="count">(<?php echo (int) $counts['active']; ?>)</span></a> |</li>
 				<li><a href="<?php echo esc_url( add_query_arg( 'status', 'unsubscribed', $base_url ) ); ?>" class="<?php echo 'unsubscribed' === $status ? 'current' : ''; ?>"><?php esc_html_e( 'Unsubscribed', 'formistic' ); ?> <span class="count">(<?php echo (int) $counts['unsubscribed']; ?>)</span></a></li>
@@ -587,5 +618,216 @@ class Wpistic_Formistic_Newsletter {
 		}
 		wp_safe_redirect( admin_url( 'admin.php?page=' . self::PAGE ) );
 		exit;
+	}
+
+	/* ------------------------------------------------------------------
+	 * Confirmation email
+	 * ------------------------------------------------------------------ */
+
+	/**
+	 * Send the branded welcome/confirmation email.
+	 *
+	 * Fired on both wpistic_formistic_newsletter_subscribed and
+	 * _resubscribed. Respects the global email kill switches, the
+	 * per-feature toggle, and a per-address throttle so a resubscribe loop
+	 * can't spam one inbox.
+	 *
+	 * @param string $email  Subscriber email.
+	 * @param string $source Capture source slug.
+	 */
+	public static function send_confirmation( $email, $source = '' ) {
+		if ( ( defined( 'WPISTIC_FORMISTIC_EMAIL_DISABLED' ) && WPISTIC_FORMISTIC_EMAIL_DISABLED )
+			|| ( defined( 'WPCF_EMAIL_DISABLED' ) && WPCF_EMAIL_DISABLED )
+			|| (bool) get_option( 'wpistic_formistic_emails_disabled', false ) ) {
+			return;
+		}
+		if ( '1' !== get_option( 'wpistic_formistic_newsletter_confirm_enabled', '1' ) ) {
+			return;
+		}
+		$email = sanitize_email( $email );
+		if ( ! $email || ! is_email( $email ) ) {
+			return;
+		}
+
+		// Per-address throttle: one confirmation per hour max.
+		$throttle_key = 'wpistic_formistic_nlc_' . md5( strtolower( $email ) );
+		if ( false !== get_transient( $throttle_key ) ) {
+			return;
+		}
+		set_transient( $throttle_key, 1, HOUR_IN_SECONDS );
+
+		$site_name = wp_specialchars_decode( get_bloginfo( 'name' ), ENT_QUOTES );
+		$subject   = (string) get_option(
+			'wpistic_formistic_newsletter_confirm_subject',
+			__( "You're on the list", 'formistic' ) . ' — ' . $site_name
+		);
+		$intro     = (string) get_option(
+			'wpistic_formistic_newsletter_confirm_intro',
+			__( "You're officially on the list. From now on, the good stuff lands in your inbox first.", 'formistic' )
+		);
+		$subject = strtr( $subject, [ '{site_name}' => $site_name ] );
+		$intro   = strtr( $intro, [ '{site_name}' => $site_name ] );
+
+		$unsubscribe = self::unsubscribe_url( $email );
+
+		$inner  = '<h2 style="margin:0 0 16px;font-size:20px;font-weight:700;letter-spacing:-.01em;color:' . Wpistic_Formistic_Emails::COLOR_VOID . ';">' . esc_html( sprintf( /* translators: %s: site name */ __( 'Welcome to the %s list', 'formistic' ), $site_name ) ) . '</h2>';
+		$inner .= '<p style="margin:0 0 16px;">' . esc_html( $intro ) . '</p>';
+		$inner .= '<p style="margin:0 0 8px;">' . esc_html__( 'If you ever need a hand, just reply to this email — our team will take care of the rest.', 'formistic' ) . '</p>';
+		$inner .= '<p style="margin:0;">' . esc_html( sprintf( /* translators: %s: site name */ __( 'Thanks for choosing %s.', 'formistic' ), $site_name ) ) . '</p>';
+
+		$body = Wpistic_Formistic_Emails::wrap( $inner, [
+			'preheader'       => wp_strip_all_tags( $intro ),
+			'unsubscribe_url' => $unsubscribe,
+			'title'           => $subject,
+		] );
+
+		$from_name  = get_option( 'wpistic_formistic_reply_from_name', get_bloginfo( 'name' ) );
+		$from_email = get_option( 'wpistic_formistic_reply_from_email', get_option( 'admin_email' ) );
+		$headers    = [ 'Content-Type: text/html; charset=UTF-8' ];
+		if ( is_email( $from_email ) ) {
+			$headers[] = sprintf( 'From: %s <%s>', $from_name, $from_email );
+			$headers[] = 'Reply-To: ' . $from_email;
+		}
+		// RFC 2369 / 8058 list management headers — improves deliverability
+		// and gives Gmail/Yahoo their native unsubscribe affordance.
+		$headers[] = 'List-Unsubscribe: <' . $unsubscribe . '>';
+		$headers[] = 'List-Unsubscribe-Post: List-Unsubscribe=One-Click';
+
+		$sent = Wpistic_Formistic_Capture::send_internal( $email, $subject, $body, $headers );
+		if ( ! $sent && defined( 'WP_DEBUG' ) && WP_DEBUG ) {
+			error_log( sprintf( '[Formistic] Newsletter confirmation email failed for %s (source: %s).', $email, $source ) ); // phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log
+		}
+	}
+
+	/* ------------------------------------------------------------------
+	 * Tokenized unsubscribe
+	 * ------------------------------------------------------------------ */
+
+	/**
+	 * HMAC token binding an unsubscribe link to one email address.
+	 * Stateless: derived from the auth salt, so no extra column needed.
+	 *
+	 * @param string $email Subscriber email.
+	 * @return string
+	 */
+	public static function unsubscribe_token( $email ) {
+		return hash_hmac( 'sha256', strtolower( trim( (string) $email ) ), wp_salt( 'auth' ) );
+	}
+
+	/**
+	 * Public unsubscribe URL for one subscriber.
+	 *
+	 * @param string $email Subscriber email.
+	 * @return string
+	 */
+	public static function unsubscribe_url( $email ) {
+		return add_query_arg(
+			[
+				'email' => rawurlencode( $email ),
+				'token' => self::unsubscribe_token( $email ),
+			],
+			rest_url( 'formistic/v1/newsletter/unsubscribe' )
+		);
+	}
+
+	/**
+	 * Register the public one-click unsubscribe REST route.
+	 */
+	public static function register_unsubscribe_rest() {
+		register_rest_route( 'formistic/v1', '/newsletter/unsubscribe', [
+			'methods'             => [ 'GET', 'POST' ],
+			'callback'            => [ __CLASS__, 'rest_unsubscribe' ],
+			// Public by design — the HMAC token itself is the auth, not a
+			// nonce (this link is clicked from an email, days after the
+			// nonce that created the subscription would have expired).
+			'permission_callback' => '__return_true',
+			'args'                => [
+				'email' => [ 'type' => 'string', 'required' => true ],
+				'token' => [ 'type' => 'string', 'required' => true ],
+			],
+		] );
+	}
+
+	/**
+	 * REST handler: validate the HMAC token, flag the subscriber as
+	 * unsubscribed, then show a minimal branded confirmation page (GET)
+	 * or return JSON (POST one-click).
+	 *
+	 * @param WP_REST_Request $request Request.
+	 */
+	public static function rest_unsubscribe( $request ) {
+		$email = sanitize_email( rawurldecode( (string) $request->get_param( 'email' ) ) );
+		$token = (string) $request->get_param( 'token' );
+
+		$valid = $email && is_email( $email ) && hash_equals( self::unsubscribe_token( $email ), $token );
+
+		if ( $valid ) {
+			global $wpdb;
+			$wpdb->update(
+				self::table(),
+				[ 'status' => 'unsubscribed', 'unsubscribed_at' => current_time( 'mysql' ) ],
+				[ 'email' => $email ]
+			);
+		}
+
+		// One-click POST (Gmail/Yahoo robots): plain JSON, no HTML page.
+		if ( 'POST' === $request->get_method() ) {
+			return new WP_REST_Response( [ 'status' => $valid ? 'unsubscribed' : 'invalid' ], $valid ? 200 : 400 );
+		}
+
+		// Human GET click: render a small branded page and stop.
+		self::render_unsubscribe_page( $valid, $email );
+		exit;
+	}
+
+	/**
+	 * Output the minimal branded unsubscribe confirmation page.
+	 *
+	 * @param bool   $valid Whether the token verified and the row updated.
+	 * @param string $email Affected address (only echoed when valid).
+	 */
+	protected static function render_unsubscribe_page( $valid, $email ) {
+		$site_name = wp_specialchars_decode( get_bloginfo( 'name' ), ENT_QUOTES );
+		$title     = $valid
+			? __( "You're unsubscribed", 'formistic' )
+			: __( 'Link not valid', 'formistic' );
+		$message   = $valid
+			? sprintf(
+				/* translators: %s: email address */
+				__( '%s will no longer receive these emails from us. Changed your mind? You can re-join from the signup form any time.', 'formistic' ),
+				$email
+			)
+			: __( 'This unsubscribe link is invalid or has expired. Please use the link from a recent email, or reply to any of our emails and we will remove you manually.', 'formistic' );
+
+		if ( ! headers_sent() ) {
+			status_header( $valid ? 200 : 400 );
+			nocache_headers();
+			header( 'Content-Type: text/html; charset=UTF-8' );
+		}
+		?>
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex">
+<title><?php echo esc_html( $title . ' — ' . $site_name ); ?></title>
+</head>
+<body style="margin:0;padding:0;background:#EEEDE7;font-family:'Inter','Segoe UI',Roboto,Arial,Helvetica,sans-serif;color:#1A191E;">
+	<div style="max-width:520px;margin:64px auto;padding:0 16px;">
+		<div style="background:#fff;border-radius:16px;overflow:hidden;box-shadow:0 8px 32px rgba(26,25,30,.10);">
+			<div style="background:#1A191E;padding:24px 28px;border-bottom:3px solid #C9A84C;">
+				<strong style="color:#F7F7F9;font-family:'Inter','Segoe UI',Arial,sans-serif;font-size:20px;letter-spacing:.04em;"><?php echo esc_html( $site_name ); ?></strong>
+			</div>
+			<div style="padding:32px;">
+				<h1 style="margin:0 0 12px;font-size:20px;"><?php echo esc_html( $title ); ?></h1>
+				<p style="margin:0 0 20px;font-size:15px;line-height:1.7;"><?php echo esc_html( $message ); ?></p>
+				<a href="<?php echo esc_url( home_url( '/' ) ); ?>" style="display:inline-block;background:#E8802F;color:#fff;padding:13px 26px;text-decoration:none;font-weight:600;font-size:14px;border-radius:8px;"><?php esc_html_e( 'Back to the site', 'formistic' ); ?></a>
+			</div>
+		</div>
+	</div>
+</body>
+</html>
+		<?php
 	}
 }

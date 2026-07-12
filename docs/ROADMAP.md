@@ -128,4 +128,4 @@ specs.
   are 301'd at the PHP layer.
 - All emails carry a kill-switch
   (`MEMBERISTIC_EMAIL_DISABLED`, `G2AB_EMAIL_DISABLED`,
-  `WPCF_EMAIL_DISABLED`) so staging can mirror prod safely.
+  `WPISTIC_FORMISTIC_EMAIL_DISABLED`) so staging can mirror prod safely.

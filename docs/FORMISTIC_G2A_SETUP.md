@@ -1,13 +1,25 @@
 # Formistic × Guns 2 Ammo — Owner Setup Guide
 
-Step-by-step for switching the Guns 2 Ammo site's contact system from the old
-**WPistic Contact Form** plugin to **Formistic** (v2.0.5+). Follow the steps in
-order — the sequence matters (import before deactivating the old plugin).
+**Status: migration complete in this repo.** The old **WPistic Contact
+Form** plugin has been removed from source control as of Formistic v2.1.0 —
+Formistic is now the site's sole contact-form/inbox/newsletter solution, and
+carries every feature the old plugin had (branded auto-responder emails,
+newsletter welcome email with a one-click unsubscribe link, the same
+spam/rate-limiting hardening). The theme no longer has a fallback path to the
+old plugin's classes.
+
+**If a live site still has WPistic Contact Form active**, follow steps 1-9
+below *before* deploying this repo's current code — the plugin's files being
+gone doesn't delete its database tables, but you do need to run the import
+(step 2) while the old plugin's tables still exist, and deactivate it (step 9)
+to stop it fighting Formistic over the shared `[wpistic_contact_form]`
+shortcode. Once a site has been through steps 1-9 and step 8's verification
+passes, the old plugin can be deactivated and its files removed — Formistic
+already migrated everything it owns.
 
 The theme is already wired: every theme form (reservation, transfer request,
-contact, newsletter) automatically stores into Formistic when it's active, and
-falls back to the old plugin if it isn't. Guests can submit without logging in;
-nothing changes on the public site.
+contact, newsletter) stores into Formistic. Guests can submit without logging
+in; nothing changes on the public site.
 
 ---
 
@@ -49,7 +61,10 @@ arrives.
 - **Newsletter** — the footer "GET RANGE UPDATES" list. Subscribers live in
   their own table (`wpistic_formistic_subscribers`), fully separate from the
   contact inbox. The addon is OFF by default; signups are still stored while
-  it's off, but you need it ON to see/export the list.
+  it's off, but you need it ON to see/export the list. Every new subscriber
+  (and every resubscribe) gets a branded welcome email with a one-click
+  unsubscribe link — toggle it or edit the copy right on the **Formistic →
+  Newsletter** admin page.
 - **Auto Responder** — instant "we got your message" acknowledgement email.
 - **AI Automation** — smart reply drafts, tags, spam scoring, and the keyword
   auto-reply rules.
@@ -155,6 +170,17 @@ prefers Formistic and only stores each submission once.)
 Deactivating does **not** delete the old tables — they stay as a backup. Only
 delete the plugin (which may drop its data) after you're fully confident in
 the migration.
+
+## 10. Remove the old plugin's files
+
+Once step 9 has been live and stable for a while and you no longer need the
+old tables as a rollback copy: **Plugins → WPistic Contact Form → Delete.**
+This repo's source tree already has the plugin's files removed — deleting it
+on the live site brings the site in line with what a fresh deploy of this
+repo would install. Note the old plugin's own `uninstall.php` only drops 3 of
+its 6 tables (`submissions`/`replies`/`attachments` — not `notes`/
+`impressions`/`subscribers`); the leftover tables are harmless and can be
+dropped by hand later if you want a fully clean database.
 
 ---
 

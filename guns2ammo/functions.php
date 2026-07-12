@@ -518,16 +518,9 @@ function g2a_route_frontend_newsletter() {
 	if ( ! g2a_verify_form_request( 'g2a_newsletter' ) ) {
 		wp_send_json( array( 'status' => 'error', 'message' => __( 'Could not verify your request. Please reload the page and try again.', 'guns2ammo' ) ), 403 );
 	}
-	// Preferred: Formistic newsletter (same return shape as the legacy
-	// plugin, own per-IP throttle, dedicated subscribers table).
+	// Formistic newsletter — dedicated subscribers table + its own per-IP throttle.
 	if ( class_exists( 'Wpistic_Formistic_Newsletter' ) && is_callable( array( 'Wpistic_Formistic_Newsletter', 'process' ) ) ) {
 		$res = Wpistic_Formistic_Newsletter::process( $email, $source );
-		$ok  = in_array( ( $res['status'] ?? '' ), array( 'ok', 'duplicate' ), true );
-		wp_send_json( $res, $ok ? 200 : 400 );
-	}
-	// Legacy fallback: original WPistic Contact Form newsletter.
-	if ( class_exists( 'WPISTIC_CF_Newsletter' ) && is_callable( array( 'WPISTIC_CF_Newsletter', 'process' ) ) ) {
-		$res = WPISTIC_CF_Newsletter::process( $email, $source );
 		$ok  = in_array( ( $res['status'] ?? '' ), array( 'ok', 'duplicate' ), true );
 		wp_send_json( $res, $ok ? 200 : 400 );
 	}
@@ -544,9 +537,8 @@ add_action( 'template_redirect', 'g2a_route_frontend_newsletter', 0 );
  * fires separately in the calling handler — passing notify=false here
  * prevents the plugin from sending its own duplicate notification.
  *
- * Prefers Formistic (the v2 rebrand of WPistic Contact Form); falls back to
- * the legacy WPISTIC_CF_Capture path so nothing breaks whichever plugin is
- * active during the transition. Silent no-op when neither is active.
+ * Formistic is the site's sole contact-form/inbox plugin. Silent no-op if
+ * it isn't active for some reason (e.g. mid-deploy).
  *
  * @param string $form_name Human-readable label shown in the inbox list.
  * @param array  $fields    Label => value pairs from the form.
@@ -564,10 +556,6 @@ function g2a_capture_to_formistic( $form_name, array $fields ) {
 		// Formistic loaded but helper unavailable — use the class directly.
 		if ( class_exists( 'Wpistic_Formistic_Capture' ) ) {
 			return (int) ( new Wpistic_Formistic_Capture() )->store( (string) $form_name, $fields, false );
-		}
-		// Legacy fallback: original WPistic Contact Form plugin.
-		if ( class_exists( 'WPISTIC_CF_Capture' ) ) {
-			return (int) ( new WPISTIC_CF_Capture() )->store( (string) $form_name, $fields, false );
 		}
 	} catch ( \Throwable $e ) {
 		// Never let a logging side-effect break the form post.

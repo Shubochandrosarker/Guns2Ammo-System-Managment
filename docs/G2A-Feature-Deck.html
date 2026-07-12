@@ -205,8 +205,9 @@ plugin)</a></li>
 <li><a href="#g2a-booking-engine" id="toc-g2a-booking-engine">3. G2A
 Booking Engine</a></li>
 <li><a href="#wpistic-contact-form-1.5.0-db-1.2.0"
-id="toc-wpistic-contact-form-1.5.0-db-1.2.0">4. WPistic Contact Form
-(1.5.0, DB 1.2.0)</a></li>
+id="toc-wpistic-contact-form-1.5.0-db-1.2.0">4. Formistic — contact forms,
+inbox, newsletter, AI auto-reply (retired the older WPistic Contact Form
+plugin; superseded, 2.1.0, DB 1.3.0)</a></li>
 <li><a href="#g2a-theme-control" id="toc-g2a-theme-control">5. G2A Theme
 Control</a></li>
 <li><a href="#security-hardening" id="toc-security-hardening">6.
@@ -444,19 +445,26 @@ override.</li>
 <li>Reminder cron TZ math fix; cron unscheduled on deactivation.</li>
 <li>Schema migration v1.5.0 collapses pre-existing duplicate rows.</li>
 </ul>
-<h2 id="wpistic-contact-form-1.5.0-db-1.2.0">4. WPistic Contact Form
-(1.5.0, DB 1.2.0)</h2>
+<h2 id="wpistic-contact-form-1.5.0-db-1.2.0">4. Formistic — contact forms,
+inbox, newsletter, AI auto-reply (2.1.0, DB 1.3.0)</h2>
+<p><em>Retired the older "WPistic Contact Form" plugin — Formistic is now
+the site's sole contact-form/inbox/newsletter solution.</em></p>
 <ul>
-<li>Contact form capture with branded admin inbox.</li>
-<li>Auto-responder with 1-hour-per-recipient transient throttle.</li>
-<li>Email kill-switch (<code>WPCF_EMAIL_DISABLED</code>).</li>
+<li>Contact form capture with branded admin inbox, plus a full drag-free
+visual form builder (13 field types) and a unified per-sender "Threads"
+view.</li>
+<li>Auto-responder with 1-hour-per-recipient transient throttle, sent as a
+branded HTML email.</li>
+<li>Email kill-switch (<code>WPISTIC_FORMISTIC_EMAIL_DISABLED</code>).</li>
 <li><strong>Newsletter system</strong>: dedicated subscribers table,
 public AJAX
 <ul>
-<li>REST + <code>[wpcf_newsletter]</code> shortcode. Admin “Newsletter”
-tab with search, Active/Unsubscribed filter, per-row unsubscribe, CSV
-export. Contact-form opt-in checkbox auto-subscribes. 60-second per-IP
-throttle. Resubscribe re-activates instead of erroring.</li>
+<li>REST + <code>[wpistic_formistic_newsletter]</code> shortcode. Admin
+“Newsletter” tab with search, Active/Unsubscribed filter, per-row
+unsubscribe, CSV export. Contact-form opt-in checkbox auto-subscribes.
+60-second per-IP throttle. Resubscribe re-activates instead of erroring. A
+branded welcome email with a one-click HMAC unsubscribe link and RFC
+2369/8058 headers is sent on every subscribe/resubscribe.</li>
 </ul></li>
 <li>Footer “GET RANGE UPDATES” + blog “Range Brief” forms wired live
 (were dead <code>onsubmit</code> placeholders).</li>
@@ -654,7 +662,7 @@ email-spray on checkout-start).</li>
 requests are 301’d at the PHP layer.</li>
 <li>All emails carry a kill-switch
 (<code>MEMBERISTIC_EMAIL_DISABLED</code>,
-<code>G2AB_EMAIL_DISABLED</code>, <code>WPCF_EMAIL_DISABLED</code>) so
+<code>G2AB_EMAIL_DISABLED</code>, <code>WPISTIC_FORMISTIC_EMAIL_DISABLED</code>) so
 staging can mirror prod safely. # SEO + AEO playbook — Guns 2 Ammo</li>
 </ul>
 <h2 id="who-owns-what">1. Who owns what</h2>
