@@ -145,7 +145,8 @@ if ( function_exists( 'g2a_faq_schema' ) && function_exists( 'g2a_emit_jsonld' )
 .col-section .sec-h2 { font-family: var(--font-display); font-size: clamp(40px,5.5vw,72px); line-height:0.95; color: var(--color-white); letter-spacing:0.01em; }
 .col-products { margin-top:32px; }
 .guide-grid { display:grid; grid-template-columns: repeat(3,1fr); gap:16px; margin-top:32px; }
-@media (max-width:860px){ .guide-grid { grid-template-columns:1fr; } }
+@media (max-width:860px){ .guide-grid { grid-template-columns:1fr 1fr; } }
+@media (max-width:560px){ .guide-grid { grid-template-columns:1fr; } }
 .guide-card { padding:28px; background: var(--color-gunmetal); border:1px solid var(--color-hairline); }
 .guide-card h3 { font-family: var(--font-condensed); font-weight:600; font-size:20px; text-transform:uppercase; letter-spacing:0.03em; color: var(--color-white); }
 .guide-card p { color: var(--color-fog); font-size:14px; line-height:1.7; margin:10px 0 0; }

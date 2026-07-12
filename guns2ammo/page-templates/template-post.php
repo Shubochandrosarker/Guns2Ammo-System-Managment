@@ -354,7 +354,7 @@ $g2a_biz = function_exists( 'g2a_biz' ) ? g2a_biz() : array();
           <div>
             <div class="lab">About the Author</div>
             <div class="name">G2A Instructor Team</div>
-            <p>NRA-certified instructors and AZDPS-approved CCW providers, teaching out of our Mesa range since 2014. Course pass-rate: 99.6%.</p>
+            <p>NRA-certified instructors and AZDPS-approved CCW providers, teaching out of our Mesa range since <?php echo esc_html( $g2a_biz['founded_year'] ?? 2014 ); ?>. Course pass-rate: 99.6%.</p>
             <a href="<?php echo esc_url( home_url( "/blog/" ) ); ?>" class="btn btn-brass btn-sm">View All Articles </a>
           </div>
         </div>

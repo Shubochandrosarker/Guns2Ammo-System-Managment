@@ -53,7 +53,9 @@ get_header( 'shop' );
 		<?php do_action( 'woocommerce_before_main_content' ); ?>
 		<div class="hero">
 			<div class="ey">Retail Inventory</div>
-			<h1>Shop</h1>
+			<?php if ( apply_filters( 'woocommerce_show_page_title', true ) ) : ?>
+				<h1 class="woocommerce-products-header__title page-title"><?php woocommerce_page_title(); ?></h1>
+			<?php endif; ?>
 		</div>
 		<div class="grid">
 			<aside class="side">
@@ -93,9 +95,7 @@ get_header( 'shop' );
 
 			<div>
 				<header class="woocommerce-products-header" style="margin-bottom:20px;">
-					<?php if ( apply_filters( 'woocommerce_show_page_title', true ) ) : ?>
-						<h1 class="woocommerce-products-header__title page-title"><?php woocommerce_page_title(); ?></h1>
-					<?php endif; ?>
+					<?php // The page title now renders once, in the hero block above. ?>
 					<?php do_action( 'woocommerce_archive_description' ); ?>
 				</header>
 				<form method="get" class="toolbar">

@@ -211,7 +211,8 @@
   .reviews .stars-meta .num { font-family: var(--font-display); font-size: 56px; color: var(--color-brass-bright); line-height: 1; display: block; letter-spacing: 0.02em; }
   .reviews .stars-meta .stars { color: var(--color-brass-bright); font-weight: 700; }
   .rv-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
-  @media (max-width: 900px) { .rv-grid { grid-template-columns: 1fr; } }
+  @media (max-width: 900px) { .rv-grid { grid-template-columns: 1fr 1fr; } }
+  @media (max-width: 600px) { .rv-grid { grid-template-columns: 1fr; } }
   .rv { padding: 28px; background: var(--color-gunmetal); border: 1px solid var(--color-hairline); position: relative; transition: all 280ms var(--ease-std); }
   .rv:hover { border-color: var(--color-brass-dim); transform: translateY(-4px); }
   .rv .quote { font-family: var(--font-display); font-size: 96px; color: var(--color-brass); position: absolute; top: 8px; right: 22px; line-height: 1; opacity: 0.18; }
