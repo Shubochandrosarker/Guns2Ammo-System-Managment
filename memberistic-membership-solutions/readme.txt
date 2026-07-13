@@ -70,6 +70,8 @@ Set Settings > Advanced > "Delete data on uninstall" to Yes before removing the 
 
 See CHANGELOG.md for the full history.
 
+Note: the plugin's version numbering was reset after 1.46.1 back to a 1.9.9.x line. Entries below are in release order (newest first), so 1.46.1 and the earlier "legacy line" 1.10.0 release predate the 1.9.9.2–1.12.0 entries above them.
+
 = 1.12.0 =
 * Change: unified the monorepo (1.10.7) and dedicated-repo (1.11.0) lines of the plugin into one tree — both the 1.10.x fixes (Stripe cancel propagation, token-bridge stylesheet) and the Advanced FFL Checkout bridge are now present everywhere. No functional changes beyond the merge.
 
@@ -112,7 +114,7 @@ See CHANGELOG.md for the full history.
 = 1.46.1 =
 Booking integration fixes. Member booking discounts now actually apply — they are read from the membership's PLAN settings (the memberships table has no settings column, so discounts were silently always empty). The renewal/expiry check is timezone-correct and no longer mis-parses a DATETIME renewal date as a "double time specification" (which had made active members read as not-bookable). Booking-form pages are exempted from content restriction so a mis-set "required plan" can never hide the lane-booking form. Member roles + active-plan meta are cleared on expiry — without stripping roles from a member who still holds another active membership. Content-gating membership resolution now matches the booking integration (honors email-linked memberships and rechecks renewal). Booking metadata carries the plan id (not the membership row id) for correct role assignment. Stripe checkout currency is validated against an allowlist.
 
-= 1.10.0 =
+= 1.10.0 (legacy line) =
 Admin operations release. Members page gains server-side pagination, eight KPI cards (Total / Active / Pending / Past Due / Expired / Cancelled / New This Month with MoM growth % / Waiver Missing), and a bulk-action option to change waiver status for many memberships at once. Plans page is rebuilt as an animated card grid with per-plan member counts (total / active / other). Payments page gets pagination, six KPI cards (lifetime revenue, this-month revenue + MoM growth, new-member vs renewal payments, failed payments, visible-on-page), and a richer CSV export. Import flow now keeps every row: expired members import as expired, members with no matching plan import under a new "No Plan" sentinel plan with status = needs_review, members with no email still import. Order/payment imports never drop a row — orphan emails create a stub Instore member and emailless rows attach to a shared Instore Walk-in membership. Emails page becomes a React console with KPI cards (sent today/week/month, delivery rate, contact coverage) and a filterable, paginated directory; CSV export now includes 13 properly labelled columns including waiver dates and renewal info.
 
 = 1.9.0 =
