@@ -10,7 +10,8 @@
 
 .cols { padding: 100px 32px; }
 .cols .c { max-width:1280px; margin:0 auto; display:grid; grid-template-columns: repeat(3,1fr); gap:24px; }
-@media(max-width:900px){ .cols .c { grid-template-columns:1fr; } }
+@media(max-width:900px){ .cols .c { grid-template-columns:1fr 1fr; } }
+@media(max-width:600px){ .cols .c { grid-template-columns:1fr; } }
 .col { padding: 32px; background: var(--color-gunmetal); border:1px solid var(--color-hairline); }
 .col h3 { font-family: var(--font-display); font-size:32px; color: var(--color-white); margin: 0 0 18px; }
 .col ul { list-style:none; padding:0; margin:0; }

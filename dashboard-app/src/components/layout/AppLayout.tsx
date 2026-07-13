@@ -1,10 +1,10 @@
-import { useEffect, useRef, useState } from 'react'
+import { useRef, useState } from 'react'
 import { Outlet, useNavigate } from 'react-router-dom'
 import { Sidebar } from './Sidebar'
 import { TopBar } from './TopBar'
 import type { Session } from '@/lib/api'
 import { api } from '@/lib/api'
-import { useDialogA11y } from '@/lib/hooks'
+import { useBodyScrollLock, useDialogA11y } from '@/lib/hooks'
 
 interface Props {
   session: Session
@@ -16,14 +16,8 @@ export function AppLayout({ session, onSessionChange }: Props) {
   const [mobileOpen, setMobileOpen] = useState(false)
 
   // Lock body scroll while the mobile nav drawer is open so the page behind
-  // it doesn't scroll along with it.
-  useEffect(() => {
-    if (!mobileOpen) return
-    document.body.classList.add('overflow-hidden')
-    return () => {
-      document.body.classList.remove('overflow-hidden')
-    }
-  }, [mobileOpen])
+  // it doesn't scroll along with it (reliably on iOS Safari too).
+  useBodyScrollLock(mobileOpen)
 
   function signOut() {
     api.auth.logout()

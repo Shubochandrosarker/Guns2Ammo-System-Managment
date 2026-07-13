@@ -231,7 +231,8 @@ $g2a_ladies_events_shortcode = get_post_meta( $g2a_page_id, 'ladies_upcoming_eve
   .lt-vox .wrap { max-width: 1280px; margin: 0 auto; }
   .lt-vox h2 { font-family: var(--font-display); font-size: clamp(40px, 6vw, 64px); line-height: 1; color: var(--color-white); letter-spacing: 0.02em; margin-bottom: 56px; }
   .vox-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; }
-  @media (max-width: 900px) { .vox-grid { grid-template-columns: 1fr; } }
+  @media (max-width: 900px) { .vox-grid { grid-template-columns: 1fr 1fr; } }
+  @media (max-width: 600px) { .vox-grid { grid-template-columns: 1fr; } }
   .vox {
     background: var(--color-gunmetal); border: 1px solid var(--color-hairline);
     padding: 28px;

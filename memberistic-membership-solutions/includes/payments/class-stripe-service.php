@@ -679,12 +679,27 @@ final class Stripe_Service {
 		// membership_activated / payment_received email. We persist the
 		// processed event ids in a capped option list so dedup survives an
 		// object-cache flush (transients used to fail open after a redeploy).
+		//
+		// The check-then-mark is wrapped in the same MySQL advisory lock used
+		// elsewhere in this class (atomic_check_and_increment) — two near-
+		// simultaneous deliveries of the same event id (a documented Stripe
+		// behavior) would otherwise both read is_event_processed() as false
+		// before either finished mark_event_processed(), letting both through.
 		if ( '' !== $event_id ) {
-			if ( self::is_event_processed( $event_id ) ) {
-				do_action( 'memberistic_stripe_webhook_event_duplicate', $event_id, $type );
-				return true;
+			$lock_key = 'stripe_evt_' . $event_id;
+			if ( ! self::acquire_lock( $lock_key ) ) {
+				// Fail closed: refuse rather than risk double-processing.
+				return new WP_Error( 'memberistic_stripe_webhook_locked', __( 'Could not acquire the idempotency lock; try again.', 'memberistic' ) );
 			}
-			self::mark_event_processed( $event_id );
+			try {
+				if ( self::is_event_processed( $event_id ) ) {
+					do_action( 'memberistic_stripe_webhook_event_duplicate', $event_id, $type );
+					return true;
+				}
+				self::mark_event_processed( $event_id );
+			} finally {
+				self::release_lock( $lock_key );
+			}
 		}
 
 		do_action( 'memberistic_stripe_webhook_event', $type, $obj, $event );

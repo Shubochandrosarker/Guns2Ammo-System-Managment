@@ -104,6 +104,7 @@ if ( function_exists( 'g2a_faq_schema' ) && function_exists( 'g2a_emit_jsonld' )
 .ar-ccw h3 { font-family: var(--font-display); font-size:32px; color: var(--color-white); }
 .ar-ccw p { color: var(--color-fog); font-size:14px; margin:8px 0 0; }
 .ar-rel { display:grid; grid-template-columns:repeat(3,1fr); gap:12px; margin-top:26px; }
+@media (max-width:900px){ .ar-rel { grid-template-columns:1fr 1fr; } }
 @media (max-width:680px){ .ar-rel { grid-template-columns:1fr; } }
 .ar-rel a { display:block; padding:20px; background: var(--color-void); border:1px solid var(--color-hairline); text-decoration:none; transition:border-color 200ms var(--ease-std); }
 .ar-rel a:hover { border-color: var(--color-brass-dim); }

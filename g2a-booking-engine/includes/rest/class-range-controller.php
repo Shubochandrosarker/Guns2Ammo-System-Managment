@@ -372,6 +372,26 @@ final class G2AB_REST_Range_Controller {
 			}
 		}
 
+		// Feed the kiosk/waiver-completion signal to any listening automation
+		// (e.g. Messageistic's SMS bridge) — this endpoint IS the actual
+		// self-serve QR kiosk, unlike the general check-in service which also
+		// covers staff-initiated check-ins.
+		$name_parts = preg_split( '/\s+/', trim( (string) $row->customer_name ) );
+		$contact    = array(
+			'first_name' => $name_parts[0] ?? '',
+			'last_name'  => count( $name_parts ) > 1 ? implode( ' ', array_slice( $name_parts, 1 ) ) : '',
+			'email'      => (string) $row->customer_email,
+			'phone'      => (string) $row->customer_phone,
+		);
+		do_action( 'g2a_kiosk_checkin_completed', $contact );
+		if ( ! $waiver_ok ) {
+			do_action( 'g2a_waiver_incomplete', array_merge( $contact, array(
+				'waiver_link' => class_exists( '\WordPressistic\Memberistic\Waivers\Waiver_Public' )
+					? \WordPressistic\Memberistic\Waivers\Waiver_Public::guest_url()
+					: add_query_arg( 'memberistic_waiver', 'guest', home_url( '/' ) ),
+			) ) );
+		}
+
 		return rest_ensure_response( array( 'success' => true, 'data' => array(
 			'checked_in' => true,
 			'waiver_ok'  => $waiver_ok,

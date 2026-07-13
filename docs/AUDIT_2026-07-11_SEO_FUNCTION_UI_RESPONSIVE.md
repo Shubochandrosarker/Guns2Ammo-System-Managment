@@ -699,6 +699,74 @@ messageistic are unchanged this round. `dashboard-app` has no plugin-zip release
 separately per `DEPLOYMENT.md`). Packaged archives are in `releases/` (previous version of each
 retained alongside); `INSTALL.md`'s version table was updated to match.
 
+**Between Round 6 and Round 7:** `wpistic-contact-form` was retired entirely and its functionality
+merged into Formistic (branded HTML emails, one-click newsletter unsubscribe, an atomic rate-limiter
+lock) — see `docs/FORMISTIC_G2A_SETUP.md` for the full writeup; not repeated here since it's a plugin
+consolidation, not an audit-item fix.
+
+### Round 7 — Messageistic dead hooks, Stripe webhook race, and previously-claimed-fixed items
+
+Closes the remaining items this report had logged as "not fixed this round" after Round 6, plus the
+"previously-reported-fixed items the functional agent re-verified were never actually fixed."
+
+| # | Fix | Files |
+|---|---|---|
+| 1 | Messageistic's kiosk-integration bridge listened for `g2a_kiosk_checkin_completed`/`g2a_waiver_incomplete` — two hooks nothing in the repo ever fired, so kiosk SMS automation was permanently inert. Wired both into `g2a-booking-engine`'s self-check-in REST endpoint (`POST /range/self-checkin`) — the actual QR self-serve kiosk flow — firing the checkin event on every successful self-check-in and the waiver-incomplete event when the booking's waiver isn't on file, with a guest-waiver link built from Memberistic's `Waiver_Public::guest_url()` (soft dependency, falls back to a plain `add_query_arg()` call if Memberistic isn't active). | `g2a-booking-engine/includes/rest/class-range-controller.php` |
+| 2 | Memberistic's Stripe webhook idempotency check (`is_event_processed()` → `mark_event_processed()`) was a non-atomic check-then-act, despite a real MySQL `GET_LOCK`/`RELEASE_LOCK` pair already existing two dozen lines away in the same class for the checkout rate limiter. Wrapped the check-and-mark in the same lock so two near-simultaneous deliveries of the same Stripe event id (a documented Stripe behavior) can no longer both slip past the dedup check and double-fire duplicate emails/Activity rows/`membership_activated` listeners. | `memberistic-membership-solutions/includes/payments/class-stripe-service.php` |
+| 3 | Duplicate `<h1>` on WooCommerce archive pages: a static `<h1>Shop</h1>` hero heading rendered unconditionally alongside WooCommerce's own dynamic `<h1 class="woocommerce-products-header__title">` (which correctly shows the category name on a category archive) — both always rendered together, a genuine duplicate-heading bug, not a false alarm. The hero now renders the one true `<h1>` with the real dynamic title; the second, now-redundant heading was removed (its wrapper + `woocommerce_archive_description` action stayed). | `guns2ammo/woocommerce/archive-product.php` |
+| 4 | Disconnected Organization/LocalBusiness/Article JSON-LD: `inc/aeo.php`'s `Organization` node (`#organization`) and `inc/seo.php`'s `LocalBusiness`/`SportsActivityLocation`/`Store` node were two separate, unlinked entities describing the same real business (different `@id`s, no cross-reference) — plus every `Article`'s `author`/`publisher` and every instructor's `Person.worksFor` inlined a *third*, minimal, anonymous duplicate `Organization` object. The LocalBusiness node now shares the same `@id` as the Organization node (the richer view of the same entity, not a second one), and every other reference now points at that one `@id` instead of inlining a fresh duplicate. | `guns2ammo/inc/seo.php`, `inc/instructors.php` |
+| 5 | "Founded 2014" hardcoded in prose across 3 files (a 4th, `inc/business-info.php`, is the legitimate dynamic-default source and was untouched) instead of reading the theme's `founded_year` Customizer field — `template-about.php` alone had 5 separate hardcoded mentions, including a "12+ YEARS" stat that now computes from the real founding year instead of being a stale literal. | `guns2ammo/page-templates/template-about.php`, `template-post.php`, `inc/llms.php`, `inc/seo.php` |
+| 6 | dashboard-app's mobile nav drawer used `document.body.classList.add('overflow-hidden')` to lock background scroll — confirmed broken on iOS Safari, which doesn't reliably respect `overflow:hidden` on `<body>` during touch scrolling (the same bug class the theme's own drawer was correctly fixed for in Round 2, but this component was never migrated). Added a shared `useBodyScrollLock` hook using the standard `position:fixed` + scroll-position-restore technique, available for future modals too. | `dashboard-app/src/lib/hooks.ts`, `src/components/layout/AppLayout.tsx` |
+| 7 | A dozen theme 3-column grids (instructor photos, related-article cards, curriculum/module cards, homepage review cards, the machine-gun weapons/tiers grids, etc.) jumped straight from 3 columns to 1 at their tablet breakpoint with no 2-column step in between — verified each one's actual `@media` rules rather than assuming, and added the missing intermediate step. Pricing/membership plan cards were deliberately left alone: their 3→1 collapse is tied to a "popular plan" visual-treatment reset, a real design choice rather than a missed breakpoint. | `guns2ammo/assets/css/front-page.css`, `machine-gun.css`, `ccw.css`, and 8 `page-templates/*.php` files |
+
+Versions after Round 7: g2a-booking-engine → **1.9.9.11**, memberistic-membership-solutions →
+**1.10.7**, guns2ammo theme → **1.27.13**. `formistic`, `advanced-ffl-checkout`, `g2a-pos-core`,
+`verifyistic`, and `messageistic` are unchanged this round. `dashboard-app` has no plugin-zip release
+artifact (deployed separately). Packaged archives are in `releases/` (previous version of each
+retained alongside); `INSTALL.md`'s version table was updated to match.
+
+**Not yet fixed** — no further known open items remain from this report.
+
+### Round 8 — repo-wide version-consistency sweep + root README
+
+Requested as a final check across every plugin/theme version, rather than a fresh audit pass. Compared
+each plugin's main-file header `Version:` against its `define('..._VERSION', ...)` constant (all
+already matched — no drift there) and then against its `readme.txt`'s `Stable tag` and any version
+field in its `README.md`. The latter comparison surfaced real, widespread drift: every plugin's
+`readme.txt` had fallen behind its actual shipped version, in one case (`g2a-booking-engine`'s
+`README.md` badge, still reading `1.4.0` against an actual `1.9.9.10`) by over 5 major version jumps.
+Also found `memberistic-membership-solutions/README.md` citing a "Plugin version" of `1.44.0` —
+not a typo of the real version, just stale/wrong. Fixed every one to match the plugin's actual
+current version; `releases/` and `INSTALL.md` were already in sync (verified, not just assumed).
+
+| Plugin | `readme.txt` Stable tag (before → after) |
+|---|---|
+| `g2a-booking-engine` | 1.9.9.4 → 1.9.9.11 (also fixed `README.md`'s version badge, 1.4.0 → 1.9.9.11) |
+| `memberistic-membership-solutions` | 1.10.1 → 1.10.7 (also fixed `README.md`'s "Plugin version" line, 1.44.0 → 1.10.7) |
+| `formistic` | 2.0.6 → 2.1.0 (also fixed `README.md`'s "Stable version" line, 2.0.0 → 2.1.0) |
+| `advanced-ffl-checkout` | 1.9.0 → 1.9.4 |
+| `messageistic` | 0.5.1 → 0.5.3 |
+| `verifyistic` | 1.4.1 → 1.4.4 |
+
+Not touched: `memberistic-membership-solutions/CHANGELOG.md` tops out at its own `1.10.1` entry (six
+versions behind current `1.10.7`) — this repo tracks detailed per-round changes in this audit series
+instead, so backfilling six versions of changelog prose there was judged out of scope for a version-
+consistency pass; flagged here rather than silently left unmentioned. `guns2ammo-waiver-manager` is a
+legacy plugin (integrates ApproveMe + PMPro) superseded by Memberistic's own waiver module for day-to-
+day use and was already absent from `INSTALL.md`'s install path before this round — left as-is, noted
+in the new root `README.md`'s component table as legacy rather than silently presented as current.
+
+Also added a root-level `README.md` (none existed before) — a repository-wide orientation doc covering
+the system architecture (theme + plugins + dashboard-app + Cloudflare Worker, with a diagram), a
+one-line description of every component and its status, pointers to `INSTALL.md`/`DEPLOYMENT.md`, a
+curated documentation index distinguishing this doc series' living references from its dated
+historical records, the single-source-of-truth NAP pattern this whole audit history keeps enforcing,
+and the release-process steps (version bump → `build-release-zips.sh` → `releases/` prune →
+`INSTALL.md` update → changelog entry) so future contributors don't have to reconstruct the convention
+from git history.
+
+No version bumps this round — this was a documentation/consistency pass, not a code change.
+
 ## Appendix — audit scope note
 
 This is a source-code audit, not a live-site crawl or a running-instance security test — the environment
