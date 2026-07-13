@@ -7,6 +7,7 @@ performance — all from one branded dashboard.
 
 > Built and published by **Wordpressistic**.
 > Website: https://www.wordpressistic.com
+> Plugin page: https://www.wordpressistic.com/marketplace/plugins/formistic/
 
 | | |
 |---|---|
@@ -97,6 +98,22 @@ Place any form with `[wpistic_form id="N"]`.
 - GDPR consent, export, erase, and auto-retention purge
 - Webhooks with optional HMAC signing, multiple endpoints, and replay
 - AI & Automation studio with trainable context and a smart rule engine
+- Branded HTML emails, a newsletter welcome/confirmation email, and one-click
+  unsubscribe (`List-Unsubscribe` / `List-Unsubscribe-Post` headers)
+
+## How it works
+
+1. A form submission is captured — from a built-in Formistic form, a captured
+   plugin form, the developer API, or the REST endpoint.
+2. The spam and security stack validates it (when the Spam Protection addon is on).
+3. Contact submissions are stored in the inbox; newsletter sign-ups go to the
+   Newsletter list.
+4. Optional notifications, auto-responder acknowledgements, and webhooks are
+   dispatched.
+5. The AI layer enriches the submission with a spam score, smart tags, and a
+   reply draft.
+6. Your team reviews, replies, and tracks response SLAs from the dashboard.
+7. Export, reporting, and GDPR retention policies run as configured.
 
 ## AI & Automation
 
@@ -192,6 +209,15 @@ Formistic only contacts third-party services when you explicitly enable them
 (reCAPTCHA, Turnstile, Akismet, administrator-configured webhooks, and optional
 AI endpoints). Each service, the data it receives, and its terms/privacy links
 are documented in `readme.txt` under **External services**.
+
+## Plugin structure
+
+- `formistic.php` — bootstrap, constants, and activation/deactivation hooks
+- `includes/` — core modules (inbox, capture, forms, spam, emails, AI, addons, REST API, GDPR, webhooks, analytics)
+- `assets/` — admin and frontend CSS/JS
+- `languages/` — translation template (`formistic.pot`)
+- `readme.txt` — WordPress.org readme with the changelog and external-services disclosures
+- `uninstall.php` — full cleanup when the plugin is deleted
 
 ## Support
 

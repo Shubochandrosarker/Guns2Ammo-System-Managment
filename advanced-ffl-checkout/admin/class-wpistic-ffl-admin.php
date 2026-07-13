@@ -147,6 +147,16 @@ class Admin {
 			true
 		);
 
+		// Vendored, dependency-free canvas charts (gap #15 -- no charting
+		// library existed anywhere in this plugin's admin before v1.13.0).
+		wp_enqueue_script(
+			'wpistic-ffl-charts',
+			WPISTIC_FFL_URL . 'assets/js/wpistic-ffl-charts.js',
+			[],
+			WPISTIC_FFL_VERSION,
+			true
+		);
+
 		wp_localize_script( 'wpistic-ffl-admin', 'wpistic_ffl_admin', [
 			'ajax_url'   => admin_url( 'admin-ajax.php' ),
 			'nonce'      => wp_create_nonce( 'wpistic_ffl_admin_nonce' ),
@@ -192,6 +202,22 @@ class Admin {
 		$slowest  = \WpisticFFL\Analytics::dealer_performance( '90d', 10, 'slowest' );
 		$pending  = $summary['pending_tokens'];
 		$portal   = get_option( 'wpistic_ffl_portal_settings', [] );
+		$chart    = [
+			'labels' => [],
+			'series' => [
+				[ 'label' => __( 'Tokens Issued', 'advanced-ffl-checkout' ), 'color' => '#3b82f6', 'data' => [] ],
+				[ 'label' => __( 'Confirmed', 'advanced-ffl-checkout' ),     'color' => '#16a34a', 'data' => [] ],
+			],
+		];
+		foreach ( self::zero_filled_daily_counts( 30 ) as $day => $blank ) {
+			$chart['labels'][] = date_i18n( 'M j', strtotime( $day ) );
+		}
+		$issued_by_day    = self::index_time_series_by_day( \WpisticFFL\Analytics::time_series( '30d', 'token_issued' ) );
+		$confirmed_by_day = self::index_time_series_by_day( \WpisticFFL\Analytics::time_series( '30d', 'confirmed' ) );
+		foreach ( array_keys( self::zero_filled_daily_counts( 30 ) ) as $day ) {
+			$chart['series'][0]['data'][] = $issued_by_day[ $day ] ?? 0;
+			$chart['series'][1]['data'][] = $confirmed_by_day[ $day ] ?? 0;
+		}
 		?>
 		<div class="wrap wpistic-ffl-admin">
 			<h1 style="display:flex;align-items:center;gap:12px;">
@@ -232,6 +258,23 @@ class Admin {
 					</div>
 				<?php endforeach; ?>
 			</div>
+
+			<!-- Funnel trend chart -->
+			<div style="background:#fff;border:1px solid #e5e7eb;border-radius:12px;padding:20px;margin-top:24px;">
+				<h2 style="margin:0 0 4px;font-size:16px;"><?php esc_html_e( 'Portal Funnel — Last 30 Days', 'advanced-ffl-checkout' ); ?></h2>
+				<p class="description" style="margin:0 0 12px;"><?php esc_html_e( 'Tokens issued vs. dealer confirmations, per day.', 'advanced-ffl-checkout' ); ?></p>
+				<canvas id="wpistic-ffl-portal-funnel-chart" data-height="220"></canvas>
+			</div>
+			<script>
+			document.addEventListener('DOMContentLoaded', function () {
+				if (window.WpisticFFLCharts) {
+					window.WpisticFFLCharts.renderTimeSeries(
+						document.getElementById('wpistic-ffl-portal-funnel-chart'),
+						<?php echo wp_json_encode( $chart ); ?>
+					);
+				}
+			});
+			</script>
 
 			<!-- Slowest dealers table -->
 			<h2 style="margin-top:36px;"><?php esc_html_e( 'Slowest Confirming Dealers (90 days)', 'advanced-ffl-checkout' ); ?></h2>
@@ -280,6 +323,33 @@ class Admin {
 			</p>
 		</div>
 		<?php
+	}
+
+	/**
+	 * Every calendar day in the trailing $days window, oldest first, each
+	 * mapped to 0 -- a zero-filled scaffold so a chart shows real gap days
+	 * instead of only the days Analytics::time_series() happened to return.
+	 *
+	 * @return array<string,int> 'Y-m-d' => 0
+	 */
+	private static function zero_filled_daily_counts( int $days ): array {
+		$out = [];
+		for ( $i = $days - 1; $i >= 0; $i-- ) {
+			$out[ gmdate( 'Y-m-d', strtotime( "-{$i} days" ) ) ] = 0;
+		}
+		return $out;
+	}
+
+	/**
+	 * @param array<int,array{date:string,count:int}> $rows
+	 * @return array<string,int> 'Y-m-d' => count
+	 */
+	private static function index_time_series_by_day( array $rows ): array {
+		$out = [];
+		foreach ( $rows as $r ) {
+			$out[ $r['date'] ] = $r['count'];
+		}
+		return $out;
 	}
 
 	// ── Admin notices ─────────────────────────────────────────────────────────

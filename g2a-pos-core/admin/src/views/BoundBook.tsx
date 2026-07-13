@@ -32,7 +32,7 @@ export default function BoundBook() {
     } finally { setLoading(false); }
   };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  useEffect(() => { load(); }, []);
+  useEffect(() => { queueMicrotask(load); }, []);
 
   const verifyChain = async () => {
     const r = await get<{ ok: boolean; rows_checked: number; broken: number[] }>('/atf/bound-book/verify');

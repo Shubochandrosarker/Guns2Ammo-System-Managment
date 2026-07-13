@@ -76,7 +76,10 @@ final class OrderEngine {
 			return array( 'error' => 'User lacks capability to process firearm sales.' );
 		}
 
-		if ( $has_firearm && in_array( $payment_status, $finalizing_states, true ) && ! in_array( $compliance_state, array( 'approved', 'cleared' ), true ) ) {
+		// $compliance_state is always 'pending_review' here (see above), so a
+		// new firearm order can never already be approved/cleared — block any
+		// attempt to create one that arrives already paid/completed.
+		if ( $has_firearm && in_array( $payment_status, $finalizing_states, true ) ) {
 			return array( 'error' => 'Firearm sale cannot be finalized until compliance_state is approved.' );
 		}
 

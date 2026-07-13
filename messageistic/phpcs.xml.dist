@@ -1,0 +1,15 @@
+<?xml version="1.0"?>
+<ruleset name="Messageistic">
+  <description>Messageistic WordPress coding and compatibility checks.</description>
+  <file>messageistic.php</file>
+  <file>uninstall.php</file>
+  <file>includes</file>
+  <file>templates</file>
+  <exclude-pattern>vendor/*</exclude-pattern>
+  <arg name="extensions" value="php"/>
+  <arg value="sp"/>
+  <rule ref="WordPress"/>
+  <rule ref="PHPCompatibilityWP">
+    <properties><property name="testVersion" value="8.0-"/></properties>
+  </rule>
+</ruleset>

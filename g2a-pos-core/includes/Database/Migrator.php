@@ -2020,16 +2020,61 @@ final class Migrator {
             KEY idx_flag (flag_kind)
         ) $charset";
 
+		// The log table must exist BEFORE the schema loop so progress can be
+		// recorded per table: an interrupted run (shared-host time limit,
+		// killed request) then RESUMES where it stopped instead of re-running
+		// every dbDelta from scratch on the next attempt.
+		self::ensure_migration_log_table( $charset, $p );
+
+		// Each statement is keyed by table + schema hash: unchanged tables are
+		// skipped entirely on later runs (no dbDelta DESCRIBE storm), while a
+		// table whose definition changed in a new version gets exactly one
+		// fresh dbDelta pass.
+		$applied = self::applied_steps();
 		foreach ( $sql as $statement ) {
+			$step = self::statement_step_id( $statement );
+			if ( isset( $applied[ $step ] ) ) {
+				continue;
+			}
 			dbDelta( $statement );
+			self::record_step( $step, G2A_POS_CORE_VERSION );
 		}
 
-		self::ensure_migration_log_table( $charset, $p );
 		self::record_step( 'baseline_schema', G2A_POS_CORE_VERSION );
 
 		StateSeeder::seed_if_empty();
 
 		update_option( 'g2a_pos_core_db_version', G2A_POS_CORE_VERSION );
+	}
+
+	/**
+	 * Stable id for one CREATE TABLE statement: table name + definition hash.
+	 * The hash changes when the table definition changes, which naturally
+	 * re-queues just that table for dbDelta on the next migration run.
+	 */
+	private static function statement_step_id( string $statement ): string {
+		$table = 'unknown';
+		if ( preg_match( '/CREATE TABLE\s+`?(\S+?)`?\s*\(/i', $statement, $m ) ) {
+			$table = $m[1];
+		}
+		return 'schema:' . $table . ':' . substr( md5( $statement ), 0, 12 );
+	}
+
+	/**
+	 * All recorded step ids, keyed for O(1) lookup. One query instead of a
+	 * SHOW TABLES + SELECT per step.
+	 *
+	 * @return array<string,true>
+	 */
+	private static function applied_steps(): array {
+		global $wpdb;
+		$table  = $wpdb->prefix . 'g2a_pos_migrations';
+		$exists = $wpdb->get_var( $wpdb->prepare( 'SHOW TABLES LIKE %s', $table ) );
+		if ( ! $exists ) {
+			return array();
+		}
+		$ids = $wpdb->get_col( "SELECT step_id FROM {$table}" ) ?: array();
+		return array_fill_keys( array_map( 'strval', $ids ), true );
 	}
 
 	/**

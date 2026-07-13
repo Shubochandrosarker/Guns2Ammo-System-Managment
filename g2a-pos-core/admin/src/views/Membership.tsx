@@ -23,7 +23,7 @@ export default function Membership() {
       setMetaMap(r.meta_map || {});
     } finally { setLoading(false); }
   };
-  useEffect(() => { load(); }, []);
+  useEffect(() => { queueMicrotask(load); }, []);
 
   const save = async () => {
     setSaving(true);

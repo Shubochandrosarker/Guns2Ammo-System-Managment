@@ -26,7 +26,7 @@ export default function AiAudit() {
     } finally { setLoading(false); }
   };
   const verify = async () => { setVerification(await get('/ai/audit/verify')); };
-  useEffect(() => { refresh(); verify(); }, []);
+  useEffect(() => { queueMicrotask(() => { refresh(); verify(); }); }, []);
 
   const cols: Column<Row>[] = [
     { key: 'created_at', label: 'When' },

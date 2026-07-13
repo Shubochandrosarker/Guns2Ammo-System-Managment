@@ -37,7 +37,7 @@ class G2A_Webhooks_Out {
 		return is_array( $raw ) ? $raw : [];
 	}
 
-	// ── Dispatch entry points ───────────────────────────────────────────────
+	// ── Dispatch entry points ────────────────────────────────
 
 	public static function dispatch_status_change( int $transfer_id, string $old_status, string $new_status ): void {
 		$payload = self::payload_for( $transfer_id, [
@@ -56,7 +56,7 @@ class G2A_Webhooks_Out {
 		self::send_to_all( $payload );
 	}
 
-	// ── Payload builder ─────────────────────────────────────────────────────
+	// ── Payload builder ──────────────────────────────────────
 
 	private static function payload_for( int $transfer_id, array $extra ): array {
 		global $wpdb;
@@ -144,7 +144,7 @@ class G2A_Webhooks_Out {
 		self::deliver( $endpoint_idx, $endpoints[ $endpoint_idx ], $payload, $attempt );
 	}
 
-	// ── Admin page ──────────────────────────────────────────────────────────
+	// ── Admin page ───────────────────────────────────────────
 
 	public function register_admin_page(): void {
 		add_submenu_page(

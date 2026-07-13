@@ -61,6 +61,15 @@ parameters:
 			path: includes/Wholesalers/SportsSouth/SportsSouthCsvImporter.php
 
 		-
+			# Intentional: this is a callback on a third-party plugin's action
+			# hook (g2ab_booking_created) -- the try/catch is a deliberate
+			# "never let a sibling plugin's hook crash on us" guard, not a
+			# claim that today's body can throw.
+			message: "#^Dead catch \\- Throwable is never thrown in the try block\\.$#"
+			count: 1
+			path: includes/Integrations/BookingEngineSync.php
+
+		-
 			# Intentional: seeding runs from a cron event; the try/catch is a
 			# deliberate "a bad knowledge pack or repo write must never kill
 			# the cron worker" guard (and schedules the retry), not a claim

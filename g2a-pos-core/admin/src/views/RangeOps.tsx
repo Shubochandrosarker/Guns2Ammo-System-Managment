@@ -35,7 +35,7 @@ export default function RangeOps() {
     setBrass(b.items || []);
   };
   useEffect(() => {
-    refresh();
+    queueMicrotask(refresh);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [date]);
 

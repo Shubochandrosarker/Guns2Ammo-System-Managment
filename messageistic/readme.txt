@@ -4,7 +4,7 @@ Tags: sms, twilio, ottertext, communication, automation
 Requires at least: 6.2
 Tested up to: 6.5
 Requires PHP: 8.0
-Stable tag: 0.5.3
+Stable tag: 0.7.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -31,6 +31,19 @@ Switch providers from settings without rebuilding the plugin.
 3. Visit Messageistic → Settings to configure your active provider.
 
 == Changelog ==
+
+= 0.7.0 =
+*Release date: 2026-07-13*
+
+Crossmatch/unification release: the two divergent copies of Messageistic (Guns2Ammo monorepo 0.5.3 line and the dedicated repo 0.6.0 line) are merged into one tree carrying both sides' fixes.
+
+* Merged from the 0.6.0 line: the Advanced FFL Checkout integration fix (real `wpistic_ffl_transfer_status_changed` hook, transfer lookup via `\WpisticFFL\DB`) and the Firearm Workflow Pack remap to advanced-ffl-checkout's actual transfer statuses, plus the PHPUnit test suite, PHPCS/PHPUnit configs, packaging/lint tools, and SECURITY-AUDIT.md.
+* Merged from the 0.5.3 audit line: Jasmin/SMS-Gate webhook signature validation now fails closed once a secret exists; Twilio webhook signatures verified against the raw form-encoded POST fields (route/query params no longer corrupt the base string); webhook routes restricted to the active provider (widen via `messageistic_webhook_allowed_providers`); the send lock made atomic for every send path, not just pilot mode; G2A Booking bridge rewritten against the real `g2ab_*` hooks with booking-row hydration; Memberistic bridge rewritten against the real membership-ID hooks with member/plan hydration and the Memberistic "SMS Notifications" toggle; root `index.php` directory-listing guard.
+* Fixed: FFL status-change bridge now skips transfers without a customer phone number instead of creating phone-less contacts.
+
+= 0.6.0 =
+* Fixed: the Advanced FFL Checkout integration never fired — it listened for a hook (`ffl_transfer_status_changed`, one array argument) that plugin has never emitted. Now listens for the real `wpistic_ffl_transfer_status_changed( $transfer_id, $old_status, $new_status )` hook and looks up the transfer itself.
+* Fixed: the bundled Firearm Workflow Pack's status-triggered messages (FFL info received, transfer arrived, ready for pickup, documentation required) used status names that never matched a real advanced-ffl-checkout transfer status, so none of them could ever send. Remapped to the plugin's actual status values.
 
 = 0.5.0 =
 * Redesigned Conversations inbox: responsive two-pane chat UI (single-pane with back navigation on mobile), contact avatars, last-message previews with relative times, unread badges, status/priority indicators, and conversation search.

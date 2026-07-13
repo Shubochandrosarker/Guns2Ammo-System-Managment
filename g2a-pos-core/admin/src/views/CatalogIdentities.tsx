@@ -62,7 +62,7 @@ export default function CatalogIdentities() {
     } finally { setLoading(false); }
   };
   useEffect(() => {
-    refresh();
+    queueMicrotask(refresh);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 

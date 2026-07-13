@@ -45,7 +45,7 @@ class G2A_Activity {
 		];
 	}
 
-	// ── Admin menu page ─────────────────────────────────────────────────────
+	// ── Admin menu page ──────────────────────────────────────────────
 
 	public function register_admin_page(): void {
 		add_submenu_page(
@@ -152,7 +152,7 @@ class G2A_Activity {
 		<?php
 	}
 
-	// ── Data: shared between admin page + REST endpoints ────────────────────
+	// ── Data: shared between admin page + REST endpoints ──────────────
 
 	/**
 	 * Pull a merged activity feed from `events` (status changes, by transfer)
@@ -264,7 +264,7 @@ class G2A_Activity {
 		];
 	}
 
-	// ── REST endpoints ──────────────────────────────────────────────────────
+	// ── REST endpoints ────────────────────────────────────────────
 
 	public function register_routes(): void {
 		$ns = WPISTIC_FFL_REST_NS;
@@ -342,7 +342,7 @@ class G2A_Activity {
 		] );
 	}
 
-	// ── Display helpers ─────────────────────────────────────────────────────
+	// ── Display helpers ──────────────────────────────────────────
 
 	private static function event_label( string $event_type, string $new_status = '' ): string {
 		$map = [

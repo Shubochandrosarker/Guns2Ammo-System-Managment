@@ -29,7 +29,7 @@ export default function GiftCards() {
       setRows(r.items || []);
     } finally { setLoading(false); }
   };
-  useEffect(() => { refresh(); }, []);
+  useEffect(() => { queueMicrotask(refresh); }, []);
 
   const issue = async () => {
     const a = parseFloat(amount);

@@ -41,7 +41,7 @@ export default function TradeIns() {
       setRows(r.items || []);
     } finally { setLoading(false); }
   };
-  useEffect(() => { refresh(); }, []);
+  useEffect(() => { queueMicrotask(refresh); }, []);
 
   const create = async () => {
     if (!form.customer_name || !form.serial_number || !form.manufacturer) return;

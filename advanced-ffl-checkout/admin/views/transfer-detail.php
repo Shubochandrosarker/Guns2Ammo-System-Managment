@@ -96,7 +96,13 @@ if ( isset( $_POST['update_status'] ) && check_admin_referer( 'wpistic_ffl_updat
 			<?php esc_html_e( 'G2A - Transfer Details', 'advanced-ffl-checkout' ); ?>
 			<span class="wpistic-ffl-transfer-ref">#<?php echo esc_html( $transfer->transfer_ref ); ?></span>
 		</h1>
-		<a href="<?php echo esc_url( admin_url( 'admin.php?page=wpistic-ffl-transfers' ) ); ?>" class="button">&larr; <?php esc_html_e( 'Back to Transfers', 'advanced-ffl-checkout' ); ?></a>
+		<span style="display:flex;gap:8px;">
+			<?php if ( $transfer ) : ?>
+				<a href="<?php echo esc_url( home_url( '/ffl-4473-draft/' . (int) $transfer->id . '/' ) ); ?>" class="button" target="_blank">📄 <?php esc_html_e( '4473 Draft', 'advanced-ffl-checkout' ); ?></a>
+				<a href="<?php echo esc_url( home_url( '/ffl-4473-draft/' . (int) $transfer->id . '/pdf/' ) ); ?>" class="button" target="_blank">⬇ <?php esc_html_e( '4473 PDF', 'advanced-ffl-checkout' ); ?></a>
+			<?php endif; ?>
+			<a href="<?php echo esc_url( admin_url( 'admin.php?page=wpistic-ffl-transfers' ) ); ?>" class="button">&larr; <?php esc_html_e( 'Back to Transfers', 'advanced-ffl-checkout' ); ?></a>
+		</span>
 	</div>
 
 	<?php if ( ! $transfer ) : ?>

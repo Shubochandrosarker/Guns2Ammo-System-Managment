@@ -37,17 +37,24 @@ class G2A_State_Laws {
 		$existing = (array) $wpdb->get_col( "SELECT DISTINCT state_code FROM {$table}" );
 		$existing = array_flip( array_map( 'strval', $existing ) );
 
-		foreach ( self::baseline_rules() as $state => $rules ) {
+		// v1.10.0 — filterable, same as the primary seed in DB::seed_state_rules(),
+		// so a maintained legal-data feed can extend/override the top-up rows too.
+		$baseline = (array) apply_filters( 'wpistic_ffl_state_rules_seed_topup', self::baseline_rules() );
+		$version  = (string) get_option( 'wpistic_ffl_state_rules_version', '1.0' );
+
+		foreach ( $baseline as $state => $rules ) {
 			if ( isset( $existing[ $state ] ) ) {
 				continue; // hand-tuned state — don't touch
 			}
 			foreach ( $rules as $rule ) {
 				$wpdb->insert( $table, [ // phpcs:ignore WordPress.DB
-					'state_code'  => $state,
-					'rule_type'   => $rule[0],
-					'description' => $rule[1],
-					'item_types'  => $rule[2] ?? 'handgun,rifle,shotgun',
-					'is_active'   => 1,
+					'state_code'   => $state,
+					'rule_type'    => $rule[0],
+					'description'  => $rule[1],
+					'item_types'   => $rule[2] ?? 'handgun,rifle,shotgun',
+					'is_active'    => 1,
+					'source'       => 'builtin',
+					'rule_version' => $version,
 				] );
 			}
 		}

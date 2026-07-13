@@ -42,7 +42,7 @@ class G2A_Admin_2FA {
 		add_action( 'wp_ajax_wpistic_ffl_totp_verify', [ __CLASS__, 'ajax_verify_challenge' ] );
 	}
 
-	// ── Profile UI ──────────────────────────────────────────────────────────
+	// ── Profile UI ────────────────────────────────────────────────
 
 	public function render_profile_section( \WP_User $user ): void {
 		if ( ! current_user_can( 'edit_user', $user->ID ) ) {
@@ -125,7 +125,7 @@ class G2A_Admin_2FA {
 		// No-op — actual enrollment goes through AJAX.
 	}
 
-	// ── Enrollment AJAX ─────────────────────────────────────────────────────
+	// ── Enrollment AJAX ──────────────────────────────────────
 
 	public static function ajax_enroll(): void {
 		check_ajax_referer( 'wpistic_ffl_admin_nonce', 'nonce' );
@@ -183,7 +183,7 @@ class G2A_Admin_2FA {
 		wp_send_json_error( [ 'message' => 'Unknown stage' ], 400 );
 	}
 
-	// ── Challenge enforcement ───────────────────────────────────────────────
+	// ── Challenge enforcement ────────────────────────────────
 
 	public function enforce_admin_challenge(): void {
 		if ( ! is_admin() || wp_doing_ajax() || wp_doing_cron() ) {
@@ -282,7 +282,7 @@ class G2A_Admin_2FA {
 		return self::CHALLENGE_KEY . '_' . $uid;
 	}
 
-	// ── TOTP cryptography ───────────────────────────────────────────────────
+	// ── TOTP cryptography ──────────────────────────────────
 
 	private static function generate_secret(): string {
 		// 20 random bytes → base32 (no padding) — RFC 4226 recommended length.
@@ -371,7 +371,7 @@ class G2A_Admin_2FA {
 		return $out;
 	}
 
-	// ── Secret encryption at rest ───────────────────────────────────────────
+	// ── Secret encryption at rest ────────────────────────────
 
 	private static function key(): string {
 		$salt = defined( 'NONCE_SALT' ) ? NONCE_SALT : ( defined( 'AUTH_KEY' ) ? AUTH_KEY : 'fallback' );

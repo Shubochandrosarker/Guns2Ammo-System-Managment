@@ -35,7 +35,7 @@ export default function Form4473Calibration() {
     setFields(f.fields || {});
     setSource(f.source);
   };
-  useEffect(() => { load(); }, []);
+  useEffect(() => { queueMicrotask(load); }, []);
 
   const upload = async (file: File) => {
     setBusy(true); setMsg('');

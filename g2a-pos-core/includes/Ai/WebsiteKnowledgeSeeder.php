@@ -397,7 +397,7 @@ final class WebsiteKnowledgeSeeder {
 			$counts = wp_count_posts( 'product' );
 			$pub    = isset( $counts->publish ) ? (int) $counts->publish : 0;
 			if ( $pub > 0 ) {
-				$cats      = function_exists( 'get_terms' ) ? get_terms(
+				$cats = function_exists( 'get_terms' ) ? get_terms(
 					array(
 						'taxonomy'   => 'product_cat',
 						'hide_empty' => true,
@@ -406,12 +406,13 @@ final class WebsiteKnowledgeSeeder {
 						'order'      => 'DESC',
 					)
 				) : array();
+				// get_terms() with no 'fields' override returns WP_Term[] (or
+				// WP_Error, excluded by the is_array() guard) — every element
+				// is always a WP_Term with a non-nullable $name.
 				$cat_names = array();
 				if ( is_array( $cats ) ) {
 					foreach ( $cats as $cat ) {
-						if ( is_object( $cat ) && isset( $cat->name ) ) {
-							$cat_names[] = $cat->name;
-						}
+						$cat_names[] = $cat->name;
 					}
 				}
 				$line = "The online store currently has {$pub} published product(s).";

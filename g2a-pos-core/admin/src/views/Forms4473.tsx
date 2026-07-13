@@ -30,7 +30,7 @@ export default function Forms4473() {
       setRows(r.items || []);
     } finally { setLoading(false); }
   };
-  useEffect(() => { refresh(); },
+  useEffect(() => { queueMicrotask(refresh); },
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [status]);
 

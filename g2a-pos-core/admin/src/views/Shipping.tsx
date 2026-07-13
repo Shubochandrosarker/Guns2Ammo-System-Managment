@@ -53,7 +53,7 @@ export default function Shipping() {
       setRows(r.items || []);
     } finally { setLoading(false); }
   };
-  useEffect(() => { refresh(); }, []);
+  useEffect(() => { queueMicrotask(refresh); }, []);
 
   const create = async () => {
     try {

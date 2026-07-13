@@ -69,7 +69,7 @@ export default function SplitTender() {
   useEffect(() => {
     // Allow ?order=42 in the URL hash to deep-link.
     const m = window.location.hash.match(/order=(\d+)/);
-    if (m) { setOrderId(m[1]); setTimeout(() => load(parseInt(m[1], 10)), 0); }
+    if (m) { queueMicrotask(() => setOrderId(m[1])); setTimeout(() => load(parseInt(m[1], 10)), 0); }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 

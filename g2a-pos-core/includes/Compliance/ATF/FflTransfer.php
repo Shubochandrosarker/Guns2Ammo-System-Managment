@@ -5,6 +5,7 @@ namespace G2A\POS\Compliance\ATF;
 use G2A\POS\Database\AuditLogRepository;
 use G2A\POS\Database\FflPartnerRepository;
 use G2A\POS\Database\FflTransferRepository;
+use G2A\POS\Integrations\FflCheckoutBridge;
 use G2A\POS\Webhooks\WebhookBus;
 
 final class FflTransfer {
@@ -66,6 +67,24 @@ final class FflTransfer {
 			)
 		);
 
+		try {
+			$from_name = $partner['business_name'] ?? ( $data['partner_name'] ?? $data['partner_ffl_number'] );
+			FflCheckoutBridge::log_activity(
+				'inbound_consignment',
+				sprintf(
+					'Inbound consignment received from %s — %s %s, S/N %s.',
+					$from_name,
+					$data['manufacturer'],
+					$data['model'],
+					$data['serial_number']
+				)
+			);
+		} catch ( \Throwable $e ) {
+			// advanced-ffl-checkout being briefly unavailable/mismatched must
+			// never break a real ATF compliance transaction.
+			unset( $e );
+		}
+
 		return array(
 			'id'         => $id,
 			'transfer'   => $transfers->find( $id ),
@@ -112,6 +131,22 @@ final class FflTransfer {
 				'serial_number'   => $data['serial_number'],
 			)
 		);
+
+		try {
+			FflCheckoutBridge::log_activity(
+				'outbound_transfer',
+				sprintf(
+					'Outbound transfer shipped to FFL %s (%s) — S/N %s.',
+					$data['partner_ffl_number'],
+					$data['partner_name'] ?? '',
+					$data['serial_number']
+				)
+			);
+		} catch ( \Throwable $e ) {
+			// advanced-ffl-checkout being briefly unavailable/mismatched must
+			// never break a real ATF compliance transaction.
+			unset( $e );
+		}
 
 		return array(
 			'id'         => $id,

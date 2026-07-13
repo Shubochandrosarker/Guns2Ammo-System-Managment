@@ -521,6 +521,12 @@ class G2A_Ffl_Verification {
 				<?php esc_html_e( 'Certified-copy tracking and dealer verification for the FFLs this store actually ships to. ATF withdrew the eZ Check-as-alternative rule on 2026-07-06, so certified-copy collection stays the required baseline here — eZ Check results are logged as supporting evidence, not a replacement.', 'advanced-ffl-checkout' ); ?>
 			</p>
 
+			<p style="margin-top:8px;">
+				<a class="button" href="<?php echo esc_url( wp_nonce_url( admin_url( 'admin.php?page=wpistic-ffl-verification&action=export_csv' ), 'wpistic_ffl_verification_export' ) ); ?>"><?php esc_html_e( '⬇ Export CSV', 'advanced-ffl-checkout' ); ?></a>
+				<a class="button" href="<?php echo esc_url( wp_nonce_url( admin_url( 'admin.php?page=wpistic-ffl-verification&action=export_pdf' ), 'wpistic_ffl_verification_export' ) ); ?>"><?php esc_html_e( '⬇ Export PDF', 'advanced-ffl-checkout' ); ?></a>
+				<a class="button" href="<?php echo esc_url( admin_url( 'admin.php?page=wpistic-ffl-regulatory-watch' ) ); ?>"><?php esc_html_e( '📅 Regulatory Watch', 'advanced-ffl-checkout' ); ?></a>
+			</p>
+
 			<!-- Policy mode -->
 			<div style="background:#fff;padding:20px;border:1px solid #ccd0d4;border-radius:10px;margin-top:20px;">
 				<h2 style="margin-top:0;border-bottom:2px solid #DCB45F;padding-bottom:8px;">⚙️ <?php esc_html_e( 'Verification Policy Mode', 'advanced-ffl-checkout' ); ?></h2>

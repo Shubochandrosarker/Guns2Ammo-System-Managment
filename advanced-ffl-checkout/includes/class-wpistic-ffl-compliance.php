@@ -226,7 +226,7 @@ class Compliance {
 		return count( self::get_applicable_rules( $state, [ $item_type ] ) ) > 0;
 	}
 
-	// ── Private helpers ───────────────────────────────────────────────────────
+	// ── Private helpers ────────────────────────────────────────────
 
 	/**
 	 * Get FFL item types currently in the WC cart.

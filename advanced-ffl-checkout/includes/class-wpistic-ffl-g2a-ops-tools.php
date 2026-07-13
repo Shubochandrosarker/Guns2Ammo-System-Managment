@@ -44,7 +44,7 @@ class G2A_Ops_Tools {
 		);
 	}
 
-	// ── Page render ─────────────────────────────────────────────────────────
+	// ── Page render ───────────────────────────────────────────────
 
 	public function render_admin_page(): void {
 		$nonce = wp_create_nonce( 'wpistic_ffl_admin_nonce' );
@@ -194,7 +194,7 @@ class G2A_Ops_Tools {
 		<?php
 	}
 
-	// ── Bulk fees ───────────────────────────────────────────────────────────
+	// ── Bulk fees ─────────────────────────────────────────────────
 
 	public static function ajax_bulk_fees(): void {
 		check_ajax_referer( 'wpistic_ffl_admin_nonce', 'nonce' );
@@ -220,7 +220,7 @@ class G2A_Ops_Tools {
 		wp_send_json_success( [ 'affected' => (int) $affected ] );
 	}
 
-	// ── Customer LTV ────────────────────────────────────────────────────────
+	// ── Customer LTV ─────────────────────────────────────────────
 
 	public static function ajax_customer_ltv(): void {
 		check_ajax_referer( 'wpistic_ffl_admin_nonce', 'nonce' );
@@ -253,12 +253,17 @@ class G2A_Ops_Tools {
 			return [ 'found' => false ];
 		}
 
-		// Lifetime value — sum order totals for the related WC orders.
-		$ltv = 0.0;
-		$pickup_days = [];
-		foreach ( $rows as $r ) {
+		// Lifetime value — sum order totals for the related WC orders. An
+		// order can now own several transfer rows (one per FFL unit, see
+		// Checkout::get_ffl_items()), so each order_id is counted at most
+		// once here or a multi-firearm order would inflate the total.
+		$ltv            = 0.0;
+		$pickup_days    = [];
+		$counted_orders = [];
+		foreach ( $rows as &$r ) {
 			$order = function_exists( 'wc_get_order' ) ? wc_get_order( (int) $r['order_id'] ) : null;
-			if ( $order ) {
+			if ( $order && ! isset( $counted_orders[ $r['order_id'] ] ) ) {
+				$counted_orders[ $r['order_id'] ] = true;
 				$ltv += (float) $order->get_total();
 			}
 			if ( ! empty( $r['dealer_received_date'] ) && ! empty( $r['created_at'] ) ) {
@@ -268,12 +273,6 @@ class G2A_Ops_Tools {
 				}
 			}
 			$r['order_url'] = $order ? $order->get_edit_order_url() : '';
-			unset( $r );
-		}
-		// (Re-build $rows with order_url because we lost it above when foreach by value.)
-		foreach ( $rows as &$r ) {
-			$o = function_exists( 'wc_get_order' ) ? wc_get_order( (int) $r['order_id'] ) : null;
-			$r['order_url'] = $o ? $o->get_edit_order_url() : '';
 		}
 		unset( $r );
 
@@ -287,7 +286,7 @@ class G2A_Ops_Tools {
 		];
 	}
 
-	// ── REST ────────────────────────────────────────────────────────────────
+	// ── REST ──────────────────────────────────────────────────
 
 	public function register_routes(): void {
 		register_rest_route( WPISTIC_FFL_REST_NS, '/customer/ltv', [
@@ -302,7 +301,7 @@ class G2A_Ops_Tools {
 		] );
 	}
 
-	// ── Dealer health nightly sweep ─────────────────────────────────────────
+	// ── Dealer health nightly sweep ─────────────────────────────
 
 	public static function run_health_check(): void {
 		global $wpdb;
@@ -357,7 +356,7 @@ class G2A_Ops_Tools {
 		update_option( 'wpistic_ffl_dealer_health_count', count( $flags ), false );
 	}
 
-	// ── Helpers ─────────────────────────────────────────────────────────────
+	// ── Helpers ───────────────────────────────────────────────────
 
 	private static function us_states(): array {
 		return [

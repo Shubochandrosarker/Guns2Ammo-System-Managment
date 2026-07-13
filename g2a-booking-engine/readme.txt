@@ -4,7 +4,7 @@ Tags: booking, reservation, scheduling, appointments, shooting range, firearms, 
 Requires at least: 6.2
 Tested up to: 6.5
 Requires PHP: 8.0
-Stable tag: 1.9.9.11
+Stable tag: 1.9.9.12
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -206,6 +206,13 @@ Yes. REST API at `/wp-json/g2a-booking/v1/` covers bookings, forms, calendar, fr
 7. Migration wizard — dry-run preview before live import.
 
 == Changelog ==
+
+= 1.9.9.12 =
+*Released 2026-07-13 — crossmatch release unifying the monorepo and dedicated-repo lines of this plugin into one tree.*
+
+* NEW: **Advanced FFL Checkout module** (G2A Booking → Addons), ported from the dedicated repo's 1.9.9.4 release. A first-party integration for the online FFL firearm-transfer checkout plugin: syncs each receiving dealer to a resource (with a default Mon-Fri 9-5 window seeded once), exposes the shared "FFL Firearm Pickup" booking type, and pushes confirmed/cancelled appointment status back onto the transfer record. Replaces that plugin's previous direct writes into this plugin's tables with a stable public API (`G2AB_Module_Ffl_Checkout`).
+* NEW: `G2AB_Module_Ffl_Checkout::is_real_open_slot()` — re-derives real availability (business hours, blackout dates, existing bookings) for a candidate appointment time, so integrations booking through the lighter admin-bookings path can still refuse a time that isn't a genuine open slot.
+* CHANGE: unified codebase — all fixes from the monorepo production line 1.9.9.4 → 1.9.9.11 (guest availability, audit rounds 1-5, email/UI modernization, rate-limiter atomicity, version-drift cleanup) and the dedicated repo's FFL Checkout module now ship together; both repositories carry an identical plugin tree.
 
 = 1.9.9.4 =
 * FIX: logged-out visitors saw "No times available on this date." for every
