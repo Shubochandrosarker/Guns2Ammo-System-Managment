@@ -2,7 +2,7 @@
 
 A production-grade WordPress booking, reservation, payment, and front-desk operations plugin. Built for shooting ranges and firearms training centers, the same engine cleanly handles any time-slot business: bays, courts, rooms, studios, simulators, instructors, and member clubs.
 
-[![Plugin Version](https://img.shields.io/badge/version-1.4.0-1f3864.svg)](#)
+[![Plugin Version](https://img.shields.io/badge/version-1.9.9.11-1f3864.svg)](#)
 [![Requires PHP](https://img.shields.io/badge/PHP-%E2%89%A5%208.0-777BB4.svg)](#)
 [![Requires WordPress](https://img.shields.io/badge/WordPress-%E2%89%A5%206.2-21759b.svg)](#)
 [![License](https://img.shields.io/badge/license-GPLv2%2B-green.svg)](LICENSE)

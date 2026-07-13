@@ -727,6 +727,46 @@ retained alongside); `INSTALL.md`'s version table was updated to match.
 
 **Not yet fixed** — no further known open items remain from this report.
 
+### Round 8 — repo-wide version-consistency sweep + root README
+
+Requested as a final check across every plugin/theme version, rather than a fresh audit pass. Compared
+each plugin's main-file header `Version:` against its `define('..._VERSION', ...)` constant (all
+already matched — no drift there) and then against its `readme.txt`'s `Stable tag` and any version
+field in its `README.md`. The latter comparison surfaced real, widespread drift: every plugin's
+`readme.txt` had fallen behind its actual shipped version, in one case (`g2a-booking-engine`'s
+`README.md` badge, still reading `1.4.0` against an actual `1.9.9.10`) by over 5 major version jumps.
+Also found `memberistic-membership-solutions/README.md` citing a "Plugin version" of `1.44.0` —
+not a typo of the real version, just stale/wrong. Fixed every one to match the plugin's actual
+current version; `releases/` and `INSTALL.md` were already in sync (verified, not just assumed).
+
+| Plugin | `readme.txt` Stable tag (before → after) |
+|---|---|
+| `g2a-booking-engine` | 1.9.9.4 → 1.9.9.11 (also fixed `README.md`'s version badge, 1.4.0 → 1.9.9.11) |
+| `memberistic-membership-solutions` | 1.10.1 → 1.10.7 (also fixed `README.md`'s "Plugin version" line, 1.44.0 → 1.10.7) |
+| `formistic` | 2.0.6 → 2.1.0 (also fixed `README.md`'s "Stable version" line, 2.0.0 → 2.1.0) |
+| `advanced-ffl-checkout` | 1.9.0 → 1.9.4 |
+| `messageistic` | 0.5.1 → 0.5.3 |
+| `verifyistic` | 1.4.1 → 1.4.4 |
+
+Not touched: `memberistic-membership-solutions/CHANGELOG.md` tops out at its own `1.10.1` entry (six
+versions behind current `1.10.7`) — this repo tracks detailed per-round changes in this audit series
+instead, so backfilling six versions of changelog prose there was judged out of scope for a version-
+consistency pass; flagged here rather than silently left unmentioned. `guns2ammo-waiver-manager` is a
+legacy plugin (integrates ApproveMe + PMPro) superseded by Memberistic's own waiver module for day-to-
+day use and was already absent from `INSTALL.md`'s install path before this round — left as-is, noted
+in the new root `README.md`'s component table as legacy rather than silently presented as current.
+
+Also added a root-level `README.md` (none existed before) — a repository-wide orientation doc covering
+the system architecture (theme + plugins + dashboard-app + Cloudflare Worker, with a diagram), a
+one-line description of every component and its status, pointers to `INSTALL.md`/`DEPLOYMENT.md`, a
+curated documentation index distinguishing this doc series' living references from its dated
+historical records, the single-source-of-truth NAP pattern this whole audit history keeps enforcing,
+and the release-process steps (version bump → `build-release-zips.sh` → `releases/` prune →
+`INSTALL.md` update → changelog entry) so future contributors don't have to reconstruct the convention
+from git history.
+
+No version bumps this round — this was a documentation/consistency pass, not a code change.
+
 ## Appendix — audit scope note
 
 This is a source-code audit, not a live-site crawl or a running-instance security test — the environment
