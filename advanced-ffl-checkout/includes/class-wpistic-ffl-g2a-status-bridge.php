@@ -16,8 +16,6 @@ defined( 'ABSPATH' ) || exit;
 
 class G2A_Status_Bridge {
 
-	const META_TRANSFER_ID = '_wpistic_ffl_transfer_id';
-
 	/**
 	 * Statuses we consider "terminal" — once a transfer is here, the bridge
 	 * leaves it alone so admin action cannot be silently undone by a WC event.
@@ -39,29 +37,38 @@ class G2A_Status_Bridge {
 		if ( ! $order instanceof \WC_Order ) {
 			return;
 		}
-		$transfer_id = (int) $order->get_meta( self::META_TRANSFER_ID );
-		if ( ! $transfer_id ) {
-			return;
-		}
 
 		$mapped = self::map_wc_to_transfer( $new_status );
 		if ( ! $mapped ) {
 			return;
 		}
 
-		self::advance_transfer( $transfer_id, $mapped, sprintf( 'WC order #%d → %s', $order_id, $new_status ) );
+		foreach ( self::transfer_ids_for_order( $order_id ) as $transfer_id ) {
+			self::advance_transfer( $transfer_id, $mapped, sprintf( 'WC order #%d → %s', $order_id, $new_status ) );
+		}
 	}
 
 	public function on_order_refunded( int $order_id, int $refund_id ): void {
-		$order = wc_get_order( $order_id );
-		if ( ! $order ) {
-			return;
+		foreach ( self::transfer_ids_for_order( $order_id ) as $transfer_id ) {
+			self::advance_transfer( $transfer_id, 'cancelled', sprintf( 'WC order #%d refunded (refund #%d)', $order_id, $refund_id ) );
 		}
-		$transfer_id = (int) $order->get_meta( self::META_TRANSFER_ID );
-		if ( ! $transfer_id ) {
-			return;
-		}
-		self::advance_transfer( $transfer_id, 'cancelled', sprintf( 'WC order #%d refunded (refund #%d)', $order_id, $refund_id ) );
+	}
+
+	/**
+	 * Every transfer tied to this order — an order can now own several
+	 * (one per FFL unit, see Checkout::get_ffl_items()). Queried straight
+	 * from the DB rather than order meta, since the DB is authoritative and
+	 * this also picks up transfers created outside the checkout flow (e.g.
+	 * admin-created, or the theme-bridge path) that share the order_id.
+	 *
+	 * @return int[]
+	 */
+	private static function transfer_ids_for_order( int $order_id ): array {
+		global $wpdb;
+		return array_map( 'intval', $wpdb->get_col( $wpdb->prepare( // phpcs:ignore WordPress.DB.DirectDatabaseQuery
+			'SELECT id FROM ' . DB::table( 'transfers' ) . ' WHERE order_id = %d',
+			$order_id
+		) ) );
 	}
 
 	/**

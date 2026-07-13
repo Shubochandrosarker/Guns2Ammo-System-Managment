@@ -30,10 +30,10 @@ class Theming {
 	 */
 	public static function default_theme_settings(): array {
 		// G2A: prefer values entered in the Guns2Ammo theme Customizer if present.
+		$g2a_name    = function_exists( 'get_theme_mod' ) ? trim( (string) get_theme_mod( 'g2a_business_name', '' ) ) : '';
 		// NOTE: the theme's actual Customizer keys are `g2a_email` / `g2a_phone`
 		// (see guns2ammo/inc/business-info.php) — there is no `g2a_business_email`
 		// or `g2a_business_phone` theme_mod, so those were always reading empty.
-		$g2a_name    = function_exists( 'get_theme_mod' ) ? trim( (string) get_theme_mod( 'g2a_business_name', '' ) ) : '';
 		$g2a_email   = function_exists( 'g2a_biz_email' ) ? trim( (string) g2a_biz_email() ) : ( function_exists( 'get_theme_mod' ) ? trim( (string) get_theme_mod( 'g2a_email', '' ) ) : '' );
 		$g2a_phone   = function_exists( 'g2a_biz_phone' ) ? trim( (string) g2a_biz_phone() ) : ( function_exists( 'get_theme_mod' ) ? trim( (string) get_theme_mod( 'g2a_phone', '' ) ) : '' );
 		$g2a_license = function_exists( 'get_theme_mod' ) ? trim( (string) get_theme_mod( 'g2a_ffl_license', '' ) ) : '';

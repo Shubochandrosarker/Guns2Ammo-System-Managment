@@ -21,6 +21,32 @@ $recent_transfers = $wpdb->get_results(
 	"SELECT t.*, d.business_name AS dealer_name FROM {$t_table} t LEFT JOIN {$d_table} d ON d.id = t.dealer_id ORDER BY t.created_at DESC LIMIT 8"
 );
 
+// Gap #15 — real charts instead of HTML-only KPI tiles: transfers by
+// status, and a zero-filled 30-day daily-created trend.
+$status_counts = $wpdb->get_results( "SELECT status, COUNT(*) AS cnt FROM {$t_table} GROUP BY status" );
+$status_count_map = [];
+foreach ( $status_counts as $row ) {
+	$status_count_map[ $row->status ] = (int) $row->cnt;
+}
+
+$daily_labels = [];
+$daily_counts = [];
+for ( $i = 29; $i >= 0; $i-- ) {
+	$day = gmdate( 'Y-m-d', strtotime( "-{$i} days" ) );
+	$daily_labels[ $day ] = date_i18n( 'M j', strtotime( $day ) );
+	$daily_counts[ $day ] = 0;
+}
+$since = gmdate( 'Y-m-d H:i:s', strtotime( '-29 days' ) );
+$daily_rows = $wpdb->get_results( $wpdb->prepare( // phpcs:ignore WordPress.DB
+	"SELECT DATE( created_at ) AS d, COUNT(*) AS cnt FROM {$t_table} WHERE created_at >= %s GROUP BY DATE( created_at )",
+	$since
+) );
+foreach ( $daily_rows as $row ) {
+	if ( isset( $daily_counts[ $row->d ] ) ) {
+		$daily_counts[ $row->d ] = (int) $row->cnt;
+	}
+}
+
 $status_labels = [
 	'dealer_selected'   => [ 'label' => 'Dealer Selected',    'class' => 'status-new' ],
 	'payment_confirmed' => [ 'label' => 'Payment Confirmed',  'class' => 'status-new' ],
@@ -33,6 +59,18 @@ $status_labels = [
 	'nics_denied'       => [ 'label' => 'NICS Denied',        'class' => 'status-denied' ],
 	'transferred'       => [ 'label' => 'Transferred',        'class' => 'status-complete' ],
 	'cancelled'         => [ 'label' => 'Cancelled',          'class' => 'status-cancelled' ],
+];
+
+$status_chart = [ 'labels' => [], 'data' => [] ];
+foreach ( $status_count_map as $status => $count ) {
+	if ( $count > 0 ) {
+		$status_chart['labels'][] = $status_labels[ $status ]['label'] ?? $status;
+		$status_chart['data'][]   = $count;
+	}
+}
+$daily_chart = [
+	'labels' => array_values( $daily_labels ),
+	'series' => [ [ 'label' => __( 'Transfers Created', 'advanced-ffl-checkout' ), 'color' => '#3b82f6', 'data' => array_values( $daily_counts ) ] ],
 ];
 ?>
 
@@ -103,6 +141,43 @@ $status_labels = [
 			</div>
 		</div>
 	</div>
+
+	<!-- Charts -->
+	<div class="wpistic-ffl-cols" style="margin-top:24px;">
+		<div class="wpistic-ffl-card wpistic-ffl-col-2">
+			<div class="wpistic-ffl-card-header">
+				<h2><?php esc_html_e( 'Transfers Created — Last 30 Days', 'advanced-ffl-checkout' ); ?></h2>
+			</div>
+			<div class="wpistic-ffl-card-body">
+				<canvas id="wpistic-ffl-daily-chart" data-height="200"></canvas>
+			</div>
+		</div>
+		<div class="wpistic-ffl-card">
+			<div class="wpistic-ffl-card-header">
+				<h2><?php esc_html_e( 'Transfers by Status', 'advanced-ffl-checkout' ); ?></h2>
+			</div>
+			<div class="wpistic-ffl-card-body">
+				<?php if ( empty( $status_chart['data'] ) ) : ?>
+					<p class="wpistic-ffl-empty"><?php esc_html_e( 'No transfers yet.', 'advanced-ffl-checkout' ); ?></p>
+				<?php else : ?>
+					<canvas id="wpistic-ffl-status-chart" data-height="200"></canvas>
+				<?php endif; ?>
+			</div>
+		</div>
+	</div>
+	<script>
+	document.addEventListener('DOMContentLoaded', function () {
+		if (!window.WpisticFFLCharts) { return; }
+		window.WpisticFFLCharts.renderTimeSeries(
+			document.getElementById('wpistic-ffl-daily-chart'),
+			<?php echo wp_json_encode( $daily_chart ); ?>
+		);
+		var statusCanvas = document.getElementById('wpistic-ffl-status-chart');
+		if (statusCanvas) {
+			window.WpisticFFLCharts.renderBars( statusCanvas, <?php echo wp_json_encode( $status_chart ); ?> );
+		}
+	});
+	</script>
 
 	<div class="wpistic-ffl-cols">
 

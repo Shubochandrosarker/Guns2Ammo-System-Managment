@@ -37,7 +37,7 @@ class API {
 	public function register_routes(): void {
 		$ns = WPISTIC_FFL_REST_NS;
 
-		// ── Dealer endpoints ─────────────────────────────────────────────────
+		// ── Dealer endpoints ─────────────────────────────────────────────────────
 		register_rest_route( $ns, '/dealers/search', [
 			'methods'             => 'GET',
 			'callback'            => [ $this, 'search_dealers' ],
@@ -84,7 +84,7 @@ class API {
 			],
 		] );
 
-		// ── Transfer endpoints ───────────────────────────────────────────────
+		// ── Transfer endpoints ──────────────────────────────────────────────────
 		register_rest_route( $ns, '/transfers', [
 			[
 				'methods'             => 'GET',
@@ -136,14 +136,14 @@ class API {
 			'permission_callback' => [ $this, 'require_manager' ],
 		] );
 
-		// ── Compliance endpoints ─────────────────────────────────────────────
+		// ── Compliance endpoints ───────────────────────────────────────────────
 		register_rest_route( $ns, '/compliance/(?P<state>[A-Z]{2})', [
 			'methods'             => 'GET',
 			'callback'            => [ $this, 'get_state_compliance' ],
 			'permission_callback' => '__return_true',
 		] );
 
-		// ── v1.1.0 — Dealer portal endpoints ─────────────────────────────────
+		// ── v1.1.0 — Dealer portal endpoints ─────────────────────────
 		register_rest_route( $ns, '/portal/issue-token', [
 			'methods'             => 'POST',
 			'callback'            => [ $this, 'portal_issue_token' ],
@@ -201,7 +201,7 @@ class API {
 			],
 		] );
 
-		// ── v1.1.2 — Business analytics endpoints ────────────────────────────
+		// ── v1.1.2 — Business analytics endpoints ────────────────────────
 		register_rest_route( $ns, '/analytics/woocommerce', [
 			'methods'             => 'GET',
 			'callback'            => [ $this, 'analytics_woocommerce' ],
@@ -247,7 +247,7 @@ class API {
 		] );
 	}
 
-	// ── v1.1.0 — Portal handlers ──────────────────────────────────────────────
+	// ── v1.1.0 — Portal handlers ───────────────────────────────────
 
 	public function portal_issue_token( \WP_REST_Request $req ): \WP_REST_Response|\WP_Error {
 		$transfer_id = (int) $req->get_param( 'transfer_id' );
@@ -629,14 +629,23 @@ class API {
 			'source' => 'amelia',
 		];
 
-		// Phone calls placeholder (Twilio / GBP — coming v1.3.0)
-		$by_source[] = [
-			'id'          => 'phone_calls', 'icon' => '📞',
-			'label'       => 'Direct Phone Calls',
-			'count'       => 0,
-			'source'      => 'placeholder',
-			'coming_soon' => true,
-		];
+		// Direct phone calls — no call-tracking integration is bundled with
+		// this plugin, so there's nothing real to report by default. Rather
+		// than ship a permanent "coming_soon" placeholder that never
+		// resolves, this is a real, filterable extension point: a site that
+		// connects its own call-tracking number (Twilio, CallRail, Google
+		// Business Profile) can return a real count via the filter, and the
+		// row only appears once something actually answers it — same
+		// honesty pattern as the NICS/ID-verification provider registries.
+		$phone_call_count = apply_filters( 'wpistic_ffl_phone_call_count', null, $since, $period );
+		if ( null !== $phone_call_count ) {
+			$by_source[] = [
+				'id'     => 'phone_calls', 'icon' => '📞',
+				'label'  => 'Direct Phone Calls',
+				'count'  => (int) $phone_call_count,
+				'source' => (string) apply_filters( 'wpistic_ffl_phone_call_source_label', 'connected', $since, $period ),
+			];
+		}
 
 		$total = 0;
 		foreach ( $by_source as $s ) { $total += (int) ( $s['count'] ?? 0 ); }
@@ -727,7 +736,7 @@ class API {
 		return $value;
 	}
 
-	// ── Permission callbacks ──────────────────────────────────────────────────
+	// ── Permission callbacks ─────────────────────────────────────────────────────
 
 	public function require_staff( \WP_REST_Request $req ): bool|\WP_Error {
 		$user = $this->get_current_user( $req );
@@ -758,7 +767,7 @@ class API {
 		return true;
 	}
 
-	// ── Dealer handlers ───────────────────────────────────────────────────────
+	// ── Dealer handlers ─────────────────────────────────────────────────
 
 	/**
 	 * v1.1.1 — Advanced multi-filter dealer search.
@@ -1080,7 +1089,7 @@ class API {
 		return rest_ensure_response( [ 'success' => true ] );
 	}
 
-	// ── Transfer handlers ─────────────────────────────────────────────────────
+	// ── Transfer handlers ──────────────────────────────────────────────
 
 	public function list_transfers( \WP_REST_Request $req ): \WP_REST_Response {
 		global $wpdb;
@@ -1260,6 +1269,16 @@ class API {
 			case 'delayed':
 				// NICS delay expires in 3 business days
 				$update['nics_delay_expires'] = date( 'Y-m-d', strtotime( '+3 days' ) );
+				$update['nics_response']      = 'delayed';
+				$update['nics_source']        = 'manual';
+				break;
+			case 'approved':
+				$update['nics_response'] = 'proceed';
+				$update['nics_source']   = 'manual';
+				break;
+			case 'denied':
+				$update['nics_response'] = 'denied';
+				$update['nics_source']   = 'manual';
 				break;
 			case 'transferred':
 				$update['transfer_date']           = $date_today;
@@ -1267,6 +1286,16 @@ class API {
 				$update['form_4473_ref']           = sanitize_text_field( $req->get_param( 'form_4473_ref' ) ?? '' );
 				$update['item_serial']             = sanitize_text_field( $req->get_param( 'serial' ) ?? '' );
 				break;
+		}
+
+		// Manual override — lets staff record/correct the NICS outcome on any
+		// status transition, not just the ones above (e.g. re-confirming after
+		// a provider-reported result). Uses the same nics_response/nics_source
+		// columns a connected provider's webhook writes to.
+		$manual_response = sanitize_key( (string) ( $req->get_param( 'nics_response' ) ?? '' ) );
+		if ( in_array( $manual_response, G2A_Background_Check_Providers::RESPONSES, true ) ) {
+			$update['nics_response'] = $manual_response;
+			$update['nics_source']   = 'manual';
 		}
 
 		$wpdb->update( DB::table( 'transfers' ), $update, [ 'id' => $id ] ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery
@@ -1324,7 +1353,7 @@ class API {
 		exit;
 	}
 
-	// ── Stats handlers ────────────────────────────────────────────────────────
+	// ── Stats handlers ─────────────────────────────────────────────────
 
 	public function get_dashboard_stats( \WP_REST_Request $req ): \WP_REST_Response {
 		global $wpdb;
@@ -1374,7 +1403,7 @@ class API {
 		] );
 	}
 
-	// ── Compliance handler ────────────────────────────────────────────────────
+	// ── Compliance handler ───────────────────────────────────────────────
 
 	public function get_state_compliance( \WP_REST_Request $req ): \WP_REST_Response {
 		global $wpdb;
@@ -1395,7 +1424,7 @@ class API {
 		] );
 	}
 
-	// ── Helpers ───────────────────────────────────────────────────────────────
+	// ── Helpers ─────────────────────────────────────────────────────
 
 	/**
 	 * Resolve the current WP user from cookie session or JWT Bearer header.

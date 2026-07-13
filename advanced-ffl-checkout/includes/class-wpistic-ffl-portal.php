@@ -467,7 +467,7 @@ class Portal {
 
 	// ── Helpers ───────────────────────────────────────────────────────────────
 
-	private static function get_transfer_with_dealer( int $id ): ?object {
+	public static function get_transfer_with_dealer( int $id ): ?object {
 		global $wpdb;
 		$row = $wpdb->get_row( $wpdb->prepare( // phpcs:ignore WordPress.DB
 			'SELECT t.*,
@@ -482,7 +482,7 @@ class Portal {
 		return $row ?: null;
 	}
 
-	private static function extract_dealer( object $transfer ): array {
+	public static function extract_dealer( object $transfer ): array {
 		return [
 			'id'             => (int) ( $transfer->d_id ?? $transfer->dealer_id ),
 			'name'           => $transfer->dealer_name ?? '',
@@ -653,7 +653,7 @@ class Portal {
 	 * Update transfer status + log event via the existing events table.
 	 * Mirrors the API class logic so the dashboard sees it identically.
 	 */
-	private static function update_transfer_status( int $transfer_id, string $new_status, string $action, string $notes ): void {
+	public static function update_transfer_status( int $transfer_id, string $new_status, string $action, string $notes ): void {
 		global $wpdb;
 
 		$existing = $wpdb->get_row( $wpdb->prepare( // phpcs:ignore WordPress.DB
@@ -684,7 +684,7 @@ class Portal {
 		do_action( 'wpistic_ffl_transfer_status_changed', $transfer_id, $existing->status, $new_status );
 	}
 
-	private static function notify_admin( int $transfer_id, string $event, string $notes ): void {
+	public static function notify_admin( int $transfer_id, string $event, string $notes ): void {
 		$transfer = self::get_transfer_with_dealer( $transfer_id );
 		if ( ! $transfer ) return;
 		Mailer::send_admin_portal_notification( $transfer, $event, $notes );

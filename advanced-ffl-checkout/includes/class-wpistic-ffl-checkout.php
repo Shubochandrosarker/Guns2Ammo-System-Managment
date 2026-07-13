@@ -54,7 +54,10 @@ class Checkout {
 		add_action( 'wp_enqueue_scripts', [ $this, 'enqueue_checkout_assets' ] );
 	}
 
-	// ── Product meta ──────────────────────────────────────────────────────────
+	// ── Product meta ───────────────────────────────────────────────
+
+	/** Allowed values for _wpistic_ffl_item_type — canonical vocabulary used across compliance, A&D, and multi-sale detection. */
+	const ITEM_TYPES = [ 'handgun', 'rifle', 'shotgun' ];
 
 	public function add_ffl_product_field(): void {
 		echo '<div class="options_group">';
@@ -63,12 +66,70 @@ class Checkout {
 			'label'       => __( 'FFL Transfer Required', 'advanced-ffl-checkout' ),
 			'description' => __( 'Check if this product requires an FFL dealer transfer (firearms, regulated items).', 'advanced-ffl-checkout' ),
 		] );
+		// v1.10.0 — these were previously read (state compliance rules, transfer
+		// record, 4473 worksheet, A&D ledger, multi-sale detection) but had no
+		// admin field to set them, so every product silently defaulted to
+		// item_type=handgun. Added so store owners can classify products for
+		// real instead of the default masking every long-gun as a handgun.
+		woocommerce_wp_select( [
+			'id'          => '_wpistic_ffl_item_type',
+			'label'       => __( 'FFL Item Type', 'advanced-ffl-checkout' ),
+			'description' => __( 'Used for state compliance rules, the 4473 worksheet, the A&D ledger, and federal multi-sale (Form 3310.4) detection. Defaults to Handgun when unset.', 'advanced-ffl-checkout' ),
+			'options'     => [
+				'handgun' => __( 'Handgun (pistol/revolver)', 'advanced-ffl-checkout' ),
+				'rifle'   => __( 'Rifle', 'advanced-ffl-checkout' ),
+				'shotgun' => __( 'Shotgun', 'advanced-ffl-checkout' ),
+			],
+		] );
+		woocommerce_wp_text_input( [
+			'id'          => '_wpistic_ffl_item_make',
+			'label'       => __( 'Manufacturer / Importer', 'advanced-ffl-checkout' ),
+			'description' => __( 'Pre-fills Section A of the 4473 worksheet and the A&D ledger.', 'advanced-ffl-checkout' ),
+		] );
+		woocommerce_wp_text_input( [
+			'id'    => '_wpistic_ffl_item_model',
+			'label' => __( 'Model', 'advanced-ffl-checkout' ),
+		] );
+		woocommerce_wp_text_input( [
+			'id'    => '_wpistic_ffl_item_caliber',
+			'label' => __( 'Caliber / Gauge', 'advanced-ffl-checkout' ),
+		] );
+		woocommerce_wp_checkbox( [
+			'id'          => '_wpistic_ffl_excise_taxable',
+			'label'       => __( 'Federal Excise Tax (Pittman-Robertson)', 'advanced-ffl-checkout' ),
+			'description' => __( 'Only check this if YOU are the manufacturer or importer of record for this item — the 10%/11% federal excise tax under 26 U.S.C. § 4181 is owed by manufacturers/importers, not by a reseller. Not legal or tax advice; confirm with counsel.', 'advanced-ffl-checkout' ),
+		] );
+		woocommerce_wp_select( [
+			'id'          => '_wpistic_ffl_excise_rate',
+			'label'       => __( 'Excise Tax Rate', 'advanced-ffl-checkout' ),
+			'options'     => [
+				'10' => __( '10% — pistols & revolvers', 'advanced-ffl-checkout' ),
+				'11' => __( '11% — other firearms, ammunition', 'advanced-ffl-checkout' ),
+			],
+		] );
+		woocommerce_wp_checkbox( [
+			'id'          => '_wpistic_ffl_age_restricted',
+			'label'       => __( 'Age-Restricted Item', 'advanced-ffl-checkout' ),
+			'description' => __( 'Ammunition, magazines, or accessories that ship directly to the buyer (no FFL transfer) but are still legally age-restricted. Triggers ID/age verification in states that require it, independent of the FFL-transfer flag above.', 'advanced-ffl-checkout' ),
+		] );
 		echo '</div>';
 	}
 
 	public function save_ffl_product_field( int $post_id ): void {
 		$value = isset( $_POST['_wpistic_ffl_required'] ) ? 'yes' : 'no'; // phpcs:ignore WordPress.Security.NonceVerification
 		update_post_meta( $post_id, '_wpistic_ffl_required', $value );
+
+		// phpcs:disable WordPress.Security.NonceVerification -- WooCommerce handles the product-save nonce.
+		$item_type = sanitize_key( wp_unslash( $_POST['_wpistic_ffl_item_type'] ?? '' ) );
+		update_post_meta( $post_id, '_wpistic_ffl_item_type', in_array( $item_type, self::ITEM_TYPES, true ) ? $item_type : 'handgun' );
+		update_post_meta( $post_id, '_wpistic_ffl_item_make', sanitize_text_field( wp_unslash( $_POST['_wpistic_ffl_item_make'] ?? '' ) ) );
+		update_post_meta( $post_id, '_wpistic_ffl_item_model', sanitize_text_field( wp_unslash( $_POST['_wpistic_ffl_item_model'] ?? '' ) ) );
+		update_post_meta( $post_id, '_wpistic_ffl_item_caliber', sanitize_text_field( wp_unslash( $_POST['_wpistic_ffl_item_caliber'] ?? '' ) ) );
+		update_post_meta( $post_id, '_wpistic_ffl_excise_taxable', isset( $_POST['_wpistic_ffl_excise_taxable'] ) ? 'yes' : 'no' );
+		$excise_rate = sanitize_text_field( wp_unslash( $_POST['_wpistic_ffl_excise_rate'] ?? '11' ) );
+		update_post_meta( $post_id, '_wpistic_ffl_excise_rate', in_array( $excise_rate, [ '10', '11' ], true ) ? $excise_rate : '11' );
+		update_post_meta( $post_id, '_wpistic_ffl_age_restricted', isset( $_POST['_wpistic_ffl_age_restricted'] ) ? 'yes' : 'no' );
+		// phpcs:enable
 	}
 
 	/**
@@ -96,7 +157,7 @@ class Checkout {
 		update_post_meta( $variation_id, '_wpistic_ffl_required', $value );
 	}
 
-	// ── Checkout widget ───────────────────────────────────────────────────────
+	// ── Checkout widget ────────────────────────────────────────────
 
 	public function render_ffl_widget(): void {
 		if ( ! $this->cart_has_ffl_items() ) {
@@ -321,16 +382,42 @@ class Checkout {
 		$order->save();
 	}
 
-	// ── Transfer record creation ──────────────────────────────────────────────
+	// ── Transfer record creation ─────────────────────────────────────
 
+	/**
+	 * Every FFL-flagged line item in the order, one entry per physical unit
+	 * (a line with quantity 2 yields the item twice) — each unit becomes its
+	 * own transfer/bound-book record. Order meta only carries a single dealer
+	 * selection, so all units in an order still go to the same dealer.
+	 *
+	 * @return array<int, array{item: \WC_Order_Item_Product, product: \WC_Product}>
+	 */
+	public static function get_ffl_items( \WC_Order $order ): array {
+		$units = [];
+		foreach ( $order->get_items() as $item ) {
+			$product = $item->get_product();
+			if ( ! $product || ! self::product_requires_ffl( $product->get_id() ) ) {
+				continue;
+			}
+			$qty = max( 1, (int) $item->get_quantity() );
+			for ( $i = 0; $i < $qty; $i++ ) {
+				$units[] = [ 'item' => $item, 'product' => $product ];
+			}
+		}
+		return $units;
+	}
+
+	/**
+	 * Creates one `transfers` row per physical FFL unit in the order (see
+	 * get_ffl_items()). This method is hooked on both woocommerce_payment_
+	 * complete and woocommerce_order_status_processing, which many gateways
+	 * fire close together for the same order — insert_one_transfer_atomic()
+	 * below is what makes a duplicate call for the same physical unit safe,
+	 * not any check performed here.
+	 */
 	public function create_transfer_on_payment( int $order_id ): void {
 		$order = wc_get_order( $order_id );
 		if ( ! $order ) {
-			return;
-		}
-
-		// Only create once
-		if ( $order->get_meta( self::META_TRANSFER_ID ) ) {
 			return;
 		}
 
@@ -339,26 +426,15 @@ class Checkout {
 			return;
 		}
 
-		// Find the first FFL item
-		$ffl_item     = null;
-		$ffl_product  = null;
-		foreach ( $order->get_items() as $item ) {
-			$product = $item->get_product();
-			if ( $product && $this->product_requires_ffl( $product->get_id() ) ) {
-				$ffl_item    = $item;
-				$ffl_product = $product;
-				break;
-			}
-		}
-
-		if ( ! $ffl_item ) {
+		$ffl_units = self::get_ffl_items( $order );
+		if ( ! $ffl_units ) {
 			return;
 		}
 
 		global $wpdb;
-		$ref = 'G2A-' . strtoupper( substr( uniqid( '', true ), -8 ) );
 
 		// Advisory: log when dealer state and buyer billing state don't match.
+		// Once per order — the dealer/buyer pair doesn't vary per line item.
 		$dealer_row = $wpdb->get_row( $wpdb->prepare( // phpcs:ignore WordPress.DB.DirectDatabaseQuery
 			'SELECT id, state FROM ' . DB::table( 'dealers' ) . ' WHERE id = %d LIMIT 1',
 			$dealer_id
@@ -367,13 +443,51 @@ class Checkout {
 			Compliance::validate_dealer_for_buyer( $dealer_row, $order );
 		}
 
+		$portal_settings   = get_option( 'wpistic_ffl_portal_settings', [] );
+		$can_notify_dealer = $order->is_paid() && ! empty( $portal_settings['enabled'] ) && ! empty( $portal_settings['notify_dealer_on_order'] );
+
+		$units_by_item = [];
+		foreach ( $ffl_units as $unit ) {
+			$units_by_item[ $unit['item']->get_id() ][] = $unit['product'];
+		}
+
+		foreach ( $units_by_item as $order_item_id => $products ) {
+			foreach ( $products as $i => $product ) {
+				$this->insert_one_transfer_atomic( $order, $order_id, $order_item_id, $i + 1, $product, $dealer_id, $can_notify_dealer );
+			}
+		}
+	}
+
+	/**
+	 * $order_item_unit is the 1-based position of this unit within its line
+	 * item's quantity (a qty-2 line inserts unit 1 then unit 2).
+	 *
+	 * Atomicity note: `transfers.uidx_order_item_unit` is UNIQUE on
+	 * (order_id, order_item_id, order_item_unit). Two near-simultaneous
+	 * calls for the same order (see create_transfer_on_payment() docblock)
+	 * can both reach this method for the same unit; the DB — not a PHP-side
+	 * check — is what guarantees only one of them actually creates a row.
+	 * The losing call's insert fails here, so it looks up the winning call's
+	 * transfer_id and links the order meta to it, but skips every side
+	 * effect (event/email/dealer-notify/action) so they only fire once, for
+	 * whichever call actually created the row. Backports a fix independently
+	 * made in the guns2ammo repo for the pre-v1.12.0 single-transfer model
+	 * (`UNIQUE KEY (order_id)`), adapted here to the multi-unit model.
+	 */
+	private function insert_one_transfer_atomic( \WC_Order $order, int $order_id, int $order_item_id, int $order_item_unit, \WC_Product $ffl_product, int $dealer_id, bool $can_notify_dealer ): void {
+		global $wpdb;
+		$ref = 'G2A-' . strtoupper( substr( uniqid( '', true ), -8 ) );
+
 		$inserted = $wpdb->insert( DB::table( 'transfers' ), [ // phpcs:ignore WordPress.DB.DirectDatabaseQuery
 			'transfer_ref'     => $ref,
 			'order_id'         => $order_id,
+			'order_item_id'    => $order_item_id,
+			'order_item_unit'  => $order_item_unit,
 			'customer_id'      => $order->get_customer_id() ?: null,
 			'customer_name'    => $order->get_billing_first_name() . ' ' . $order->get_billing_last_name(),
 			'customer_email'   => $order->get_billing_email(),
 			'customer_phone'   => $order->get_billing_phone(),
+			'customer_ip'      => self::ip_to_binary( $order->get_customer_ip_address() ),
 			'dealer_id'        => $dealer_id,
 			'status'           => 'payment_confirmed',
 			'item_description' => $ffl_product->get_name(),
@@ -384,63 +498,54 @@ class Checkout {
 			'item_caliber'     => get_post_meta( $ffl_product->get_id(), '_wpistic_ffl_item_caliber', true ) ?: '',
 		] );
 
-		$transfer_id = $wpdb->insert_id;
-		$is_new_transfer = (bool) ( $inserted && $transfer_id );
+		$transfer_id = (int) $wpdb->insert_id;
+		$is_new      = (bool) ( $inserted && $transfer_id );
 
-		// This method is registered on both woocommerce_payment_complete and
-		// woocommerce_order_status_processing, which many gateways fire close
-		// together — the `get_meta(self::META_TRANSFER_ID)` guard above is
-		// check-then-act, not atomic, so both hooks could reach this insert
-		// for the same order before either sets the meta. transfers.order_id
-		// is now UNIQUE, so the losing call's insert fails here instead of
-		// silently creating a second transfer; recover by looking up the
-		// transfer the winning call created so this order still gets linked
-		// to it, rather than the order meta being left unset even though a
-		// real transfer record exists. $is_new_transfer stays false here so
-		// the audit-event/email/dealer-notify side effects below only fire
-		// once, for whichever call actually created the row.
-		if ( ! $is_new_transfer ) {
+		if ( ! $is_new ) {
 			$transfer_id = (int) $wpdb->get_var( $wpdb->prepare( // phpcs:ignore WordPress.DB.DirectDatabaseQuery
-				'SELECT id FROM ' . DB::table( 'transfers' ) . ' WHERE order_id = %d LIMIT 1',
-				$order_id
+				'SELECT id FROM ' . DB::table( 'transfers' ) . '
+				 WHERE order_id = %d AND order_item_id = %d AND order_item_unit = %d LIMIT 1',
+				$order_id, $order_item_id, $order_item_unit
 			) );
 		}
-
-		if ( $transfer_id ) {
-			$order->update_meta_data( self::META_TRANSFER_ID, $transfer_id );
-			$order->save();
+		if ( ! $transfer_id ) {
+			return;
 		}
 
-		if ( $transfer_id && $is_new_transfer ) {
-			// Audit event
-			$wpdb->insert( DB::table( 'events' ), [ // phpcs:ignore WordPress.DB.DirectDatabaseQuery
-				'transfer_id' => $transfer_id,
-				'event_type'  => 'created',
-				'new_status'  => 'payment_confirmed',
-				'notes'       => "Transfer created automatically from Order #{$order_id}",
-				'actor'       => 'system',
-				'actor_ip'    => '',
-			] );
+		// Non-unique on purpose — one meta row per transfer this order owns.
+		// Read all of them back with $order->get_meta( self::META_TRANSFER_ID, false ).
+		$order->add_meta_data( self::META_TRANSFER_ID, $transfer_id, false );
+		$order->save();
 
-			Mailer::send_status_update( $transfer_id, 'payment_confirmed' );
-
-			// G2A: dealer notification is gated on actual payment (avoids COD /
-			// failed-payment leakage), and async-scheduled so a slow SMTP doesn't
-			// stall checkout. Filterable for special-case integrations.
-			$portal_settings = get_option( 'wpistic_ffl_portal_settings', [] );
-			$can_notify_dealer = $order->is_paid() && ! empty( $portal_settings['enabled'] ) && ! empty( $portal_settings['notify_dealer_on_order'] );
-			$can_notify_dealer = (bool) apply_filters( 'wpistic_ffl_can_notify_dealer_on_order', $can_notify_dealer, $order, $transfer_id );
-			if ( $can_notify_dealer ) {
-				// Async — never block checkout on SMTP. Routes through
-				// Action Scheduler when available, WP-Cron otherwise.
-				G2A_Scheduler::async( 'wpistic_ffl_async_issue_dealer_token', [ $transfer_id ] );
-			}
-
-			do_action( 'wpistic_ffl_transfer_created', $transfer_id, $order_id );
+		if ( ! $is_new ) {
+			return; // Another concurrent call already created this row and ran the side effects below.
 		}
+
+		$wpdb->insert( DB::table( 'events' ), [ // phpcs:ignore WordPress.DB.DirectDatabaseQuery
+			'transfer_id' => $transfer_id,
+			'event_type'  => 'created',
+			'new_status'  => 'payment_confirmed',
+			'notes'       => "Transfer created automatically from Order #{$order_id}",
+			'actor'       => 'system',
+			'actor_ip'    => '',
+		] );
+
+		Mailer::send_status_update( $transfer_id, 'payment_confirmed' );
+
+		// G2A: dealer notification is gated on actual payment (avoids COD /
+		// failed-payment leakage), and async-scheduled so a slow SMTP doesn't
+		// stall checkout. Filterable for special-case integrations.
+		$notify = (bool) apply_filters( 'wpistic_ffl_can_notify_dealer_on_order', $can_notify_dealer, $order, $transfer_id );
+		if ( $notify ) {
+			// Async — never block checkout on SMTP. Routes through
+			// Action Scheduler when available, WP-Cron otherwise.
+			G2A_Scheduler::async( 'wpistic_ffl_async_issue_dealer_token', [ $transfer_id ] );
+		}
+
+		do_action( 'wpistic_ffl_transfer_created', $transfer_id, $order_id );
 	}
 
-	// ── Admin + customer display ──────────────────────────────────────────────
+	// ── Admin + customer display ────────────────────────────────────
 
 	/**
 	 * Display FFL info in WP admin order screen.
@@ -453,17 +558,25 @@ class Checkout {
 			return;
 		}
 		$dealer_name = $order->get_meta( self::META_DEALER_NAME );
-		$transfer_id = $order->get_meta( self::META_TRANSFER_ID );
-
 		if ( ! $dealer_name ) {
 			return;
 		}
 
+		// Queried from the DB rather than order meta — an order can now own
+		// several transfers (one per FFL unit), and the DB is authoritative.
+		global $wpdb;
+		$transfer_ids = $wpdb->get_col( $wpdb->prepare( // phpcs:ignore WordPress.DB.DirectDatabaseQuery
+			'SELECT id FROM ' . DB::table( 'transfers' ) . ' WHERE order_id = %d ORDER BY id ASC',
+			$order->get_id()
+		) );
+
 		echo '<div class="wpistic-ffl-order-meta">';
 		echo '<h4>' . esc_html__( 'FFL Transfer', 'advanced-ffl-checkout' ) . '</h4>';
 		echo '<p><strong>' . esc_html__( 'Dealer:', 'advanced-ffl-checkout' ) . '</strong> ' . esc_html( $dealer_name ) . '</p>';
-		if ( $transfer_id ) {
-			echo '<p><strong>' . esc_html__( 'Transfer ID:', 'advanced-ffl-checkout' ) . '</strong> #' . esc_html( (string) $transfer_id ) . '</p>';
+		if ( $transfer_ids ) {
+			$label = count( $transfer_ids ) > 1 ? __( 'Transfer IDs:', 'advanced-ffl-checkout' ) : __( 'Transfer ID:', 'advanced-ffl-checkout' );
+			$ids   = implode( ', ', array_map( static fn( $id ) => '#' . (string) $id, $transfer_ids ) );
+			echo '<p><strong>' . esc_html( $label ) . '</strong> ' . esc_html( $ids ) . '</p>';
 		}
 		echo '</div>';
 	}
@@ -495,7 +608,7 @@ class Checkout {
 		echo '</section>';
 	}
 
-	// ── Asset enqueueing ──────────────────────────────────────────────────────
+	// ── Asset enqueueing ───────────────────────────────────────────
 
 	public function enqueue_checkout_assets(): void {
 		if ( ! is_checkout() || ! $this->cart_has_ffl_items() ) {
@@ -562,7 +675,7 @@ class Checkout {
 		wp_localize_script( 'wpistic-ffl-checkout', 'wpistic_ffl', $localized );
 	}
 
-	// ── Helpers ───────────────────────────────────────────────────────────────
+	// ── Helpers ───────────────────────────────────────────────────
 
 	public function cart_has_ffl_items(): bool {
 		if ( ! WC()->cart ) {
@@ -570,14 +683,20 @@ class Checkout {
 		}
 		foreach ( WC()->cart->get_cart() as $item ) {
 			$product_id = $item['variation_id'] ?: $item['product_id'];
-			if ( $this->product_requires_ffl( $product_id ) ) {
+			if ( self::product_requires_ffl( $product_id ) ) {
 				return true;
 			}
 		}
 		return false;
 	}
 
-	private function product_requires_ffl( int $product_id ): bool {
+	public static function product_requires_ffl( int $product_id ): bool {
 		return 'yes' === get_post_meta( $product_id, '_wpistic_ffl_required', true );
+	}
+
+	/** Same packed-binary storage as dealer_tokens.created_ip / Token::ip_to_binary(). */
+	private static function ip_to_binary( string $ip ): ?string {
+		$packed = @inet_pton( $ip ); // phpcs:ignore WordPress.PHP.NoSilencedErrors
+		return false === $packed ? null : $packed;
 	}
 }

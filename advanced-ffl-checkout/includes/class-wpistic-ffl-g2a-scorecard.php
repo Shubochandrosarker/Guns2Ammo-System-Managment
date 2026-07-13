@@ -119,7 +119,7 @@ tr:nth-child(even) td { background: #FAF8F4; }
 <body>
 
 <div class="no-print" style="text-align:right;margin-bottom:12px;">
-	<button class="btn-print" onclick="window.print()">🖨️ Print / Save as PDF</button>
+	<button class="btn-print" onclick="window.print()">🖶️ Print / Save as PDF</button>
 </div>
 
 <section class="cover">

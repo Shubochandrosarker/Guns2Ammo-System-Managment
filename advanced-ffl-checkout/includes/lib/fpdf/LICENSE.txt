@@ -1,0 +1,24 @@
+FPDF (fpdf.php) — vendored third-party library
+=================================================
+
+Source: https://raw.githubusercontent.com/Setasign/FPDF/master/fpdf.php
+Homepage: http://www.fpdf.org
+Author: Olivier Plathey
+Version: bundled as distributed upstream, unmodified.
+
+FPDF is distributed under a permissive license (see http://www.fpdf.org/en/script/license.txt):
+
+"This software is provided 'as-is', without any express or implied
+warranty. In no event will the authors be held liable for any damages
+arising from the use of this software.
+
+You may not claim that you wrote the original software. If you use this
+software in a product, an acknowledgment in the product documentation
+would be appreciated but is not required. If you distribute unmodified or
+modified versions, please keep the original notices intact — you are not
+required to keep source code secret or provide it to end users."
+
+This file is not modified from upstream. Used by
+includes/class-wpistic-ffl-g2a-form-4473.php to generate a real PDF for the
+Form 4473 draft worksheet (v1.10.0) instead of relying on the browser's
+print-to-PDF.

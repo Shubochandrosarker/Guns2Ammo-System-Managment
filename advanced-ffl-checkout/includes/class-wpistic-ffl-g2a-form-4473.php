@@ -42,6 +42,8 @@ class G2A_Form_4473 {
 
 	const ROLES = [ 'buyer', 'dealer' ];
 
+	const QUERY_VAR_PDF = 'g2a_4473_draft_pdf';
+
 	public function __construct() {
 		add_action( 'init',              [ $this, 'register_rewrites' ] );
 		add_filter( 'query_vars',         [ $this, 'add_query_var' ] );
@@ -52,15 +54,19 @@ class G2A_Form_4473 {
 	public function register_rewrites(): void {
 		add_rewrite_tag( '%' . self::QUERY_VAR . '%', '([0-9]+)' );
 		add_rewrite_rule( '^ffl-4473-draft/([0-9]+)/?$', 'index.php?' . self::QUERY_VAR . '=$matches[1]', 'top' );
+		add_rewrite_tag( '%' . self::QUERY_VAR_PDF . '%', '([0-9]+)' );
+		add_rewrite_rule( '^ffl-4473-draft/([0-9]+)/pdf/?$', 'index.php?' . self::QUERY_VAR_PDF . '=$matches[1]', 'top' );
 	}
 
 	public function add_query_var( array $v ): array {
 		$v[] = self::QUERY_VAR;
+		$v[] = self::QUERY_VAR_PDF;
 		return $v;
 	}
 
 	public function maybe_render(): void {
-		$id = (int) get_query_var( self::QUERY_VAR );
+		$pdf_id = (int) get_query_var( self::QUERY_VAR_PDF );
+		$id     = $pdf_id ?: (int) get_query_var( self::QUERY_VAR );
 		if ( ! $id ) {
 			return;
 		}
@@ -81,7 +87,11 @@ class G2A_Form_4473 {
 			status_header( 404 );
 			wp_die( 'Transfer not found.' );
 		}
-		self::render( $row );
+		if ( $pdf_id ) {
+			self::generate_pdf( $row );
+		} else {
+			self::render( $row );
+		}
 		exit;
 	}
 
@@ -232,7 +242,10 @@ table.kv td:first-child { width: 38%; color: #444; font-weight: 600; font-size: 
 
 <div class="no-print" style="margin-bottom:14px;display:flex;gap:10px;align-items:center;justify-content:space-between;">
 	<strong>4473 worksheet for transfer #<?php echo esc_html( $t->transfer_ref ); ?></strong>
-	<button class="btn-print" onclick="window.print()">🖨️ Print / Save as PDF</button>
+	<span style="display:flex;gap:8px;">
+		<a class="btn-print" style="text-decoration:none;display:inline-block;" href="<?php echo esc_url( home_url( '/ffl-4473-draft/' . (int) $t->id . '/pdf/' ) ); ?>">⬇ Download PDF</a>
+		<button class="btn-print" onclick="window.print()">🖨️ Print / Save as PDF</button>
+	</span>
 </div>
 
 <div class="draft-banner">
@@ -273,7 +286,18 @@ table.kv td:first-child { width: 38%; color: #444; font-weight: 600; font-size: 
 	<table class="kv">
 		<tr><td>NICS check date</td><td><?php echo esc_html( $t->nics_check_date ?: '____ / ____ / ____' ); ?></td></tr>
 		<tr><td>NICS Transaction Number (NTN)</td><td><?php echo esc_html( $t->nics_transaction_number ?: '____________________' ); ?></td></tr>
-		<tr><td>Response</td><td>☐ Proceed ☐ Delayed ☐ Denied ☐ Cancelled</td></tr>
+		<tr><td>Response</td><td><?php
+			$nics_response = (string) ( $t->nics_response ?? '' );
+			$nics_options  = [ 'proceed' => 'Proceed', 'delayed' => 'Delayed', 'denied' => 'Denied', 'cancelled' => 'Cancelled' ];
+			$boxes = [];
+			foreach ( $nics_options as $slug => $label ) {
+				$boxes[] = ( $slug === $nics_response ? '☑' : '☐' ) . ' ' . $label;
+			}
+			echo esc_html( implode( ' ', $boxes ) );
+			if ( $nics_response && ! empty( $t->nics_source ) && 'manual' !== $t->nics_source ) {
+				echo ' ' . esc_html( '(via ' . $t->nics_source . ')' );
+			}
+		?></td></tr>
 		<tr><td>3-day window expires (if delayed)</td><td><?php echo esc_html( $t->nics_delay_expires ?: '____ / ____ / ____' ); ?></td></tr>
 	</table>
 </fieldset>
@@ -443,5 +467,156 @@ table.kv td:first-child { width: 38%; color: #444; font-weight: 600; font-size: 
 </body>
 </html>
 		<?php
+	}
+
+	/**
+	 * v1.10.0 — real PDF via a vendored PDF library (FPDF), replacing reliance
+	 * on the browser's print-to-PDF. Same content + DRAFT banner as render(),
+	 * plus the captured signature images embedded as real images. The DRAFT
+	 * labeling stays — this is still our own worksheet, not the official ATF
+	 * Form 4473, and is not a substitute for it.
+	 */
+	private static function generate_pdf( object $t ): void {
+		if ( ! class_exists( 'FPDF' ) ) {
+			require_once WPISTIC_FFL_PATH . 'includes/lib/fpdf/fpdf.php';
+		}
+
+		$theme = Theming::settings();
+		$store = $theme['business_name'] ?: get_bloginfo( 'name' );
+		$sigs  = self::latest_signatures( (int) $t->id );
+
+		$pdf = new \FPDF( 'P', 'mm', 'Letter' );
+		$pdf->SetMargins( 15, 15, 15 );
+		$pdf->SetAutoPageBreak( true, 15 );
+		$pdf->AddPage();
+
+		// DRAFT banner.
+		$pdf->SetFillColor( 0xDC, 0xB4, 0x5F );
+		$pdf->SetTextColor( 15, 14, 18 );
+		$pdf->SetFont( 'Helvetica', 'B', 11 );
+		$pdf->Cell( 0, 8, 'DRAFT -- NOT FOR ATF SUBMISSION', 0, 1, 'C', true );
+		$pdf->SetFont( 'Helvetica', '', 7 );
+		$pdf->MultiCell( 0, 4, 'This worksheet pre-fills the same field labels as ATF Form 4473 to speed up the dealer\'s paperwork. Transcribe values onto the official ATF form.', 0, 'C' );
+		$pdf->Ln( 3 );
+
+		$pdf->SetTextColor( 17, 17, 17 );
+		$pdf->SetFont( 'Helvetica', 'B', 16 );
+		$pdf->Cell( 0, 8, self::pdf_text( $store . ' -- FFL Transfer Worksheet' ), 0, 1 );
+		$pdf->SetFont( 'Helvetica', '', 8 );
+		$pdf->SetTextColor( 102, 102, 102 );
+		$pdf->Cell( 0, 5, self::pdf_text( 'Transfer Reference: ' . $t->transfer_ref . ' -- Generated ' . date_i18n( 'F j, Y g:i a' ) ), 0, 1 );
+		$pdf->SetTextColor( 17, 17, 17 );
+		$pdf->Ln( 2 );
+
+		self::pdf_section( $pdf, 'Section A -- Firearm Transaction Information', [
+			[ 'Manufacturer / Importer', $t->item_make ?: '-' ],
+			[ 'Model', $t->item_model ?: '-' ],
+			[ 'Serial number', $t->item_serial ?: '__________________' ],
+			[ 'Type', ucfirst( $t->item_type ?: 'handgun' ) ],
+			[ 'Caliber / gauge', $t->item_caliber ?: '__________' ],
+			[ 'Item description (SKU)', $t->item_description . ( $t->item_sku ? ' -- SKU ' . $t->item_sku : '' ) ],
+		] );
+
+		self::pdf_section( $pdf, 'Section B -- Transferee (Buyer)', [
+			[ 'Name', $t->customer_name ],
+			[ 'Phone', $t->customer_phone ?: '-' ],
+			[ 'Email', $t->customer_email ],
+			[ 'Date of birth', '__ / __ / ____' ],
+			[ 'State of residence', '__' ],
+			[ 'ID type + number', '____________________________' ],
+		] );
+
+		$response = (string) ( $t->nics_response ?? '' );
+		$nics_map = [ 'proceed' => 'Proceed', 'delayed' => 'Delayed', 'denied' => 'Denied', 'cancelled' => 'Cancelled' ];
+		$boxes    = [];
+		foreach ( $nics_map as $slug => $label ) {
+			$boxes[] = ( $slug === $response ? '[X]' : '[ ]' ) . ' ' . $label;
+		}
+		self::pdf_section( $pdf, 'Section C -- NICS', [
+			[ 'NICS check date', $t->nics_check_date ?: '____ / ____ / ____' ],
+			[ 'NICS Transaction Number (NTN)', $t->nics_transaction_number ?: '____________________' ],
+			[ 'Response', implode( '  ', $boxes ) ],
+			[ '3-day window expires (if delayed)', $t->nics_delay_expires ?: '____ / ____ / ____' ],
+		] );
+
+		self::pdf_section( $pdf, 'Section D -- Transferor (Receiving FFL)', [
+			[ 'Business name', $t->dealer_name ?? '-' ],
+			[ 'FFL number', $t->dealer_license ?? '-' ],
+			[ 'Address', trim( ( $t->dealer_street ?? '' ) . ', ' . ( $t->dealer_city ?? '' ) . ', ' . ( $t->dealer_state ?? '' ) . ' ' . ( $t->dealer_zip ?? '' ), ', ' ) ],
+			[ 'Phone', $t->dealer_phone ?? '-' ],
+			[ 'Transfer date', $t->transfer_date ?: '____ / ____ / ____' ],
+		] );
+
+		// Signatures.
+		$pdf->Ln( 2 );
+		$pdf->SetFont( 'Helvetica', 'B', 9 );
+		$pdf->Cell( 0, 6, 'Signatures', 0, 1 );
+		$tmp_files = [];
+		foreach ( self::ROLES as $role ) {
+			$sig   = $sigs[ $role ];
+			$label = 'buyer' === $role ? 'Buyer signature' : 'Dealer signature';
+			$pdf->SetFont( 'Helvetica', '', 8 );
+			$pdf->Cell( 0, 5, self::pdf_text( $label . ':' ), 0, 1 );
+			if ( $sig && preg_match( '#^data:image/png;base64,([A-Za-z0-9+/]+={0,2})$#', (string) $sig->signature_data, $m ) ) {
+				$binary = base64_decode( $m[1], true ); // phpcs:ignore WordPress.PHP.DiscouragedPHPFunctions
+				$tmp    = wp_tempnam( 'wpistic-ffl-sig-' . $role . '.png' );
+				if ( false !== $binary && $tmp ) {
+					file_put_contents( $tmp, $binary ); // phpcs:ignore WordPress.WP.AlternativeFunctions
+					$tmp_files[] = $tmp;
+					$pdf->Image( $tmp, $pdf->GetX(), $pdf->GetY(), 70, 20, 'PNG' );
+					$pdf->Ln( 22 );
+					$pdf->SetFont( 'Helvetica', '', 7 );
+					$pdf->SetTextColor( 102, 102, 102 );
+					$pdf->Cell( 0, 4, self::pdf_text( ( $sig->signer_name ?: ucfirst( $role ) ) . ' -- signed ' . date_i18n( 'F j, Y g:i a', strtotime( $sig->created_at ) ) ), 0, 1 );
+					$pdf->SetTextColor( 17, 17, 17 );
+				}
+			} else {
+				$pdf->SetDrawColor( 200, 200, 200 );
+				$pdf->Rect( $pdf->GetX(), $pdf->GetY(), 70, 20 );
+				$pdf->Ln( 22 );
+				$pdf->SetFont( 'Helvetica', 'I', 7 );
+				$pdf->SetTextColor( 150, 150, 150 );
+				$pdf->Cell( 0, 4, 'Not yet signed', 0, 1 );
+				$pdf->SetTextColor( 17, 17, 17 );
+			}
+			$pdf->Ln( 2 );
+		}
+
+		$pdf->SetFont( 'Helvetica', '', 7 );
+		$pdf->SetTextColor( 102, 102, 102 );
+		$pdf->MultiCell( 0, 4, 'This worksheet is a draft only, generated from the e-commerce transfer record. It is not the official ATF Form 4473 and may not be submitted to ATF in place of the official form. All federal certification questions (Section B 11.a-11.l, etc.) must be answered by the transferee on the official Form 4473 in the presence of the dealer.' );
+
+		nocache_headers();
+		$pdf->Output( 'D', 'ffl-4473-draft-' . $t->transfer_ref . '.pdf' );
+
+		foreach ( $tmp_files as $tmp ) {
+			@unlink( $tmp ); // phpcs:ignore WordPress.PHP.NoSilencedErrors
+		}
+	}
+
+	/**
+	 * @param array<int,array{0:string,1:string}> $rows
+	 */
+	private static function pdf_section( \FPDF $pdf, string $title, array $rows ): void {
+		$pdf->SetFont( 'Helvetica', 'B', 9 );
+		$pdf->SetDrawColor( 26, 25, 30 );
+		$pdf->Cell( 0, 6, self::pdf_text( $title ), 'B', 1 );
+		$pdf->Ln( 1 );
+		$pdf->SetFont( 'Helvetica', '', 8 );
+		foreach ( $rows as [ $label, $value ] ) {
+			$pdf->SetFont( 'Helvetica', 'B', 7.5 );
+			$pdf->Cell( 60, 5.5, self::pdf_text( $label ), 0, 0 );
+			$pdf->SetFont( 'Helvetica', '', 8 );
+			$pdf->Cell( 0, 5.5, self::pdf_text( (string) $value ), 0, 1 );
+		}
+		$pdf->Ln( 3 );
+	}
+
+	/**
+	 * FPDF's core fonts are Latin-1 (cp1252), not UTF-8 — transliterate so
+	 * accented/curly-quote input from order data doesn't render as garbage.
+	 */
+	private static function pdf_text( string $text ): string {
+		return iconv( 'UTF-8', 'CP1252//TRANSLIT//IGNORE', $text ) ?: $text;
 	}
 }

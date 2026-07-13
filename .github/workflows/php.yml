@@ -37,7 +37,7 @@ jobs:
       matrix:
         # This repo is a monorepo of WordPress plugins; only these
         # subprojects carry a composer.json (there is none at the root).
-        project: [ g2a-business-api, g2a-pos-core, messageistic ]
+        project: [ g2a-business-api, g2a-pos-core, messageistic, advanced-ffl-checkout ]
     defaults:
       run:
         working-directory: ${{ matrix.project }}
@@ -59,8 +59,5 @@ jobs:
     - name: Install dependencies
       run: composer install --prefer-dist --no-progress
 
-    # Add a test script to composer.json, for instance: "test": "vendor/bin/phpunit"
-    # Docs: https://getcomposer.org/doc/articles/scripts.md
-
-    # - name: Run test suite
-    #   run: composer run-script test
+    - name: Run test suite
+      run: composer run-script test
