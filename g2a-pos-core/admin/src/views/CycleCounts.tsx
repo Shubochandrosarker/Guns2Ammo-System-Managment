@@ -37,7 +37,7 @@ export default function CycleCounts() {
       setRows(r.items || []);
     } finally { setLoading(false); }
   };
-  useEffect(() => { refresh(); }, []);
+  useEffect(() => { queueMicrotask(refresh); }, []);
 
   const create = async () => {
     const scope = prompt('Scope value (e.g. category name, location)?') ?? '';

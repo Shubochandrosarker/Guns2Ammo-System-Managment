@@ -3,7 +3,7 @@
  * Plugin Name:       Advanced FFL Checkout Solutions — G2A Edition
  * Plugin URI:        https://wordpressistic.com/products/advanced-ffl-checkout
  * Description:       Federal Firearms License (FFL) dealer management, WooCommerce checkout integration, transfer tracking and one-click dealer confirmation portal — customized for the Guns2Ammo system (HPOS-safe order meta, brass/graphite branding, customer "My FFL Transfers" tab, NICS 3-day automation, SMS via Verifyistic, WC order ↔ transfer status bridge).
- * Version:           1.9.4
+ * Version:           1.15.0
  * Requires at least: 6.4
  * Requires PHP:      8.1
  * Author:            Wordpressistic
@@ -29,7 +29,7 @@ if ( version_compare( PHP_VERSION, '8.1', '<' ) ) {
 }
 
 // ── Constants ─────────────────────────────────────────────────────────────────
-define( 'WPISTIC_FFL_VERSION',   '1.9.4' );
+define( 'WPISTIC_FFL_VERSION',   '1.15.0' );
 define( 'WPISTIC_FFL_FILE',      __FILE__ );
 define( 'WPISTIC_FFL_PATH',      plugin_dir_path( __FILE__ ) );
 define( 'WPISTIC_FFL_URL',       plugin_dir_url( __FILE__ ) );
@@ -158,6 +158,8 @@ register_deactivation_hook( __FILE__, function (): void {
 		'wpistic_ffl_async_issue_dealer_token',
 		'wpistic_ffl_dealer_health_check',
 		'wpistic_ffl_webhook_retry',
+		'wpistic_ffl_license_revalidate',
+		'wpistic_ffl_regulatory_watch_check',
 	];
 	foreach ( $hooks as $hook ) {
 		wp_clear_scheduled_hook( $hook );
@@ -350,8 +352,59 @@ add_action( 'plugins_loaded', function (): void {
 	// eZ Check logging, and an ATF-sync validity check for dealers this
 	// store has actually shipped to.
 	new \WpisticFFL\G2A_Ffl_Verification();
+	// Verification Hub Phase B (v1.12.0): expiration reminders, dashboard
+	// widget, CSV/PDF audit export.
+	new \WpisticFFL\G2A_Verification_Phase_B();
+	// Verification Hub Phase B (v1.12.0): Federal Register regulatory watcher.
+	new \WpisticFFL\G2A_Regulatory_Watch();
+
+	// v1.10.0 — FFL Checkout Solutions audit, Exhibits 01-05:
+	// Exhibit 01: background-check provider registry (manual fallback + push webhook).
+	new \WpisticFFL\G2A_Background_Check_Providers();
+	// Exhibit 02: Acquisition & Disposition (bound book) ledger.
+	new \WpisticFFL\G2A_Ad_Ledger();
+	// Exhibit 04: multiple-sale (Form 3310.4) watcher.
+	new \WpisticFFL\G2A_Multi_Sale_Watcher();
+	// Exhibit 05: state-rules admin CRUD + REST feed, and the excise-tax line item.
+	new \WpisticFFL\G2A_State_Rules_Admin();
+	new \WpisticFFL\G2A_Excise_Tax();
+	// Exhibit 03 (PDF generation) lives inside the existing G2A_Form_4473,
+	// already instantiated above — no new bootstrap entry needed.
+
+	// v1.11.0 — FFL Checkout Solutions audit, Exhibits 06-10:
+	// Exhibit 06: real license activation (weekly revalidation cron + AJAX handlers).
+	new \WpisticFFL\License();
+	// Exhibit 07: NMI payment gateway — self-registers via the filter below.
+	// Exhibit 08 (rate-shop + label purchase) lives inside the existing
+	// G2A_Carrier_Providers, already instantiated above.
+	// Exhibit 09: real pickup scheduling via g2a-booking-engine.
+	new \WpisticFFL\G2A_Booking_Bridge();
+	// Exhibit 10: ID/age verification gated by ship-to state.
+	new \WpisticFFL\G2A_Id_Verification();
+
+	// v1.13.0 — gap #12: persistent dealer portal login (opt-in
+	// alternative to the single-use magic-link flow, which keeps working
+	// unchanged for every dealer who isn't invited).
+	new \WpisticFFL\G2A_Dealer_Login();
+
+	// v1.13.0 — gap #13: buyer-side fraud/straw-purchase risk scoring
+	// (rules-based, no vendor -- recommendation only, never auto-blocks).
+	new \WpisticFFL\G2A_Fraud_Score();
+
+	// v1.13.0 — gap #11: Lipsey's distributor drop-ship integration
+	// (real dealer API client -- catalog sync + explicit-click order
+	// submission only, never automatic).
+	new \WpisticFFL\G2A_Lipseys();
 
 }, 20 );
+
+// Exhibit 07 — register the NMI gateway with WooCommerce's own gateway list.
+// Returning the class name (not an instance) is deliberate: WooCommerce
+// instantiates it itself once per request, same as every other gateway.
+add_filter( 'woocommerce_payment_gateways', function ( array $methods ): array {
+	$methods[] = '\WpisticFFL\G2A_Gateway_Nmi';
+	return $methods;
+} );
 
 // ── v1.1.3 — Default options bootstrap ────────────────────────────────────────
 function wpistic_ffl_ensure_default_options(): void {

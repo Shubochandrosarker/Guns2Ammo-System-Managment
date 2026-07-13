@@ -119,6 +119,15 @@ final class Integrations_Registry {
 				'available' => static function () { return defined( 'MESSAGEISTIC_VERSION' ) || class_exists( '\\Messageistic\\Core\\Plugin' ); },
 				'dep_label' => __( 'Install & activate the Messageistic plugin to use this.', 'memberistic' ),
 			),
+			'ffl_checkout'     => array(
+				'name'      => __( 'Advanced FFL Checkout', 'memberistic' ),
+				'desc'      => __( 'Show a member\'s own online FFL firearm-transfer history on their account dashboard, and a quick heads-up on the staff verification card if they have one in flight. Read-only.', 'memberistic' ),
+				'icon'      => 'F',
+				'setting'   => 'integration_ffl_checkout_enabled',
+				'default'   => 'no',
+				'available' => static function () { return defined( 'WPISTIC_FFL_VERSION' ); },
+				'dep_label' => __( 'Install & activate the Advanced FFL Checkout plugin to use this.', 'memberistic' ),
+			),
 		);
 
 		$coming = array(

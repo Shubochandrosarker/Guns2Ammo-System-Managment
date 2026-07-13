@@ -2,7 +2,7 @@
 
 A production-grade WordPress booking, reservation, payment, and front-desk operations plugin. Built for shooting ranges and firearms training centers, the same engine cleanly handles any time-slot business: bays, courts, rooms, studios, simulators, instructors, and member clubs.
 
-[![Plugin Version](https://img.shields.io/badge/version-1.9.9.11-1f3864.svg)](#)
+[![Plugin Version](https://img.shields.io/badge/version-1.9.9.12-1f3864.svg)](#)
 [![Requires PHP](https://img.shields.io/badge/PHP-%E2%89%A5%208.0-777BB4.svg)](#)
 [![Requires WordPress](https://img.shields.io/badge/WordPress-%E2%89%A5%206.2-21759b.svg)](#)
 [![License](https://img.shields.io/badge/license-GPLv2%2B-green.svg)](LICENSE)
@@ -86,6 +86,7 @@ Each module under `includes/modules/<slug>/` is self-contained — it ships a `m
 | `verifyistic` | Off | Free | Waiver / e-signature integration hooks |
 | `woocommerce-bridge` | Off | Pro | Route bookings through WooCommerce checkout, bidirectional sync |
 | `ai-autoreply` | Off | Pro | OpenAI-compatible reply drafts for incoming emails |
+| `ffl-checkout` | On | Free | Advanced FFL Checkout integration — dealer→resource sync, shared "FFL Firearm Pickup" booking type, status push-back onto transfer records |
 
 ## REST API
 

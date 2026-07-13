@@ -4,7 +4,7 @@ Tags: membership, operations, staff dashboard, stripe, woocommerce, rest api
 Requires at least: 6.0
 Requires PHP: 8.0
 Tested up to: 6.7
-Stable tag: 1.10.7
+Stable tag: 1.12.0
 License: GPLv2 or later
 
 A modern membership operations engine for service businesses. Co-developed by WordPressistic and launch partner Guns 2 Ammo (https://guns2ammo.com).
@@ -69,6 +69,12 @@ Set Settings > Advanced > "Delete data on uninstall" to Yes before removing the 
 == Changelog ==
 
 See CHANGELOG.md for the full history.
+
+= 1.12.0 =
+* Change: unified the monorepo (1.10.7) and dedicated-repo (1.11.0) lines of the plugin into one tree — both the 1.10.x fixes (Stripe cancel propagation, token-bridge stylesheet) and the Advanced FFL Checkout bridge are now present everywhere. No functional changes beyond the merge.
+
+= 1.11.0 =
+* New: Advanced FFL Checkout bridge — a member's own online FFL firearm-transfer history on their account dashboard, and a heads-up on the staff verification card. Read-only, off by default.
 
 = 1.10.1 =
 * Fix: cancelling a membership on the site now cancels the member's Stripe subscription too — previously only the local status changed and Stripe kept billing. Covers the members app Cancel action, admin status edits, and the legacy wp-admin members page. Failed cancels are logged to the activity feed instead of failing silently.

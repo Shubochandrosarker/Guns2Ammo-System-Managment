@@ -50,7 +50,7 @@ export default function Distributors() {
     } finally { setLoading(false); }
   };
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => { queueMicrotask(load); }, []);
 
   const loadRuns = async (id: number) => {
     const r = await get<{ runs: SyncRun[] }>(`/inventory/distributors/${id}/runs`);

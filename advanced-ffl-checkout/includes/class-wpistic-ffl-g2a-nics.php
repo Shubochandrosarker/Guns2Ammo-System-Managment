@@ -127,7 +127,7 @@ class G2A_NICS {
 	 * per the standard federal-observance rule (5 U.S.C. § 6103), since that's
 	 * the day the FFL/dealer is actually closed.
 	 */
-	private static function is_federal_holiday( string $ymd ): bool {
+	public static function is_federal_holiday( string $ymd ): bool {
 		$year = (int) substr( $ymd, 0, 4 );
 		return in_array( $ymd, self::federal_holidays_for_year( $year ), true );
 	}

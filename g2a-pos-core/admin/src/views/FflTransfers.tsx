@@ -40,7 +40,8 @@ export default function FflTransfers() {
       setLoading(false);
     }
   };
-  useEffect(() => { load(); }, []); // eslint-disable-line
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => { queueMicrotask(load); }, []);
 
   const cols: Column<Transfer>[] = [
     { key: 'transfer_ref', label: 'Ref', render: (r) => <span className="font-mono text-xs">{r.transfer_ref || `#${r.id}`}</span> },

@@ -61,6 +61,7 @@ final class Plugin {
 			'includes/integrations/class-pos-bridge.php',
 			'includes/integrations/class-corestore-client.php',
 			'includes/integrations/class-corestore-bridge.php',
+			'includes/integrations/class-ffl-checkout-bridge.php',
 			'includes/payments/class-stripe-service.php',
 			'includes/admin/class-admin-menu.php',
 			'includes/admin/class-dashboard-page.php',
@@ -160,6 +161,10 @@ final class Plugin {
 		// hosted coreSTORE POS. Independent from POS_Bridge above; gates
 		// itself on its own Integrations toggle.
 		add_action( 'init', array( Integrations\CoreStore_Bridge::class, 'register' ) );
+		// Advanced FFL Checkout bridge: read-only transfer history on the
+		// member account dashboard + staff verification card. Gates itself
+		// on its own Integrations toggle + plugin presence.
+		add_action( 'init', array( Integrations\FFL_Checkout_Bridge::class, 'register' ) );
 		// Per-plan WooCommerce member discounts (gates itself on the Woo
 		// toggle + the woo_member_discounts_enabled sub-option).
 		add_action( 'init', array( Integrations\WooCommerce_Discounts::class, 'register' ) );

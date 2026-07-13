@@ -35,19 +35,30 @@ class G2A_Carrier_Providers {
 	const OPTION_KEY     = 'wpistic_ffl_carrier_settings';
 	const CRON_HOOK_POLL = 'wpistic_ffl_carrier_poll';
 
+	/** Default parcel sizes by item type — oz / inches — used when the linked WC product has no weight/dimensions set. */
+	const DEFAULT_PARCELS = [
+		'handgun' => [ 'weight_oz' => 48,  'length' => 13, 'width' => 9,  'height' => 4 ],
+		'rifle'   => [ 'weight_oz' => 128, 'length' => 46, 'width' => 10, 'height' => 4 ],
+		'shotgun' => [ 'weight_oz' => 128, 'length' => 46, 'width' => 10, 'height' => 4 ],
+	];
+
 	public function __construct() {
 		add_action( 'init',                  [ $this, 'register_defaults' ], 20 );
 		add_action( 'rest_api_init',         [ $this, 'register_routes' ] );
 		add_action( self::CRON_HOOK_POLL,    [ __CLASS__, 'cron_poll_in_flight' ] );
 		add_action( 'admin_menu',            [ $this, 'register_admin_page' ], 30 );
+		add_action( 'wpistic_ffl_transfer_created', [ __CLASS__, 'maybe_rate_shop' ], 20, 1 );
 
 		// AJAX: per-transfer "Check now" button from the admin row.
 		add_action( 'wp_ajax_wpistic_ffl_carrier_check_now',    [ __CLASS__, 'ajax_check_now' ] );
 		add_action( 'wp_ajax_wpistic_ffl_carrier_save_settings', [ __CLASS__, 'ajax_save_settings' ] );
 		add_action( 'wp_ajax_wpistic_ffl_carrier_rotate_secret', [ __CLASS__, 'ajax_rotate_secret' ] );
+		// Exhibit 08: rate-shop + label purchase — same vendor/key EasyPost tracking already uses.
+		add_action( 'wp_ajax_wpistic_ffl_carrier_rate_shop', [ __CLASS__, 'ajax_rate_shop' ] );
+		add_action( 'wp_ajax_wpistic_ffl_carrier_buy_label', [ __CLASS__, 'ajax_buy_label' ] );
 	}
 
-	// ── Admin page ──────────────────────────────────────────────────────────
+	// ── Admin page ────────────────────────────────────────────
 
 	public function register_admin_page(): void {
 		add_submenu_page(
@@ -259,12 +270,21 @@ class G2A_Carrier_Providers {
 				'webhook_secret'       => wp_generate_password( 32, false ),
 				'poll_enabled'         => 1,
 				'auto_advance_on_delivered' => 1,
+				// Exhibit 08 — rate-shop + label purchase.
+				'rate_shop_enabled'    => 1,
+				'require_adult_signature' => 1,
+				'ship_from_name'       => '',
+				'ship_from_street'     => '',
+				'ship_from_city'       => '',
+				'ship_from_state'      => '',
+				'ship_from_zip'        => '',
+				'ship_from_phone'      => '',
 			] );
 		}
 		G2A_Scheduler::recurring( DAY_IN_SECONDS, self::CRON_HOOK_POLL, [], strtotime( 'tomorrow 04:00' ) );
 	}
 
-	// ── Provider registry ───────────────────────────────────────────────────
+	// ── Provider registry ──────────────────────────────────────────
 
 	/**
 	 * Get the list of providers known to the plugin. Returns
@@ -288,11 +308,48 @@ class G2A_Carrier_Providers {
 			'webhook_secret'            => '',
 			'poll_enabled'              => 1,
 			'auto_advance_on_delivered' => 1,
+			'rate_shop_enabled'         => 1,
+			'require_adult_signature'   => 1,
+			'ship_from_name'            => '',
+			'ship_from_street'          => '',
+			'ship_from_city'            => '',
+			'ship_from_state'           => '',
+			'ship_from_zip'             => '',
+			'ship_from_phone'           => '',
 		];
 		return array_merge( $defaults, is_array( $saved ) ? $saved : [] );
 	}
 
-	// ── Pull path: daily cron + manual "Check now" ──────────────────────────
+	/**
+	 * Ship-from address — the explicit setting above wins; falls back to
+	 * WooCommerce's own configured store address so most sites need zero new
+	 * data entry to start rate-shopping.
+	 */
+	private static function ship_from_address(): array {
+		$s = self::settings();
+		if ( $s['ship_from_street'] && $s['ship_from_zip'] ) {
+			return [
+				'name'    => $s['ship_from_name'] ?: get_bloginfo( 'name' ),
+				'street1' => $s['ship_from_street'],
+				'city'    => $s['ship_from_city'],
+				'state'   => $s['ship_from_state'],
+				'zip'     => $s['ship_from_zip'],
+				'country' => 'US',
+				'phone'   => $s['ship_from_phone'],
+			];
+		}
+		return [
+			'name'    => $s['ship_from_name'] ?: get_bloginfo( 'name' ),
+			'street1' => get_option( 'woocommerce_store_address', '' ) . ' ' . get_option( 'woocommerce_store_address_2', '' ),
+			'city'    => get_option( 'woocommerce_store_city', '' ),
+			'state'   => function_exists( 'wc_get_base_location' ) ? ( wc_get_base_location()['state'] ?? '' ) : '',
+			'zip'     => get_option( 'woocommerce_store_postcode', '' ),
+			'country' => function_exists( 'wc_get_base_location' ) ? ( wc_get_base_location()['country'] ?? 'US' ) : 'US',
+			'phone'   => $s['ship_from_phone'],
+		];
+	}
+
+	// ── Pull path: daily cron + manual "Check now" ──────────────────────
 
 	/**
 	 * Cron handler — scan every in-flight transfer with a tracking number and
@@ -310,7 +367,7 @@ class G2A_Carrier_Providers {
 		global $wpdb;
 		// Only transfers actively shipped, not yet received, with tracking data.
 		$rows = $wpdb->get_results( $wpdb->prepare( // phpcs:ignore WordPress.DB
-			'SELECT id, shipment_carrier, shipment_tracking, status FROM ' . DB::table( 'transfers' ) . "
+			'SELECT id, shipment_carrier, shipment_tracking, status FROM ' . DB::table( 'transfers' ) . " 
 			 WHERE status IN ('shipped_to_dealer','shipped')
 			   AND shipment_tracking != ''
 			   AND ( dealer_received_date IS NULL OR dealer_received_date = '0000-00-00' )
@@ -370,7 +427,7 @@ class G2A_Carrier_Providers {
 		] );
 	}
 
-	// ── EasyPost client ─────────────────────────────────────────────────────
+	// ── EasyPost client ──────────────────────────────────────────
 
 	/**
 	 * Minimal EasyPost Tracker fetch — POSTs a Tracker create request which
@@ -437,7 +494,236 @@ class G2A_Carrier_Providers {
 		};
 	}
 
-	// ── Push path: webhook receiver ─────────────────────────────────────────
+	// ── Rate shop + label purchase (Exhibit 08) ──────────────────────
+
+	/**
+	 * Auto-called when a transfer is created — quotes rates from EasyPost and
+	 * caches them on the transfer for staff to review. Never purchases
+	 * anything by itself; buying a label is always an explicit admin action
+	 * (real money spent), same "auto-quote, human buys" split this class
+	 * already uses for tracking ("Check now" is manual too).
+	 */
+	public static function maybe_rate_shop( int $transfer_id ): void {
+		$s = self::settings();
+		if ( empty( $s['rate_shop_enabled'] ) || 'easypost' !== ( $s['provider'] ?? '' ) || empty( $s['easypost_api_key'] ) ) {
+			return;
+		}
+		self::rate_shop( $transfer_id );
+	}
+
+	/**
+	 * Quote shipping rates for a transfer from EasyPost, caching the result.
+	 * Docs: https://docs.easypost.com/docs/shipments#create-a-shipment
+	 *
+	 * @return array|WP_Error rates array on success.
+	 */
+	public static function rate_shop( int $transfer_id ) {
+		$s = self::settings();
+		if ( empty( $s['easypost_api_key'] ) ) {
+			return new \WP_Error( 'no_api_key', 'EasyPost API key is not configured.' );
+		}
+
+		global $wpdb;
+		$t = $wpdb->get_row( $wpdb->prepare( // phpcs:ignore WordPress.DB
+			'SELECT tr.*, d.business_name, d.premise_street, d.premise_city, d.premise_state, d.premise_zip, d.phone AS dealer_phone
+			 FROM ' . DB::table( 'transfers' ) . ' tr
+			 LEFT JOIN ' . DB::table( 'dealers' ) . ' d ON d.id = tr.dealer_id
+			 WHERE tr.id = %d', $transfer_id
+		) );
+		if ( ! $t || ! $t->premise_street ) {
+			return new \WP_Error( 'no_dealer_address', 'Transfer has no dealer address to ship to.' );
+		}
+
+		$parcel = self::parcel_for_transfer( $t );
+
+		$body = [
+			'shipment' => [
+				'to_address'   => [
+					'name'    => $t->business_name ?: 'Receiving FFL',
+					'street1' => $t->premise_street,
+					'city'    => $t->premise_city,
+					'state'   => $t->premise_state,
+					'zip'     => $t->premise_zip,
+					'country' => 'US',
+					'phone'   => $t->dealer_phone ?: '',
+				],
+				'from_address' => self::ship_from_address(),
+				'parcel'       => [
+					'weight' => $parcel['weight_oz'],
+					'length' => $parcel['length'],
+					'width'  => $parcel['width'],
+					'height' => $parcel['height'],
+				],
+				'options'      => array_filter( [
+					// FFL-to-FFL firearm shipments require an adult signature at
+					// delivery — this is standard carrier policy, not a plugin
+					// invention. Configurable in case a store has its own
+					// carrier agreement that already covers it.
+					'delivery_confirmation' => ! empty( $s['require_adult_signature'] ) ? 'ADULT_SIGNATURE' : null,
+				] ),
+			],
+		];
+
+		$resp = wp_remote_post( 'https://api.easypost.com/v2/shipments', [
+			'timeout' => 20,
+			'headers' => [
+				'Authorization' => 'Basic ' . base64_encode( $s['easypost_api_key'] . ':' ),
+				'Content-Type'  => 'application/json',
+			],
+			'body'    => wp_json_encode( $body ),
+		] );
+		if ( is_wp_error( $resp ) ) {
+			return $resp;
+		}
+		$code = wp_remote_retrieve_response_code( $resp );
+		$payload = json_decode( wp_remote_retrieve_body( $resp ), true );
+		if ( $code < 200 || $code >= 300 || ! is_array( $payload ) ) {
+			return new \WP_Error( 'easypost_error', $payload['error']['message'] ?? 'EasyPost rate request failed.', [ 'status' => $code ] );
+		}
+
+		$rates = array_map( static function ( $r ) {
+			return [
+				'id'            => $r['id'] ?? '',
+				'carrier'       => $r['carrier'] ?? '',
+				'service'       => $r['service'] ?? '',
+				'rate'          => $r['rate'] ?? '',
+				'currency'      => $r['currency'] ?? 'USD',
+				'delivery_days' => $r['delivery_days'] ?? null,
+			];
+		}, (array) ( $payload['rates'] ?? [] ) );
+		usort( $rates, static fn( $a, $b ) => (float) $a['rate'] <=> (float) $b['rate'] );
+
+		$wpdb->update( DB::table( 'transfers' ), [ // phpcs:ignore WordPress.DB
+			'easypost_shipment_id' => (string) ( $payload['id'] ?? '' ),
+			'shipping_rates_json'  => wp_json_encode( $rates ),
+			'updated_at'           => current_time( 'mysql' ),
+		], [ 'id' => $transfer_id ] );
+
+		$wpdb->insert( DB::table( 'events' ), [ // phpcs:ignore WordPress.DB
+			'transfer_id' => $transfer_id,
+			'event_type'  => 'rate_shopped',
+			'notes'       => count( $rates ) . ' shipping rate(s) quoted from EasyPost.',
+			'actor'       => 'carrier-sync',
+			'actor_ip'    => '',
+		] );
+
+		return $rates;
+	}
+
+	/**
+	 * Pick a default parcel size for a transfer: the linked WC product's own
+	 * weight/dimensions when set, otherwise a sensible per-item-type default.
+	 */
+	private static function parcel_for_transfer( object $t ): array {
+		$type    = self::DEFAULT_PARCELS[ $t->item_type ] ?? self::DEFAULT_PARCELS['handgun'];
+		$product = $t->item_sku && function_exists( 'wc_get_product_id_by_sku' ) ? wc_get_product( wc_get_product_id_by_sku( $t->item_sku ) ) : null;
+		if ( $product && $product->has_weight() && $product->get_length() && $product->get_width() && $product->get_height() ) {
+			$unit_w = get_option( 'woocommerce_weight_unit', 'lbs' );
+			$unit_d = get_option( 'woocommerce_dimension_unit', 'in' );
+			$weight_oz = 'kg' === $unit_w ? ( (float) $product->get_weight() * 35.274 ) : ( (float) $product->get_weight() * 16 );
+			$to_in     = static fn( $v ) => 'cm' === $unit_d ? ( (float) $v / 2.54 ) : (float) $v;
+			return [
+				'weight_oz' => round( $weight_oz ),
+				'length'    => round( $to_in( $product->get_length() ) ),
+				'width'     => round( $to_in( $product->get_width() ) ),
+				'height'    => round( $to_in( $product->get_height() ) ),
+			];
+		}
+		return $type;
+	}
+
+	public static function ajax_rate_shop(): void {
+		check_ajax_referer( 'wpistic_ffl_admin_nonce', 'nonce' );
+		if ( ! current_user_can( 'manage_woocommerce' ) ) {
+			wp_send_json_error( [ 'message' => 'Forbidden' ], 403 );
+		}
+		$id = (int) ( $_POST['transfer_id'] ?? 0 ); // phpcs:ignore WordPress.Security.NonceVerification
+		if ( ! $id ) {
+			wp_send_json_error( [ 'message' => 'Missing transfer_id' ], 400 );
+		}
+		$rates = self::rate_shop( $id );
+		if ( is_wp_error( $rates ) ) {
+			wp_send_json_error( [ 'message' => $rates->get_error_message() ], 400 );
+		}
+		wp_send_json_success( [ 'rates' => $rates ] );
+	}
+
+	/**
+	 * Purchase a specific quoted rate. Real money spent — always an explicit
+	 * admin click, never automatic.
+	 */
+	public static function ajax_buy_label(): void {
+		check_ajax_referer( 'wpistic_ffl_admin_nonce', 'nonce' );
+		if ( ! current_user_can( 'manage_woocommerce' ) ) {
+			wp_send_json_error( [ 'message' => 'Forbidden' ], 403 );
+		}
+		// phpcs:disable WordPress.Security.NonceVerification
+		$id      = (int) ( $_POST['transfer_id'] ?? 0 );
+		$rate_id = sanitize_text_field( wp_unslash( $_POST['rate_id'] ?? '' ) );
+		// phpcs:enable
+		if ( ! $id || '' === $rate_id ) {
+			wp_send_json_error( [ 'message' => 'Missing transfer or rate.' ], 400 );
+		}
+
+		$s = self::settings();
+		if ( empty( $s['easypost_api_key'] ) ) {
+			wp_send_json_error( [ 'message' => 'EasyPost is not configured.' ], 400 );
+		}
+
+		global $wpdb;
+		$t = $wpdb->get_row( $wpdb->prepare( // phpcs:ignore WordPress.DB
+			'SELECT id, transfer_ref, status, easypost_shipment_id FROM ' . DB::table( 'transfers' ) . ' WHERE id = %d', $id
+		) );
+		if ( ! $t || ! $t->easypost_shipment_id ) {
+			wp_send_json_error( [ 'message' => 'No rate-shopped shipment on file. Rate-shop again first.' ], 404 );
+		}
+
+		$resp = wp_remote_post( 'https://api.easypost.com/v2/shipments/' . rawurlencode( $t->easypost_shipment_id ) . '/buy', [
+			'timeout' => 25,
+			'headers' => [
+				'Authorization' => 'Basic ' . base64_encode( $s['easypost_api_key'] . ':' ),
+				'Content-Type'  => 'application/json',
+			],
+			'body'    => wp_json_encode( [ 'rate' => [ 'id' => $rate_id ] ] ),
+		] );
+		if ( is_wp_error( $resp ) ) {
+			wp_send_json_error( [ 'message' => $resp->get_error_message() ], 502 );
+		}
+		$code    = wp_remote_retrieve_response_code( $resp );
+		$payload = json_decode( wp_remote_retrieve_body( $resp ), true );
+		if ( $code < 200 || $code >= 300 || empty( $payload['tracking_code'] ) ) {
+			wp_send_json_error( [ 'message' => $payload['error']['message'] ?? 'Label purchase failed.' ], 502 );
+		}
+
+		$carrier    = (string) ( $payload['selected_rate']['carrier'] ?? '' );
+		$tracking   = (string) $payload['tracking_code'];
+		$label_url  = (string) ( $payload['postage_label']['label_url'] ?? '' );
+
+		$wpdb->update( DB::table( 'transfers' ), [ // phpcs:ignore WordPress.DB
+			'shipment_carrier'   => $carrier,
+			'shipment_tracking'  => $tracking,
+			'shipping_label_url' => $label_url,
+			'shipped_date'       => current_time( 'Y-m-d' ),
+			'status'             => 'shipped_to_dealer',
+			'updated_at'         => current_time( 'mysql' ),
+		], [ 'id' => $id ] );
+
+		$wpdb->insert( DB::table( 'events' ), [ // phpcs:ignore WordPress.DB
+			'transfer_id' => $id,
+			'event_type'  => 'label_purchased',
+			'old_status'  => $t->status,
+			'new_status'  => 'shipped_to_dealer',
+			'notes'       => sprintf( 'Label purchased via EasyPost — %s, tracking %s.', $carrier, $tracking ),
+			'actor'       => wp_get_current_user()->user_login ?: 'staff',
+			'actor_ip'    => Token::client_ip(),
+		] );
+
+		do_action( 'wpistic_ffl_transfer_status_changed', $id, $t->status, 'shipped_to_dealer' );
+
+		wp_send_json_success( [ 'carrier' => $carrier, 'tracking' => $tracking, 'label_url' => $label_url ] );
+	}
+
+	// ── Push path: webhook receiver ─────────────────────────────
 
 	public function register_routes(): void {
 		register_rest_route( WPISTIC_FFL_REST_NS, '/carrier/webhook', [
@@ -567,7 +853,7 @@ class G2A_Carrier_Providers {
 		];
 	}
 
-	// ── Canonical ingestion ─────────────────────────────────────────────────
+	// ── Canonical ingestion ──────────────────────────────────────
 
 	/**
 	 * Apply a carrier status to a transfer. Records the audit event and, if

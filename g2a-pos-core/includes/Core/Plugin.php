@@ -54,7 +54,6 @@ final class Plugin {
 	public function boot(): void {
 		Cron::register_intervals();
 		JWT::bootstrap();
-		Roles::register_caps();
 		SecurityHeaders::boot();
 		Privacy::boot();
 		self::maybe_upgrade();
@@ -289,6 +288,17 @@ final class Plugin {
 	}
 
 	private static function maybe_upgrade(): void {
+		// Upgrade/self-heal work never runs on public front-end requests.
+		// The schema migration creates ~90 tables via dbDelta; before this
+		// gate existed, a plugin-file replace meant EVERY visitor request
+		// re-ran the full migration (no lock, version option written only at
+		// the very end) — concurrent dbDelta storms took whole sites down on
+		// shared hosting. Admin, cron and WP-CLI contexts are frequent enough
+		// for the self-heal duties too.
+		if ( ! is_admin() && ! wp_doing_cron() && ! ( defined( 'WP_CLI' ) && WP_CLI ) ) {
+			return;
+		}
+
 		// Self-heal every recurring event: older versions scheduled some hooks
 		// only during activation (which never re-runs on a plugin-file
 		// replace) and scheduled the minute-interval events before the
@@ -320,9 +330,56 @@ final class Plugin {
 		if ( get_option( 'g2a_pos_core_db_version' ) === G2A_POS_CORE_VERSION ) {
 			return;
 		}
-		Migrator::run();
-		Roles::register_roles();
-		Roles::register_caps();
+		self::run_migrations();
+	}
+
+	/**
+	 * Run the schema migration + role sync exactly once at a time.
+	 *
+	 * A cross-request lock prevents the migration stampede that used to take
+	 * sites down: without it, every request between "files replaced" and
+	 * "version option saved" ran the full ~90-table dbDelta concurrently.
+	 * The request is also detached from the client and freed from the PHP
+	 * time limit so a slow shared host can finish the initial install.
+	 */
+	private static function run_migrations(): void {
+		if ( ! self::acquire_migration_lock() ) {
+			return; // Another request is already migrating.
+		}
+		ignore_user_abort( true );
+		if ( function_exists( 'set_time_limit' ) ) {
+			@set_time_limit( 0 ); // phpcs:ignore WordPress.PHP.NoSilencedErrors.Discouraged -- disabled function on some hosts.
+		}
+		try {
+			Migrator::run();
+			Roles::register_roles();
+			Roles::register_caps();
+		} finally {
+			self::release_migration_lock();
+		}
+	}
+
+	private const MIGRATION_LOCK = 'g2a_pos_migration_lock';
+
+	/**
+	 * Atomic lock via add_option (unique key on option_name makes a double
+	 * insert impossible). A lock older than 15 minutes is treated as left
+	 * behind by a killed request and taken over.
+	 */
+	private static function acquire_migration_lock(): bool {
+		if ( add_option( self::MIGRATION_LOCK, (string) time(), '', false ) ) {
+			return true;
+		}
+		$started = (int) get_option( self::MIGRATION_LOCK );
+		if ( $started > 0 && ( time() - $started ) > 15 * MINUTE_IN_SECONDS ) {
+			update_option( self::MIGRATION_LOCK, (string) time(), false );
+			return true;
+		}
+		return false;
+	}
+
+	private static function release_migration_lock(): void {
+		delete_option( self::MIGRATION_LOCK );
 	}
 
 	/** Timestamp for the next ~3:15 AM in the site's timezone (true nightly run). */
@@ -341,9 +398,9 @@ final class Plugin {
 	}
 
 	public static function activate(): void {
-		Migrator::run();
-		Roles::register_roles();
-		Roles::register_caps();
+		// Locked + detached + untimed: the initial install creates ~90 tables
+		// and must survive shared-hosting execution limits.
+		self::run_migrations();
 
 		// schedule_all_crons() registers the custom 'minute' interval before
 		// scheduling — activation runs before our plugins_loaded boot, so

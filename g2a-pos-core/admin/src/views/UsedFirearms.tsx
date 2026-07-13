@@ -52,7 +52,7 @@ export default function UsedFirearms() {
     } finally { setLoading(false); }
   };
   useEffect(() => {
-    refresh();
+    queueMicrotask(refresh);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [status]);
 

@@ -54,7 +54,7 @@ export default function Classes() {
       setSessions(ss.sessions || []);
     } finally { setLoading(false); }
   };
-  useEffect(() => { refresh(); }, []);
+  useEffect(() => { queueMicrotask(refresh); }, []);
 
   const createClass = async () => {
     if (!newClass.class_code || !newClass.title) return;

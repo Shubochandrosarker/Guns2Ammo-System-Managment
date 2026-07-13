@@ -110,6 +110,13 @@ const VIEWS: Record<NavKey, () => JSX.Element> = {
   settings: Settings,
 };
 
+// Fall back to a friendly notice instead of crashing if a hash ever maps to
+// a key with no registered view component. Declared here (not inline in
+// App) so it isn't recreated on every render.
+function NotAvailableView() {
+  return <div className="card p-6">This screen isn’t available. Pick another from the sidebar.</div>;
+}
+
 export default function App() {
   const [view, setView] = useState<NavKey>(() => {
     const hash = window.location.hash.replace(/^#/, '') as NavKey;
@@ -135,11 +142,7 @@ export default function App() {
     return () => window.removeEventListener('hashchange', handler);
   }, []);
 
-  // Fall back to a friendly notice instead of crashing if a hash ever maps to
-  // a key with no registered view component.
-  const View = VIEWS[view] ?? (() => (
-    <div className="card p-6">This screen isn’t available. Pick another from the sidebar.</div>
-  ));
+  const View = VIEWS[view] ?? NotAvailableView;
 
   return (
     <div className="flex h-full min-h-screen w-full bg-zinc-50 text-zinc-900 dark:bg-zinc-950 dark:text-zinc-100">

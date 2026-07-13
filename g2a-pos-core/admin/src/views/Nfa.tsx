@@ -62,7 +62,7 @@ export default function Nfa() {
       setTrusts(tr.items || []);
     } finally { setLoading(false); }
   };
-  useEffect(() => { refresh(); }, []);
+  useEffect(() => { queueMicrotask(refresh); }, []);
 
   const createItem = async () => {
     if (!form.serial_number || !form.manufacturer) return;

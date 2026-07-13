@@ -71,7 +71,7 @@ export default function Customers() {
     } finally { setLoading(false); }
   };
 
-  useEffect(() => { search(); },
+  useEffect(() => { queueMicrotask(search); },
     // eslint-disable-next-line react-hooks/exhaustive-deps
     []);
 

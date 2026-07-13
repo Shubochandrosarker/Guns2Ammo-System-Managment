@@ -106,6 +106,15 @@ This plugin can connect to third-party services when enabled by the site adminis
 
 == Changelog ==
 
+= 2.1.0 =
+* New: branded HTML email system (`Wpistic_Formistic_Emails`) — the auto-responder acknowledgement and newsletter emails now use a modern branded shell instead of plain text, and the newsletter gains a welcome/confirmation email.
+* New: newsletter one-click unsubscribe — a stateless HMAC unsubscribe token, RFC 2369/8058 `List-Unsubscribe` / `List-Unsubscribe-Post` headers (native Gmail/Yahoo unsubscribe affordance), and a branded unsubscribe landing page.
+* Fix: the per-IP submission rate limiter's non-atomic check-then-act race is now guarded with a MySQL advisory lock, so concurrent submissions can no longer slip past the limit.
+* Change: Formistic is now the sole contact-form/inbox/newsletter plugin — the legacy WPistic Contact Form plugin is retired. The "Import from Wpistic Contact Form" migration tool remains available, and the legacy `WPCF_EMAIL_DISABLED` wp-config constant is still honored for a grace period.
+
+= 2.0.7 =
+* Change: the one-time "Seed Guns 2 Ammo defaults" AI knowledge (FAQ and business facts) now reads the business name, address, phone, and email from the theme's live business-info helpers (single source of truth) instead of a hard-coded copy, so seeded defaults never drift from the Customizer-edited values.
+
 = 2.0.6 =
 * Fix: on sites behind Cloudflare (or another reverse proxy), the per-IP submission rate limit and the newsletter throttle could resolve every visitor to the proxy's shared edge IP, silently blocking most real submissions after the first few. Cloudflare's published IP ranges are now fill-only seeded into the trusted-proxy list (Settings → Spam tab) on activation and via the "Seed Guns 2 Ammo defaults" button, and the newsletter throttle now honors the same trusted-proxy list the contact-form rate limit already used.
 * Fix: the legacy admin-post.php capture path (used only as a fallback for stale-cached forms) no longer drops the "Course" field from theme reservation forms.
@@ -159,6 +168,9 @@ This plugin can connect to third-party services when enabled by the site adminis
 * AI & Automation tab with trainable context and easy auto-reply rules.
 
 == Upgrade Notice ==
+
+= 2.1.0 =
+Branded HTML emails, newsletter one-click unsubscribe (List-Unsubscribe headers), and an atomic rate-limiter fix. Recommended for all users.
 
 = 2.0.0 =
 Major release: modular Addons system, standalone visual form builder, Contact/Newsletter form types, and a fully rebranded code structure. A fresh install is recommended.

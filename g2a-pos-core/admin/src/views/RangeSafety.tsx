@@ -51,7 +51,7 @@ export default function RangeSafety() {
     setTickets(m.items || []);
     setIncidents(i.items || []);
   };
-  useEffect(() => { refresh(); }, []);
+  useEffect(() => { queueMicrotask(refresh); }, []);
 
   const openTicket = async () => {
     if (!maintForm.lane_code) return;

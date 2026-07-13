@@ -419,17 +419,77 @@ define( 'WPISTIC_FFL_OTTER_KEY', 'your-jwt-here' );</pre>
 				</div>
 			<?php endif; ?>
 
-			<p class="description"><?php esc_html_e( 'Remote license activation against wordpressistic.com (via Paid Memberships Pro) will arrive in v1.2.0. For now, license management is handled via a wp-config.php constant.', 'advanced-ffl-checkout' ); ?></p>
+			<?php if ( ! ( defined( 'WPISTIC_FFL_UNLIMITED' ) && WPISTIC_FFL_UNLIMITED ) ) : ?>
+				<p class="description"><?php esc_html_e( 'Activates against wordpressistic.com. Entitlements are cached locally and revalidated weekly, with a 7-day grace period if the license server is briefly unreachable.', 'advanced-ffl-checkout' ); ?></p>
 
-			<table class="form-table">
-				<tr>
-					<th><label for="license_key"><?php esc_html_e( 'License key', 'advanced-ffl-checkout' ); ?></label></th>
-					<td>
-						<input type="text" id="license_key" name="license_key" value="<?php echo esc_attr( (string) ( $lic['key'] ?? '' ) ); ?>" class="regular-text" disabled>
-						<p class="description"><?php esc_html_e( 'Placeholder — remote verification coming in v1.2.0.', 'advanced-ffl-checkout' ); ?></p>
-					</td>
-				</tr>
-			</table>
+				<?php if ( 'remote' === ( $lic['mode'] ?? '' ) && ! empty( $lic['key'] ) ) : ?>
+					<p class="description">
+						<?php
+						if ( ! empty( $lic['last_validated'] ) ) {
+							printf( esc_html__( 'Last validated: %s', 'advanced-ffl-checkout' ), esc_html( date_i18n( 'M j, Y g:i a', (int) $lic['last_validated'] ) ) );
+						}
+						if ( ! empty( $lic['grace_since'] ) ) {
+							echo ' — <strong style="color:#B45309;">' . esc_html__( 'License server unreachable — running on grace period.', 'advanced-ffl-checkout' ) . '</strong>';
+						}
+						?>
+					</p>
+				<?php endif; ?>
+
+				<table class="form-table">
+					<tr>
+						<th><label for="license_key"><?php esc_html_e( 'License key', 'advanced-ffl-checkout' ); ?></label></th>
+						<td>
+							<input type="text" id="license_key" name="license_key" value="<?php echo esc_attr( (string) ( $lic['key'] ?? '' ) ); ?>" class="regular-text" placeholder="<?php esc_attr_e( 'Paste your license key', 'advanced-ffl-checkout' ); ?>">
+							<button type="button" class="button button-primary" id="wpistic-ffl-license-activate"><?php esc_html_e( 'Activate', 'advanced-ffl-checkout' ); ?></button>
+							<?php if ( ! empty( $lic['key'] ) ) : ?>
+								<button type="button" class="button" id="wpistic-ffl-license-deactivate"><?php esc_html_e( 'Deactivate', 'advanced-ffl-checkout' ); ?></button>
+							<?php endif; ?>
+							<p class="description" id="wpistic-ffl-license-result"></p>
+						</td>
+					</tr>
+				</table>
+
+				<script>
+				(function(){
+					var nonce = <?php echo wp_json_encode( wp_create_nonce( 'wpistic_ffl_admin_nonce' ) ); ?>;
+					var result = document.getElementById('wpistic-ffl-license-result');
+					function call(action, extra) {
+						var fd = new FormData();
+						fd.append('action', action);
+						fd.append('nonce', nonce);
+						if (extra) { fd.append('license_key', extra); }
+						result.textContent = 'Working…';
+						result.style.color = '#666';
+						fetch(ajaxurl, { method: 'POST', body: fd, credentials: 'same-origin' })
+							.then(function(r){ return r.json(); })
+							.then(function(j){
+								if (j && j.success) {
+									result.textContent = '✓ Done — reloading…';
+									result.style.color = '#16A34A';
+									setTimeout(function(){ location.reload(); }, 600);
+								} else {
+									result.textContent = '✗ ' + ((j && j.data && j.data.message) || 'Failed');
+									result.style.color = '#DC2626';
+								}
+							})
+							.catch(function(){ result.textContent = '✗ Network error'; result.style.color = '#DC2626'; });
+					}
+					var actBtn = document.getElementById('wpistic-ffl-license-activate');
+					if (actBtn) {
+						actBtn.addEventListener('click', function(){
+							call('wpistic_ffl_license_activate', document.getElementById('license_key').value);
+						});
+					}
+					var deactBtn = document.getElementById('wpistic-ffl-license-deactivate');
+					if (deactBtn) {
+						deactBtn.addEventListener('click', function(){
+							if (! confirm('<?php echo esc_js( __( 'Deactivate this license? Pro/Agency features will lock immediately.', 'advanced-ffl-checkout' ) ); ?>')) return;
+							call('wpistic_ffl_license_deactivate');
+						});
+					}
+				})();
+				</script>
+			<?php endif; ?>
 		</div>
 
 	<?php endif; ?>

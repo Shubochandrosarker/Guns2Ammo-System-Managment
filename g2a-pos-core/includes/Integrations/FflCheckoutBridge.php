@@ -5,12 +5,30 @@ namespace G2A\POS\Integrations;
 defined( 'ABSPATH' ) || exit;
 
 /**
- * Advanced FFL Checkout (advanced-ffl-checkout plugin) bridge — read-only v1.
+ * Advanced FFL Checkout (advanced-ffl-checkout plugin) bridge.
  *
  * That plugin tracks WooCommerce-order FFL transfers in its own tables
  * (wp_wpistic_ffl_transfers / wp_wpistic_ffl_dealers). This bridge lists
  * them for the POS "FFL Transfers" view and counts them per customer for
- * the CRM detail panel. No writes.
+ * the CRM detail panel.
+ *
+ * v2 (addon integration): the two domain models don't actually line up
+ * well enough to merge — advanced-ffl-checkout's `transfers` table is a
+ * WooCommerce-order-driven CUSTOMER pickup record (status vocabulary:
+ * payment_confirmed → shipped_to_dealer → received_by_dealer →
+ * transferred), while this plugin's `FflTransfer::inbound_consignment()`/
+ * `outbound_transfer()` are dealer-to-dealer INVENTORY consignments with
+ * no end customer and no WooCommerce order at all. Forcing a consignment
+ * into the customer-transfer table (or into that plugin's `ad_ledger`,
+ * whose `transfer_id` column is a NOT NULL FK to a real transfer row)
+ * would mean inventing a fake customer/transfer row — worse than no
+ * integration. Instead this pushes a plain audit-log entry into that
+ * plugin's own Activity Log (`wp_wpistic_ffl_events`, `transfer_id = 0` —
+ * the same "not tied to a specific transfer" sentinel that plugin's own
+ * Verification Hub and State Rules admin already use for site-wide
+ * events), so POS-side dealer-to-dealer FFL activity is at least visible
+ * in the WooCommerce-facing plugin's unified activity feed. Read path is
+ * unchanged and remains the primary integration.
  */
 final class FflCheckoutBridge {
 
@@ -102,5 +120,50 @@ final class FflCheckoutBridge {
 				(string) $email
 			)
 		);
+	}
+
+	/**
+	 * Log a POS-side dealer-to-dealer FFL event into advanced-ffl-checkout's
+	 * own Activity Log, so staff watching that plugin's dashboard see it too.
+	 * `transfer_id = 0` is that plugin's own established sentinel for a
+	 * site-wide/non-transfer-specific audit row (its Verification Hub policy
+	 * changes and State Rules admin edits already log this way) — safe to
+	 * reuse without inventing a fake transfer record.
+	 */
+	public static function log_activity( string $event_type, string $notes ): void {
+		if ( ! self::is_active() ) {
+			return;
+		}
+		global $wpdb;
+		$wpdb->insert(
+			$wpdb->prefix . 'wpistic_ffl_events',
+			array(
+				'transfer_id' => 0,
+				'event_type'  => 'pos_' . sanitize_key( $event_type ),
+				'notes'       => $notes,
+				'actor'       => 'g2a-pos-core',
+				'actor_ip'    => '',
+			)
+		);
+	}
+
+	/**
+	 * Resolve a synced ATF dealer row in advanced-ffl-checkout's own
+	 * `dealers` table by FFL license number, for context in the log line —
+	 * best-effort, returns null (not an error) if that dealer isn't in the
+	 * ~80k-row monthly ATF sync yet.
+	 */
+	public static function find_dealer_business_name( string $ffl_number ): ?string {
+		if ( ! self::is_active() || '' === $ffl_number ) {
+			return null;
+		}
+		global $wpdb;
+		$name = $wpdb->get_var(
+			$wpdb->prepare(
+				'SELECT business_name FROM ' . $wpdb->prefix . 'wpistic_ffl_dealers WHERE license_number = %s LIMIT 1',
+				$ffl_number
+			)
+		);
+		return $name ? (string) $name : null;
 	}
 }

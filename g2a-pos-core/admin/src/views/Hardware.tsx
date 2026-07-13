@@ -43,7 +43,7 @@ export default function Hardware() {
     const r = await get<{ items: Profile[] }>('/hardware/profiles');
     setRows(r.items || []);
   };
-  useEffect(() => { refresh(); }, []);
+  useEffect(() => { queueMicrotask(refresh); }, []);
 
   const save = async () => {
     if (!form.register_code) return;

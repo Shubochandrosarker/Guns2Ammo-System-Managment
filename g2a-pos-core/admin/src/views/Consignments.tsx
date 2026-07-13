@@ -43,7 +43,7 @@ export default function Consignments() {
       setRows(r.items || []);
     } finally { setLoading(false); }
   };
-  useEffect(() => { refresh(); }, []);
+  useEffect(() => { queueMicrotask(refresh); }, []);
 
   const create = async () => {
     if (!form.consignor_name || !form.firearm_serial) return;

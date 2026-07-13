@@ -40,7 +40,7 @@ export default function LocationTransfers() {
       setRows(r.items || []);
     } finally { setLoading(false); }
   };
-  useEffect(() => { refresh(); }, []);
+  useEffect(() => { queueMicrotask(refresh); }, []);
 
   const create = async () => {
     if (!form.from_location_id || !form.to_location_id) return;

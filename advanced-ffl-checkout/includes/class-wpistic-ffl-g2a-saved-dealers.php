@@ -38,7 +38,7 @@ class G2A_Saved_Dealers {
 		add_action( 'rest_api_init', [ $this, 'register_routes' ] );
 	}
 
-	// ── Data access ─────────────────────────────────────────────────────────
+	// ── Data access ────────────────────────────────────────────
 
 	/**
 	 * Return the user's saved-dealer list — most-recent first.
@@ -109,7 +109,7 @@ class G2A_Saved_Dealers {
 		];
 	}
 
-	// ── Auto-save after a transfer is created ───────────────────────────────
+	// ── Auto-save after a transfer is created ─────────────────────
 
 	/**
 	 * Hooked into wpistic_ffl_transfer_created. We look up the dealer ID
@@ -167,7 +167,7 @@ class G2A_Saved_Dealers {
 		}
 	}
 
-	// ── Checkout integration ────────────────────────────────────────────────
+	// ── Checkout integration ────────────────────────────────
 
 	/**
 	 * Inject the saved-dealers list into wp_localize_script data so the
@@ -194,7 +194,7 @@ class G2A_Saved_Dealers {
 		return $data;
 	}
 
-	// ── REST ────────────────────────────────────────────────────────────────
+	// ── REST ──────────────────────────────────────────────────
 
 	public function register_routes(): void {
 		$ns = WPISTIC_FFL_REST_NS;

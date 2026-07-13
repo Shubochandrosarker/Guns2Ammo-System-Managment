@@ -51,7 +51,7 @@ export default function PurchaseOrders() {
       setRows(r.items || []);
     } finally { setLoading(false); }
   };
-  useEffect(() => { refresh(); }, []);
+  useEffect(() => { queueMicrotask(refresh); }, []);
 
   const create = async () => {
     if (!form.items?.length) return;

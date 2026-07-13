@@ -91,7 +91,7 @@ class G2A_Compliance_Check {
 		<?php
 	}
 
-	// ── Audit checks ────────────────────────────────────────────────────────
+	// ── Audit checks ────────────────────────────────────────────────────
 
 	public static function run_audit(): array {
 		global $wpdb;
@@ -326,6 +326,72 @@ class G2A_Compliance_Check {
 			'action'      => '',
 		];
 
+		// 17. Multi-sale (Form 3310.4) pending review
+		$pending_ms = (int) $wpdb->get_var( "SELECT COUNT(*) FROM " . DB::table( 'multi_sale_flags' ) . " WHERE status = 'pending_review'" );
+		$checks[] = [
+			'name'        => 'Multiple-sale (Form 3310.4) watch',
+			'description' => 'Detected buyers with 2+ handgun transfers within a rolling 5-business-day window, awaiting staff review/filing.',
+			'status'      => $pending_ms > 0 ? 'warn' : 'pass',
+			'detail'      => $pending_ms > 0 ? $pending_ms . ' flag(s) pending review' : 'None pending',
+			'action'      => $pending_ms > 0 ? '<a href="' . esc_url( admin_url( 'admin.php?page=wpistic-ffl-multi-sale' ) ) . '">Review flags</a>' : '',
+		];
+
+		// 18. A&D bound-book entries missing a serial number
+		$missing_serial = (int) $wpdb->get_var( "SELECT COUNT(*) FROM " . DB::table( 'ad_ledger' ) . " WHERE serial_number = ''" );
+		$checks[] = [
+			'name'        => 'Bound book — missing serial numbers',
+			'description' => 'A&D ledger rows recorded before a serial number was on file.',
+			'status'      => $missing_serial > 0 ? 'warn' : 'pass',
+			'detail'      => $missing_serial > 0 ? $missing_serial . ' row(s) need a serial number' : 'All rows have a serial number',
+			'action'      => $missing_serial > 0 ? '<a href="' . esc_url( admin_url( 'admin.php?page=wpistic-ffl-ad-ledger' ) ) . '">Open Bound Book</a>' : '',
+		];
+
+		// 19. Background-check provider configured
+		if ( class_exists( '\WpisticFFL\G2A_Background_Check_Providers' ) ) {
+			$bg = G2A_Background_Check_Providers::settings();
+			$checks[] = [
+				'name'        => 'Background-check provider',
+				'description' => 'Manual entry always works; a connected provider can also push results via webhook.',
+				'status'      => 'info',
+				'detail'      => 'manual' === $bg['provider'] ? 'Manual entry only' : ucfirst( $bg['provider'] ) . ' connected',
+				'action'      => '<a href="' . esc_url( admin_url( 'admin.php?page=wpistic-ffl-background-check' ) ) . '">Configure</a>',
+			];
+		}
+
+		// 20. Payment gateway is a known firearms-averse processor
+		if ( function_exists( 'WC' ) && WC()->payment_gateways() ) {
+			$high_risk_averse = [ 'stripe', 'ppcp', 'paypal', 'square', 'square_credit_card' ];
+			$active_averse    = [];
+			foreach ( (array) WC()->payment_gateways()->get_available_payment_gateways() as $gw_id => $gw ) {
+				foreach ( $high_risk_averse as $needle ) {
+					if ( false !== strpos( strtolower( $gw_id ), $needle ) ) {
+						$active_averse[] = $gw->get_title();
+						break;
+					}
+				}
+			}
+			$checks[] = [
+				'name'        => 'Payment gateway firearms risk',
+				'description' => 'Stripe, PayPal, and Square routinely terminate firearms-merchant accounts mid-season with no warning. A first-party NMI gateway adapter (Advanced FFL → Settings → Payments) targets processors that actually work with this industry.',
+				'status'      => $active_averse ? 'warn' : 'pass',
+				'detail'      => $active_averse ? 'Active gateway(s) with known firearms-merchant risk: ' . implode( ', ', $active_averse ) : 'No known high-risk-averse gateway currently active',
+				'action'      => $active_averse ? '<a href="' . esc_url( admin_url( 'admin.php?page=wc-settings&tab=checkout&section=wpistic_ffl_nmi' ) ) . '">Configure NMI gateway</a>' : '',
+			];
+		}
+
+		// 21. License activation mode
+		if ( class_exists( '\WpisticFFL\License' ) ) {
+			$lic = \WpisticFFL\License::entitlements();
+			$unlimited = defined( 'WPISTIC_FFL_UNLIMITED' ) && WPISTIC_FFL_UNLIMITED;
+			$checks[] = [
+				'name'        => 'License activation',
+				'description' => 'How this install\'s Pro/Agency entitlements are determined.',
+				'status'      => 'info',
+				'detail'      => $unlimited ? 'Unlimited mode (wp-config constant)' : ( ! empty( $lic['mode'] ) ? ucfirst( (string) $lic['mode'] ) . ' — tier ' . ( $lic['tier'] ?? 'free' ) : 'Not activated (free tier)' ),
+				'action'      => '',
+			];
+		}
+
 		// Summarize
 		$summary = [ 'pass' => 0, 'warn' => 0, 'fail' => 0, 'info' => 0 ];
 		foreach ( $checks as $c ) {
@@ -339,7 +405,7 @@ class G2A_Compliance_Check {
 		];
 	}
 
-	// ── Token secret notice + action ────────────────────────────────────────
+	// ── Token secret notice + action ────────────────────────────────
 
 	public function maybe_token_secret_notice(): void {
 		// Only nag on our own pages.
@@ -412,7 +478,7 @@ class G2A_Compliance_Check {
 		} );
 	}
 
-	// ── REST ────────────────────────────────────────────────────────────────
+	// ── REST ─────────────────────────────────────────────────────
 
 	public function register_routes(): void {
 		register_rest_route( WPISTIC_FFL_REST_NS, '/compliance/audit', [

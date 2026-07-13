@@ -94,7 +94,7 @@ export default function AiBrain() {
       } catch { /* stats are decorative — never block the doc list */ }
     } finally { setLoading(false); }
   };
-  useEffect(() => { refresh(); }, []);
+  useEffect(() => { queueMicrotask(refresh); }, []);
 
   const ingestText = async () => {
     if (!textForm.label || !textForm.body) return;

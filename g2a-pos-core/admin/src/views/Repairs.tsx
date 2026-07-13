@@ -43,7 +43,7 @@ export default function Repairs() {
       setRows(r.items || []);
     } finally { setLoading(false); }
   };
-  useEffect(() => { refresh(); }, []);
+  useEffect(() => { queueMicrotask(refresh); }, []);
 
   const create = async () => {
     if (!form.customer_name || !form.problem_description) return;

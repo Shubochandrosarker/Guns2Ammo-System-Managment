@@ -197,12 +197,26 @@ class Mailer {
 	}
 
 	private static function email_customer_dealer_received( object $transfer ): void {
-		// G2A: attach a tentative .ics pickup invite so the customer can one-tap
-		// block off time to visit the dealer. Tentative + has a 1-hour reminder.
+		// v1.11.0 (Exhibit 09) — g2a-booking-engine is a real, race-safe
+		// appointment system already running in the same business system.
+		// When it's active, link the customer to a page that shows the
+		// dealer's ACTUAL open slots and lets them book one for real. The
+		// old fixed-guess .ics invite (next business day, 12:00, 30 min —
+		// a time nobody confirmed) is now only the fallback for sites that
+		// don't have the booking engine installed.
+		$scheduling_available = class_exists( '\WpisticFFL\G2A_Booking_Bridge' ) && \WpisticFFL\G2A_Booking_Bridge::is_available();
+
 		$ics_path = null;
-		if ( class_exists( '\WpisticFFL\G2A_Ics' ) ) {
+		$extra    = '';
+		if ( $scheduling_available ) {
+			$schedule_url = \WpisticFFL\G2A_Booking_Bridge::url_for( $transfer->transfer_ref );
+			$extra = '<p style="margin-top:14px;"><a href="' . esc_url( $schedule_url ) . '" style="display:inline-block;padding:10px 20px;background:#DCB45F;color:#0F0E12;text-decoration:none;border-radius:8px;font-weight:700;">📅 ' . esc_html__( 'Schedule Your Pickup', 'advanced-ffl-checkout' ) . '</a></p>'
+				. '<p style="font-size:12px;opacity:.7;">' . esc_html__( 'Pick a real open time at the dealer — no guessing.', 'advanced-ffl-checkout' ) . '</p>';
+		} elseif ( class_exists( '\WpisticFFL\G2A_Ics' ) ) {
 			$ics_path = \WpisticFFL\G2A_Ics::build_temp_file( $transfer );
+			$extra    = $ics_path ? '<p style="margin-top:14px;font-size:13px;opacity:.8;">📅 ' . esc_html__( 'A tentative calendar invite is attached — use it as a starting point for your pickup appointment.', 'advanced-ffl-checkout' ) . '</p>' : '';
 		}
+
 		self::send(
 			$transfer->customer_email,
 			sprintf( __( 'Item Arrived at Dealer — FFL Transfer #%s', 'advanced-ffl-checkout' ), $transfer->transfer_ref ),
@@ -212,8 +226,7 @@ class Mailer {
 				sprintf(
 					__( 'Your firearm has been received by <strong>%s</strong>. The dealer will contact you to schedule your background check and pickup.', 'advanced-ffl-checkout' ),
 					esc_html( $transfer->dealer_name )
-				) . self::dealer_block( $transfer )
-				. ( $ics_path ? '<p style="margin-top:14px;font-size:13px;opacity:.8;">📅 ' . esc_html__( 'A tentative calendar invite is attached — use it as a starting point for your pickup appointment.', 'advanced-ffl-checkout' ) . '</p>' : '' ),
+				) . self::dealer_block( $transfer ) . $extra,
 				'primary'
 			),
 			'', // legacy nonce arg unused

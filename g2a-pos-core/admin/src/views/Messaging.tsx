@@ -60,7 +60,7 @@ export default function Messaging() {
       setTemplates(t.items || []);
     } finally { setLoading(false); }
   };
-  useEffect(() => { refresh(); }, []);
+  useEffect(() => { queueMicrotask(refresh); }, []);
 
   const send = async () => {
     if (!form.to_address || !form.body) return;

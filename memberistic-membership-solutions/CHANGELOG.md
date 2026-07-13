@@ -2,6 +2,16 @@
 
 All notable changes are tracked here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## 1.12.0 — Crossmatch unification (2026-07-13)
+
+### Changed
+- **Unified the two divergent copies of the plugin** (the Guns2Ammo-System-Managment monorepo line, which had reached 1.10.7, and the dedicated memberistic-membership-solutions repo line, which had reached 1.11.0). Both locations now carry the identical 1.12.0 tree containing the newest code from each line: the monorepo's 1.10.1–1.10.7 fixes (Stripe cancel propagation, token-bridge stylesheet, audit hardening) **and** the dedicated repo's Advanced FFL Checkout bridge (1.11.0). No functional changes beyond the merge itself.
+
+## 1.11.0 — Advanced FFL Checkout bridge
+
+### Added
+- **Advanced FFL Checkout integration.** New read-only bridge (`FFL_Checkout_Bridge`) surfaces a member's own online FFL firearm-transfer history — from the separate `advanced-ffl-checkout` WooCommerce storefront plugin — on their account dashboard (matched by email against that plugin's `transfers` table, same-site direct read, the same pattern the POS Bridge and coreSTORE Bridge already use), plus a quick heads-up on the staff "Member Verification" QR card if they have an open transfer in flight. New "Advanced FFL Checkout" card on Memberistic → Integrations (off by default; gated on that plugin being active).
+
 ## 1.10.1 — Cancelling on the site now cancels the Stripe subscription
 
 ### Fixed
