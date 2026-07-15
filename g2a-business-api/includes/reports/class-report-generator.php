@@ -211,10 +211,83 @@ class Report_Generator {
 			sprintf( 'Store: $%s from %d orders', number_format( $store_rev / 100 ), $orders ),
 			sprintf( 'Memberships: %d active · %d renewed · %d expired', $active, $renewals, $expired ),
 			sprintf( 'SEO clicks: %d', $clicks ),
-			'',
-			'Full detail: https://app.guns2ammo.com/business-analysis',
 		);
+
+		$waivers = self::waiver_digest_line();
+		if ( '' !== $waivers ) {
+			$lines[] = $waivers;
+		}
+
+		$lines[] = '';
+		$lines[] = 'Full detail: https://app.guns2ammo.com/business-analysis';
 		return implode( "\n", $lines );
+	}
+
+	/**
+	 * One-line waiver-operations digest for the weekly report: signings this
+	 * week (kiosk share), waivers expiring in the next 30 days, and upcoming
+	 * bookings with no waiver on file. Empty string when Memberistic's waiver
+	 * tables aren't present.
+	 */
+	private static function waiver_digest_line(): string {
+		global $wpdb;
+		if ( ! isset( $wpdb ) || ! is_object( $wpdb ) || ! property_exists( $wpdb, 'prefix' ) ) {
+			return '';
+		}
+		$sigs    = $wpdb->prefix . 'memberistic_waiver_signatures';
+		$archive = $wpdb->prefix . 'memberistic_waivers_archive';
+		if ( ! $wpdb->get_var( $wpdb->prepare( 'SHOW TABLES LIKE %s', $sigs ) )
+			|| ! $wpdb->get_var( $wpdb->prepare( 'SHOW TABLES LIKE %s', $archive ) ) ) {
+			return '';
+		}
+
+		$week_ago = gmdate( 'Y-m-d H:i:s', strtotime( '-7 days' ) );
+		// phpcs:disable WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+		$signed_7d = (int) $wpdb->get_var( $wpdb->prepare( "SELECT COUNT(*) FROM {$sigs} WHERE signed_at >= %s", $week_ago ) );
+		$kiosk_7d  = (int) $wpdb->get_var( $wpdb->prepare( "SELECT COUNT(*) FROM {$sigs} WHERE signed_at >= %s AND source = 'kiosk'", $week_ago ) );
+
+		// Expiring in 30 days: current archive rows whose signed_at falls in
+		// the month before the validity cutoff (validity default 365 days).
+		$validity = class_exists( '\WordPressistic\Memberistic\Waivers\Waiver_Service' )
+			? (int) \WordPressistic\Memberistic\Waivers\Waiver_Service::validity_days()
+			: 365;
+		$cutoff   = gmdate( 'Y-m-d H:i:s', strtotime( '-' . $validity . ' days' ) );
+		$soon     = gmdate( 'Y-m-d H:i:s', strtotime( '-' . ( $validity - 30 ) . ' days' ) );
+		$expiring = (int) $wpdb->get_var( $wpdb->prepare( "SELECT COUNT(*) FROM {$archive} WHERE is_current = 1 AND signed_at IS NOT NULL AND signed_at >= %s AND signed_at < %s", $cutoff, $soon ) );
+
+		// Bookings in the next 7 days still missing a waiver.
+		$missing  = 0;
+		$bookings = $wpdb->prefix . 'g2ab_bookings';
+		if ( $wpdb->get_var( $wpdb->prepare( 'SHOW TABLES LIKE %s', $bookings ) ) ) {
+			$cols = (array) $wpdb->get_col( "SHOW COLUMNS FROM {$bookings}" );
+			if ( in_array( 'waiver_signed', $cols, true ) && in_array( 'customer_email', $cols, true ) ) {
+				$rows = $wpdb->get_results(
+					$wpdb->prepare(
+						"SELECT customer_email FROM {$bookings} WHERE waiver_signed = 0 AND status IN ('paid','completed','pending','unpaid') AND start_at BETWEEN %s AND %s",
+						gmdate( 'Y-m-d H:i:s' ),
+						gmdate( 'Y-m-d H:i:s', strtotime( '+7 days' ) )
+					),
+					ARRAY_A
+				);
+				foreach ( (array) $rows as $b ) {
+					$email = (string) ( $b['customer_email'] ?? '' );
+					if ( '' === $email
+						|| ! class_exists( '\WordPressistic\Memberistic\Waivers\Waivers_Archive' )
+						|| ! \WordPressistic\Memberistic\Waivers\Waivers_Archive::has_on_file( $email ) ) {
+						$missing++;
+					}
+				}
+			}
+		}
+		// phpcs:enable
+
+		return sprintf(
+			'Waivers: %d signed this week (%d at the kiosk) · %d expiring in 30d · %d upcoming bookings missing a waiver',
+			$signed_7d,
+			$kiosk_7d,
+			$expiring,
+			$missing
+		);
 	}
 
 	public static function compose_monthly(

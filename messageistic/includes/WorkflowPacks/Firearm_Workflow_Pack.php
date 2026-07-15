@@ -28,6 +28,8 @@ final class Firearm_Workflow_Pack {
             'document_needed' => [ 'name' => 'Documentation required', 'trigger' => 'ffl.status_changed', 'status' => 'delayed', 'body' => '{first_name}, {business_name} needs additional documentation to continue your transaction. Please contact the store; do not send sensitive documents by SMS. Reply STOP to opt out.' ],
             'class_reminder' => [ 'name' => 'Training class reminder', 'trigger' => 'booking.reminder_24h', 'body' => '{first_name}, reminder: your training appointment is {booking_date} at {booking_time} with {business_name}. Reply STOP to opt out.' ],
             'waiver_reminder' => [ 'name' => 'Waiver incomplete', 'trigger' => 'waiver.incomplete', 'body' => '{first_name}, your required waiver is incomplete. Complete it before arrival: {waiver_link}. Reply STOP to opt out.' ],
+            'waiver_signed_confirm' => [ 'name' => 'Waiver signed confirmation', 'trigger' => 'waiver.signed', 'body' => '{first_name}, your {business_name} range waiver is on file and valid through {waiver_expires}. See you at the range. Reply STOP to opt out.' ],
+            'waiver_renewal_sms' => [ 'name' => 'Waiver renewal due', 'trigger' => 'waiver.renewal_due', 'body' => '{first_name}, your {business_name} range waiver expires {waiver_expires}. Re-sign in under a minute, no login needed: {waiver_link}. Reply STOP to opt out.' ],
         ];
     }
 
