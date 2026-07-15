@@ -54,7 +54,29 @@ final class Migrations {
 			'1.4.0' => array( self::class, 'migrate_1_4_0' ),
 			'1.5.0' => array( self::class, 'migrate_1_5_0' ),
 			'1.6.0' => array( self::class, 'migrate_1_6_0' ),
+			'1.7.0' => array( self::class, 'migrate_1_7_0' ),
 		);
+	}
+
+	/**
+	 * 1.7.0 — Signing-parity columns on waiver signatures.
+	 *
+	 * New e-sign fields (DOB, phone, emergency contact, minors signed for by
+	 * a guardian) plus the waiver_version_id groundwork for versioned waiver
+	 * text. Matches the columns the old OtterWaiver export carried.
+	 */
+	public static function migrate_1_7_0() {
+		global $wpdb;
+
+		$table = $wpdb->prefix . 'memberistic_waiver_signatures';
+		self::add_column_if_missing( $table, 'dob', 'DATE NULL AFTER attachment_id' );
+		self::add_column_if_missing( $table, 'phone', 'VARCHAR(60) NULL AFTER dob' );
+		self::add_column_if_missing( $table, 'emergency_name', 'VARCHAR(191) NULL AFTER phone' );
+		self::add_column_if_missing( $table, 'emergency_phone', 'VARCHAR(60) NULL AFTER emergency_name' );
+		self::add_column_if_missing( $table, 'minors_json', 'LONGTEXT NULL AFTER emergency_phone' );
+		self::add_column_if_missing( $table, 'waiver_version_id', 'BIGINT UNSIGNED NULL AFTER minors_json' );
+
+		return true;
 	}
 
 	/**

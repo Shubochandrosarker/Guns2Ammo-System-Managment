@@ -180,14 +180,40 @@ final class Waivers_Archive {
 		$last  = (string) array_pop( $parts );
 		$first = implode( ' ', $parts );
 
-		$key = self::dedupe_key( $email, $first, $last, '' );
+		// First minor (the archive schema models one) — the signature row can
+		// carry several in minors_json; all names are kept, first DOB wins.
+		$minor_name = '';
+		$minor_age  = '';
+		if ( ! empty( $sig['minors_json'] ) ) {
+			$minors = (array) json_decode( (string) $sig['minors_json'], true );
+			$names  = array();
+			foreach ( $minors as $m ) {
+				$n = trim( (string) ( $m['name'] ?? '' ) );
+				if ( '' !== $n ) {
+					$names[] = $n;
+					if ( '' === $minor_age && ! empty( $m['dob'] ) ) {
+						$minor_age = substr( (string) $m['dob'], 0, 20 );
+					}
+				}
+			}
+			$minor_name = substr( implode( ', ', $names ), 0, 191 );
+		}
+
+		$dob = ! empty( $sig['dob'] ) ? substr( (string) $sig['dob'], 0, 10 ) : '';
+		$key = self::dedupe_key( $email, $first, $last, $dob );
 		$id  = self::insert(
 			array(
 				'first_name'      => $first,
 				'last_name'       => $last,
 				'email'           => $email,
+				'phone'           => ! empty( $sig['phone'] ) ? (string) $sig['phone'] : '',
+				'dob'             => '' !== $dob ? $dob : null,
 				'signed_at'       => ! empty( $sig['signed_at'] ) ? (string) $sig['signed_at'] : null,
 				'source'          => 'esign' . ( ! empty( $sig['source'] ) ? ':' . sanitize_key( (string) $sig['source'] ) : '' ),
+				'minor_name'      => $minor_name,
+				'minor_age'       => $minor_age,
+				'emergency_name'  => ! empty( $sig['emergency_name'] ) ? (string) $sig['emergency_name'] : '',
+				'emergency_phone' => ! empty( $sig['emergency_phone'] ) ? (string) $sig['emergency_phone'] : '',
 				'matched_user_id' => ! empty( $sig['user_id'] ) ? (int) $sig['user_id'] : null,
 				'dedupe_key'      => $key,
 				'raw_json'        => (string) wp_json_encode( array( 'signature_id' => (int) $sig['id'] ) ),
@@ -229,10 +255,22 @@ final class Waivers_Archive {
 		if ( $id <= 0 ) {
 			return '';
 		}
-		if ( empty( $row['local_path'] ) && empty( $row['attachment_id'] ) && empty( $row['external_url'] ) ) {
-			return '';
+		if ( ! empty( $row['local_path'] ) || ! empty( $row['attachment_id'] ) || ! empty( $row['external_url'] ) ) {
+			return self::stream_url( $id );
 		}
-		return self::stream_url( $id );
+		// E-sign mirror rows carry no file of their own — the generated PDF
+		// lives in the private document store, linked from the signature row.
+		if ( ! empty( $row['raw_json'] ) ) {
+			$raw = json_decode( (string) $row['raw_json'], true );
+			$sid = is_array( $raw ) && ! empty( $raw['signature_id'] ) ? (int) $raw['signature_id'] : 0;
+			if ( $sid > 0 && class_exists( '\WordPressistic\Memberistic\Waivers\Waiver_Service' ) ) {
+				$sig = Waiver_Service::get_signature( $sid );
+				if ( $sig && ! empty( $sig['attachment_id'] ) && class_exists( '\WordPressistic\Memberistic\Waivers\Documents' ) ) {
+					return Documents::download_url( (int) $sig['attachment_id'] );
+				}
+			}
+		}
+		return '';
 	}
 
 	/** Nonced, staff-only streaming URL for an archive row's document. */

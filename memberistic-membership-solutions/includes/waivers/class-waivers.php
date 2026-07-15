@@ -216,11 +216,16 @@ final class Waiver_Service {
 				'membership_id' => $membership ? (int) $membership['id'] : 0,
 				'signer_name'   => $signer,
 				'signer_email'  => $person ? (string) ( $person['email'] ?? '' ) : ( get_userdata( $user_id ) ? get_userdata( $user_id )->user_email : '' ),
-				'source'        => isset( $meta['source'] ) ? (string) $meta['source'] : 'self_serve',
-				'signed_at'     => $now,
-				'expires_at'    => $expires,
-				'ip'            => isset( $meta['ip'] ) ? (string) $meta['ip'] : '',
-				'user_agent'    => isset( $meta['user_agent'] ) ? (string) $meta['user_agent'] : ( isset( $_SERVER['HTTP_USER_AGENT'] ) ? sanitize_text_field( wp_unslash( $_SERVER['HTTP_USER_AGENT'] ) ) : '' ),
+				'source'          => isset( $meta['source'] ) ? (string) $meta['source'] : 'self_serve',
+				'signed_at'       => $now,
+				'expires_at'      => $expires,
+				'ip'              => isset( $meta['ip'] ) ? (string) $meta['ip'] : '',
+				'user_agent'      => isset( $meta['user_agent'] ) ? (string) $meta['user_agent'] : ( isset( $_SERVER['HTTP_USER_AGENT'] ) ? sanitize_text_field( wp_unslash( $_SERVER['HTTP_USER_AGENT'] ) ) : '' ),
+				'dob'             => isset( $meta['dob'] ) ? (string) $meta['dob'] : '',
+				'phone'           => isset( $meta['phone'] ) ? (string) $meta['phone'] : '',
+				'emergency_name'  => isset( $meta['emergency_name'] ) ? (string) $meta['emergency_name'] : '',
+				'emergency_phone' => isset( $meta['emergency_phone'] ) ? (string) $meta['emergency_phone'] : '',
+				'minors'          => isset( $meta['minors'] ) ? (array) $meta['minors'] : array(),
 			)
 		);
 	}
@@ -236,25 +241,46 @@ final class Waiver_Service {
 		global $wpdb;
 		$text = self::waiver_text();
 		$now  = current_time( 'mysql' );
+
+		// Minors the adult signer is covering as parent/guardian:
+		// array of { name, dob } rows, stored as JSON.
+		$minors = array();
+		foreach ( (array) ( $args['minors'] ?? array() ) as $m ) {
+			$m_name = sanitize_text_field( (string) ( $m['name'] ?? '' ) );
+			if ( '' === $m_name ) {
+				continue;
+			}
+			$minors[] = array(
+				'name' => $m_name,
+				'dob'  => sanitize_text_field( (string) ( $m['dob'] ?? '' ) ),
+			);
+		}
+
 		$wpdb->insert(
 			self::signatures_table(),
 			array(
-				'user_id'       => ! empty( $args['user_id'] ) ? (int) $args['user_id'] : null,
-				'person_id'     => ! empty( $args['person_id'] ) ? (int) $args['person_id'] : null,
-				'membership_id' => ! empty( $args['membership_id'] ) ? (int) $args['membership_id'] : null,
-				'signer_name'   => isset( $args['signer_name'] ) ? sanitize_text_field( (string) $args['signer_name'] ) : '',
-				'signer_email'  => isset( $args['signer_email'] ) ? sanitize_email( (string) $args['signer_email'] ) : '',
-				'source'        => isset( $args['source'] ) ? sanitize_key( (string) $args['source'] ) : 'self_serve',
-				'signed_at'     => ! empty( $args['signed_at'] ) ? (string) $args['signed_at'] : $now,
-				'expires_at'    => ! empty( $args['expires_at'] ) ? (string) $args['expires_at'] : null,
-				'ip'            => isset( $args['ip'] ) ? substr( sanitize_text_field( (string) $args['ip'] ), 0, 64 ) : '',
-				'user_agent'    => isset( $args['user_agent'] ) ? substr( sanitize_text_field( (string) $args['user_agent'] ), 0, 255 ) : '',
-				'waiver_text'   => $text,
-				'text_hash'     => hash( 'sha256', $text ),
-				'attachment_id' => ! empty( $args['attachment_id'] ) ? (int) $args['attachment_id'] : null,
-				'created_at'    => $now,
+				'user_id'           => ! empty( $args['user_id'] ) ? (int) $args['user_id'] : null,
+				'person_id'         => ! empty( $args['person_id'] ) ? (int) $args['person_id'] : null,
+				'membership_id'     => ! empty( $args['membership_id'] ) ? (int) $args['membership_id'] : null,
+				'signer_name'       => isset( $args['signer_name'] ) ? sanitize_text_field( (string) $args['signer_name'] ) : '',
+				'signer_email'      => isset( $args['signer_email'] ) ? sanitize_email( (string) $args['signer_email'] ) : '',
+				'source'            => isset( $args['source'] ) ? sanitize_key( (string) $args['source'] ) : 'self_serve',
+				'signed_at'         => ! empty( $args['signed_at'] ) ? (string) $args['signed_at'] : $now,
+				'expires_at'        => ! empty( $args['expires_at'] ) ? (string) $args['expires_at'] : null,
+				'ip'                => isset( $args['ip'] ) ? substr( sanitize_text_field( (string) $args['ip'] ), 0, 64 ) : '',
+				'user_agent'        => isset( $args['user_agent'] ) ? substr( sanitize_text_field( (string) $args['user_agent'] ), 0, 255 ) : '',
+				'waiver_text'       => $text,
+				'text_hash'         => hash( 'sha256', $text ),
+				'attachment_id'     => ! empty( $args['attachment_id'] ) ? (int) $args['attachment_id'] : null,
+				'dob'               => ! empty( $args['dob'] ) ? sanitize_text_field( (string) $args['dob'] ) : null,
+				'phone'             => ! empty( $args['phone'] ) ? substr( sanitize_text_field( (string) $args['phone'] ), 0, 60 ) : null,
+				'emergency_name'    => ! empty( $args['emergency_name'] ) ? sanitize_text_field( (string) $args['emergency_name'] ) : null,
+				'emergency_phone'   => ! empty( $args['emergency_phone'] ) ? substr( sanitize_text_field( (string) $args['emergency_phone'] ), 0, 60 ) : null,
+				'minors_json'       => $minors ? (string) wp_json_encode( $minors ) : null,
+				'waiver_version_id' => ! empty( $args['waiver_version_id'] ) ? (int) $args['waiver_version_id'] : null,
+				'created_at'        => $now,
 			),
-			array( '%d', '%d', '%d', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%d', '%s' )
+			array( '%d', '%d', '%d', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%d', '%s', '%s', '%s', '%s', '%s', '%d', '%s' )
 		);
 		$sig_id = (int) $wpdb->insert_id;
 
@@ -600,6 +626,10 @@ final class Waiver_Public {
 			if ( ! $agree || '' === $name || ! is_email( $email ) ) {
 				self::render_guest_form( __( 'Please enter your full name, a valid email, and check the agreement box.', 'memberistic' ) );
 			}
+			$extra = self::collect_extra_fields();
+			if ( ! empty( $extra['error'] ) ) {
+				self::render_guest_form( (string) $extra['error'] );
+			}
 			$ip = isset( $_SERVER['REMOTE_ADDR'] ) ? sanitize_text_field( wp_unslash( $_SERVER['REMOTE_ADDR'] ) ) : '';
 
 			// Throttle the fully-unauthenticated guest surface to curb scripted
@@ -612,16 +642,22 @@ final class Waiver_Public {
 			}
 			set_transient( $rk, $count + 1, HOUR_IN_SECONDS );
 
-			Waiver_Service::record_signature(
-				array(
-					'signer_name'  => $name,
-					'signer_email' => $email,
-					'source'       => 'guest',
-					'signed_at'    => current_time( 'mysql' ),
-					'expires_at'   => wp_date( 'Y-m-d H:i:s', current_time( 'timestamp' ) + ( Waiver_Service::validity_days() * DAY_IN_SECONDS ) ),
-					'ip'           => $ip,
+			$sig_id = (int) Waiver_Service::record_signature(
+				array_merge(
+					array(
+						'signer_name'  => $name,
+						'signer_email' => $email,
+						'source'       => 'guest',
+						'signed_at'    => current_time( 'mysql' ),
+						'expires_at'   => wp_date( 'Y-m-d H:i:s', current_time( 'timestamp' ) + ( Waiver_Service::validity_days() * DAY_IN_SECONDS ) ),
+						'ip'           => $ip,
+					),
+					$extra['fields']
 				)
 			);
+			if ( $sig_id ) {
+				self::store_signature_artifacts( $sig_id, (string) $extra['jpeg'] );
+			}
 			self::render(
 				__( 'Waiver complete', 'memberistic' ),
 				'<p>' . esc_html__( 'Thank you — your waiver is on file. Enjoy your visit.', 'memberistic' ) . '</p>'
@@ -645,10 +681,193 @@ final class Waiver_Public {
 		echo '<input type="text" name="signature_name" required style="width:100%;padding:12px 14px;background:#0F1115;border:1px solid #2A323D;border-radius:4px;color:#fff;font-size:16px;margin-bottom:14px;box-sizing:border-box;">';
 		echo '<label style="display:block;font-size:12px;letter-spacing:.12em;text-transform:uppercase;color:#8A95A5;margin-bottom:6px;">' . esc_html__( 'Email address', 'memberistic' ) . '</label>';
 		echo '<input type="email" name="signature_email" required style="width:100%;padding:12px 14px;background:#0F1115;border:1px solid #2A323D;border-radius:4px;color:#fff;font-size:16px;margin-bottom:14px;box-sizing:border-box;">';
+		self::render_extra_fields();
 		echo '<label style="display:flex;gap:10px;align-items:flex-start;color:#CBCAD2;font-size:14px;cursor:pointer;"><input type="checkbox" name="agree" value="1" required style="width:20px;height:20px;margin-top:2px;"> <span>' . esc_html__( 'I have read and agree to the waiver above, and I am signing electronically.', 'memberistic' ) . '</span></label>';
 		echo '<button type="submit" style="margin-top:18px;width:100%;padding:14px;background:#E8802F;color:#111;border:0;border-radius:4px;font-weight:700;font-size:15px;letter-spacing:.06em;text-transform:uppercase;cursor:pointer;">' . esc_html__( 'Sign Waiver', 'memberistic' ) . '</button>';
 		echo '</form>';
 		self::render( __( 'Range Waiver', 'memberistic' ), ob_get_clean(), 200 );
+	}
+
+	/* ------------------------------------------------------------------ */
+	/* Shared signing fields (guest + member forms)                        */
+	/* ------------------------------------------------------------------ */
+
+	/**
+	 * Echo the signing-parity fields both forms share: phone, DOB, emergency
+	 * contact, minors (guardian signing), and the draw-to-sign signature pad.
+	 */
+	private static function render_extra_fields() {
+		$in = 'width:100%;padding:12px 14px;background:#0F1115;border:1px solid #2A323D;border-radius:4px;color:#fff;font-size:16px;margin-bottom:14px;box-sizing:border-box;';
+		$lb = 'display:block;font-size:12px;letter-spacing:.12em;text-transform:uppercase;color:#8A95A5;margin-bottom:6px;';
+
+		echo '<div style="display:flex;gap:12px;">';
+		echo '<div style="flex:1;"><label style="' . esc_attr( $lb ) . '">' . esc_html__( 'Phone number', 'memberistic' ) . '</label>';
+		echo '<input type="tel" name="signature_phone" required autocomplete="tel" style="' . esc_attr( $in ) . '"></div>';
+		echo '<div style="flex:1;"><label style="' . esc_attr( $lb ) . '">' . esc_html__( 'Date of birth', 'memberistic' ) . '</label>';
+		echo '<input type="date" name="signature_dob" required max="' . esc_attr( wp_date( 'Y-m-d' ) ) . '" style="' . esc_attr( $in ) . '"></div>';
+		echo '</div>';
+
+		echo '<div style="display:flex;gap:12px;">';
+		echo '<div style="flex:1;"><label style="' . esc_attr( $lb ) . '">' . esc_html__( 'Emergency contact name', 'memberistic' ) . '</label>';
+		echo '<input type="text" name="emergency_name" style="' . esc_attr( $in ) . '"></div>';
+		echo '<div style="flex:1;"><label style="' . esc_attr( $lb ) . '">' . esc_html__( 'Emergency contact phone', 'memberistic' ) . '</label>';
+		echo '<input type="tel" name="emergency_phone" style="' . esc_attr( $in ) . '"></div>';
+		echo '</div>';
+
+		// Minors — the adult signs as parent/guardian for up to 4 children.
+		echo '<label style="' . esc_attr( $lb ) . '">' . esc_html__( 'Minors you are signing for as parent/guardian (optional)', 'memberistic' ) . '</label>';
+		echo '<div id="mw-minors">';
+		echo '<div class="mw-minor-row" style="display:flex;gap:12px;">';
+		echo '<input type="text" name="minor_name[]" placeholder="' . esc_attr__( "Minor's full name", 'memberistic' ) . '" style="' . esc_attr( $in ) . 'flex:2;">';
+		echo '<input type="date" name="minor_dob[]" max="' . esc_attr( wp_date( 'Y-m-d' ) ) . '" style="' . esc_attr( $in ) . 'flex:1;">';
+		echo '</div>';
+		echo '</div>';
+		echo '<button type="button" id="mw-addminor" style="margin:0 0 14px;padding:8px 14px;background:transparent;border:1px dashed #2A323D;border-radius:4px;color:#8A95A5;font-size:13px;cursor:pointer;">+ ' . esc_html__( 'Add another minor', 'memberistic' ) . '</button>';
+
+		// Draw-to-sign pad. Exported as JPEG (white background) so the PDF
+		// generator can embed it via DCTDecode with no image libraries.
+		echo '<label style="' . esc_attr( $lb ) . '">' . esc_html__( 'Signature — please sign in the box below', 'memberistic' ) . '</label>';
+		echo '<div style="background:#fff;border:1px solid #2A323D;border-radius:6px;">';
+		echo '<canvas id="mw-sigpad" width="640" height="200" style="width:100%;height:auto;display:block;touch-action:none;border-radius:6px;"></canvas>';
+		echo '</div>';
+		echo '<div style="text-align:right;margin:6px 0 14px;"><button type="button" id="mw-sigclear" style="padding:6px 12px;background:transparent;border:1px solid #2A323D;border-radius:4px;color:#8A95A5;font-size:12px;cursor:pointer;">' . esc_html__( 'Clear signature', 'memberistic' ) . '</button></div>';
+		echo '<input type="hidden" name="signature_data" id="mw-sigdata">';
+		echo '<noscript><p style="color:#E8802F;">' . esc_html__( 'JavaScript is required to sign electronically. Please ask range staff for a paper waiver.', 'memberistic' ) . '</p></noscript>';
+		echo '<script>(function(){'
+			. 'var c=document.getElementById("mw-sigpad");if(!c||!c.getContext)return;'
+			. 'var x=c.getContext("2d"),drawn=false,down=false;'
+			. 'function blank(){x.fillStyle="#fff";x.fillRect(0,0,c.width,c.height);x.strokeStyle="#111";x.lineWidth=2.5;x.lineJoin=x.lineCap="round";}'
+			. 'blank();'
+			. 'function pos(e){var r=c.getBoundingClientRect();return{x:(e.clientX-r.left)*(c.width/r.width),y:(e.clientY-r.top)*(c.height/r.height)};}'
+			. 'c.addEventListener("pointerdown",function(e){down=true;drawn=true;var p=pos(e);x.beginPath();x.moveTo(p.x,p.y);x.lineTo(p.x+.1,p.y+.1);x.stroke();e.preventDefault();});'
+			. 'c.addEventListener("pointermove",function(e){if(!down)return;var p=pos(e);x.lineTo(p.x,p.y);x.stroke();e.preventDefault();});'
+			. '["pointerup","pointerleave","pointercancel"].forEach(function(ev){c.addEventListener(ev,function(){down=false;});});'
+			. 'document.getElementById("mw-sigclear").addEventListener("click",function(){blank();drawn=false;document.getElementById("mw-sigdata").value="";});'
+			. 'var add=document.getElementById("mw-addminor");'
+			. 'if(add){add.addEventListener("click",function(){'
+			. 'var w=document.getElementById("mw-minors"),rows=w.querySelectorAll(".mw-minor-row");'
+			. 'if(rows.length>=4)return;'
+			. 'var t=rows[0].cloneNode(true);t.querySelectorAll("input").forEach(function(i){i.value="";});w.appendChild(t);});}'
+			. 'var f=c.closest("form");'
+			. 'if(f){f.addEventListener("submit",function(e){'
+			. 'if(!drawn){e.preventDefault();alert(' . wp_json_encode( __( 'Please sign in the signature box.', 'memberistic' ) ) . ');return;}'
+			. 'document.getElementById("mw-sigdata").value=c.toDataURL("image/jpeg",0.85);});}'
+			. '})();</script>';
+	}
+
+	/**
+	 * Read + validate the shared signing fields from $_POST (nonce already
+	 * verified by the caller).
+	 *
+	 * @return array { fields: array, jpeg: string } or { error: string }.
+	 */
+	private static function collect_extra_fields() {
+		// phpcs:disable WordPress.Security.NonceVerification.Missing -- caller verified.
+		$dob    = isset( $_POST['signature_dob'] ) ? sanitize_text_field( wp_unslash( $_POST['signature_dob'] ) ) : '';
+		$phone  = isset( $_POST['signature_phone'] ) ? sanitize_text_field( wp_unslash( $_POST['signature_phone'] ) ) : '';
+		$em_n   = isset( $_POST['emergency_name'] ) ? sanitize_text_field( wp_unslash( $_POST['emergency_name'] ) ) : '';
+		$em_p   = isset( $_POST['emergency_phone'] ) ? sanitize_text_field( wp_unslash( $_POST['emergency_phone'] ) ) : '';
+		$m_name = isset( $_POST['minor_name'] ) ? array_map( 'sanitize_text_field', (array) wp_unslash( $_POST['minor_name'] ) ) : array();
+		$m_dob  = isset( $_POST['minor_dob'] ) ? array_map( 'sanitize_text_field', (array) wp_unslash( $_POST['minor_dob'] ) ) : array();
+		$data   = isset( $_POST['signature_data'] ) ? (string) wp_unslash( $_POST['signature_data'] ) : '';
+		// phpcs:enable
+
+		$ts = preg_match( '/^\d{4}-\d{2}-\d{2}$/', $dob ) ? strtotime( $dob . ' 00:00:00' ) : false;
+		if ( false === $ts || $ts > current_time( 'timestamp' ) ) {
+			return array( 'error' => __( 'Please enter your date of birth.', 'memberistic' ) );
+		}
+		$age = (int) floor( ( current_time( 'timestamp' ) - $ts ) / ( 365.2425 * DAY_IN_SECONDS ) );
+		if ( $age < 18 ) {
+			return array( 'error' => __( 'You must be 18 or older to sign this waiver. A parent or guardian signs for minors — add the minor below their own signature.', 'memberistic' ) );
+		}
+		if ( strlen( preg_replace( '/\D+/', '', $phone ) ) < 7 ) {
+			return array( 'error' => __( 'Please enter a valid phone number.', 'memberistic' ) );
+		}
+
+		$minors = array();
+		foreach ( $m_name as $i => $n ) {
+			$n = trim( (string) $n );
+			if ( '' === $n ) {
+				continue;
+			}
+			$md = isset( $m_dob[ $i ] ) ? trim( (string) $m_dob[ $i ] ) : '';
+			if ( ! preg_match( '/^\d{4}-\d{2}-\d{2}$/', $md ) ) {
+				return array( 'error' => __( 'Please enter a date of birth for each minor listed.', 'memberistic' ) );
+			}
+			$minors[] = array(
+				'name' => $n,
+				'dob'  => $md,
+			);
+			if ( count( $minors ) >= 4 ) {
+				break;
+			}
+		}
+
+		if ( 0 !== strpos( $data, 'data:image/jpeg;base64,' ) ) {
+			return array( 'error' => __( 'Please sign in the signature box.', 'memberistic' ) );
+		}
+		$jpeg = base64_decode( substr( $data, strlen( 'data:image/jpeg;base64,' ) ), true );
+		$max  = (int) apply_filters( 'memberistic_signature_image_max_bytes', 262144 );
+		if ( false === $jpeg || strlen( $jpeg ) < 100 || strlen( $jpeg ) > $max || null === Waiver_PDF::jpeg_dims( $jpeg ) ) {
+			return array( 'error' => __( 'Your signature could not be read. Please clear the box and sign again.', 'memberistic' ) );
+		}
+
+		return array(
+			'fields' => array(
+				'dob'             => $dob,
+				'phone'           => $phone,
+				'emergency_name'  => $em_n,
+				'emergency_phone' => $em_p,
+				'minors'          => $minors,
+			),
+			'jpeg'   => $jpeg,
+		);
+	}
+
+	/**
+	 * File the permanent artifacts for a fresh signature: the drawn-signature
+	 * JPEG and the generated signed-waiver PDF, both in the hardened private
+	 * document store. The PDF becomes the signature's canonical attachment.
+	 *
+	 * @param int    $sig_id  Signature id.
+	 * @param string $jpeg    Raw JPEG bytes of the drawn signature.
+	 * @param array  $context Optional user_id / person_id / membership_id.
+	 */
+	private static function store_signature_artifacts( $sig_id, $jpeg, $context = array() ) {
+		$sig = Waiver_Service::get_signature( (int) $sig_id );
+		if ( ! $sig ) {
+			return;
+		}
+		$ctx = array_merge(
+			$context,
+			array(
+				'signature_id' => (int) $sig_id,
+				'uploaded_by'  => ! empty( $context['user_id'] ) ? (int) $context['user_id'] : 0,
+			)
+		);
+		if ( '' !== $jpeg ) {
+			Documents::store_generated(
+				$jpeg,
+				'signature-' . (int) $sig_id . '.jpg',
+				array_merge( $ctx, array(
+					'doc_type' => 'waiver_signature_image',
+					'label'    => __( 'Drawn signature', 'memberistic' ),
+				) )
+			);
+		}
+		$pdf    = Waiver_PDF::build( $sig, (string) $jpeg );
+		$doc_id = Documents::store_generated(
+			$pdf,
+			'waiver-' . (int) $sig_id . '.pdf',
+			array_merge( $ctx, array(
+				'doc_type' => 'waiver_pdf',
+				'label'    => __( 'Signed waiver (PDF)', 'memberistic' ),
+			) )
+		);
+		if ( ! is_wp_error( $doc_id ) && $doc_id ) {
+			global $wpdb;
+			$wpdb->update( Waiver_Service::signatures_table(), array( 'attachment_id' => (int) $doc_id ), array( 'id' => (int) $sig_id ) );
+		}
 	}
 
 	public static function maybe_handle() {
@@ -686,29 +905,40 @@ final class Waiver_Public {
 			if ( ! $agree || '' === $typed ) {
 				self::render_form( $user, $token, __( 'Please type your full name and check the agreement box.', 'memberistic' ) );
 			}
+			$extra = self::collect_extra_fields();
+			if ( ! empty( $extra['error'] ) ) {
+				self::render_form( $user, $token, (string) $extra['error'] );
+			}
 			$ip     = isset( $_SERVER['REMOTE_ADDR'] ) ? sanitize_text_field( wp_unslash( $_SERVER['REMOTE_ADDR'] ) ) : '';
-			$sig_id = (int) Waiver_Service::mark_signed( $user_id, $typed, array( 'ip' => $ip, 'source' => 'self_serve' ) );
+			$sig_id = (int) Waiver_Service::mark_signed( $user_id, $typed, array_merge( array( 'ip' => $ip, 'source' => 'self_serve' ), $extra['fields'] ) );
+
+			$membership = Memberships_Repository::get_by_user_id( $user_id );
+			$person     = $membership ? People_Repository::get_primary_by_membership( (int) $membership['id'] ) : null;
+			$doc_ctx    = array(
+				'user_id'       => $user_id,
+				'person_id'     => $person ? (int) $person['id'] : 0,
+				'membership_id' => $membership ? (int) $membership['id'] : 0,
+			);
 
 			// Optional supporting document (e.g. photo of ID / paper waiver).
 			// The token authenticates this specific member; store privately.
+			// Kept as its own documents row — the generated PDF below stays
+			// the signature's canonical attachment.
 			if ( $sig_id && ! empty( $_FILES['waiver_doc']['name'] ) ) {
-				$membership = Memberships_Repository::get_by_user_id( $user_id );
-				$person     = $membership ? People_Repository::get_primary_by_membership( (int) $membership['id'] ) : null;
-				$doc_id     = Documents::store_upload(
+				Documents::store_upload(
 					$_FILES['waiver_doc'], // phpcs:ignore WordPress.Security.ValidatedSanitizedInput
-					array(
-						'user_id'       => $user_id,
-						'person_id'     => $person ? (int) $person['id'] : 0,
-						'membership_id' => $membership ? (int) $membership['id'] : 0,
-						'signature_id'  => $sig_id,
-						'doc_type'      => 'waiver_attachment',
-						'uploaded_by'   => $user_id,
-					)
+					array_merge( $doc_ctx, array(
+						'signature_id' => $sig_id,
+						'doc_type'     => 'waiver_attachment',
+						'uploaded_by'  => $user_id,
+					) )
 				);
-				if ( ! is_wp_error( $doc_id ) && $doc_id ) {
-					global $wpdb;
-					$wpdb->update( Waiver_Service::signatures_table(), array( 'attachment_id' => (int) $doc_id ), array( 'id' => $sig_id ) );
-				}
+			}
+
+			// File the canonical artifacts: drawn-signature JPEG + generated
+			// signed-waiver PDF (becomes the signature's attachment).
+			if ( $sig_id ) {
+				self::store_signature_artifacts( $sig_id, (string) $extra['jpeg'], $doc_ctx );
 			}
 			$account = home_url( '/account/' );
 			self::render(
@@ -744,6 +974,7 @@ final class Waiver_Public {
 		wp_nonce_field( 'memberistic_waiver_' . $token, 'memberistic_waiver_nonce' );
 		echo '<label style="display:block;font-size:12px;letter-spacing:.12em;text-transform:uppercase;color:#8A95A5;margin-bottom:6px;">' . esc_html__( 'Type your full legal name', 'memberistic' ) . '</label>';
 		echo '<input type="text" name="signature_name" required value="' . esc_attr( $user->display_name ) . '" style="width:100%;padding:12px 14px;background:#0F1115;border:1px solid #2A323D;border-radius:4px;color:#fff;font-size:16px;margin-bottom:14px;box-sizing:border-box;">';
+		self::render_extra_fields();
 		echo '<label style="display:flex;gap:10px;align-items:flex-start;color:#CBCAD2;font-size:14px;cursor:pointer;"><input type="checkbox" name="agree" value="1" required style="width:20px;height:20px;margin-top:2px;"> <span>' . esc_html__( 'I have read and agree to the waiver above, and I am signing electronically.', 'memberistic' ) . '</span></label>';
 		echo '<label style="display:block;font-size:12px;letter-spacing:.12em;text-transform:uppercase;color:#8A95A5;margin:16px 0 6px;">' . esc_html__( 'Optional: attach a photo of your ID or a signed paper waiver (PDF/JPG/PNG)', 'memberistic' ) . '</label>';
 		echo '<input type="file" name="waiver_doc" accept=".pdf,.jpg,.jpeg,.png,.webp" style="width:100%;color:#CBCAD2;font-size:14px;">';
@@ -989,7 +1220,7 @@ final class Waiver_Admin_Page {
 		header( 'Content-Type: text/csv; charset=utf-8' );
 		header( 'Content-Disposition: attachment; filename="memberistic-waivers-' . gmdate( 'Y-m-d' ) . '.csv"' );
 		$out = fopen( 'php://output', 'w' );
-		fputcsv( $out, array( 'id', 'signed_at', 'expires_at', 'source', 'signer_name', 'signer_email', 'membership_id', 'ip', 'text_hash', 'has_attachment', 'waiver_text' ) );
+		fputcsv( $out, array( 'id', 'signed_at', 'expires_at', 'source', 'signer_name', 'signer_email', 'dob', 'phone', 'emergency_name', 'emergency_phone', 'minors', 'membership_id', 'ip', 'text_hash', 'has_attachment', 'waiver_text' ) );
 		$page = 0;
 		do {
 			$rows = Waiver_Service::get_signatures( 1000, $page * 1000 );
@@ -1005,6 +1236,11 @@ final class Waiver_Admin_Page {
 							$r['source'],
 							$r['signer_name'],
 							$r['signer_email'],
+							$r['dob'] ?? '',
+							$r['phone'] ?? '',
+							$r['emergency_name'] ?? '',
+							$r['emergency_phone'] ?? '',
+							$r['minors_json'] ?? '',
 							$r['membership_id'],
 							$r['ip'],
 							$r['text_hash'],
@@ -1039,6 +1275,27 @@ final class Waiver_Admin_Page {
 		echo '<h1>' . esc_html( $brand ) . ' — ' . esc_html__( 'Liability Waiver (signed copy)', 'memberistic' ) . '</h1>';
 		echo '<div class="meta">';
 		echo '<div><strong>' . esc_html__( 'Signer', 'memberistic' ) . ':</strong> ' . esc_html( (string) $sig['signer_name'] ) . ' &lt;' . esc_html( (string) $sig['signer_email'] ) . '&gt;</div>';
+		if ( ! empty( $sig['dob'] ) ) {
+			echo '<div><strong>' . esc_html__( 'Date of birth', 'memberistic' ) . ':</strong> ' . esc_html( (string) $sig['dob'] ) . '</div>';
+		}
+		if ( ! empty( $sig['phone'] ) ) {
+			echo '<div><strong>' . esc_html__( 'Phone', 'memberistic' ) . ':</strong> ' . esc_html( (string) $sig['phone'] ) . '</div>';
+		}
+		if ( ! empty( $sig['emergency_name'] ) || ! empty( $sig['emergency_phone'] ) ) {
+			echo '<div><strong>' . esc_html__( 'Emergency contact', 'memberistic' ) . ':</strong> ' . esc_html( trim( (string) ( $sig['emergency_name'] ?? '' ) . ' ' . (string) ( $sig['emergency_phone'] ?? '' ) ) ) . '</div>';
+		}
+		if ( ! empty( $sig['minors_json'] ) ) {
+			$minors = (array) json_decode( (string) $sig['minors_json'], true );
+			$names  = array();
+			foreach ( $minors as $m ) {
+				if ( ! empty( $m['name'] ) ) {
+					$names[] = (string) $m['name'] . ( ! empty( $m['dob'] ) ? ' (DOB ' . (string) $m['dob'] . ')' : '' );
+				}
+			}
+			if ( $names ) {
+				echo '<div><strong>' . esc_html__( 'Minors covered', 'memberistic' ) . ':</strong> ' . esc_html( implode( '; ', $names ) ) . '</div>';
+			}
+		}
 		echo '<div><strong>' . esc_html__( 'Signed', 'memberistic' ) . ':</strong> ' . esc_html( $signed ) . '</div>';
 		echo '<div><strong>' . esc_html__( 'Valid through', 'memberistic' ) . ':</strong> ' . esc_html( $expires ) . '</div>';
 		echo '<div><strong>' . esc_html__( 'Method', 'memberistic' ) . ':</strong> ' . esc_html( (string) $sig['source'] ) . '</div>';

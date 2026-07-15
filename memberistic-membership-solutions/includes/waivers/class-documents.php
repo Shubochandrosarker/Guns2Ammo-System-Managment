@@ -195,6 +195,47 @@ final class Documents {
 		}
 		@chmod( $dest, 0640 ); // phpcs:ignore
 
+		return self::insert_row( $dest, sanitize_file_name( (string) $file['name'] ), $mime, (int) $file['size'], $context );
+	}
+
+	/**
+	 * Store a server-GENERATED file (e.g. the signed-waiver PDF or the drawn
+	 * signature image) into the same hardened private store, recording a
+	 * documents row. Bypasses the $_FILES-only checks in store_upload() but
+	 * keeps the type allowlist, size cap, and random on-disk naming.
+	 *
+	 * @param string $contents  Raw file bytes.
+	 * @param string $file_name Display filename (extension picks the type).
+	 * @param array  $context   Same context keys as store_upload().
+	 * @return int|\WP_Error Document id on success.
+	 */
+	public static function store_generated( $contents, $file_name, $context = array() ) {
+		$contents = (string) $contents;
+		$size     = strlen( $contents );
+		if ( $size <= 0 || $size > self::max_bytes() ) {
+			return new \WP_Error( 'memberistic_bad_size', __( 'Generated file is empty or too large.', 'memberistic' ) );
+		}
+		$allowed = self::allowed_types();
+		$ext     = strtolower( (string) pathinfo( (string) $file_name, PATHINFO_EXTENSION ) );
+		if ( ! $ext || ! isset( $allowed[ $ext ] ) ) {
+			return new \WP_Error( 'memberistic_bad_type', __( 'Generated file type is not allowed.', 'memberistic' ) );
+		}
+
+		$dir = self::private_dir();
+		if ( is_wp_error( $dir ) ) {
+			return $dir;
+		}
+		$dest = trailingslashit( $dir ) . wp_generate_password( 40, false, false ) . '.' . $ext;
+		if ( false === @file_put_contents( $dest, $contents ) ) { // phpcs:ignore
+			return new \WP_Error( 'memberistic_write_failed', __( 'Could not save the generated file.', 'memberistic' ) );
+		}
+		@chmod( $dest, 0640 ); // phpcs:ignore
+
+		return self::insert_row( $dest, sanitize_file_name( (string) $file_name ), $allowed[ $ext ], $size, $context );
+	}
+
+	/** Shared documents-row insert for uploaded + generated files. */
+	private static function insert_row( $dest, $file_name, $mime, $size, $context ) {
 		global $wpdb;
 		$up        = wp_upload_dir();
 		$rel_path  = ltrim( str_replace( trailingslashit( $up['basedir'] ), '', $dest ), '/' );
@@ -206,9 +247,9 @@ final class Documents {
 				'membership_id' => ! empty( $context['membership_id'] ) ? (int) $context['membership_id'] : null,
 				'signature_id'  => ! empty( $context['signature_id'] ) ? (int) $context['signature_id'] : null,
 				'file_path'     => $rel_path,
-				'file_name'     => sanitize_file_name( (string) $file['name'] ),
+				'file_name'     => $file_name,
 				'mime'          => $mime,
-				'file_size'     => (int) $file['size'],
+				'file_size'     => (int) $size,
 				'label'         => isset( $context['label'] ) ? sanitize_text_field( (string) $context['label'] ) : '',
 				'doc_type'      => isset( $context['doc_type'] ) ? sanitize_key( (string) $context['doc_type'] ) : 'document',
 				'uploaded_by'   => ! empty( $context['uploaded_by'] ) ? (int) $context['uploaded_by'] : get_current_user_id(),

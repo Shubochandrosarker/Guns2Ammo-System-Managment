@@ -307,3 +307,13 @@ endpoint.
 | 0.3 Unify waiver stores | **Fixed.** `record_signature()` now mirrors every new e-signature into `memberistic_waivers_archive` (idempotent `sig:{id}` key); DB migration 1.6.0 backfills all pre-existing signatures. The booking/check-in on-file lookup now sees Ottertext imports **and** new signings. |
 | 0.4 Self check-in matching | **Fixed.** `g2ab_waiver_satisfied` at self check-in now receives the booking's `customer_email`/`customer_name` so the bridge can match. |
 | 0.5 PDF exposure path | **Fixed.** `Waivers_Archive::pdf_url()` now always returns the capability + nonce gated streaming endpoint (never a raw media URL or otterwaiver.com link); the endpoint streams linked attachments instead of exposing their public URLs. |
+
+## Phase 1 status (updated 2026-07-15)
+
+| Task | Status |
+|---|---|
+| Signing-parity fields (G5) | **Done.** Both sign pages (member token + guest) now capture phone, DOB (18+ enforced server-side), and emergency contact. New columns on `memberistic_waiver_signatures` via DB migration 1.7.0; all fields flow into the archive mirror, the CSV export, and the printable page. |
+| Minor/guardian flow (G6) | **Done.** The adult signer can list up to 4 minors (name + DOB) they sign for as parent/guardian; stored as `minors_json` on the signature, mirrored into the archive's minor fields, shown on the PDF and printable page. |
+| Drawn signature | **Done.** Canvas draw-to-sign pad (pointer events, mobile-friendly) on both forms; exported as JPEG, validated server-side (base64/JPEG magic/size cap), stored in the hardened private document store linked to the signature. |
+| Server-side PDF (G7) | **Done.** New dependency-free `Waiver_PDF` emitter (`includes/waivers/class-waiver-pdf.php`) generates a canonical signed-waiver PDF (waiver-text snapshot, signer data, minors, audit trail, embedded signature image) on every signing; filed via `Documents::store_generated()` and linked as the signature's attachment. Verified by rendering the output with a real PDF engine. |
+| `waiver_version_id` groundwork | Column added (null for now) — Phase 2 wires versioning. |
