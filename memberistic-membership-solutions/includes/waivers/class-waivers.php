@@ -67,6 +67,14 @@ final class Waiver_Service {
 	 * NOT legal advice — the range should have counsel review the final text.
 	 */
 	public static function waiver_text() {
+		// The versions table is the source of truth; the legacy option is a
+		// synced fallback (and the seed for version 1 on migration).
+		if ( class_exists( '\WordPressistic\Memberistic\Waivers\Waiver_Versions' ) ) {
+			$ver = Waiver_Versions::current();
+			if ( $ver && '' !== trim( (string) $ver['body'] ) ) {
+				return (string) apply_filters( 'memberistic_waiver_text', (string) $ver['body'] );
+			}
+		}
 		$saved = (string) get_option( 'memberistic_waiver_text', '' );
 		if ( '' === trim( $saved ) ) {
 			$brand = memberistic_get_brand_label();
@@ -122,6 +130,16 @@ final class Waiver_Service {
 	public static function is_current( $person ) {
 		if ( empty( $person['waiver_status'] ) || 'signed' !== $person['waiver_status'] ) {
 			return false;
+		}
+		// A re-consent version invalidates any signature made before it took
+		// effect (person rows are also flipped to needs_review at publish
+		// time; this covers rows written between then and now, e.g. imports).
+		$boundary = Waiver_Versions::reconsent_boundary();
+		if ( '' !== $boundary ) {
+			$signed = ! empty( $person['waiver_signed_at'] ) ? strtotime( (string) $person['waiver_signed_at'] ) : 0;
+			if ( $signed < strtotime( $boundary ) ) {
+				return false;
+			}
 		}
 		if ( empty( $person['waiver_expires_at'] ) ) {
 			return true;
@@ -277,10 +295,11 @@ final class Waiver_Service {
 				'emergency_name'    => ! empty( $args['emergency_name'] ) ? sanitize_text_field( (string) $args['emergency_name'] ) : null,
 				'emergency_phone'   => ! empty( $args['emergency_phone'] ) ? substr( sanitize_text_field( (string) $args['emergency_phone'] ), 0, 60 ) : null,
 				'minors_json'       => $minors ? (string) wp_json_encode( $minors ) : null,
-				'waiver_version_id' => ! empty( $args['waiver_version_id'] ) ? (int) $args['waiver_version_id'] : null,
+				'waiver_version_id' => ! empty( $args['waiver_version_id'] ) ? (int) $args['waiver_version_id'] : ( Waiver_Versions::current_id() ?: null ),
+				'station'           => ! empty( $args['station'] ) ? substr( sanitize_title( (string) $args['station'] ), 0, 100 ) : null,
 				'created_at'        => $now,
 			),
-			array( '%d', '%d', '%d', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%d', '%s', '%s', '%s', '%s', '%s', '%d', '%s' )
+			array( '%d', '%d', '%d', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%d', '%s', '%s', '%s', '%s', '%s', '%d', '%s', '%s' )
 		);
 		$sig_id = (int) $wpdb->insert_id;
 
@@ -289,7 +308,11 @@ final class Waiver_Service {
 		// (guest or member) are found at their next visit, exactly like the
 		// imported Ottertext signers.
 		if ( $sig_id > 0 ) {
-			Waivers_Archive::upsert_from_signature( self::get_signature( $sig_id ) );
+			$row = self::get_signature( $sig_id );
+			Waivers_Archive::upsert_from_signature( $row );
+			// Completion signal for live surfaces + automations (front-desk
+			// check-in waiting on a waiver, Messageistic SMS bridges, etc.).
+			do_action( 'memberistic_waiver_signed', $sig_id, is_array( $row ) ? $row : array() );
 		}
 		return $sig_id;
 	}
@@ -452,6 +475,71 @@ final class Waiver_Service {
 	}
 
 	/**
+	 * Days before expiry to send the renewal reminder. 0 disables.
+	 */
+	public static function renewal_reminder_days() {
+		$days = (int) get_option( 'memberistic_waiver_renewal_reminder_days', 30 );
+		$days = max( 0, min( 365, $days ) );
+		return (int) apply_filters( 'memberistic_waiver_renewal_reminder_days', $days );
+	}
+
+	/**
+	 * Renewal reminders: email members whose signed waiver expires within the
+	 * reminder window, once per signing cycle (re-signing resets the gate,
+	 * because waiver_signed_at moves past waiver_renewal_reminded_at).
+	 * Called daily from the Scheduler. Returns the number of emails sent.
+	 */
+	public static function send_renewal_reminders() {
+		$days = self::renewal_reminder_days();
+		if ( $days <= 0 ) {
+			return 0;
+		}
+		global $wpdb;
+		$table = People_Repository::table();
+
+		// Tolerate a not-yet-migrated schema (column ships in DB 1.8.0).
+		$columns = (array) $wpdb->get_col( "SHOW COLUMNS FROM {$table}" ); // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+		if ( ! in_array( 'waiver_renewal_reminded_at', $columns, true ) ) {
+			return 0;
+		}
+
+		$now   = current_time( 'mysql' );
+		$until = wp_date( 'Y-m-d H:i:s', current_time( 'timestamp' ) + ( $days * DAY_IN_SECONDS ) );
+		// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+		$rows = $wpdb->get_results(
+			$wpdb->prepare(
+				"SELECT id, membership_id, waiver_expires_at FROM {$table}
+				 WHERE status = 'active' AND waiver_status = 'signed'
+				   AND membership_id IS NOT NULL AND membership_id > 0
+				   AND waiver_expires_at IS NOT NULL AND waiver_expires_at BETWEEN %s AND %s
+				   AND ( waiver_renewal_reminded_at IS NULL OR waiver_renewal_reminded_at <= COALESCE(waiver_signed_at, '1970-01-01') )
+				 LIMIT 200",
+				$now,
+				$until
+			),
+			ARRAY_A
+		);
+
+		$sent = 0;
+		foreach ( (array) $rows as $row ) {
+			$ok = Email_Service::send_membership_email(
+				(int) $row['membership_id'],
+				'waiver_renewal',
+				array(
+					'waiver_expires' => date_i18n( get_option( 'date_format' ), strtotime( (string) $row['waiver_expires_at'] ) ),
+				)
+			);
+			// Stamp even on send failure? No — leave unset so tomorrow's run
+			// retries; the LIMIT keeps a persistent failure from flooding.
+			if ( $ok ) {
+				$wpdb->update( $table, array( 'waiver_renewal_reminded_at' => $now ), array( 'id' => (int) $row['id'] ) );
+				$sent++;
+			}
+		}
+		return $sent;
+	}
+
+	/**
 	 * Counts of active people by waiver bucket.
 	 *
 	 * @return array{signed:int,missing:int,expired:int,needs_review:int,total:int}
@@ -559,6 +647,16 @@ final class Waiver_Public {
 	 * — works as a kiosk URL with no page setup.
 	 */
 	public static function render_kiosk() {
+		// Station mode: a valid HMAC station token unlocks the full-screen
+		// attract UI (and carries into the guest form, where it lifts the
+		// public throttle + stamps the station on the signature). An expired
+		// token just falls through to the public hub below.
+		$token   = Waiver_Kiosk::request_token();
+		$station = Waiver_Kiosk::verify_token( $token );
+		if ( '' !== $station ) {
+			self::render_kiosk_attract( $token, $station );
+			return;
+		}
 		$guest   = self::guest_url();
 		$account = home_url( '/account/' );
 		// Brand colors flow through CSS custom properties so the kiosk + the
@@ -575,6 +673,59 @@ final class Waiver_Public {
 		$html   .= '<a href="' . esc_url( $account ) . '" style="' . esc_attr( $big ) . 'background:var(--memberistic-brand-primary);color:#fff;border:1px solid rgba(255,255,255,.1);">' . esc_html__( 'Member — Sign In to Show Your Pass', 'memberistic' ) . '</a>';
 		$html   .= '<p style="color:#5A6371;font-size:12px;margin-top:20px;">' . esc_html__( 'Already have your member QR on your phone? Just show it at the desk.', 'memberistic' ) . '</p>';
 		self::render( __( 'Range Check-In', 'memberistic' ), $html, 200 );
+	}
+
+	/**
+	 * Full-screen attract screen for a verified kiosk station: one giant
+	 * "sign the waiver" button, a member path, and (when a staff PIN is
+	 * configured) a discreet server-verified exit button. The station token
+	 * threads through every link so the whole loop stays in kiosk mode.
+	 */
+	private static function render_kiosk_attract( $token, $station ) {
+		// Server-verified staff exit (device-level guided access is the real
+		// lock; this is the polite path off the attract loop).
+		$pin = Waiver_Kiosk::staff_pin();
+		if ( '' !== $pin && isset( $_POST['kiosk_exit_pin'] ) ) { // phpcs:ignore WordPress.Security.NonceVerification.Missing -- kiosk surface; PIN is the credential.
+			$given = preg_replace( '/\D+/', '', (string) wp_unslash( $_POST['kiosk_exit_pin'] ) );
+			if ( hash_equals( $pin, $given ) ) {
+				wp_safe_redirect( home_url( '/' ) );
+				exit;
+			}
+		}
+		$guest   = Waiver_Kiosk::guest_url( $token );
+		$account = home_url( '/account/' );
+		$primary = (string) get_option( 'memberistic_primary_brand_color', '#0F2044' );
+		$accent  = (string) get_option( 'memberistic_accent_brand_color', '#E8802F' );
+		$brand   = memberistic_get_brand_label();
+
+		nocache_headers();
+		header( 'Content-Type: text/html; charset=utf-8' );
+		echo '<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">';
+		echo '<title>' . esc_html( $brand ) . ' — ' . esc_html__( 'Range Check-In', 'memberistic' ) . '</title>';
+		echo '<style>'
+			. ':root{--p:' . esc_attr( $primary ) . ';--a:' . esc_attr( $accent ) . ';}'
+			. '*{-webkit-tap-highlight-color:transparent;}'
+			. 'body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;background:var(--p);color:#fff;margin:0;min-height:100vh;display:grid;place-items:center;padding:24px;box-sizing:border-box;overscroll-behavior:none;}'
+			. '.wrap{max-width:640px;width:100%;text-align:center;}'
+			. '.brand{font-family:"Bebas Neue",Impact,sans-serif;letter-spacing:.2em;color:#C9A84C;text-transform:uppercase;font-size:20px;margin-bottom:8px;}'
+			. 'h1{font-size:34px;margin:0 0 28px;}'
+			. 'a.big{display:block;padding:30px;margin:0 0 18px;border-radius:12px;font-weight:800;font-size:24px;letter-spacing:.04em;text-decoration:none;}'
+			. 'a.guest{background:var(--a);color:#111;}'
+			. 'a.member{background:rgba(255,255,255,.08);color:#fff;border:1px solid rgba(255,255,255,.18);}'
+			. '.station{color:rgba(255,255,255,.35);font-size:12px;margin-top:26px;letter-spacing:.08em;text-transform:uppercase;}'
+			. '.exit{position:fixed;bottom:10px;right:12px;}'
+			. '.exit button{background:none;border:0;color:rgba(255,255,255,.25);font-size:12px;cursor:pointer;padding:8px;}'
+			. '</style></head><body><div class="wrap">';
+		echo '<div class="brand">' . esc_html( $brand ) . '</div>';
+		echo '<h1>' . esc_html__( 'Welcome to the range', 'memberistic' ) . '</h1>';
+		echo '<a class="big guest" href="' . esc_url( $guest ) . '">' . esc_html__( 'Guest / First Visit — Sign the Waiver', 'memberistic' ) . '</a>';
+		echo '<a class="big member" href="' . esc_url( $account ) . '">' . esc_html__( 'Member — Show Your Pass', 'memberistic' ) . '</a>';
+		echo '<div class="station">' . esc_html( sprintf( /* translators: %s: station name */ __( 'Station: %s', 'memberistic' ), $station ) ) . '</div>';
+		if ( '' !== $pin ) {
+			echo '<form class="exit" method="post"><button type="button" onclick="var p=prompt(' . wp_json_encode( __( 'Staff PIN', 'memberistic' ) ) . ');if(p!==null){this.form.kiosk_exit_pin.value=p;this.form.submit();}">' . esc_html__( 'Staff exit', 'memberistic' ) . '</button><input type="hidden" name="kiosk_exit_pin" value=""></form>';
+		}
+		echo '</div></body></html>';
+		exit;
 	}
 
 	/**
@@ -616,6 +767,13 @@ final class Waiver_Public {
 	 * uploads.
 	 */
 	public static function handle_guest() {
+		// Kiosk station mode: a valid HMAC token lifts the public per-IP
+		// throttle (one desk device signs many guests), stamps the station
+		// on the signature, and turns the success page into an auto-reset
+		// loop back to the attract screen for the next guest.
+		$station_token = Waiver_Kiosk::request_token();
+		$station       = Waiver_Kiosk::verify_token( $station_token );
+
 		if ( 'POST' === strtoupper( (string) ( $_SERVER['REQUEST_METHOD'] ?? '' ) ) ) {
 			if ( ! isset( $_POST['memberistic_waiver_nonce'] ) || ! wp_verify_nonce( sanitize_text_field( wp_unslash( $_POST['memberistic_waiver_nonce'] ) ), 'memberistic_waiver_guest' ) ) {
 				self::render( __( 'Session expired', 'memberistic' ), '<p>' . esc_html__( 'Please reload the page and try again.', 'memberistic' ) . '</p>', 400 );
@@ -633,21 +791,26 @@ final class Waiver_Public {
 			$ip = isset( $_SERVER['REMOTE_ADDR'] ) ? sanitize_text_field( wp_unslash( $_SERVER['REMOTE_ADDR'] ) ) : '';
 
 			// Throttle the fully-unauthenticated guest surface to curb scripted
-			// row spam: cap per-IP submissions per hour (filterable).
-			$limit = (int) apply_filters( 'memberistic_guest_waiver_hourly_limit', 8 );
-			$rk    = 'memberistic_guest_wv_' . md5( $ip );
-			$count = (int) get_transient( $rk );
-			if ( $count >= $limit ) {
-				self::render( __( 'Please try again later', 'memberistic' ), '<p>' . esc_html__( 'Too many waiver submissions from this connection. Please ask range staff for help.', 'memberistic' ) . '</p>', 429 );
+			// row spam: cap per-IP submissions per hour (filterable). A
+			// verified kiosk station is exempt — the front desk signs a
+			// steady stream of guests from one IP.
+			if ( '' === $station ) {
+				$limit = (int) apply_filters( 'memberistic_guest_waiver_hourly_limit', 8 );
+				$rk    = 'memberistic_guest_wv_' . md5( $ip );
+				$count = (int) get_transient( $rk );
+				if ( $count >= $limit ) {
+					self::render( __( 'Please try again later', 'memberistic' ), '<p>' . esc_html__( 'Too many waiver submissions from this connection. Please ask range staff for help.', 'memberistic' ) . '</p>', 429 );
+				}
+				set_transient( $rk, $count + 1, HOUR_IN_SECONDS );
 			}
-			set_transient( $rk, $count + 1, HOUR_IN_SECONDS );
 
 			$sig_id = (int) Waiver_Service::record_signature(
 				array_merge(
 					array(
 						'signer_name'  => $name,
 						'signer_email' => $email,
-						'source'       => 'guest',
+						'source'       => '' !== $station ? 'kiosk' : 'guest',
+						'station'      => $station,
 						'signed_at'    => current_time( 'mysql' ),
 						'expires_at'   => wp_date( 'Y-m-d H:i:s', current_time( 'timestamp' ) + ( Waiver_Service::validity_days() * DAY_IN_SECONDS ) ),
 						'ip'           => $ip,
@@ -657,6 +820,20 @@ final class Waiver_Public {
 			);
 			if ( $sig_id ) {
 				self::store_signature_artifacts( $sig_id, (string) $extra['jpeg'] );
+			}
+			if ( '' !== $station ) {
+				// Auto-reset kiosk loop: bounce back to the attract screen
+				// after a short thank-you so the device is ready for the
+				// next guest even if nobody touches it.
+				$attract = Waiver_Kiosk::kiosk_url( $station_token );
+				self::render(
+					__( 'Waiver complete', 'memberistic' ),
+					'<p>' . esc_html__( 'Thank you — your waiver is on file. Enjoy your visit.', 'memberistic' ) . '</p>'
+					. '<p><a class="btn" href="' . esc_url( $attract ) . '">' . esc_html__( 'Next guest — tap here', 'memberistic' ) . '</a></p>'
+					. '<p style="color:#5A6371;font-size:12px;" id="mw-reset-note"></p>'
+					. '<script>(function(){var s=12,n=document.getElementById("mw-reset-note");function t(){n.textContent="' . esc_js( __( 'Resetting for the next guest in', 'memberistic' ) ) . ' "+s+"s";if(s--<=0){window.location.href=' . wp_json_encode( $attract ) . ';return;}setTimeout(t,1000);}t();})();</script>',
+					200
+				);
 			}
 			self::render(
 				__( 'Waiver complete', 'memberistic' ),
@@ -677,6 +854,12 @@ final class Waiver_Public {
 		echo '<div style="text-align:left;background:#11161D;border:1px solid #2A323D;border-radius:8px;padding:18px;max-height:280px;overflow:auto;color:#CBCAD2;line-height:1.6;font-size:14px;white-space:pre-wrap;">' . esc_html( $text ) . '</div>';
 		echo '<form method="post" style="margin-top:18px;text-align:left;">';
 		wp_nonce_field( 'memberistic_waiver_guest', 'memberistic_waiver_nonce' );
+		// Thread a kiosk station token (if any) through the POST so the
+		// submit keeps its throttle exemption + station attribution.
+		$station_token = Waiver_Kiosk::request_token();
+		if ( '' !== $station_token && '' !== Waiver_Kiosk::verify_token( $station_token ) ) {
+			echo '<input type="hidden" name="' . esc_attr( Waiver_Kiosk::PARAM ) . '" value="' . esc_attr( $station_token ) . '">';
+		}
 		echo '<label style="display:block;font-size:12px;letter-spacing:.12em;text-transform:uppercase;color:#8A95A5;margin-bottom:6px;">' . esc_html__( 'Full legal name', 'memberistic' ) . '</label>';
 		echo '<input type="text" name="signature_name" required style="width:100%;padding:12px 14px;background:#0F1115;border:1px solid #2A323D;border-radius:4px;color:#fff;font-size:16px;margin-bottom:14px;box-sizing:border-box;">';
 		echo '<label style="display:block;font-size:12px;letter-spacing:.12em;text-transform:uppercase;color:#8A95A5;margin-bottom:6px;">' . esc_html__( 'Email address', 'memberistic' ) . '</label>';
@@ -1028,11 +1211,54 @@ final class Waiver_Admin_Page {
 		$notice = '';
 		switch ( $action ) {
 			case 'save_settings':
-				$text  = isset( $_POST['waiver_text'] ) ? sanitize_textarea_field( wp_unslash( $_POST['waiver_text'] ) ) : '';
-				$days  = isset( $_POST['waiver_validity_days'] ) ? absint( $_POST['waiver_validity_days'] ) : Waiver_Service::DEFAULT_VALIDITY;
-				update_option( 'memberistic_waiver_text', $text );
+				$days     = isset( $_POST['waiver_validity_days'] ) ? absint( $_POST['waiver_validity_days'] ) : Waiver_Service::DEFAULT_VALIDITY;
+				$reminder = isset( $_POST['waiver_renewal_reminder_days'] ) ? absint( $_POST['waiver_renewal_reminder_days'] ) : 30;
 				update_option( 'memberistic_waiver_validity_days', $days > 0 ? $days : Waiver_Service::DEFAULT_VALIDITY );
+				update_option( 'memberistic_waiver_renewal_reminder_days', min( 365, $reminder ) );
 				$notice = __( 'Waiver settings saved.', 'memberistic' );
+				break;
+			case 'publish_version':
+				$text      = isset( $_POST['waiver_text'] ) ? sanitize_textarea_field( wp_unslash( $_POST['waiver_text'] ) ) : '';
+				$title     = isset( $_POST['waiver_version_title'] ) ? sanitize_text_field( wp_unslash( $_POST['waiver_version_title'] ) ) : '';
+				$reconsent = ! empty( $_POST['waiver_requires_reconsent'] );
+				$current   = Waiver_Versions::current();
+				if ( '' === trim( $text ) ) {
+					$notice = __( 'The waiver text cannot be empty.', 'memberistic' );
+					break;
+				}
+				if ( $current && hash( 'sha256', trim( $text ) ) === (string) $current['text_hash'] && ! $reconsent ) {
+					$notice = __( 'No changes — the text matches the current version.', 'memberistic' );
+					break;
+				}
+				$vid = Waiver_Versions::publish( $text, $title, $reconsent, get_current_user_id() );
+				if ( $vid ) {
+					$notice = $reconsent
+						? sprintf( /* translators: %d: version id */ __( 'Version %d published. All previously signed waivers now require re-consent.', 'memberistic' ), $vid )
+						: sprintf( /* translators: %d: version id */ __( 'Version %d published. Existing signatures remain valid until their normal expiry.', 'memberistic' ), $vid );
+				} else {
+					$notice = __( 'The new version could not be published.', 'memberistic' );
+				}
+				break;
+			case 'kiosk_link':
+				$station = isset( $_POST['kiosk_station'] ) ? sanitize_title( wp_unslash( $_POST['kiosk_station'] ) ) : '';
+				$token   = Waiver_Kiosk::mint_token( $station ?: 'front-desk' );
+				set_transient(
+					'memberistic_kiosk_link_' . get_current_user_id(),
+					array(
+						'url'     => Waiver_Kiosk::kiosk_url( $token ),
+						'station' => $station ?: 'front-desk',
+						'expires' => time() + Waiver_Kiosk::ttl(),
+					),
+					5 * MINUTE_IN_SECONDS
+				);
+				$notice = __( 'Kiosk link generated — see the Kiosk stations card below. Open it on the kiosk device.', 'memberistic' );
+				break;
+			case 'save_kiosk_pin':
+				$pin = isset( $_POST['kiosk_staff_pin'] ) ? preg_replace( '/\D+/', '', (string) wp_unslash( $_POST['kiosk_staff_pin'] ) ) : '';
+				update_option( Waiver_Kiosk::PIN_OPTION, substr( $pin, 0, 8 ), false );
+				$notice = '' === $pin
+					? __( 'Kiosk staff PIN removed.', 'memberistic' )
+					: __( 'Kiosk staff PIN saved.', 'memberistic' );
 				break;
 			case 'bulk_sign':
 				$n      = Waiver_Service::bulk_mark_active_signed();
@@ -1220,7 +1446,7 @@ final class Waiver_Admin_Page {
 		header( 'Content-Type: text/csv; charset=utf-8' );
 		header( 'Content-Disposition: attachment; filename="memberistic-waivers-' . gmdate( 'Y-m-d' ) . '.csv"' );
 		$out = fopen( 'php://output', 'w' );
-		fputcsv( $out, array( 'id', 'signed_at', 'expires_at', 'source', 'signer_name', 'signer_email', 'dob', 'phone', 'emergency_name', 'emergency_phone', 'minors', 'membership_id', 'ip', 'text_hash', 'has_attachment', 'waiver_text' ) );
+		fputcsv( $out, array( 'id', 'signed_at', 'expires_at', 'source', 'station', 'signer_name', 'signer_email', 'dob', 'phone', 'emergency_name', 'emergency_phone', 'minors', 'membership_id', 'ip', 'waiver_version', 'text_hash', 'has_attachment', 'waiver_text' ) );
 		$page = 0;
 		do {
 			$rows = Waiver_Service::get_signatures( 1000, $page * 1000 );
@@ -1234,6 +1460,7 @@ final class Waiver_Admin_Page {
 							$r['signed_at'],
 							$r['expires_at'],
 							$r['source'],
+							$r['station'] ?? '',
 							$r['signer_name'],
 							$r['signer_email'],
 							$r['dob'] ?? '',
@@ -1243,6 +1470,7 @@ final class Waiver_Admin_Page {
 							$r['minors_json'] ?? '',
 							$r['membership_id'],
 							$r['ip'],
+							$r['waiver_version_id'] ?? '',
 							$r['text_hash'],
 							! empty( $r['attachment_id'] ) ? 'yes' : 'no',
 							$r['waiver_text'],
@@ -1298,7 +1526,7 @@ final class Waiver_Admin_Page {
 		}
 		echo '<div><strong>' . esc_html__( 'Signed', 'memberistic' ) . ':</strong> ' . esc_html( $signed ) . '</div>';
 		echo '<div><strong>' . esc_html__( 'Valid through', 'memberistic' ) . ':</strong> ' . esc_html( $expires ) . '</div>';
-		echo '<div><strong>' . esc_html__( 'Method', 'memberistic' ) . ':</strong> ' . esc_html( (string) $sig['source'] ) . '</div>';
+		echo '<div><strong>' . esc_html__( 'Method', 'memberistic' ) . ':</strong> ' . esc_html( (string) $sig['source'] . ( ! empty( $sig['station'] ) ? ' @ ' . (string) $sig['station'] : '' ) ) . '</div>';
 		echo '<div><strong>IP:</strong> ' . esc_html( (string) $sig['ip'] ) . '</div>';
 		echo '<div><strong>' . esc_html__( 'Document hash (SHA-256)', 'memberistic' ) . ':</strong> ' . esc_html( (string) $sig['text_hash'] ) . '</div>';
 		echo '</div>';
@@ -1429,19 +1657,117 @@ final class Waiver_Admin_Page {
 			</div>
 
 			<div class="memberistic-card">
-				<h2><?php esc_html_e( 'Waiver document', 'memberistic' ); ?></h2>
+				<h2><?php esc_html_e( 'Waiver document (versioned)', 'memberistic' ); ?></h2>
+				<?php $cur_ver = Waiver_Versions::current(); ?>
+				<?php if ( $cur_ver ) : ?>
+					<p class="description">
+						<?php
+						printf(
+							/* translators: 1: version id, 2: title, 3: date */
+							esc_html__( 'Currently in effect: version %1$d%2$s, published %3$s.', 'memberistic' ),
+							(int) $cur_ver['id'],
+							$cur_ver['title'] ? ' (' . esc_html( (string) $cur_ver['title'] ) . ')' : '',
+							esc_html( date_i18n( get_option( 'date_format' ), strtotime( (string) $cur_ver['effective_from'] ) ) )
+						);
+						?>
+					</p>
+				<?php endif; ?>
+				<form method="post">
+					<?php wp_nonce_field( 'memberistic_waivers' ); ?>
+					<input type="hidden" name="memberistic_waiver_action" value="publish_version">
+					<p>
+						<label for="waiver_text" style="font-weight:600;display:block;margin-bottom:6px;"><?php esc_html_e( 'Waiver text shown when signing (saving publishes a NEW version — past signatures keep their original text snapshot)', 'memberistic' ); ?></label>
+						<textarea id="waiver_text" name="waiver_text" rows="8" class="large-text" style="width:100%;"><?php echo esc_textarea( Waiver_Service::waiver_text() ); ?></textarea>
+					</p>
+					<p>
+						<label for="waiver_version_title" style="font-weight:600;"><?php esc_html_e( 'Version label (optional, e.g. "2026 insurance update")', 'memberistic' ); ?></label><br>
+						<input type="text" id="waiver_version_title" name="waiver_version_title" class="regular-text">
+					</p>
+					<p>
+						<label>
+							<input type="checkbox" name="waiver_requires_reconsent" value="1">
+							<strong><?php esc_html_e( 'Require re-consent', 'memberistic' ); ?></strong> —
+							<?php esc_html_e( 'everyone signed before this version must sign again (their status flips to "needs review" and waivers on file stop satisfying booking/check-in). Leave unchecked for wording tweaks: existing signatures then stay valid until their normal expiry.', 'memberistic' ); ?>
+						</label>
+					</p>
+					<p><button type="submit" class="button button-primary"><?php esc_html_e( 'Publish new version', 'memberistic' ); ?></button></p>
+				</form>
+				<?php $versions = Waiver_Versions::all( 10 ); ?>
+				<?php if ( $versions ) : ?>
+					<h3 style="margin-top:18px;"><?php esc_html_e( 'Version history', 'memberistic' ); ?></h3>
+					<table class="widefat striped">
+						<thead><tr>
+							<th><?php esc_html_e( 'Version', 'memberistic' ); ?></th>
+							<th><?php esc_html_e( 'Label', 'memberistic' ); ?></th>
+							<th><?php esc_html_e( 'Effective from', 'memberistic' ); ?></th>
+							<th><?php esc_html_e( 'Re-consent', 'memberistic' ); ?></th>
+							<th><?php esc_html_e( 'Published by', 'memberistic' ); ?></th>
+						</tr></thead>
+						<tbody>
+						<?php foreach ( $versions as $v ) : ?>
+							<tr>
+								<td>#<?php echo (int) $v['id']; ?><?php if ( $cur_ver && (int) $cur_ver['id'] === (int) $v['id'] ) : ?> <strong>(<?php esc_html_e( 'current', 'memberistic' ); ?>)</strong><?php endif; ?></td>
+								<td><?php echo esc_html( $v['title'] ?: '—' ); ?></td>
+								<td><?php echo esc_html( date_i18n( get_option( 'date_format' ) . ' H:i', strtotime( (string) $v['effective_from'] ) ) ); ?></td>
+								<td><?php echo $v['requires_reconsent'] ? '<span style="color:#b32d2e;font-weight:600;">' . esc_html__( 'Yes', 'memberistic' ) . '</span>' : esc_html__( 'No', 'memberistic' ); ?></td>
+								<td><?php $u = $v['created_by'] ? get_userdata( (int) $v['created_by'] ) : null; echo esc_html( $u ? $u->display_name : '—' ); ?></td>
+							</tr>
+						<?php endforeach; ?>
+						</tbody>
+					</table>
+				<?php endif; ?>
+			</div>
+
+			<div class="memberistic-card">
+				<h2><?php esc_html_e( 'Waiver schedule settings', 'memberistic' ); ?></h2>
 				<form method="post">
 					<?php wp_nonce_field( 'memberistic_waivers' ); ?>
 					<input type="hidden" name="memberistic_waiver_action" value="save_settings">
 					<p>
-						<label for="waiver_text" style="font-weight:600;display:block;margin-bottom:6px;"><?php esc_html_e( 'Waiver text shown to members when signing', 'memberistic' ); ?></label>
-						<textarea id="waiver_text" name="waiver_text" rows="8" class="large-text" style="width:100%;"><?php echo esc_textarea( Waiver_Service::waiver_text() ); ?></textarea>
-					</p>
-					<p>
 						<label for="waiver_validity_days" style="font-weight:600;"><?php esc_html_e( 'Validity (days before a signed waiver expires)', 'memberistic' ); ?></label><br>
 						<input type="number" min="1" id="waiver_validity_days" name="waiver_validity_days" value="<?php echo esc_attr( (string) Waiver_Service::validity_days() ); ?>" class="small-text">
 					</p>
+					<p>
+						<label for="waiver_renewal_reminder_days" style="font-weight:600;"><?php esc_html_e( 'Renewal reminder (days before expiry to email the member; 0 disables)', 'memberistic' ); ?></label><br>
+						<input type="number" min="0" max="365" id="waiver_renewal_reminder_days" name="waiver_renewal_reminder_days" value="<?php echo esc_attr( (string) Waiver_Service::renewal_reminder_days() ); ?>" class="small-text">
+					</p>
 					<p><button type="submit" class="button button-primary"><?php esc_html_e( 'Save waiver settings', 'memberistic' ); ?></button></p>
+				</form>
+			</div>
+
+			<div class="memberistic-card">
+				<h2><?php esc_html_e( 'Kiosk stations', 'memberistic' ); ?></h2>
+				<p class="description" style="max-width:680px;">
+					<?php
+					printf(
+						/* translators: %d: hours */
+						esc_html__( 'Generate a signed kiosk link for a front-desk device. A kiosk link unlocks the full-screen signing mode, skips the public per-IP throttle, and stamps the station name on every signature. Links are valid for %d hours — mint a fresh one each shift, like the check-in stations.', 'memberistic' ),
+						(int) round( Waiver_Kiosk::ttl() / HOUR_IN_SECONDS )
+					);
+					?>
+				</p>
+				<?php
+				$kiosk_link = get_transient( 'memberistic_kiosk_link_' . get_current_user_id() );
+				if ( is_array( $kiosk_link ) && ! empty( $kiosk_link['url'] ) ) :
+					delete_transient( 'memberistic_kiosk_link_' . get_current_user_id() );
+					?>
+					<div class="notice notice-success inline" style="padding:12px;">
+						<p style="margin:0 0 6px;"><strong><?php echo esc_html( (string) $kiosk_link['station'] ); ?></strong> — <?php esc_html_e( 'open this on the kiosk device (valid until', 'memberistic' ); ?> <?php echo esc_html( date_i18n( get_option( 'time_format' ), (int) $kiosk_link['expires'] + (int) ( get_option( 'gmt_offset' ) * HOUR_IN_SECONDS ) ) ); ?>):</p>
+						<p style="margin:0;"><input type="text" readonly value="<?php echo esc_attr( (string) $kiosk_link['url'] ); ?>" class="large-text" onclick="this.select();"> <a class="button" href="<?php echo esc_url( (string) $kiosk_link['url'] ); ?>" target="_blank" rel="noopener"><?php esc_html_e( 'Open', 'memberistic' ); ?></a></p>
+					</div>
+				<?php endif; ?>
+				<form method="post" style="margin-bottom:14px;">
+					<?php wp_nonce_field( 'memberistic_waivers' ); ?>
+					<input type="hidden" name="memberistic_waiver_action" value="kiosk_link">
+					<input type="text" name="kiosk_station" placeholder="<?php esc_attr_e( 'Station name (e.g. front-desk-ipad)', 'memberistic' ); ?>" class="regular-text">
+					<button type="submit" class="button button-primary"><?php esc_html_e( 'Generate kiosk link', 'memberistic' ); ?></button>
+				</form>
+				<form method="post">
+					<?php wp_nonce_field( 'memberistic_waivers' ); ?>
+					<input type="hidden" name="memberistic_waiver_action" value="save_kiosk_pin">
+					<label for="kiosk_staff_pin" style="font-weight:600;"><?php esc_html_e( 'Staff exit PIN (digits, optional — shows a PIN-gated exit button on the kiosk; empty disables)', 'memberistic' ); ?></label><br>
+					<input type="password" inputmode="numeric" pattern="[0-9]*" maxlength="8" id="kiosk_staff_pin" name="kiosk_staff_pin" value="<?php echo esc_attr( Waiver_Kiosk::staff_pin() ); ?>" class="small-text" autocomplete="off">
+					<button type="submit" class="button"><?php esc_html_e( 'Save PIN', 'memberistic' ); ?></button>
 				</form>
 			</div>
 

@@ -3,7 +3,7 @@
  * Plugin Name: Guns2Ammo Waiver Manager
  * Plugin URI: https://wordpressistic.com/
  * Description: Guns2Ammo Waiver Manager is a custom-built WordPress plugin that automates the waiver and user management process for the Guns2Ammo site. It integrates tightly with ApproveMe WP E-Signature and Paid Memberships Pro (PMPro) to manage both membership and kiosk walk-in users, ensuring that waiver forms are signed, users are registered, and access is controlled — all hands-free.
- * Version: 1.5
+ * Version: 1.5.1
  * Author: Wordpressistic
  * Author URI: https://wordpressistic.com/
  */
@@ -12,7 +12,21 @@ if ( ! defined( 'ABSPATH' ) ) {
     exit;
 }
 
-define( 'G2A_WAIVER_VERSION', '1.5' );
+define( 'G2A_WAIVER_VERSION', '1.5.1' );
+
+// === RETIRED: superseded by Memberistic's built-in waiver system === //
+// Memberistic >= 1.17 covers everything this plugin did — e-sign (member,
+// guest, and station-token kiosk modes), minors, generated PDFs, versioned
+// waiver text, expiry + renewal reminders — without ApproveMe or PMPro.
+// This plugin is kept in the repo only for archival reference.
+add_action( 'admin_notices', function () {
+	if ( ! current_user_can( 'activate_plugins' ) ) {
+		return;
+	}
+	echo '<div class="notice notice-warning"><p><strong>Guns2Ammo Waiver Manager is retired.</strong> '
+		. 'Waivers now run on Memberistic (Memberistic &rarr; Waivers: e-sign, kiosk stations, minors, PDFs, versioning, renewal reminders). '
+		. 'This plugin no longer needs to be active &mdash; please deactivate and delete it.</p></div>';
+} );
 
 // === CREATE CUSTOM "kiosk" ROLE ON PLUGIN ACTIVATION === //
 register_activation_hook(__FILE__, function () {

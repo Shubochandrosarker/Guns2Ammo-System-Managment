@@ -83,6 +83,7 @@ CREATE TABLE {$prefix}memberistic_people (
   waiver_status VARCHAR(50) DEFAULT 'missing',
   waiver_signed_at DATETIME NULL,
   waiver_expires_at DATETIME NULL,
+  waiver_renewal_reminded_at DATETIME NULL,
   status VARCHAR(50) DEFAULT 'active',
   notes TEXT NULL,
   created_at DATETIME NOT NULL,
@@ -222,6 +223,7 @@ CREATE TABLE {$prefix}memberistic_waiver_signatures (
   emergency_phone VARCHAR(60) NULL,
   minors_json LONGTEXT NULL,
   waiver_version_id BIGINT UNSIGNED NULL,
+  station VARCHAR(100) NULL,
   created_at DATETIME NOT NULL,
   PRIMARY KEY  (id),
   KEY user_id (user_id),
@@ -245,6 +247,18 @@ CREATE TABLE {$prefix}memberistic_documents (
   PRIMARY KEY  (id),
   KEY user_id (user_id),
   KEY membership_id (membership_id)
+) {$charset_collate};
+CREATE TABLE {$prefix}memberistic_waiver_versions (
+  id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  title VARCHAR(191) NULL,
+  body LONGTEXT NOT NULL,
+  text_hash CHAR(64) NOT NULL,
+  requires_reconsent TINYINT(1) NOT NULL DEFAULT 0,
+  effective_from DATETIME NOT NULL,
+  created_by BIGINT UNSIGNED NULL,
+  created_at DATETIME NOT NULL,
+  PRIMARY KEY  (id),
+  KEY effective_from (effective_from)
 ) {$charset_collate};
 CREATE TABLE {$prefix}memberistic_waivers_archive (
   id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
