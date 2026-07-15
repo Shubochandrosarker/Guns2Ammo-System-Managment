@@ -459,3 +459,82 @@ export interface ContentPage {
   total: number
   totalPages: number
 }
+
+// ---------------------------------------------------------------------------
+// Waivers (g2a/v1/waivers — Memberistic unified waiver archive)
+// ---------------------------------------------------------------------------
+
+export type WaiverStatus = 'current' | 'expiring' | 'expired' | 'superseded'
+
+export interface WaiverItem {
+  id: number
+  name: string
+  email: string
+  phone: string
+  dob: string
+  signed_at: string | null
+  expires_at: string | null
+  source: string
+  minor_name: string
+  is_current: boolean
+  status: WaiverStatus
+  matched: boolean
+  has_pdf: boolean
+}
+
+export interface WaiversPage {
+  active: boolean
+  items: WaiverItem[]
+  total: number
+  page: number
+}
+
+export interface WaiverPeopleCounts {
+  signed: number
+  missing: number
+  expired: number
+  needs_review: number
+  total: number
+}
+
+export interface WaiverStats {
+  active: boolean
+  on_file?: number
+  current?: number
+  expiring_30d?: number
+  expired?: number
+  people?: WaiverPeopleCounts
+  upcoming_missing_48h?: number
+  validity_days?: number
+}
+
+export interface WaiverHistoryRow {
+  signature_id: number
+  signed_at: string
+  expires_at: string
+  source: string
+  version: number | null
+  has_pdf: boolean
+}
+
+export interface WaiverDetail extends WaiverItem {
+  emergency_name: string
+  emergency_phone: string
+  minor_age: string
+  history: WaiverHistoryRow[]
+}
+
+export interface WaiverTodayItem {
+  booking_id: number
+  name: string
+  email: string
+  start_at: string
+  status: string
+  waiver_signed: boolean
+  waiver_ok: boolean
+}
+
+export interface WaiverTodayPage {
+  active: boolean
+  items: WaiverTodayItem[]
+}

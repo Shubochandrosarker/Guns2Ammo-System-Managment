@@ -35,6 +35,7 @@ use WordPressistic\G2ABA\REST\Settings_Controller;
 use WordPressistic\G2ABA\REST\Site_Health_Controller;
 use WordPressistic\G2ABA\REST\System_Controller;
 use WordPressistic\G2ABA\REST\Tasks_Controller;
+use WordPressistic\G2ABA\REST\Waivers_Controller;
 
 if ( ! defined( 'ABSPATH' ) ) {
 	exit;
@@ -73,6 +74,7 @@ class Router {
 			Tasks_Controller::class,
 			Export_Controller::class,
 			Leads_Controller::class,
+			Waivers_Controller::class,
 		);
 	}
 
