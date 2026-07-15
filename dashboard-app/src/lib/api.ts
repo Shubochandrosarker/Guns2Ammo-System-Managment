@@ -1,11 +1,28 @@
 // Thin API client for the Guns2Ammo Business Control Center.
 //
 // The WordPress plugin `g2a-business-api` exposes these routes under
-// `/wp-json/g2a/v1/*`. When VITE_G2A_USE_MOCKS is set, we short-circuit
-// to bundled fixtures so the UI is fully browsable without a live WP.
+// `{VITE_G2A_API_BASE}` (the full REST base, e.g.
+// https://guns2ammo.com/wp-json/g2a/v1 — see src/lib/env.ts).
+//
+// Auth (Phase 2, fixed contract):
+//   * The session credential is an HttpOnly cookie the server sets on
+//     POST /auth/session/login. JavaScript NEVER reads or stores it —
+//     every fetch simply carries it via `credentials: 'include'`.
+//   * A per-session CSRF token is returned in the login/session JSON and
+//     kept in module memory ONLY (never localStorage/sessionStorage).
+//     Every non-GET request sends it as `X-G2A-CSRF`.
+//   * 401 anywhere → clear client auth state and let the app route to
+//     /login. 403 with code `g2aba_csrf_failed` → re-hydrate the CSRF
+//     token once via GET /auth/session and retry the request once.
+//
+// In dev, VITE_G2A_USE_MOCKS short-circuits to bundled fixtures so the UI
+// is browsable without a live WP. The fixtures are loaded via a dynamic
+// import gated on a literal `import.meta.env.DEV`, so production builds
+// tree-shake the entire mock module out of the bundle (env.ts additionally
+// forces useMocks=false in prod).
 
 import { env } from './env'
-import * as mock from '@/mocks/data'
+import type { SessionResponse, SessionUser } from '@/types/auth'
 import type {
   AIInsight,
   Agent,
@@ -38,66 +55,139 @@ import type {
   WpContentItem,
 } from '@/types/analytics'
 
-const AUTH_KEY = 'g2a.auth.token'
+// ---------------------------------------------------------------------------
+// Legacy credential cleanup
+// ---------------------------------------------------------------------------
 
-export interface Session {
-  // Base64(email:appPassword) for WordPress application-password auth.
-  // The g2a-business-api plugin validates this on the /auth/login handshake;
-  // subsequent requests re-send it as `Authorization: Basic <token>`.
-  //
-  // In mock mode this is just a placeholder — nothing consumes it.
-  token: string
-  displayName: string
-  role: 'owner' | 'manager' | 'staff' | 'analyst'
+// Phase 1 builds persisted base64(email:appPassword) under this key. Sessions
+// are HttpOnly-cookie-managed now; scrub any stale credential on app boot so
+// it can't linger in existing users' browsers.
+try {
+  localStorage.removeItem('g2a.auth.token')
+} catch {
+  // Storage unavailable (private mode / disabled) — nothing to clean.
 }
 
-export function readSession(): Session | null {
-  try {
-    const raw = localStorage.getItem(AUTH_KEY)
-    return raw ? (JSON.parse(raw) as Session) : null
-  } catch {
-    return null
+// ---------------------------------------------------------------------------
+// Auth state (module memory ONLY — nothing is persisted)
+// ---------------------------------------------------------------------------
+
+// Per-session CSRF token from /auth/session(/login). A page reload loses it
+// by design; App boot re-obtains it via GET /auth/session.
+let csrfToken: string | null = null
+
+// Mock-mode stand-in for the cookie session (dev only, memory only).
+let mockUser: SessionUser | null = null
+
+// App-level hook: invoked whenever the API sees a 401 so the router can
+// clear auth state and land on /login (App.tsx registers it on mount).
+let onUnauthorized: (() => void) | null = null
+export function setUnauthorizedHandler(handler: (() => void) | null) {
+  onUnauthorized = handler
+}
+
+// ---------------------------------------------------------------------------
+// Dev-only mock fixtures (dynamically imported, tree-shaken from prod)
+// ---------------------------------------------------------------------------
+
+type MockModule = typeof import('@/mocks/data')
+let mockModule: MockModule | null = null
+
+async function mocks(): Promise<MockModule> {
+  if (import.meta.env.DEV) {
+    if (!mockModule) mockModule = await import('@/mocks/data')
+    return mockModule
   }
-}
-
-export function writeSession(s: Session | null) {
-  if (s) localStorage.setItem(AUTH_KEY, JSON.stringify(s))
-  else localStorage.removeItem(AUTH_KEY)
+  // Unreachable in practice: env.ts forces useMocks=false in prod builds.
+  // The literal DEV guard above is what lets Rollup drop the dynamic import
+  // (and the whole fixtures chunk) from production bundles.
+  throw new Error('g2a: mock data is not available in production builds')
 }
 
 // ---------------------------------------------------------------------------
 // HTTP transport
 // ---------------------------------------------------------------------------
 
-class ApiError extends Error {
+export class ApiError extends Error {
   status: number
-  constructor(status: number, message: string) {
+  /** WP_Error-style machine code from the JSON body, e.g. 'g2aba_csrf_failed'. */
+  code?: string
+  constructor(status: number, message: string, code?: string) {
     super(message)
     this.status = status
+    this.code = code
   }
 }
 
-async function httpRaw(path: string, init?: RequestInit): Promise<Response> {
-  const base = env.apiBase.replace(/\/$/, '')
-  const url = `${base}/wp-json/g2a/v1${path}`
-  const session = readSession()
-  const res = await fetch(url, {
+function apiUrl(path: string): string {
+  return `${env.apiBase.replace(/\/$/, '')}${path}`
+}
+
+// Re-fetch the CSRF token from GET /auth/session (e.g. after the session
+// was rotated in another tab). Returns true when a fresh token was stored.
+async function rehydrateCsrf(): Promise<boolean> {
+  try {
+    const res = await fetch(apiUrl('/auth/session'), {
+      headers: { Accept: 'application/json' },
+      credentials: 'include',
+    })
+    if (res.status === 401) {
+      csrfToken = null
+      onUnauthorized?.()
+      return false
+    }
+    if (!res.ok) return false
+    const data = (await res.json()) as SessionResponse
+    csrfToken = data.csrfToken ?? null
+    return csrfToken !== null
+  } catch {
+    return false
+  }
+}
+
+async function httpRaw(path: string, init?: RequestInit, isRetry = false): Promise<Response> {
+  const method = (init?.method ?? 'GET').toUpperCase()
+  const res = await fetch(apiUrl(path), {
     ...init,
     headers: {
       Accept: 'application/json',
       'Content-Type': 'application/json',
-      // WordPress application-password auth. `Basic` because the token
-      // *is* base64(email:appPassword) — see the Session comment.
-      ...(session ? { Authorization: `Basic ${session.token}` } : {}),
+      // CSRF protection: every unsafe (non-GET/HEAD) request must carry the
+      // per-session token. The HttpOnly cookie alone must never authorize a
+      // state change.
+      ...(method !== 'GET' && method !== 'HEAD' && csrfToken
+        ? { 'X-G2A-CSRF': csrfToken }
+        : {}),
       ...(init?.headers || {}),
     },
+    // The HttpOnly session cookie rides on every request.
     credentials: 'include',
   })
-  if (!res.ok) {
-    const text = await res.text().catch(() => '')
-    throw new ApiError(res.status, text || res.statusText)
+  if (res.ok) return res
+
+  const text = await res.text().catch(() => '')
+  let code: string | undefined
+  try {
+    code = (JSON.parse(text) as { code?: string }).code
+  } catch {
+    // Non-JSON error body — no machine code available.
   }
-  return res
+
+  if (res.status === 401) {
+    // Session expired or revoked: drop client auth state; the app-level
+    // handler clears the user and the router lands on /login.
+    csrfToken = null
+    onUnauthorized?.()
+    throw new ApiError(401, text || res.statusText, code)
+  }
+
+  if (res.status === 403 && code === 'g2aba_csrf_failed' && !isRetry) {
+    // Stale CSRF token — re-hydrate once via GET /auth/session, then retry
+    // the request exactly once.
+    if (await rehydrateCsrf()) return httpRaw(path, init, true)
+  }
+
+  throw new ApiError(res.status, text || res.statusText, code)
 }
 
 async function http<T>(path: string, init?: RequestInit): Promise<T> {
@@ -150,10 +240,10 @@ function mockContentPage(items: WpContentItem[], params: ContentListParams): Con
   }
 }
 
-function contentResource(type: ContentResourceType, mockItems: WpContentItem[]) {
+function contentResource(type: ContentResourceType, pickMock: (m: MockModule) => WpContentItem[]) {
   return (params: ContentListParams = {}): Promise<ContentPage> =>
     env.useMocks
-      ? Promise.resolve(mockContentPage(mockItems, params))
+      ? mocks().then(m => mockContentPage(pickMock(m), params))
       : httpContentList(`/content/${type}${contentQueryString(params)}`)
 }
 
@@ -169,102 +259,121 @@ const defaultRange = (): Range => {
 
 export const api = {
   auth: {
-    async login(email: string, password: string): Promise<Session> {
+    // POST {API_BASE}/auth/session/login — the server validates the
+    // credentials (a WordPress application password typed as the password
+    // works too), sets the HttpOnly session cookie, and returns the user +
+    // CSRF token. 401 on bad credentials, 429 when rate-limited.
+    async login(username: string, password: string): Promise<SessionUser> {
       if (env.useMocks) {
-        if (!email || !password) throw new ApiError(400, 'Email and password required')
-        const session: Session = {
-          token: 'mock-token',
-          displayName: email.split('@')[0] || 'Owner',
-          role: 'owner',
+        if (!username || !password) throw new ApiError(400, 'Username and password required')
+        mockUser = {
+          id: 1,
+          displayName: username.split('@')[0] || 'Owner',
+          email: username.includes('@') ? username : `${username}@guns2ammo.test`,
+          capabilities: ['g2a_dashboard', 'g2a_dashboard_admin'],
         }
-        writeSession(session)
-        return session
+        csrfToken = 'mock-csrf-token'
+        return mockUser
       }
+      const res = await http<SessionResponse>('/auth/session/login', {
+        method: 'POST',
+        body: JSON.stringify({ username, password }),
+      })
+      csrfToken = res.csrfToken
+      return res.user
+    },
 
-      // Mint the Basic-auth token BEFORE calling /auth/login so the
-      // handshake itself is authenticated — the plugin needs it to check
-      // `current_user_can(g2a_dashboard)` against a real WP user.
-      const basic = btoa(`${email}:${password}`)
-      writeSession({ token: basic, displayName: email, role: 'analyst' })
-
+    // GET {API_BASE}/auth/session — hydrate an existing cookie session (and
+    // the in-memory CSRF token) on app boot / reload. Resolves null when no
+    // session exists (401).
+    async session(): Promise<SessionUser | null> {
+      if (env.useMocks) return mockUser
       try {
-        const server = await http<Omit<Session, 'token'>>('/auth/login', {
-          method: 'POST',
-          body: JSON.stringify({ email, password }),
-        })
-        // `server` is typed as Omit<Session, 'token'> but the PHP backend's
-        // /auth/login response actually does include its own `token` field
-        // (a throwaway random string, not a usable credential) — spreading
-        // it AFTER the explicit `token: basic` would silently overwrite the
-        // real Basic-auth credential every request needs, breaking auth on
-        // the very next call. Spread first, then set `token` so it always wins.
-        const session: Session = { ...server, token: basic }
-        writeSession(session)
-        return session
+        const res = await http<SessionResponse>('/auth/session')
+        csrfToken = res.csrfToken
+        return res.user
       } catch (err) {
-        writeSession(null)
+        if (err instanceof ApiError && err.status === 401) return null
         throw err
       }
     },
-    logout() {
-      writeSession(null)
-    },
-    async me(): Promise<Omit<Session, 'token'>> {
+
+    // POST {API_BASE}/auth/session/logout — revokes the server session and
+    // clears the cookie (CSRF header attached by httpRaw). Local auth state
+    // is dropped even if the network call fails.
+    async logout(): Promise<void> {
       if (env.useMocks) {
-        const s = readSession()
-        return { displayName: s?.displayName ?? 'Owner', role: s?.role ?? 'owner' }
+        mockUser = null
+        csrfToken = null
+        return
       }
-      return http<Omit<Session, 'token'>>('/auth/me')
+      try {
+        await http('/auth/session/logout', { method: 'POST' })
+      } finally {
+        csrfToken = null
+      }
+    },
+
+    // POST {API_BASE}/auth/session/revoke-all — revokes every dashboard
+    // session (including the caller's own; the next API call will 401 and
+    // bounce to /login).
+    async revokeAll(): Promise<SystemActionResult> {
+      if (env.useMocks) throw new Error('revokeAll is unavailable in mock mode')
+      const result = await http<Record<string, unknown>>('/auth/session/revoke-all', {
+        method: 'POST',
+      })
+      csrfToken = null
+      return { ok: true, result }
     },
   },
 
   analytics: {
     revenueOverview(range: Range = defaultRange()): Promise<RevenueOverview> {
       return env.useMocks
-        ? Promise.resolve(mock.revenueOverview)
+        ? mocks().then(m => m.revenueOverview)
         : http<RevenueOverview>(`/analytics/overview?from=${range.from}&to=${range.to}`)
     },
     bookings(range: Range = defaultRange()): Promise<BookingAnalytics> {
       return env.useMocks
-        ? Promise.resolve(mock.bookings)
+        ? mocks().then(m => m.bookings)
         : http<BookingAnalytics>(`/analytics/bookings?from=${range.from}&to=${range.to}`)
     },
     memberships(range: Range = defaultRange()): Promise<MembershipAnalytics> {
       return env.useMocks
-        ? Promise.resolve(mock.memberships)
+        ? mocks().then(m => m.memberships)
         : http<MembershipAnalytics>(`/analytics/memberships?from=${range.from}&to=${range.to}`)
     },
     store(range: Range = defaultRange()): Promise<StoreAnalytics> {
       return env.useMocks
-        ? Promise.resolve(mock.store)
+        ? mocks().then(m => m.store)
         : http<StoreAnalytics>(`/analytics/store?from=${range.from}&to=${range.to}`)
     },
     seo(range: Range = defaultRange()): Promise<SeoAnalytics> {
       return env.useMocks
-        ? Promise.resolve(mock.seo)
+        ? mocks().then(m => m.seo)
         : http<SeoAnalytics>(`/analytics/seo?from=${range.from}&to=${range.to}`)
     },
     insightistic(range: Range = defaultRange()): Promise<InsightisticAnalytics> {
       return env.useMocks
-        ? Promise.resolve(mock.insightistic)
+        ? mocks().then(m => m.insightistic)
         : http<InsightisticAnalytics>(`/analytics/insightistic?from=${range.from}&to=${range.to}`)
     },
     shooterInsights(): Promise<ShooterInsights> {
       return env.useMocks
-        ? Promise.resolve(mock.shooterInsights)
+        ? mocks().then(m => m.shooterInsights)
         : http<ShooterInsights>('/analytics/shooter-insights')
     },
   },
 
   gaps: {
     list(): Promise<BusinessGap[]> {
-      return env.useMocks ? Promise.resolve(mock.gaps) : http<BusinessGap[]>('/insights/business-gaps')
+      return env.useMocks ? mocks().then(m => m.gaps) : http<BusinessGap[]>('/insights/business-gaps')
     },
   },
 
   insights: {
     list(): Promise<AIInsight[]> {
-      return env.useMocks ? Promise.resolve(mock.insights) : http<AIInsight[]>('/ai/insights')
+      return env.useMocks ? mocks().then(m => m.insights) : http<AIInsight[]>('/ai/insights')
     },
     async approve(id: string): Promise<Task> {
       if (env.useMocks) throw new Error('approve is unavailable in mock mode')
@@ -287,7 +396,7 @@ export const api = {
 
   tasks: {
     async list(status: 'open' | 'all' = 'open'): Promise<Task[]> {
-      if (env.useMocks) return mock.tasks.filter(t => status === 'all' || t.status === 'open')
+      if (env.useMocks) return (await mocks()).tasks.filter(t => status === 'all' || t.status === 'open')
       return http<Task[]>(status === 'open' ? '/tasks?status=open' : '/tasks')
     },
     async create(title: string, body = '', owner = ''): Promise<Task> {
@@ -309,7 +418,7 @@ export const api = {
 
   automations: {
     list(): Promise<Automation[]> {
-      return env.useMocks ? Promise.resolve(mock.automations) : http<Automation[]>('/automations')
+      return env.useMocks ? mocks().then(m => m.automations) : http<Automation[]>('/automations')
     },
     async toggle(id: string, enabled: boolean): Promise<void> {
       if (env.useMocks) return
@@ -330,11 +439,11 @@ export const api = {
   routing: {
     get(): Promise<ModelRoutingResponse> {
       if (env.useMocks) {
-        return Promise.resolve({
-          purposes: MOCK_PURPOSES,
-          labels: MOCK_ROUTING_LABELS,
-          routing: MOCK_ROUTING,
-        })
+        return mocks().then(m => ({
+          purposes: m.mockPurposes,
+          labels: m.mockRoutingLabels,
+          routing: m.mockRouting,
+        }))
       }
       return http<ModelRoutingResponse>('/model-routing')
     },
@@ -349,27 +458,27 @@ export const api = {
   },
 
   content: {
-    posts: contentResource('posts', mock.contentPosts),
-    pages: contentResource('pages', mock.contentPages),
-    media: contentResource('media', mock.contentMedia),
-    categories: contentResource('categories', mock.contentCategories),
-    tags: contentResource('tags', mock.contentTags),
+    posts: contentResource('posts', m => m.contentPosts),
+    pages: contentResource('pages', m => m.contentPages),
+    media: contentResource('media', m => m.contentMedia),
+    categories: contentResource('categories', m => m.contentCategories),
+    tags: contentResource('tags', m => m.contentTags),
   },
 
   system: {
     integrations(): Promise<IntegrationsStatus> {
       return env.useMocks
-        ? Promise.resolve(mock.integrations)
+        ? mocks().then(m => m.integrations)
         : http<IntegrationsStatus>('/system/integrations')
     },
     namespaces(): Promise<NamespacesStatus> {
       return env.useMocks
-        ? Promise.resolve(mock.namespacesStatus)
+        ? mocks().then(m => m.namespacesStatus)
         : http<NamespacesStatus>('/system/namespaces')
     },
     siteHealth(): Promise<SiteHealthSummary> {
       return env.useMocks
-        ? Promise.resolve(mock.siteHealthSummary)
+        ? mocks().then(m => m.siteHealthSummary)
         : http<SiteHealthSummary>('/system/site-health')
     },
     async rotateKeys(): Promise<SystemActionResult> {
@@ -379,6 +488,9 @@ export const api = {
         body: JSON.stringify({ confirm: true }),
       })
     },
+    // Legacy nuclear option: deletes every WP application password for
+    // dashboard users. Kept for the Basic-auth migration window; the
+    // Settings UI now uses api.auth.revokeAll() (cookie sessions) instead.
     async revokeSessions(): Promise<SystemActionResult> {
       if (env.useMocks) throw new Error('revokeSessions is unavailable in mock mode')
       return http<SystemActionResult>('/system/revoke-sessions', {
@@ -396,21 +508,25 @@ export const api = {
   },
 
   exports: {
-    // Build absolute URLs so the browser handles Content-Disposition properly.
+    // Plain <a href> download links, kept as top-level GET navigations on
+    // purpose: the HttpOnly session cookie flows on same-site top-level GETs
+    // (SameSite=Lax), so no Authorization header or JS fetch is needed and
+    // the browser handles Content-Disposition natively. These URLs point at
+    // API_BASE and RELY ON THE SESSION COOKIE — they 401 if signed out.
     tasksCsvUrl(): string {
-      return `${env.apiBase.replace(/\/$/, '')}/wp-json/g2a/v1/export/tasks.csv`
+      return apiUrl('/export/tasks.csv')
     },
     auditCsvUrl(): string {
-      return `${env.apiBase.replace(/\/$/, '')}/wp-json/g2a/v1/export/audit-log.csv`
+      return apiUrl('/export/audit-log.csv')
     },
     reportTxtUrl(id: string): string {
-      return `${env.apiBase.replace(/\/$/, '')}/wp-json/g2a/v1/export/reports/${id}.txt`
+      return apiUrl(`/export/reports/${id}.txt`)
     },
   },
 
   agents: {
     list(): Promise<Agent[]> {
-      return env.useMocks ? Promise.resolve(mock.agents) : http<Agent[]>('/agents')
+      return env.useMocks ? mocks().then(m => m.agents) : http<Agent[]>('/agents')
     },
     async run(id: string): Promise<void> {
       if (env.useMocks) return
@@ -419,9 +535,9 @@ export const api = {
   },
 
   leads: {
-    list(params: LeadsListParams = {}): Promise<LeadsPage> {
+    async list(params: LeadsListParams = {}): Promise<LeadsPage> {
       if (env.useMocks) {
-        let items = mock.leads
+        let items = (await mocks()).leads
         if (params.category) items = items.filter(l => l.category === params.category)
         if (params.status)   items = items.filter(l => l.status === params.status)
         if (params.source)   items = items.filter(l => l.source === params.source)
@@ -441,7 +557,7 @@ export const api = {
         const perPage = params.perPage || 20
         const page = params.page || 1
         const start = (page - 1) * perPage
-        return Promise.resolve({ items: items.slice(start, start + perPage), total })
+        return { items: items.slice(start, start + perPage), total }
       }
       const qs = new URLSearchParams()
       if (params.category)  qs.set('category', params.category)
@@ -456,13 +572,13 @@ export const api = {
       return http<LeadsPage>(`/leads${suffix ? `?${suffix}` : ''}`)
     },
     stats(): Promise<LeadStats> {
-      return env.useMocks ? Promise.resolve(mock.leadStats) : http<LeadStats>('/leads/stats')
+      return env.useMocks ? mocks().then(m => m.leadStats) : http<LeadStats>('/leads/stats')
     },
-    get(id: number): Promise<Lead> {
+    async get(id: number): Promise<Lead> {
       if (env.useMocks) {
-        const found = mock.leads.find(l => l.id === id)
+        const found = (await mocks()).leads.find(l => l.id === id)
         if (!found) throw new ApiError(404, 'Lead not found')
-        return Promise.resolve(found)
+        return found
       }
       return http<Lead>(`/leads/${id}`)
     },
@@ -477,14 +593,14 @@ export const api = {
 
   brain: {
     query(q: string, k?: number, scope?: string): Promise<BrainQueryResult> {
-      if (env.useMocks) return Promise.resolve(mock.brainQueryResult)
+      if (env.useMocks) return mocks().then(m => m.brainQueryResult)
       const qs = new URLSearchParams({ q })
       if (k) qs.set('k', String(k))
       if (scope) qs.set('scope', scope)
       return http<BrainQueryResult>(`/brain/query?${qs.toString()}`)
     },
     stats(scope?: string): Promise<BrainStats> {
-      if (env.useMocks) return Promise.resolve(mock.brainStats)
+      if (env.useMocks) return mocks().then(m => m.brainStats)
       const qs = scope ? `?scope=${encodeURIComponent(scope)}` : ''
       return http<BrainStats>(`/brain/stats${qs}`)
     },
@@ -499,7 +615,7 @@ export const api = {
 
   models: {
     list(): Promise<ModelConnection[]> {
-      return env.useMocks ? Promise.resolve(mock.models) : http<ModelConnection[]>('/model-connections')
+      return env.useMocks ? mocks().then(m => m.models) : http<ModelConnection[]>('/model-connections')
     },
     async test(id: string): Promise<ModelTestResult> {
       if (env.useMocks) return { ok: true, latencyMs: 240, provider: 'mock', probe: 'mock' }
@@ -531,14 +647,14 @@ export const api = {
       })
     },
     async catalog(id: string): Promise<ModelCatalogResult> {
-      if (env.useMocks) return { ok: true, provider: 'mock', models: mock.modelCatalog }
+      if (env.useMocks) return { ok: true, provider: 'mock', models: (await mocks()).modelCatalog }
       return http<ModelCatalogResult>(`/model-connections/${id}/catalog`)
     },
   },
 
   reports: {
     list(): Promise<ReportDefinition[]> {
-      if (env.useMocks) return Promise.resolve(mock.reports ?? [])
+      if (env.useMocks) return mocks().then(m => m.reports ?? [])
       return http<ReportDefinition[]>('/reports')
     },
     async runNow(id: string): Promise<ReportDelivery> {
@@ -553,7 +669,7 @@ export const api = {
 
   settings: {
     get(): Promise<DashboardSettings> {
-      if (env.useMocks) return Promise.resolve(mock.dashboardSettings)
+      if (env.useMocks) return mocks().then(m => m.dashboardSettings)
       return http<DashboardSettings>('/settings')
     },
     async update(patch: Partial<DashboardSettings>): Promise<DashboardSettings> {
@@ -568,7 +684,7 @@ export const api = {
 
   health: {
     checks(): Promise<SystemHealthCheck[]> {
-      return env.useMocks ? Promise.resolve(mock.health) : http<SystemHealthCheck[]>('/system/health')
+      return env.useMocks ? mocks().then(m => m.health) : http<SystemHealthCheck[]>('/system/health')
     },
   },
 
@@ -616,14 +732,14 @@ export const api = {
   emails: {
     overview(): Promise<EmailOverview> {
       return env.useMocks
-        ? Promise.resolve(mock.emailOverview)
+        ? mocks().then(m => m.emailOverview)
         : http<EmailOverview>('/emails/overview')
     },
   },
 
   emailDrafts: {
     async list(status: 'pending' | 'all' = 'pending'): Promise<EmailDraft[]> {
-      if (env.useMocks) return mock.emailDrafts.filter(d => status === 'all' || d.status === 'pending_send')
+      if (env.useMocks) return (await mocks()).emailDrafts.filter(d => status === 'all' || d.status === 'pending_send')
       const path = status === 'pending' ? '/email-drafts?status=pending' : '/email-drafts'
       return http<EmailDraft[]>(path)
     },
@@ -642,7 +758,7 @@ export const api = {
 
   cancellations: {
     async list(status: 'awaiting' | 'all' = 'awaiting'): Promise<Cancellation[]> {
-      if (env.useMocks) return mock.cancellations.filter(c => status === 'all' || c.status === 'awaiting_manual_action')
+      if (env.useMocks) return (await mocks()).cancellations.filter(c => status === 'all' || c.status === 'awaiting_manual_action')
       const path = status === 'awaiting' ? '/cancellations?status=awaiting' : '/cancellations'
       return http<Cancellation[]>(path)
     },
@@ -661,7 +777,7 @@ export const api = {
 
   agentHistory: {
     async list(agentId: string): Promise<AgentHistoryEntry[]> {
-      if (env.useMocks) return mock.agentHistory[agentId] ?? []
+      if (env.useMocks) return (await mocks()).agentHistory[agentId] ?? []
       return http<AgentHistoryEntry[]>(`/agents/${agentId}/history`)
     },
   },
@@ -683,7 +799,7 @@ export const api = {
 
   auditLog: {
     async list(limit = 100): Promise<AuditLogEntry[]> {
-      if (env.useMocks) return mock.auditLog
+      if (env.useMocks) return (await mocks()).auditLog
       return http<AuditLogEntry[]>(`/audit-log?limit=${limit}`)
     },
   },
@@ -835,31 +951,6 @@ export interface ModelRoutingResponse {
 export interface SystemActionResult {
   ok: true
   result: Record<string, unknown>
-}
-
-const MOCK_PURPOSES = [
-  'business_analysis', 'seo_analysis', 'booking_suggest', 'support_classify',
-  'email_drafts', 'daily_summaries', 'private_inventory',
-]
-
-const MOCK_ROUTING_LABELS: Record<string, string> = {
-  business_analysis: 'Deep business analysis',
-  seo_analysis:      'SEO analysis',
-  booking_suggest:   'Booking suggestions',
-  support_classify:  'Customer support classify',
-  email_drafts:      'Email drafts',
-  daily_summaries:   'Cheap daily summaries',
-  private_inventory: 'Private inventory',
-}
-
-const MOCK_ROUTING: Record<string, string | null> = {
-  business_analysis: 'm1',
-  seo_analysis:      'm1',
-  booking_suggest:   'm2',
-  support_classify:  'm3',
-  email_drafts:      'm4',
-  daily_summaries:   'm4',
-  private_inventory: 'm5',
 }
 
 export interface DashboardSettings {

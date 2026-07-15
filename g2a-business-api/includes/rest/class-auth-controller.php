@@ -11,12 +11,21 @@
  * long-lived credential the operator would then have to rotate manually.
  * Reusing application-passwords keeps auth centralized in WP.
  *
+ * DEPRECATED (since 0.2.0): the Basic-auth flow is superseded by the
+ * server-managed cookie sessions in Auth_Session_Controller
+ * (POST /auth/session/login). This route stays functional during the
+ * migration window but is rate-limited, flags itself `deprecated` in the
+ * response, and audit-logs every use (`legacy_basic_login`) so a cutoff
+ * can be planned from real usage data.
+ *
  * @package G2ABA
  */
 
 namespace WordPressistic\G2ABA\REST;
 
 use WordPressistic\G2ABA\Capabilities;
+use WordPressistic\G2ABA\Ops\Audit_Log;
+use WordPressistic\G2ABA\Ops\Rate_Limiter;
 
 if ( ! defined( 'ABSPATH' ) ) {
 	exit;
@@ -31,6 +40,7 @@ class Auth_Controller extends REST_Controller {
 				'methods'             => \WP_REST_Server::CREATABLE,
 				'callback'            => array( $this, 'login' ),
 				'permission_callback' => '__return_true',
+				'description'         => 'DEPRECATED: use POST /auth/session/login (cookie session) instead. This Basic-auth handshake will be removed after the dashboard migration.',
 				'args'                => array(
 					'email'    => array(
 						'type'              => 'string',
@@ -98,6 +108,21 @@ class Auth_Controller extends REST_Controller {
 		$email    = (string) $req->get_param( 'email' );
 		$password = (string) $req->get_param( 'password' );
 
+		// Same buckets as POST /auth/session/login (Auth_Session_Controller)
+		// so alternating endpoints doesn't double an attacker's budget:
+		// 10/15min per IP, 5/15min per account identifier.
+		$ip       = Rate_Limiter::client_ip();
+		$ip_check = ( new Rate_Limiter( Auth_Session_Controller::IP_SCOPE, Auth_Session_Controller::IP_LIMIT, Auth_Session_Controller::LIMIT_WINDOW ) )->hit( $ip );
+		if ( ! $ip_check['allowed'] ) {
+			return $this->too_many_requests( $ip_check['retryAfter'] );
+		}
+		if ( '' !== $email ) {
+			$user_check = ( new Rate_Limiter( Auth_Session_Controller::USERNAME_SCOPE, Auth_Session_Controller::USER_LIMIT, Auth_Session_Controller::LIMIT_WINDOW ) )->hit_key( strtolower( $email ) );
+			if ( ! $user_check['allowed'] ) {
+				return $this->too_many_requests( $user_check['retryAfter'] );
+			}
+		}
+
 		if ( '' === $email || '' === $password ) {
 			return new \WP_Error(
 				'g2aba_auth_missing',
@@ -143,11 +168,22 @@ class Auth_Controller extends REST_Controller {
 			);
 		}
 
+		// Track every legacy handshake so the Basic-auth cutoff (migration
+		// step 5) can be scheduled from real usage instead of guesswork.
+		( new Audit_Log() )->record(
+			'legacy_basic_login',
+			sprintf( 'Legacy basic-auth login for %s (deprecated route)', $user->user_login ),
+			array( 'ip' => $ip, 'user' => (int) $user->ID )
+		);
+
 		return $this->ok(
 			array(
 				'token'       => wp_generate_password( 32, false ),
 				'displayName' => $user->display_name ? $user->display_name : $user->user_login,
 				'role'        => $this->role_for( $user ),
+				// Signal to clients that this flow is going away — the
+				// replacement is POST /auth/session/login.
+				'deprecated'  => true,
 			)
 		);
 	}

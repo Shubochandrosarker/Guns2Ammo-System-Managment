@@ -1,7 +1,9 @@
 import { useEffect, useMemo, useState } from 'react'
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
 import { AppLayout } from '@/components/layout/AppLayout'
-import { api, readSession, writeSession, type Session } from '@/lib/api'
+import { api, setUnauthorizedHandler } from '@/lib/api'
+import type { SessionUser } from '@/types/auth'
+import { Spinner } from '@/components/ui/Spinner'
 import { Login } from '@/pages/Login'
 import { DashboardHome } from '@/pages/DashboardHome'
 import { BusinessAnalysis } from '@/pages/BusinessAnalysis'
@@ -27,32 +29,37 @@ import { Tasks } from '@/pages/Tasks'
 import { WebsiteContent } from '@/pages/WebsiteContent'
 
 export function App() {
-  const [session, setSession] = useState<Session | null>(() => readSession())
+  const [session, setSession] = useState<SessionUser | null>(null)
+  const [booting, setBooting] = useState(true)
 
-  // Verify the stored token is still valid on every mount. If /auth/me
-  // rejects — password revoked, capability removed, WP logged out — clear
-  // localStorage and bounce back to /login. Silent success is the common
-  // case so we don't render a spinner.
+  // Global 401 handling: any API call that comes back unauthorized clears
+  // the auth state, and the route guards below land on /login.
   useEffect(() => {
-    if (!session) return
+    setUnauthorizedHandler(() => setSession(null))
+    return () => setUnauthorizedHandler(null)
+  }, [])
+
+  // Hydrate the HttpOnly cookie session on boot: GET /auth/session returns
+  // the user (and refreshes the in-memory CSRF token inside the api module)
+  // or resolves null on 401 → login screen. Nothing auth-related is read
+  // from localStorage anymore.
+  useEffect(() => {
     let cancelled = false
     void api.auth
-      .me()
-      .then(me => {
-        if (cancelled) return
-        // Keep the token, refresh the displayable metadata.
-        setSession(prev => (prev ? { ...prev, displayName: me.displayName, role: me.role } : prev))
+      .session()
+      .then(user => {
+        if (!cancelled) setSession(user)
       })
       .catch(() => {
-        if (cancelled) return
-        writeSession(null)
-        setSession(null)
+        if (!cancelled) setSession(null)
+      })
+      .finally(() => {
+        if (!cancelled) setBooting(false)
       })
     return () => {
       cancelled = true
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [session?.token])
+  }, [])
 
   const routes = useMemo(
     () => (
@@ -96,6 +103,15 @@ export function App() {
     ),
     [session],
   )
+
+  if (booting) {
+    // Session probe in flight — avoid flashing the login screen.
+    return (
+      <div className="min-h-full flex items-center justify-center">
+        <Spinner label="Signing in…" />
+      </div>
+    )
+  }
 
   return <BrowserRouter>{routes}</BrowserRouter>
 }

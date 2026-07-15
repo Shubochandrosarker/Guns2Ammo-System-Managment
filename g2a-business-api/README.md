@@ -18,11 +18,50 @@ Drop the directory into `wp-content/plugins/` and activate. Activation:
 
 ## Auth
 
+### Cookie sessions (0.2.0+, preferred)
+
+`POST /wp-json/g2a/v1/auth/session/login` — accepts `{username, password}`
+(real WP password or an application password, via `wp_authenticate()`).
+Rate-limited: 10/15min per IP and 5/15min per username (429 +
+`Retry-After` on breach). On success the server creates a row in
+`{prefix}g2aba_sessions` and sets the session cookie:
+
+```
+g2aba_session=<64-hex token>; HttpOnly; Secure; Path=/wp-json/g2a/v1; SameSite=None
+```
+
+(`SameSite` is filterable via `g2aba_session_samesite`; the default is
+`None` because app.guns2ammo.com is cross-origin today.) The response body
+is `{user: {id, displayName, email, capabilities}, csrfToken}` — the raw
+cookie token never appears in a body, and only its SHA-256 is stored.
+
+- **Lifetimes**: 12h absolute (`g2aba_session_lifetime` filter) + 2h
+  sliding inactivity (`g2aba_session_idle_timeout`); `last_seen_at` is
+  refreshed at most once per 5 minutes.
+- **CSRF**: every non-GET/HEAD/OPTIONS `g2a/v1` request authenticated via
+  the cookie must send `X-G2A-CSRF: <csrfToken>`; enforced centrally on
+  `rest_pre_dispatch`, failure = 403 `g2aba_csrf_failed`. Basic-auth
+  requests are exempt (not CSRF-forgeable).
+- **`GET /auth/session`** — envelope for the current cookie session (SPA
+  boot / CSRF re-sync); 401 without one.
+- **`POST /auth/session/logout`** — revokes the session server-side and
+  clears the cookie.
+- **`POST /auth/session/revoke-all`** — revokes every session of the
+  current user.
+- Expired/revoked rows are purged after 7 days by the daily
+  `g2aba_sessions_cleanup` cron event.
+- Audit-log events: `session_login_success`, `session_login_failed`,
+  `session_logout`, `session_revoked_all`, `legacy_basic_login`.
+
+### Legacy Basic-auth handshake (deprecated)
+
 `POST /wp-json/g2a/v1/auth/login` — accepts `{email, password}` where the
 password is a **WordPress application password** (WP 5.6+). Returns
-`{token, displayName, role}`. The token is opaque to the frontend; subsequent
-requests are authenticated by the WP application-password auth header the
-browser holds.
+`{token, displayName, role, deprecated: true}`. Subsequent requests are
+authenticated by the WP application-password Basic header the browser
+holds. **Deprecated since 0.2.0** — it now shares the session login's
+rate-limit buckets and every use is audit-logged (`legacy_basic_login`)
+so the cutoff can be planned; migrate clients to `/auth/session/login`.
 
 All other routes require `g2a_dashboard` (read) or `g2a_dashboard_admin`
 (mutations).
@@ -31,7 +70,11 @@ All other routes require `g2a_dashboard` (read) or `g2a_dashboard_admin`
 
 | Method | Path                                        | Cap    |
 | ------ | ------------------------------------------- | ------ |
-| POST   | `/auth/login`                               | public |
+| POST   | `/auth/login` (deprecated)                  | public (rate-limited) |
+| POST   | `/auth/session/login`                       | public (rate-limited) |
+| GET    | `/auth/session`                             | session cookie |
+| POST   | `/auth/session/logout`                      | session cookie + CSRF |
+| POST   | `/auth/session/revoke-all`                  | session cookie + CSRF |
 | GET    | `/analytics/overview?from=&to=`             | read   |
 | GET    | `/analytics/bookings?from=&to=`             | read   |
 | GET    | `/analytics/memberships?from=&to=`          | read   |

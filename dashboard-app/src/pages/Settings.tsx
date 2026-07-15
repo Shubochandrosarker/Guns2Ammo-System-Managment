@@ -242,8 +242,8 @@ const DANGER_COPY: Record<DangerAction, { label: string; confirm: string; succes
   },
   sessions: {
     label:   'Force re-auth all sessions',
-    confirm: 'Revoke every WordPress application password for dashboard users? You will be signed out too.',
-    success: r => `Revoked ${Number(r.revoked ?? 0)} password(s) across ${Number(r.users ?? 0)} user(s).`,
+    confirm: 'Revoke every active dashboard session? Everyone — including you — must sign in again.',
+    success: () => 'All dashboard sessions revoked. Every device must sign in again.',
   },
 }
 
@@ -260,7 +260,10 @@ function DangerZone() {
       const res =
         kind === 'rag'      ? await api.system.rebuildRag()      :
         kind === 'keys'     ? await api.system.rotateKeys()      :
-                              await api.system.revokeSessions()
+                              // POST /auth/session/revoke-all — cookie-session
+                              // revocation (the caller's own session included;
+                              // the next API call 401s back to /login).
+                              await api.auth.revokeAll()
       setStatus({ ok: true, msg: copy.success(res.result ?? {}) })
     } catch (err) {
       setStatus({ ok: false, msg: err instanceof Error ? err.message : String(err) })

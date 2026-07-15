@@ -242,5 +242,67 @@ if ( ! function_exists( 'dbDelta' ) ) {
 }
 $GLOBALS['g2aba_test_dbdelta_calls'] = array();
 
+// Stubs added for the cookie-session auth phase (Session_Store /
+// Session_Auth / Auth_Session_Controller) — controllable via globals the
+// same way the wp_mail/cron stubs above are.
+if ( ! function_exists( 'sanitize_text_field' ) ) {
+	function sanitize_text_field( $str ) {
+		return trim( preg_replace( '/[\r\n\t ]+/', ' ', (string) $str ) );
+	}
+}
+if ( ! function_exists( 'is_wp_error' ) ) {
+	function is_wp_error( $thing ) {
+		return $thing instanceof WP_Error;
+	}
+}
+if ( ! class_exists( 'WP_User' ) ) {
+	class WP_User {
+		public $ID           = 0;
+		public $user_login   = '';
+		public $user_email   = '';
+		public $user_pass    = '';
+		public $display_name = '';
+		public $roles        = array();
+		public function __construct( $id = 0, $login = '', $email = '' ) {
+			$this->ID         = $id;
+			$this->user_login = $login;
+			$this->user_email = $email;
+		}
+	}
+}
+// Per-test capability map: $GLOBALS['g2aba_test_user_caps'][<user id>] = ['g2a_dashboard', ...].
+$GLOBALS['g2aba_test_user_caps'] = array();
+if ( ! function_exists( 'user_can' ) ) {
+	function user_can( $user, $cap ) {
+		$id   = $user instanceof WP_User ? $user->ID : (int) $user;
+		$caps = $GLOBALS['g2aba_test_user_caps'][ $id ] ?? array();
+		return in_array( $cap, $caps, true );
+	}
+}
+// wp_authenticate outcome per test: a WP_User, a WP_Error, or unset (= error).
+if ( ! function_exists( 'wp_authenticate' ) ) {
+	function wp_authenticate( $username, $password ) {
+		$GLOBALS['g2aba_test_wp_authenticate_calls'][] = array( 'username' => $username );
+		return $GLOBALS['g2aba_test_wp_authenticate'] ?? new WP_Error( 'invalid_username', 'Unknown user.' );
+	}
+}
+$GLOBALS['g2aba_test_wp_authenticate_calls'] = array();
+if ( ! function_exists( 'wp_authenticate_application_password' ) ) {
+	function wp_authenticate_application_password( $input_user, $username, $password ) {
+		return $GLOBALS['g2aba_test_app_password_auth'] ?? null;
+	}
+}
+if ( ! function_exists( 'get_user_by' ) ) {
+	function get_user_by( $field, $value ) {
+		return $GLOBALS['g2aba_test_users'][ $field ][ $value ] ?? false;
+	}
+}
+$GLOBALS['g2aba_test_users'] = array();
+if ( ! function_exists( 'wp_generate_password' ) ) {
+	function wp_generate_password( $length = 12, $special_chars = true ) {
+		return substr( bin2hex( random_bytes( 64 ) ), 0, $length );
+	}
+}
+
 require_once dirname( __DIR__ ) . '/includes/class-autoloader.php';
 \WordPressistic\G2ABA\Autoloader::register();

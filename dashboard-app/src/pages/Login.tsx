@@ -1,14 +1,27 @@
 import { FormEvent, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { api, type Session } from '@/lib/api'
+import { api, ApiError } from '@/lib/api'
+import type { SessionUser } from '@/types/auth'
 
 interface Props {
-  onSignedIn: (s: Session) => void
+  onSignedIn: (u: SessionUser) => void
+}
+
+function loginErrorMessage(err: unknown): string {
+  if (err instanceof ApiError) {
+    if (err.status === 429) {
+      return 'Too many sign-in attempts — please wait a few minutes before trying again.'
+    }
+    if (err.status === 401) {
+      return 'Invalid username or password.'
+    }
+  }
+  return err instanceof Error && err.message ? err.message : 'Sign-in failed'
 }
 
 export function Login({ onSignedIn }: Props) {
   const nav = useNavigate()
-  const [email, setEmail] = useState('')
+  const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -18,11 +31,13 @@ export function Login({ onSignedIn }: Props) {
     setBusy(true)
     setError(null)
     try {
-      const session = await api.auth.login(email, password)
-      onSignedIn(session)
+      // POST /auth/session/login sets the HttpOnly session cookie; nothing
+      // credential-shaped is ever stored client-side.
+      const user = await api.auth.login(username, password)
+      onSignedIn(user)
       nav('/', { replace: true })
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Sign-in failed')
+      setError(loginErrorMessage(err))
     } finally {
       setBusy(false)
     }
@@ -49,16 +64,17 @@ export function Login({ onSignedIn }: Props) {
 
         <form onSubmit={submit} className="p-6 space-y-4">
           <div>
-            <label className="label" htmlFor="email">Email</label>
+            <label className="label" htmlFor="username">Username</label>
             <input
-              id="email"
-              type="email"
-              autoComplete="email"
+              id="username"
+              type="text"
+              autoComplete="username"
               className="input"
-              value={email}
-              onChange={e => setEmail(e.target.value)}
-              placeholder="owner@guns2ammo.com"
+              value={username}
+              onChange={e => setUsername(e.target.value)}
+              placeholder="Your WordPress username or email"
               required
+              disabled={busy}
             />
           </div>
           <div>
@@ -71,11 +87,16 @@ export function Login({ onSignedIn }: Props) {
               value={password}
               onChange={e => setPassword(e.target.value)}
               required
+              disabled={busy}
             />
+            <p className="mt-1 text-xs text-ink-500">
+              Your WordPress password. A WordPress <em>application password</em>{' '}
+              pasted here works too.
+            </p>
           </div>
 
           {error && (
-            <div className="text-sm text-rose-700 bg-rose-100 rounded-lg px-3 py-2">
+            <div className="text-sm text-rose-700 bg-rose-100 rounded-lg px-3 py-2" role="alert">
               {error}
             </div>
           )}
@@ -86,7 +107,7 @@ export function Login({ onSignedIn }: Props) {
 
           <div className="text-xs text-ink-500 text-center pt-2">
             Sign-in is served by the <code className="font-mono">g2a-business-api</code>{' '}
-            plugin. In dev, any email/password works (mock mode).
+            plugin. In dev, any username/password works (mock mode).
           </div>
         </form>
       </div>

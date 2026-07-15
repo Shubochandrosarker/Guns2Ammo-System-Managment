@@ -2,13 +2,13 @@ import { useRef, useState } from 'react'
 import { Outlet, useNavigate } from 'react-router-dom'
 import { Sidebar } from './Sidebar'
 import { TopBar } from './TopBar'
-import type { Session } from '@/lib/api'
+import type { SessionUser } from '@/types/auth'
 import { api } from '@/lib/api'
 import { useBodyScrollLock, useDialogA11y } from '@/lib/hooks'
 
 interface Props {
-  session: Session
-  onSessionChange: (s: Session | null) => void
+  session: SessionUser
+  onSessionChange: (s: SessionUser | null) => void
 }
 
 export function AppLayout({ session, onSessionChange }: Props) {
@@ -19,10 +19,17 @@ export function AppLayout({ session, onSessionChange }: Props) {
   // it doesn't scroll along with it (reliably on iOS Safari too).
   useBodyScrollLock(mobileOpen)
 
-  function signOut() {
-    api.auth.logout()
-    onSessionChange(null)
-    nav('/login', { replace: true })
+  async function signOut() {
+    try {
+      // Server-side revocation: POST /auth/session/logout clears the
+      // HttpOnly cookie and kills the session record.
+      await api.auth.logout()
+    } finally {
+      // Local state is dropped even if the network call failed — the
+      // worst case is a still-valid cookie that the next boot re-hydrates.
+      onSessionChange(null)
+      nav('/login', { replace: true })
+    }
   }
 
   return (

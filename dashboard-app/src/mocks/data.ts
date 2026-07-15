@@ -650,3 +650,30 @@ export const brainQueryResult: BrainQueryResult = {
     { id: 3, document_id: 41, text_content: 'Range ammo is required for all rental firearms; outside ammo is only permitted with owned firearms.', source_type: 'range_policy', source_label: 'Rental ammo policy', source_uri: '', score: 0.81 },
   ],
 }
+
+// GET /model-routing — purpose → model-connection map (moved here from
+// api.ts so nothing mock-shaped survives in the production bundle).
+export const mockPurposes = [
+  'business_analysis', 'seo_analysis', 'booking_suggest', 'support_classify',
+  'email_drafts', 'daily_summaries', 'private_inventory',
+]
+
+export const mockRoutingLabels: Record<string, string> = {
+  business_analysis: 'Deep business analysis',
+  seo_analysis:      'SEO analysis',
+  booking_suggest:   'Booking suggestions',
+  support_classify:  'Customer support classify',
+  email_drafts:      'Email drafts',
+  daily_summaries:   'Cheap daily summaries',
+  private_inventory: 'Private inventory',
+}
+
+export const mockRouting: Record<string, string | null> = {
+  business_analysis: 'm1',
+  seo_analysis:      'm1',
+  booking_suggest:   'm2',
+  support_classify:  'm3',
+  email_drafts:      'm4',
+  daily_summaries:   'm4',
+  private_inventory: 'm5',
+}

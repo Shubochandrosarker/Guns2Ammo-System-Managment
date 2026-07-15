@@ -22,7 +22,9 @@ export default defineConfig({
   },
   build: {
     outDir: 'dist',
-    sourcemap: true,
+    // Never publish production sourcemaps — they hand attackers the exact
+    // auth implementation (auth plan risk R6 / decision D7).
+    sourcemap: false,
     target: 'es2020',
   },
 })
