@@ -1,0 +1,546 @@
+{
+  "auditDate": "2026-07-14",
+  "repository": "Shubochandrosarker/Guns2Ammo-System-Managment",
+  "branch": "claude/guns2ammo-audit-roadmap-2o1a9q",
+  "items": [
+    {
+      "id": "G2A-CRIT-001",
+      "title": "Membership cancellation is not atomic with Stripe cancellation",
+      "category": "payments",
+      "severity": "critical",
+      "businessImpact": "A remote Stripe failure during cancellation leaves the membership reading 'cancelled' locally while Stripe continues billing the customer's card. Directly matches the client's #1 reported issue.",
+      "component": "Memberistic Membership Solutions",
+      "files": [
+        "memberistic-membership-solutions/includes/database/class-memberships-repository.php:517-550",
+        "memberistic-membership-solutions/includes/payments/class-stripe-service.php:212-274",
+        "memberistic-membership-solutions/includes/rest/class-memberships-controller.php:1304-1322"
+      ],
+      "rootCause": "change_status() writes local DB status at line 535, then fires do_action('memberistic_membership_status_changed') at line 546. The Stripe cancel listener runs after the local write already committed; on failure it only logs an Activity Repository entry, with no revert and no distinct failure state.",
+      "recommendedSolution": "Introduce cancel_pending/cancel_failed states; attempt remote cancellation before or atomically with the local write; surface failures in a dedicated staff-visible queue instead of only a per-record activity log.",
+      "dependencies": [],
+      "effort": "M",
+      "risk": "low",
+      "acceptanceCriteria": [
+        "A simulated Stripe API failure during cancellation leaves the membership in a distinct, staff-visible failure state, never silently 'cancelled'.",
+        "The success path is unchanged in behavior."
+      ],
+      "tests": [
+        "Automated failure-injection unit test on Stripe_Service::maybe_cancel_remote_subscription()",
+        "Manual staging verification with an invalidated Stripe secret key"
+      ],
+      "phase": 0
+    },
+    {
+      "id": "G2A-CRIT-002",
+      "title": "Lipsey's second wholesaler account is structurally unreachable",
+      "category": "integration",
+      "severity": "critical",
+      "businessImpact": "Whichever Lipsey's account (firearms or accessories) was configured first is the only one the system can ever sync; the second is silently unreachable, and a blank account_number can cause credential overwrite.",
+      "component": "G2A POS Core",
+      "files": [
+        "g2a-pos-core/includes/Database/WholesalerRepository.php:22-33",
+        "g2a-pos-core/includes/Database/WholesalerRepository.php:51-60",
+        "g2a-pos-core/includes/Wholesalers/WholesalerImportBridge.php:83-98",
+        "g2a-pos-core/includes/Wholesalers/Lipseys/LipseysProvider.php:13"
+      ],
+      "rootCause": "findByCode() runs 'ORDER BY id ASC LIMIT 1' on provider_code alone; LipseysProvider::CODE is a single literal shared by both accounts; the upsert dedup match treats a blank account_number as a match key.",
+      "recommendedSolution": "Add an account_number-aware lookup (findByCodeAndAccount); require the import bridge to pass the specific account; add a UNIQUE(provider_code, account_number) index with a non-null sentinel for single-account providers.",
+      "dependencies": [
+        "Data cleanup: confirm/assign distinct account_number values on existing production wholesaler rows before deploying"
+      ],
+      "effort": "M",
+      "risk": "medium",
+      "acceptanceCriteria": [
+        "Two wholesaler rows with the same provider_code and distinct account numbers resolve independently.",
+        "Neither account's import overwrites the other's stored credentials."
+      ],
+      "tests": [
+        "Two-account import regression test"
+      ],
+      "phase": 0
+    },
+    {
+      "id": "G2A-CRIT-003",
+      "title": "Lipsey's category mapping is configured but never applied to WooCommerce products",
+      "category": "integration",
+      "severity": "critical",
+      "businessImpact": "Every promoted Lipsey's product lands uncategorized in WooCommerce regardless of the configured wc_category_id mapping. Matches the client's 'product categories didn't seem to carry over.'",
+      "component": "G2A POS Core",
+      "files": [
+        "g2a-pos-core/includes/Database/Migrator.php:449",
+        "g2a-pos-core/includes/Database/WholesalerCategoryRepository.php:61",
+        "g2a-pos-core/includes/Wholesalers/Promotion/VendorProductPromoter.php"
+      ],
+      "rootCause": "wc_category_id is a savable schema column but VendorProductPromoter only reads the category row for markup_percent pricing; it never calls wp_set_object_terms()/set_category_ids().",
+      "recommendedSolution": "Read wc_category_id alongside the existing pricing lookup and assign the WooCommerce product_cat term during promotion.",
+      "dependencies": [],
+      "effort": "S",
+      "risk": "low",
+      "acceptanceCriteria": [
+        "A product promoted after configuring its category mapping shows the correct product_cat term in WooCommerce."
+      ],
+      "tests": [
+        "Promotion-with-mapping integration test"
+      ],
+      "phase": 0
+    },
+    {
+      "id": "G2A-CRIT-004",
+      "title": "No uniqueness enforcement on memberistic_people.email enables misattached memberships",
+      "category": "data-integrity",
+      "severity": "critical",
+      "businessImpact": "Direct, evidenced mechanism for the client's 'wrong people attached to memberships' report; get_by_email() silently resolves to the most recently created duplicate on every lookup, including waiver stamping.",
+      "component": "Memberistic Membership Solutions",
+      "files": [
+        "memberistic-membership-solutions/includes/database/class-schema.php:73-96",
+        "memberistic-membership-solutions/includes/database/class-people-repository.php:40-61",
+        "memberistic-membership-solutions/includes/database/class-people-repository.php:96-106"
+      ],
+      "rootCause": "email is a plain KEY, not UNIQUE; create() never checks for an existing person by email before inserting; get_by_email() orders by id DESC LIMIT 1.",
+      "recommendedSolution": "Short-term: staff-facing audit report of existing cross-membership email duplicates (G2A-DATA-002). Medium-term: block/warn on duplicate-email creation; consider a conditional unique index after production data cleanup.",
+      "dependencies": [
+        "Production duplicate-email audit before any hard schema constraint"
+      ],
+      "effort": "M",
+      "risk": "medium",
+      "acceptanceCriteria": [
+        "Duplicate-email person creation is flagged/blocked, not silent.",
+        "Existing duplicates are enumerated in a report for staff review."
+      ],
+      "tests": [
+        "Duplicate-creation attempt test in staging"
+      ],
+      "phase": 0
+    },
+    {
+      "id": "G2A-CRIT-005",
+      "title": "Booking Engine capability grants only happen on plugin activation, with no upgrade safety net",
+      "category": "operational",
+      "severity": "critical",
+      "businessImpact": "Most probable root cause of 'no calendar for classes on the backend' and plausibly other missing admin-menu items, given the client's confirmed zip-overwrite deploy process never re-fires WordPress activation hooks.",
+      "component": "G2A Booking Engine",
+      "files": [
+        "g2a-booking-engine/g2a-booking-engine.php:177",
+        "g2a-booking-engine/includes/class-activator.php:14-141"
+      ],
+      "rootCause": "register_roles_and_caps() is only called from G2AB_Activator::activate(), reachable solely via register_activation_hook, which never fires on a file-overwrite deploy.",
+      "recommendedSolution": "Add a version-comparison check on admin_init/plugins_loaded that re-runs role/capability provisioning idempotently whenever the stored version differs from the running version. Apply the same audit to every other plugin.",
+      "dependencies": [],
+      "effort": "S",
+      "risk": "low",
+      "acceptanceCriteria": [
+        "Capabilities are re-granted after a simulated version bump without a manual deactivate/reactivate.",
+        "Immediate unblock available with zero code change: deactivate/reactivate the plugin once on production."
+      ],
+      "tests": [
+        "Simulated-upgrade capability re-provisioning test"
+      ],
+      "phase": 0
+    },
+    {
+      "id": "G2A-CRIT-006",
+      "title": "No visitor-facing chatbot implementation exists in this codebase",
+      "category": "live-verification",
+      "severity": "critical",
+      "businessImpact": "Blocks a confident decision on cancelling Otter Text — the client's stated replacement chatbot cannot be identified, verified, or checklist-tested from source.",
+      "component": "Cross-cutting (theme, g2a-pos-core, cloudflare-rag-worker, messageistic)",
+      "files": [
+        "guns2ammo/inc/ottertext-cleanup.php",
+        "cloudflare-rag-worker/src/index.ts",
+        "g2a-pos-core/includes/API/AiController.php",
+        "g2a-booking-engine/includes/modules/ai-autoreply/class-autoreply-engine.php"
+      ],
+      "rootCause": "Otter Text was always an externally-injected script never part of this repository, per the theme's own defensive cleanup code comments. Both in-repo AI systems are staff-facing/dashboard tools, not visitor-facing chat. No chat-widget REST route or CORS-enabled visitor endpoint exists anywhere in the repository.",
+      "recommendedSolution": "Live investigation to identify the actual chatbot implementation (view-source, Plugins list, header/footer script injector, GTM); then build and run the 8-point Otter Text retirement acceptance checklist against it.",
+      "dependencies": [
+        "Production access"
+      ],
+      "effort": "S",
+      "risk": "low",
+      "acceptanceCriteria": [
+        "The chatbot's technical implementation is identified and named.",
+        "An 8-point acceptance checklist is run against it with a PASS/FAIL per item before any Otter Text cancellation."
+      ],
+      "tests": [],
+      "phase": 0
+    },
+    {
+      "id": "G2A-CRIT-007",
+      "title": "No reliable way to confirm what production is actually running",
+      "category": "operational",
+      "severity": "critical",
+      "businessImpact": "Every fix in this audit needs live confirmation before it can be trusted as deployed and effective, not just present in this repository.",
+      "component": "Cross-cutting",
+      "files": [
+        "INSTALL.md",
+        "guns2ammo/functions.php:10",
+        "guns2ammo/style.css"
+      ],
+      "rootCause": "No staging environment, no deploy manifest, and no confirmed clean authenticated read of the live site was available as of the last check on file; in-repo version constants also disagree with each other in at least one case (theme).",
+      "recommendedSolution": "Fix the Bridgistic/WAF blocker or obtain direct wp-admin/SFTP access; generate a dated production manifest of every deployed component's version.",
+      "dependencies": [
+        "Client-provided production access"
+      ],
+      "effort": "S",
+      "risk": "low",
+      "acceptanceCriteria": [
+        "A dated manifest of every deployed component's version exists and is reconciled against this repository."
+      ],
+      "tests": [],
+      "phase": 0
+    },
+    {
+      "id": "G2A-HIGH-001",
+      "title": "Waiver-import match statistics can overcount actual account stamps",
+      "category": "data-integrity",
+      "severity": "high",
+      "businessImpact": "An import can report N members matched while some were never actually stamped waiver_status=signed, because the person record didn't exist for that email. Customer account pages can show stale/missing waiver status even though the waiver is correctly archived.",
+      "component": "Memberistic Membership Solutions",
+      "files": [
+        "memberistic-membership-solutions/includes/waivers/class-waiver-import.php:172",
+        "memberistic-membership-solutions/includes/waivers/class-waiver-import.php:196-205",
+        "memberistic-membership-solutions/includes/waivers/class-waiver-import.php:452-462"
+      ],
+      "rootCause": "The import loop increments stats.members_matched whenever a WordPress user email match is found, but stamp_member() silently returns without effect if no Memberistic person record exists for that email, and does not report this back to the caller.",
+      "recommendedSolution": "Have stamp_member() return a success/failure signal; track a distinct 'matched but not stamped' counter; produce an itemized (not aggregate-only) unmatched/unstamped report.",
+      "dependencies": [],
+      "effort": "S",
+      "risk": "low",
+      "acceptanceCriteria": [
+        "A fixture row with a WP-user match but no person record is reported in a distinct counter, not folded into members_matched."
+      ],
+      "tests": [
+        "Import fixture test with a WP-user-only match case"
+      ],
+      "phase": 0
+    },
+    {
+      "id": "G2A-HIGH-002",
+      "title": "No restricted content-editor role or content-correction tracking exists",
+      "category": "product-improvement",
+      "severity": "high",
+      "businessImpact": "Client cannot safely self-serve website content edits without full administrator access, and has no tracked register of outstanding per-page corrections.",
+      "component": "guns2ammo theme, G2A Theme Control",
+      "files": [],
+      "rootCause": "No capability-scoped content-manager role or correction-register artifact found repo-wide; G2A Theme Control is only 472 LOC relative to the ambition of this requirement.",
+      "recommendedSolution": "Build a content_manager role scoped to page content only, plus a correction-register content type with approved/completed/accepted status, plus a recorded editing walkthrough.",
+      "dependencies": [],
+      "effort": "M",
+      "risk": "low",
+      "acceptanceCriteria": [
+        "Client successfully edits and republishes a real page correction using the new role, without admin access."
+      ],
+      "tests": [
+        "Manual client-led edit using the new role"
+      ],
+      "phase": 1
+    },
+    {
+      "id": "G2A-HIGH-003",
+      "title": "Lipsey's product images are hotlinked, never mirrored locally",
+      "category": "integration",
+      "severity": "high",
+      "businessImpact": "Product photos depend entirely on Lipsey's CDN staying reachable with stable filenames and permissive hotlink referrers; no local fallback exists if any of that fails.",
+      "component": "G2A POS Core",
+      "files": [
+        "g2a-pos-core/includes/Wholesalers/Media/LipseysImageUrls.php"
+      ],
+      "rootCause": "cdnUrl() constructs a direct lipseyscloud.com URL from the IMAGENAME CSV/API field; no download-and-attach-to-media-library step exists in the promotion path.",
+      "recommendedSolution": "Download the image into the WordPress media library on first promotion (reusing the waiver-PDF-mirroring pattern already proven in this codebase); batch/cron for full-catalog re-syncs.",
+      "dependencies": [
+        "Storage/bandwidth planning for a full catalog re-sync"
+      ],
+      "effort": "M",
+      "risk": "low",
+      "acceptanceCriteria": [
+        "Promoted products use a local media attachment as their featured image, with the CDN URL retained only as a fallback."
+      ],
+      "tests": [
+        "Promotion image-mirroring integration test"
+      ],
+      "phase": 1
+    },
+    {
+      "id": "G2A-HIGH-004",
+      "title": "Theme version constant disagrees with theme header version",
+      "category": "technical-debt",
+      "severity": "high",
+      "businessImpact": "Asset cache-busting query strings have not changed across 8+ style.css releases; any cache respecting query-string versioning had no signal to fetch fresh CSS/JS across those releases.",
+      "component": "guns2ammo theme",
+      "files": [
+        "guns2ammo/functions.php:10",
+        "guns2ammo/style.css"
+      ],
+      "rootCause": "G2A_VERSION is a hardcoded literal ('1.27.5') independent of the style.css Version header (1.27.13), used directly as the cache-busting version string on every enqueued theme asset.",
+      "recommendedSolution": "Read the version from wp_get_theme()->get('Version') at runtime, or add a build step that keeps both in sync.",
+      "dependencies": [],
+      "effort": "S",
+      "risk": "low",
+      "acceptanceCriteria": [
+        "Both version identifiers agree at all times going forward."
+      ],
+      "tests": [
+        "Manual post-deploy verification"
+      ],
+      "phase": 1
+    },
+    {
+      "id": "G2A-MED-001",
+      "title": "Waiver export/print routes rely on capability check only, not nonce verification",
+      "category": "security",
+      "severity": "medium",
+      "businessImpact": "Low-severity CSRF-hygiene gap: a logged-in staff member with the waiver capability could be induced via a crafted link to trigger an export/print action.",
+      "component": "Memberistic Membership Solutions",
+      "files": [
+        "memberistic-membership-solutions/includes/waivers/class-waivers.php:954-970"
+      ],
+      "rootCause": "print_url() generates a wp_nonce_url() but maybe_handle_export() never calls wp_verify_nonce()/check_admin_referer() — only the capability check gates access.",
+      "recommendedSolution": "Add check_admin_referer()/wp_verify_nonce() alongside the existing capability check.",
+      "dependencies": [],
+      "effort": "S",
+      "risk": "low",
+      "acceptanceCriteria": [
+        "A request with a stale or missing nonce is rejected even with a valid capability."
+      ],
+      "tests": [
+        "Manual request with stale/missing nonce"
+      ],
+      "phase": 1
+    },
+    {
+      "id": "G2A-LOW-001",
+      "title": "dashboard-app ESLint configuration is incompatible with the installed ESLint version",
+      "category": "technical-debt",
+      "severity": "low",
+      "businessImpact": "None functional; lint has been unenforceable with the currently pinned tooling.",
+      "component": "dashboard-app",
+      "files": [
+        "dashboard-app/package.json"
+      ],
+      "rootCause": "ESLint 10.1.0 requires a flat config (eslint.config.js), which does not exist in the project.",
+      "recommendedSolution": "Add eslint.config.js migrated from the legacy config, or pin ESLint to ^8.",
+      "dependencies": [],
+      "effort": "S",
+      "risk": "low",
+      "acceptanceCriteria": [
+        "npm run lint exits 0 or with real, addressed findings, not a config error."
+      ],
+      "tests": [
+        "npm run lint"
+      ],
+      "phase": 1
+    },
+    {
+      "id": "G2A-DATA-001",
+      "title": "Build a Customer Identity Reconciliation Tool",
+      "category": "data-integrity",
+      "severity": "high",
+      "businessImpact": "Client-requested cleanup/dedupe of existing contacts; long-term mitigation for G2A-CRIT-004's duplicate-creation risk.",
+      "component": "New, cross-cutting",
+      "files": [],
+      "rootCause": "No cross-plugin duplicate-detection or merge tooling exists anywhere in the repository.",
+      "recommendedSolution": "Detect-and-flag only tool: normalized email/phone matching, confidence scoring, staff review screen with side-by-side comparison, approve/reject/hold, full audit trail, reversible soft-delete merges, never auto-merge.",
+      "dependencies": [
+        "G2A-CRIT-004 data audit",
+        "Extended identity mapping for POS/Formistic/Messageistic customer stores not fully traced this audit pass"
+      ],
+      "effort": "L",
+      "risk": "medium",
+      "acceptanceCriteria": [
+        "A seeded duplicate is correctly flagged, reviewed, and merged with full audit trail.",
+        "A seeded non-duplicate near-match is correctly not auto-merged."
+      ],
+      "tests": [
+        "Seeded-duplicate integration test",
+        "False-positive near-match test"
+      ],
+      "phase": 1
+    },
+    {
+      "id": "G2A-DATA-002",
+      "title": "Build a membership-linking integrity audit report",
+      "category": "data-integrity",
+      "severity": "high",
+      "businessImpact": "Client-requested detection of people misattached to memberships.",
+      "component": "Memberistic Membership Solutions",
+      "files": [],
+      "rootCause": "No report exists for duplicate primary members per membership, seat-count vs. plan-limit mismatches, or waiver-status-vs-archive drift.",
+      "recommendedSolution": "Build a read-only audit report covering these three rule classes as a first pass; wire resolution actions into G2A-DATA-001's review UI.",
+      "dependencies": [],
+      "effort": "M",
+      "risk": "low",
+      "acceptanceCriteria": [
+        "Report correctly flags a seeded duplicate-primary-member case and a seeded waiver-status-drift case."
+      ],
+      "tests": [
+        "Seeded-data report accuracy test"
+      ],
+      "phase": 1
+    },
+    {
+      "id": "G2A-OPS-001",
+      "title": "Build a unified failed-operations queue / health dashboard",
+      "category": "observability",
+      "severity": "high",
+      "businessImpact": "Staff currently cannot answer basic reliability questions (did the cancellation succeed, did the sync fail) without knowing which component's log to check.",
+      "component": "New, cross-cutting",
+      "files": [],
+      "rootCause": "Good per-component logging exists (Activity Repository, Email Logs Repository, Stripe event-processed tracking, wholesaler sync repositories) but nothing aggregates it into one view.",
+      "recommendedSolution": "Aggregation layer over existing logs, not a replacement logging system; surfaces failed cancellations, failed waiver stamps, failed syncs, webhook event viewer, cron health, production version display.",
+      "dependencies": [
+        "G2A-CRIT-001's new failure states as a first feed"
+      ],
+      "effort": "L",
+      "risk": "low",
+      "acceptanceCriteria": [
+        "A failed Stripe cancellation, a failed waiver stamp, and a failed Lipsey's sync all appear in one staff-facing view within minutes of occurring."
+      ],
+      "tests": [
+        "Seeded-failure-per-source visibility test"
+      ],
+      "phase": 1
+    },
+    {
+      "id": "G2A-OPS-002",
+      "title": "Stand up a staging environment and production deploy manifest",
+      "category": "operational",
+      "severity": "critical",
+      "businessImpact": "Root enabler of most other findings — client currently cannot test before hard-deploying changes to a live business.",
+      "component": "Cross-cutting / infrastructure",
+      "files": [],
+      "rootCause": "No staging clone, no deploy manifest, deploys are direct zip overwrites to production.",
+      "recommendedSolution": "Stand up a staging clone (hosting-dependent); generate a dated manifest of every deployed component's version on every deploy.",
+      "dependencies": [
+        "Hosting/infrastructure decision, client budget/timeline"
+      ],
+      "effort": "L",
+      "risk": "low",
+      "acceptanceCriteria": [
+        "A code change can be deployed to staging, verified, then promoted to production via a repeatable process."
+      ],
+      "tests": [],
+      "phase": 0
+    },
+    {
+      "id": "G2A-OPS-003",
+      "title": "Build a sandboxed staff training mode",
+      "category": "product-improvement",
+      "severity": "medium",
+      "businessImpact": "Client-stated: not confident enough to teach employees the range check-in workflow.",
+      "component": "New, cross-cutting",
+      "files": [],
+      "rootCause": "No sandboxed environment exists for onboarding new counter staff without touching real customer records, payments, or messaging.",
+      "recommendedSolution": "A training_mode flag stubbing payment gateway calls and email/SMS sends, seeded fake scenarios covering every case in the counter checklist, per-staff completion tracking.",
+      "dependencies": [
+        "Live counter-workflow walkthrough should happen first so training mode teaches the verified workflow"
+      ],
+      "effort": "L",
+      "risk": "low",
+      "acceptanceCriteria": [
+        "A new hire completes every named scenario in training mode with zero real payment/email/SMS side effects, tracked to their staff account."
+      ],
+      "tests": [
+        "Manual scenario walkthrough",
+        "Automated assertion that training-mode transactions never reach a real gateway"
+      ],
+      "phase": 2
+    },
+    {
+      "id": "G2A-PLAT-001",
+      "title": "Build a MembershipGatewayInterface abstraction ahead of any Stripe replacement",
+      "category": "payments",
+      "severity": "high",
+      "businessImpact": "Blocks any safe merchant-service migration; client wants Stripe replaced with an in-house-manageable processor.",
+      "component": "Memberistic Membership Solutions",
+      "files": [
+        "memberistic-membership-solutions/includes/payments/class-stripe-service.php"
+      ],
+      "rootCause": "Stripe integration is direct API calls throughout, with no interface boundary a second gateway could implement.",
+      "recommendedSolution": "Mechanical extraction of Stripe_Service's existing methods behind a MembershipGatewayInterface (createCustomer, createSubscription, retrieveSubscription, cancelSubscription, pauseSubscription, resumeSubscription, updatePaymentMethod, refundPayment, processWebhook, reconcileSubscription, createCustomerPortalSession); no behavior change in this step.",
+      "dependencies": [
+        "A second gateway adapter depends on the client's processor decision (Fortis is best-positioned given existing Booking Engine precedent)"
+      ],
+      "effort": "M",
+      "risk": "low",
+      "acceptanceCriteria": [
+        "All existing Memberistic Stripe behavior is unchanged after the refactor.",
+        "The concrete gateway class resolves via a setting, not a hardcoded reference."
+      ],
+      "tests": [
+        "Full existing Memberistic payment test suite must still pass",
+        "Manual smoke test of checkout/cancel/renew"
+      ],
+      "phase": 1
+    },
+    {
+      "id": "G2A-GROWTH-001",
+      "title": "Build a customer segmentation query layer",
+      "category": "growth",
+      "severity": "medium",
+      "businessImpact": "Directly enables the client's requested email/SMS/social growth push during a seasonally slow retail period despite strong range usage.",
+      "component": "New, spans Memberistic/Booking/WooCommerce/Formistic/Messageistic",
+      "files": [],
+      "rootCause": "The underlying data for every named persona (active/expired member, range-visitor-no-purchase, class attendee, lapsed, etc.) already exists across confirmed tables, but no segmentation query layer exists on top of it.",
+      "recommendedSolution": "Build queryable segment definitions per persona named by the client, exportable for campaign use.",
+      "dependencies": [
+        "Consent-enforcement verification (quiet hours, STOP handling) before send volume increases"
+      ],
+      "effort": "M",
+      "risk": "low",
+      "acceptanceCriteria": [
+        "Each named segment can be queried and its member list exported."
+      ],
+      "tests": [
+        "Per-segment query accuracy test against seeded data"
+      ],
+      "phase": 2
+    },
+    {
+      "id": "G2A-GROWTH-002",
+      "title": "Build campaign automation on top of Formistic/Messageistic",
+      "category": "growth",
+      "severity": "medium",
+      "businessImpact": "Converts existing delivery/consent infrastructure investment into the client's actual desired growth outcome.",
+      "component": "Formistic, Messageistic",
+      "files": [],
+      "rootCause": "Delivery and consent plumbing exists (contacts, newsletter, SMS, consent events); campaign trigger/segmentation logic does not.",
+      "recommendedSolution": "Build the named campaigns (range-visitor-to-retail, lapsed-member recovery, class-attendee-to-repeat, etc.) on top of G2A-GROWTH-001's segments.",
+      "dependencies": [
+        "G2A-GROWTH-001"
+      ],
+      "effort": "L",
+      "risk": "medium",
+      "acceptanceCriteria": [
+        "At least one full campaign runs end-to-end with delivery and consent correctly enforced."
+      ],
+      "tests": [
+        "Consent-boundary test: a STOP'd/unsubscribed contact never receives a campaign send"
+      ],
+      "phase": 3
+    },
+    {
+      "id": "G2A-PLAT-002",
+      "title": "Build a Unified Customer 360 view",
+      "category": "platform",
+      "severity": "medium",
+      "businessImpact": "Advanced-platform target from the audit brief; natural home for reconciliation and segmentation output once the underlying identity model is trustworthy.",
+      "component": "New, cross-cutting",
+      "files": [],
+      "rootCause": "No single view stitches WP user, Memberistic person, WooCommerce customer, waiver, booking, and POS history together.",
+      "recommendedSolution": "Build only after G2A-CRIT-004 and G2A-DATA-001 establish a trustworthy identity model — building this on unreconciled duplicate data would amplify, not reduce, the existing confusion.",
+      "dependencies": [
+        "G2A-CRIT-004",
+        "G2A-DATA-001"
+      ],
+      "effort": "XL",
+      "risk": "medium",
+      "acceptanceCriteria": [
+        "A single staff-facing profile correctly aggregates all of a real, non-duplicate customer's cross-system history."
+      ],
+      "tests": [
+        "Aggregation-accuracy test against a known-good seeded customer"
+      ],
+      "phase": 4
+    }
+  ]
+}
