@@ -89,6 +89,7 @@ All other routes require `g2a_dashboard` (read) or `g2a_dashboard_admin`
 | GET    | `/model-connections`                        | read   |
 | POST   | `/model-connections/{id}/test`              | admin  |
 | GET    | `/analytics/insightistic?from=&to=`         | read   |
+| GET    | `/dashboard/overview?from=&to=`             | read   |
 | GET    | `/system/health`                            | read   |
 | POST   | `/bridgistic/ask`                           | read   |
 | GET    | `/bridgistic/actions?status=pending`        | read   |
@@ -112,6 +113,100 @@ All other routes require `g2a_dashboard` (read) or `g2a_dashboard_admin`
 | GET    | `/content/media?per_page=&page=&search=`    | read   |
 | GET    | `/content/categories?per_page=&page=&search=` | read |
 | GET    | `/content/tags?per_page=&page=&search=`     | read   |
+
+## Aggregation layer (0.3.0, canonical envelope)
+
+`GET /dashboard/overview` and `GET /system/health` return the canonical
+Phase-C envelope:
+
+```json
+{
+  "success": true,
+  "data": { ... },
+  "meta": {
+    "requestId": "<uuid4>",
+    "generatedAt": "<ISO-8601 UTC>",
+    "timezone": "<wp_timezone_string()>",
+    "currency": "USD",
+    "source": ["g2a-booking-engine", "..."],
+    "freshness": { "status": "fresh|stale|unavailable", "lastUpdatedAt": "<ISO UTC|null>" }
+  }
+}
+```
+
+Errors are `{"success": false, "error": {"code": "<stable_snake_case>",
+"message": "<safe>", "requestId": "<uuid4>"}}` with the matching HTTP status
+(`invalid_date_format` / `invalid_date_range` / `date_range_too_long` = 400).
+All money is integer USD cents; all datetimes in `data` are ISO-8601 UTC.
+Freshness roll-up: every module fresh → `fresh`; every module unavailable →
+`unavailable`; mixed → `stale`.
+
+### `GET /dashboard/overview?from=YYYY-MM-DD&to=YYYY-MM-DD` (read)
+
+Defaults to the last 30 days; the window is validated and bounded at 366
+days. `data`:
+
+- `revenue` — `{bookingsCents, membershipsCents, wooCents, totalCents}`
+  (bookings = net of refunds; memberships = completed Memberistic payments
+  in range; woo = net of refunds over completed+processing orders).
+- `bookings` — contract keys `count/paid/unpaid/revenueCents` plus
+  `revenue{gross,refund,net}Cents`, `byStatus`, `avgBookingValueCents`,
+  `reconciliation{warnings, paidBookingsWithoutPayment, unknownStatusPayments}`.
+- `memberships` — `active/new/expired/mrrCents` plus full lifecycle
+  `counts`, `cancelledInRange`, `revenueCents`, `planBreakdown[]`
+  (`planId`, `name`, `count`, `revenueCents`).
+- `woocommerce` — `orders/revenueCents` plus `statusesIncluded`,
+  `revenue{...}`, `aovCents`, `truncated`.
+- `waivers` — counts only, never PII: `signed/pending` plus
+  `counts{current, expiring30d, expired, missing}`, `archive{total, current}`,
+  `stores{people, archive}`.
+- `alerts[]` — `{code, severity: critical|error|warning|info, message}`:
+  `<module>_unavailable`, `waivers_expiring_spike`,
+  `stripe_cancel_failures` (count-only read of the
+  `memberistic_stripe_cancel_failures` option), and
+  `booking_reconciliation_warnings`.
+- `modules` — per module `{available, source: [plugin-slug], freshness}`.
+
+**Revenue-status mapping** (documented in each provider's header):
+
+- Booking engine `g2ab_payments.status`: `succeeded`, `captured`, `paid`,
+  `completed`, `refunded`, `partial_refund` count toward gross (refund rows
+  subtract their `refund_amount` into net); `pending`/`failed` are excluded;
+  unknown statuses are excluded AND counted as reconciliation warnings.
+- Memberistic `memberistic_payments.status`: only `completed`, recognised
+  on `paid_at` (fallback `created_at`).
+- WooCommerce: order statuses `completed` + `processing`, net of
+  `get_total_refunded()`.
+
+Every provider is capability-tier cached for 120s (filter
+`g2aba_analytics_cache_ttl`), does bounded/aggregate queries only, checks
+table existence before touching a sibling plugin's schema, and degrades to
+an explicit `available: false` payload instead of fataling.
+
+### `GET /system/health` (read, envelope — replaced the pre-0.3.0 checklist payload)
+
+`data`: `plugins[]` (`{slug, name, active, version}` for booking engine,
+Memberistic, Verifyistic, WooCommerce, FFL checkout, Messageistic, POS
+core), `cron[]` (`{hook, nextRunAt|null}` for the Memberistic dailies,
+`g2aba_sessions_cleanup`, `g2aba_generate_insights`, booking-engine
+cleanup), `sessions{table, activeCount}`, `audit{recentFailures24h}`,
+`integrations{stripe{configured}, woo{active}}`. Booleans/counts/versions
+only — no credentials, secrets, or filesystem paths.
+
+## Reconciliation CLI
+
+```
+wp g2a-business reconcile <bookings|memberships|woo> [--from=YYYY-MM-DD] [--to=YYYY-MM-DD]
+```
+
+Registered only when `WP_CLI` is defined. Independently recomputes revenue
+from the source table/service for the window and diffs it against the
+dashboard provider's uncached result for the same range. Prints: source
+table/service, source row count, included count, excluded count with
+per-status reasons (the status-mapping table), gross/refund/net cents for
+both sides, the difference, and **PASS/FAIL** (PASS = zero unexplained
+difference). Use it after imports, migrations, or webhook incidents to
+prove the dashboard numbers still tie out.
 
 ## System discovery & website content
 

@@ -18,6 +18,7 @@ use WordPressistic\G2ABA\REST\Automations_Controller;
 use WordPressistic\G2ABA\REST\Brain_Controller;
 use WordPressistic\G2ABA\REST\BridGistic_Controller;
 use WordPressistic\G2ABA\REST\Content_Controller;
+use WordPressistic\G2ABA\REST\Dashboard_Controller;
 use WordPressistic\G2ABA\REST\Email_Overview_Controller;
 use WordPressistic\G2ABA\REST\Export_Controller;
 use WordPressistic\G2ABA\REST\Gaps_Controller;
@@ -50,6 +51,7 @@ class Router {
 			Auth_Controller::class,
 			Auth_Session_Controller::class,
 			Analytics_Controller::class,
+			Dashboard_Controller::class,
 			Insights_Controller::class,
 			Gaps_Controller::class,
 			Automations_Controller::class,
