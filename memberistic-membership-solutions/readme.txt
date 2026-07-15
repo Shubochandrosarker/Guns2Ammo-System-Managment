@@ -4,7 +4,7 @@ Tags: membership, operations, staff dashboard, stripe, woocommerce, rest api
 Requires at least: 6.0
 Requires PHP: 8.0
 Tested up to: 6.7
-Stable tag: 1.13.0
+Stable tag: 1.13.1
 License: GPLv2 or later
 
 A modern membership operations engine for service businesses. Co-developed by WordPressistic and launch partner Guns 2 Ammo (https://guns2ammo.com).
@@ -71,6 +71,9 @@ Set Settings > Advanced > "Delete data on uninstall" to Yes before removing the 
 See CHANGELOG.md for the full history.
 
 Note: the plugin's version numbering was reset after 1.46.1 back to a 1.9.9.x line. Entries below are in release order (newest first), so 1.46.1 and the earlier "legacy line" 1.10.0 release predate the 1.9.9.2–1.12.0 entries above them.
+
+= 1.13.1 =
+* Security: the booking-engine waiver bridge now auto-satisfies the booking waiver by EMAIL match only. The previous name fallback let a guest who typed a name matching any prior signer skip the waiver checkbox on the public booking form. Staff lookup screens keep name/DOB search.
 
 = 1.13.0 =
 * Fix: guaranteed Stripe cancellation — cancelling a membership on the site now stops the Stripe subscription FIRST and only then marks the membership cancelled. If Stripe cannot be reached, the membership keeps its current status (no more "cancelled locally but still billing"), the failure is shown as a persistent wp-admin notice, and automatic retries (5 min → 48 h backoff) finish the cancellation the moment Stripe confirms. Staff can still force a local-only cancel explicitly (REST force=true).

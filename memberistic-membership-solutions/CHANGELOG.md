@@ -2,6 +2,10 @@
 
 All notable changes are tracked here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## 1.13.1 — Waiver bridge hardening (2026-07-15)
+
+- **Security:** `Waiver_Booking_Bridge` (the `g2ab_waiver_satisfied` hooker) now matches an on-file waiver by **email only**. The name fallback meant the public booking form's attacker-controlled `customer_name` could satisfy the waiver requirement by matching any prior signer. `Waivers_Archive::find_on_file()` keeps name/DOB matching for authenticated staff screens.
+
 ## 1.13.0 — Guaranteed Stripe cancellation (2026-07-15)
 
 - **Stripe first, local status second.** Cancelling a membership (members app REST action, admin edit screen, legacy wp-admin links) now confirms the Stripe subscription is stopped **before** the local record flips to cancelled. Previously the DB was marked cancelled first; if the Stripe call then failed, the site showed "cancelled" while Stripe kept billing the member.

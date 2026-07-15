@@ -1,6 +1,6 @@
 # Advanced FFL Checkout Solutions — Present Conditions
 
-_Last updated: 2026-07-13 · Plugin version 1.15.0 · DB schema 1.11.0_
+_Last updated: 2026-07-15 · Plugin version 1.15.1 · DB schema 1.11.0_
 
 This file is the living reference for where the plugin actually stands —
 what exists, what was just shipped, what's open, and what to pick up next
@@ -91,6 +91,7 @@ Both repos develop on branch `claude/ffl-checkout-audit-9kdjub` (guns2ammo)
 | 1.12.0 | Checkout now creates one `transfers` row per FFL unit in an order (not just the first line item) — fixes the known undercount in the A&D ledger, the Form 3310.4 watcher, and rate-shopping/label-buying for multi-firearm carts; `G2A_Status_Bridge` and the Ops Tools LTV lookup updated to match. Verification Hub Phase B: certified-copy expiration reminders (60/30/7/0 days), a WP dashboard widget, CSV/PDF audit export, and a new 📅 Regulatory Watch page (real Federal Register API sweep, alert-only) | ffl-checkout--solutions only this round — see §1 |
 | 1.13.0 | Remaining gaps from the original 15-gap audit: PHPUnit test suite (Brain Monkey mocks, GitHub Actions), vendored dependency-free canvas charts on the FFL Dashboard + Portal analytics pages + fixed the hardcoded `coming_soon` phone-calls stub, persistent dealer portal login (`ffl_dealer` role + `[ffl_dealer_portal]` shortcode, alongside the unchanged magic-link flow), buyer-side fraud/straw-purchase rules-based risk scoring (🚩 Fraud Review queue), and a real Lipsey's distributor drop-ship client (📦 Distributor page) | ffl-checkout--solutions only this round — see §1 |
 | 1.14.0 | Backported real, independent fixes found in guns2ammo (still at plugin 1.9.4 there) during a cross-repo reconciliation check: checkout-time Verifyistic age-verification enforcement, dealer-detail REST endpoint rate-limit + a public `notes`-column leak fix, federal-holiday-aware NICS/multi-sale business-day math, a theme Customizer key bug (business email/phone always empty), an iOS zoom CSS fix, and atomic (DB-enforced, not check-then-act) race guards on multi-item transfer creation + two status-advance paths | ffl-checkout--solutions only this round — see §1 |
+| 1.15.1 | Security: Lipsey's dealer credentials encrypted at rest (AES-256-GCM keyed from AUTH_KEY); legacy plaintext re-encrypted transparently on first read | Both repos |
 | 1.15.0 | Cross-repo unification (crossmatch): verified file-by-file that 1.14.0 was already a strict functional superset of the guns2ammo copy (1.9.4), ported the one remaining cosmetic monorepo difference (standard 🖨️ printer emoji on the scorecard Print button), and wrote the identical unified tree to BOTH repos — parity restored, no schema change | Both repos, byte-identical this round |
 
 ---
