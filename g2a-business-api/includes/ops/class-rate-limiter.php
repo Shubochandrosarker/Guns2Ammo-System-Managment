@@ -49,7 +49,33 @@ class Rate_Limiter {
 			return array( 'allowed' => true, 'retryAfter' => 0, 'remaining' => $this->limit );
 		}
 
-		$key = self::transient_key( $this->scope, $ip );
+		return $this->charge( $ip );
+	}
+
+	/**
+	 * Same sliding-window bucket, keyed by an arbitrary identity instead of
+	 * an IP — used for the per-username login bucket, where the key is
+	 * attacker-chosen text rather than an address. The key is hashed into
+	 * the transient name, so no length/charset constraints apply.
+	 *
+	 * @return array{allowed:bool,retryAfter:int,remaining:int}
+	 */
+	public function hit_key( string $key ): array {
+		$key = trim( $key );
+		if ( '' === $key ) {
+			return array( 'allowed' => true, 'retryAfter' => 0, 'remaining' => $this->limit );
+		}
+
+		return $this->charge( $key );
+	}
+
+	/**
+	 * Read-modify-write on one bucket, guarded by the advisory lock.
+	 *
+	 * @return array{allowed:bool,retryAfter:int,remaining:int}
+	 */
+	private function charge( string $identity ): array {
+		$key = self::transient_key( $this->scope, $identity );
 
 		if ( ! self::acquire_lock( $key ) ) {
 			// Couldn't get exclusive access to this bucket within the

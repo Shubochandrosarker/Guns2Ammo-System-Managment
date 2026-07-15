@@ -108,7 +108,7 @@ class Cors {
 		// Exact origin echo — never `*` — because the dashboard sends credentials.
 		header( 'Access-Control-Allow-Origin: ' . $matched );
 		header( 'Access-Control-Allow-Credentials: true' );
-		header( 'Access-Control-Allow-Headers: Authorization, Content-Type, X-WP-Nonce' );
+		header( 'Access-Control-Allow-Headers: Authorization, Content-Type, X-WP-Nonce, X-G2A-CSRF' );
 		header( 'Access-Control-Allow-Methods: GET, POST, PUT, PATCH, DELETE, OPTIONS' );
 		header( 'Access-Control-Max-Age: 600' );
 		header( 'Vary: Origin', false );

@@ -19,6 +19,7 @@ class Deactivator {
 		$hooks = array(
 			'g2aba_generate_insights',
 			'g2aba_run_agent',
+			'g2aba_sessions_cleanup',
 		);
 		// Also unschedule every automation hook the store knows about, so
 		// paused-plus-uninstall doesn't leave orphaned events in wp_cron.

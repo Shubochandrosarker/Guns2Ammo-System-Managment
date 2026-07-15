@@ -54,4 +54,23 @@ abstract class REST_Controller extends \WP_REST_Controller {
 		$res->header( 'Cache-Control', 'private, max-age=15' );
 		return $res;
 	}
+
+	/**
+	 * 429 with a real `Retry-After` header. Built as a WP_REST_Response
+	 * (WP_Error data never becomes headers) but shaped like WP's standard
+	 * error body so clients handle it uniformly.
+	 */
+	protected function too_many_requests( int $retry_after ): \WP_REST_Response {
+		$retry_after = max( 1, $retry_after );
+		$res         = new \WP_REST_Response(
+			array(
+				'code'    => 'g2aba_rate_limited',
+				'message' => __( 'Too many requests. Try again shortly.', 'g2a-business-api' ),
+				'data'    => array( 'status' => 429 ),
+			),
+			429
+		);
+		$res->header( 'Retry-After', (string) $retry_after );
+		return $res;
+	}
 }

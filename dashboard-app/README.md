@@ -32,7 +32,9 @@ To hit real data:
 
 ```
 VITE_G2A_USE_MOCKS=0
-VITE_G2A_API_BASE=https://guns2ammo.com
+# Full REST base, including /wp-json/g2a/v1 (leave unset in dev to use the
+# relative default that rides the Vite proxy):
+VITE_G2A_API_BASE=https://guns2ammo.com/wp-json/g2a/v1
 ```
 
 ## Modules

@@ -25,6 +25,16 @@ class Plugin {
 		\WordPressistic\G2ABA\Leads\Leads_Installer::maybe_install();
 		\WordPressistic\G2ABA\Leads\Lead_Ingestion::register();
 
+		// Cookie-session auth (Phase 2). Session_Installer follows the same
+		// version-option/dbDelta pattern as Leads_Installer; Session_Auth
+		// must be registered on every request because determine_current_user
+		// fires long before rest_api_init; the cookie emitter and the daily
+		// purge cron are likewise request-wide concerns.
+		\WordPressistic\G2ABA\Auth\Session_Installer::maybe_install();
+		\WordPressistic\G2ABA\Auth\Session_Cookie::register();
+		\WordPressistic\G2ABA\Auth\Session_Auth::register();
+		\WordPressistic\G2ABA\Auth\Session_Store::register_cron();
+
 		// Same idea, one option comparison: only re-seeds automations +
 		// agents (and re-syncs cron) when their defs version changed, so
 		// an already-activated install picks up new/changed automations

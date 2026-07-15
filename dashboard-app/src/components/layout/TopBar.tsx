@@ -1,11 +1,11 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { initials } from '@/lib/format'
-import type { Session } from '@/lib/api'
+import type { SessionUser } from '@/types/auth'
 import { useTheme } from '@/lib/theme'
 
 interface Props {
-  session: Session
+  session: SessionUser
   onSignOut: () => void
   onOpenSidebar: () => void
 }
@@ -76,8 +76,8 @@ export function TopBar({ session, onSignOut, onOpenSidebar }: Props) {
             <div className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>
               {session.displayName}
             </div>
-            <div className="text-xs capitalize" style={{ color: 'var(--text-muted)' }}>
-              {session.role}
+            <div className="text-xs" style={{ color: 'var(--text-muted)' }}>
+              {session.email}
             </div>
           </div>
           <button
