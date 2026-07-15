@@ -508,7 +508,7 @@ final class Waiver_Service {
 		// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
 		$rows = $wpdb->get_results(
 			$wpdb->prepare(
-				"SELECT id, membership_id, waiver_expires_at FROM {$table}
+				"SELECT id, membership_id, wp_user_id, full_name, email, phone, waiver_expires_at FROM {$table}
 				 WHERE status = 'active' AND waiver_status = 'signed'
 				   AND membership_id IS NOT NULL AND membership_id > 0
 				   AND waiver_expires_at IS NOT NULL AND waiver_expires_at BETWEEN %s AND %s
@@ -522,18 +522,37 @@ final class Waiver_Service {
 
 		$sent = 0;
 		foreach ( (array) $rows as $row ) {
-			$ok = Email_Service::send_membership_email(
+			$expires = date_i18n( get_option( 'date_format' ), strtotime( (string) $row['waiver_expires_at'] ) );
+			$ok      = Email_Service::send_membership_email(
 				(int) $row['membership_id'],
 				'waiver_renewal',
-				array(
-					'waiver_expires' => date_i18n( get_option( 'date_format' ), strtotime( (string) $row['waiver_expires_at'] ) ),
-				)
+				array( 'waiver_expires' => $expires )
 			);
 			// Stamp even on send failure? No — leave unset so tomorrow's run
 			// retries; the LIMIT keeps a persistent failure from flooding.
 			if ( $ok ) {
 				$wpdb->update( $table, array( 'waiver_renewal_reminded_at' => $now ), array( 'id' => (int) $row['id'] ) );
 				$sent++;
+
+				// Companion signal for other channels (Messageistic sends the
+				// SMS version). Fired only when the cycle is stamped, so both
+				// channels share the once-per-cycle guarantee.
+				$link = ! empty( $row['wp_user_id'] )
+					? self::waiver_url( (int) $row['wp_user_id'] )
+					: ( class_exists( '\WordPressistic\Memberistic\Waivers\Waiver_Public' ) ? Waiver_Public::guest_url() : home_url( '/' ) );
+				$name_parts = preg_split( '/\s+/', trim( (string) ( $row['full_name'] ?? '' ) ) );
+				do_action(
+					'memberistic_waiver_renewal_due',
+					array(
+						'person_id'      => (int) $row['id'],
+						'first_name'     => (string) ( $name_parts[0] ?? '' ),
+						'last_name'      => count( $name_parts ) > 1 ? implode( ' ', array_slice( $name_parts, 1 ) ) : '',
+						'email'          => (string) ( $row['email'] ?? '' ),
+						'phone'          => (string) ( $row['phone'] ?? '' ),
+						'waiver_link'    => (string) $link,
+						'waiver_expires' => (string) $expires,
+					)
+				);
 			}
 		}
 		return $sent;

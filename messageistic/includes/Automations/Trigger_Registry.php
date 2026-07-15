@@ -27,6 +27,8 @@ final class Trigger_Registry {
             'woocommerce.order_completed'    => __( 'WooCommerce order completed', 'messageistic' ),
             'ffl.status_changed'             => __( 'FFL transfer status changed', 'messageistic' ),
             'waiver.incomplete'              => __( 'Waiver incomplete', 'messageistic' ),
+            'waiver.signed'                  => __( 'Waiver signed', 'messageistic' ),
+            'waiver.renewal_due'             => __( 'Waiver renewal due', 'messageistic' ),
             'kiosk.checkin_completed'        => __( 'KIOSK check-in completed', 'messageistic' ),
             'customer.inactive_x_days'       => __( 'Customer inactive for X days', 'messageistic' ),
         ] );
