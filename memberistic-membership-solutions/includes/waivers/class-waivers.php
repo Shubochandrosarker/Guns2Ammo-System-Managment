@@ -67,6 +67,14 @@ final class Waiver_Service {
 	 * NOT legal advice — the range should have counsel review the final text.
 	 */
 	public static function waiver_text() {
+		// The versions table is the source of truth; the legacy option is a
+		// synced fallback (and the seed for version 1 on migration).
+		if ( class_exists( '\WordPressistic\Memberistic\Waivers\Waiver_Versions' ) ) {
+			$ver = Waiver_Versions::current();
+			if ( $ver && '' !== trim( (string) $ver['body'] ) ) {
+				return (string) apply_filters( 'memberistic_waiver_text', (string) $ver['body'] );
+			}
+		}
 		$saved = (string) get_option( 'memberistic_waiver_text', '' );
 		if ( '' === trim( $saved ) ) {
 			$brand = memberistic_get_brand_label();
@@ -122,6 +130,16 @@ final class Waiver_Service {
 	public static function is_current( $person ) {
 		if ( empty( $person['waiver_status'] ) || 'signed' !== $person['waiver_status'] ) {
 			return false;
+		}
+		// A re-consent version invalidates any signature made before it took
+		// effect (person rows are also flipped to needs_review at publish
+		// time; this covers rows written between then and now, e.g. imports).
+		$boundary = Waiver_Versions::reconsent_boundary();
+		if ( '' !== $boundary ) {
+			$signed = ! empty( $person['waiver_signed_at'] ) ? strtotime( (string) $person['waiver_signed_at'] ) : 0;
+			if ( $signed < strtotime( $boundary ) ) {
+				return false;
+			}
 		}
 		if ( empty( $person['waiver_expires_at'] ) ) {
 			return true;
@@ -277,7 +295,7 @@ final class Waiver_Service {
 				'emergency_name'    => ! empty( $args['emergency_name'] ) ? sanitize_text_field( (string) $args['emergency_name'] ) : null,
 				'emergency_phone'   => ! empty( $args['emergency_phone'] ) ? substr( sanitize_text_field( (string) $args['emergency_phone'] ), 0, 60 ) : null,
 				'minors_json'       => $minors ? (string) wp_json_encode( $minors ) : null,
-				'waiver_version_id' => ! empty( $args['waiver_version_id'] ) ? (int) $args['waiver_version_id'] : null,
+				'waiver_version_id' => ! empty( $args['waiver_version_id'] ) ? (int) $args['waiver_version_id'] : ( Waiver_Versions::current_id() ?: null ),
 				'created_at'        => $now,
 			),
 			array( '%d', '%d', '%d', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%d', '%s', '%s', '%s', '%s', '%s', '%d', '%s' )
@@ -449,6 +467,71 @@ final class Waiver_Service {
 				$now
 			)
 		);
+	}
+
+	/**
+	 * Days before expiry to send the renewal reminder. 0 disables.
+	 */
+	public static function renewal_reminder_days() {
+		$days = (int) get_option( 'memberistic_waiver_renewal_reminder_days', 30 );
+		$days = max( 0, min( 365, $days ) );
+		return (int) apply_filters( 'memberistic_waiver_renewal_reminder_days', $days );
+	}
+
+	/**
+	 * Renewal reminders: email members whose signed waiver expires within the
+	 * reminder window, once per signing cycle (re-signing resets the gate,
+	 * because waiver_signed_at moves past waiver_renewal_reminded_at).
+	 * Called daily from the Scheduler. Returns the number of emails sent.
+	 */
+	public static function send_renewal_reminders() {
+		$days = self::renewal_reminder_days();
+		if ( $days <= 0 ) {
+			return 0;
+		}
+		global $wpdb;
+		$table = People_Repository::table();
+
+		// Tolerate a not-yet-migrated schema (column ships in DB 1.8.0).
+		$columns = (array) $wpdb->get_col( "SHOW COLUMNS FROM {$table}" ); // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+		if ( ! in_array( 'waiver_renewal_reminded_at', $columns, true ) ) {
+			return 0;
+		}
+
+		$now   = current_time( 'mysql' );
+		$until = wp_date( 'Y-m-d H:i:s', current_time( 'timestamp' ) + ( $days * DAY_IN_SECONDS ) );
+		// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+		$rows = $wpdb->get_results(
+			$wpdb->prepare(
+				"SELECT id, membership_id, waiver_expires_at FROM {$table}
+				 WHERE status = 'active' AND waiver_status = 'signed'
+				   AND membership_id IS NOT NULL AND membership_id > 0
+				   AND waiver_expires_at IS NOT NULL AND waiver_expires_at BETWEEN %s AND %s
+				   AND ( waiver_renewal_reminded_at IS NULL OR waiver_renewal_reminded_at <= COALESCE(waiver_signed_at, '1970-01-01') )
+				 LIMIT 200",
+				$now,
+				$until
+			),
+			ARRAY_A
+		);
+
+		$sent = 0;
+		foreach ( (array) $rows as $row ) {
+			$ok = Email_Service::send_membership_email(
+				(int) $row['membership_id'],
+				'waiver_renewal',
+				array(
+					'waiver_expires' => date_i18n( get_option( 'date_format' ), strtotime( (string) $row['waiver_expires_at'] ) ),
+				)
+			);
+			// Stamp even on send failure? No — leave unset so tomorrow's run
+			// retries; the LIMIT keeps a persistent failure from flooding.
+			if ( $ok ) {
+				$wpdb->update( $table, array( 'waiver_renewal_reminded_at' => $now ), array( 'id' => (int) $row['id'] ) );
+				$sent++;
+			}
+		}
+		return $sent;
 	}
 
 	/**
@@ -1028,11 +1111,33 @@ final class Waiver_Admin_Page {
 		$notice = '';
 		switch ( $action ) {
 			case 'save_settings':
-				$text  = isset( $_POST['waiver_text'] ) ? sanitize_textarea_field( wp_unslash( $_POST['waiver_text'] ) ) : '';
-				$days  = isset( $_POST['waiver_validity_days'] ) ? absint( $_POST['waiver_validity_days'] ) : Waiver_Service::DEFAULT_VALIDITY;
-				update_option( 'memberistic_waiver_text', $text );
+				$days     = isset( $_POST['waiver_validity_days'] ) ? absint( $_POST['waiver_validity_days'] ) : Waiver_Service::DEFAULT_VALIDITY;
+				$reminder = isset( $_POST['waiver_renewal_reminder_days'] ) ? absint( $_POST['waiver_renewal_reminder_days'] ) : 30;
 				update_option( 'memberistic_waiver_validity_days', $days > 0 ? $days : Waiver_Service::DEFAULT_VALIDITY );
+				update_option( 'memberistic_waiver_renewal_reminder_days', min( 365, $reminder ) );
 				$notice = __( 'Waiver settings saved.', 'memberistic' );
+				break;
+			case 'publish_version':
+				$text      = isset( $_POST['waiver_text'] ) ? sanitize_textarea_field( wp_unslash( $_POST['waiver_text'] ) ) : '';
+				$title     = isset( $_POST['waiver_version_title'] ) ? sanitize_text_field( wp_unslash( $_POST['waiver_version_title'] ) ) : '';
+				$reconsent = ! empty( $_POST['waiver_requires_reconsent'] );
+				$current   = Waiver_Versions::current();
+				if ( '' === trim( $text ) ) {
+					$notice = __( 'The waiver text cannot be empty.', 'memberistic' );
+					break;
+				}
+				if ( $current && hash( 'sha256', trim( $text ) ) === (string) $current['text_hash'] && ! $reconsent ) {
+					$notice = __( 'No changes — the text matches the current version.', 'memberistic' );
+					break;
+				}
+				$vid = Waiver_Versions::publish( $text, $title, $reconsent, get_current_user_id() );
+				if ( $vid ) {
+					$notice = $reconsent
+						? sprintf( /* translators: %d: version id */ __( 'Version %d published. All previously signed waivers now require re-consent.', 'memberistic' ), $vid )
+						: sprintf( /* translators: %d: version id */ __( 'Version %d published. Existing signatures remain valid until their normal expiry.', 'memberistic' ), $vid );
+				} else {
+					$notice = __( 'The new version could not be published.', 'memberistic' );
+				}
 				break;
 			case 'bulk_sign':
 				$n      = Waiver_Service::bulk_mark_active_signed();
@@ -1220,7 +1325,7 @@ final class Waiver_Admin_Page {
 		header( 'Content-Type: text/csv; charset=utf-8' );
 		header( 'Content-Disposition: attachment; filename="memberistic-waivers-' . gmdate( 'Y-m-d' ) . '.csv"' );
 		$out = fopen( 'php://output', 'w' );
-		fputcsv( $out, array( 'id', 'signed_at', 'expires_at', 'source', 'signer_name', 'signer_email', 'dob', 'phone', 'emergency_name', 'emergency_phone', 'minors', 'membership_id', 'ip', 'text_hash', 'has_attachment', 'waiver_text' ) );
+		fputcsv( $out, array( 'id', 'signed_at', 'expires_at', 'source', 'signer_name', 'signer_email', 'dob', 'phone', 'emergency_name', 'emergency_phone', 'minors', 'membership_id', 'ip', 'waiver_version', 'text_hash', 'has_attachment', 'waiver_text' ) );
 		$page = 0;
 		do {
 			$rows = Waiver_Service::get_signatures( 1000, $page * 1000 );
@@ -1243,6 +1348,7 @@ final class Waiver_Admin_Page {
 							$r['minors_json'] ?? '',
 							$r['membership_id'],
 							$r['ip'],
+							$r['waiver_version_id'] ?? '',
 							$r['text_hash'],
 							! empty( $r['attachment_id'] ) ? 'yes' : 'no',
 							$r['waiver_text'],
@@ -1429,17 +1535,79 @@ final class Waiver_Admin_Page {
 			</div>
 
 			<div class="memberistic-card">
-				<h2><?php esc_html_e( 'Waiver document', 'memberistic' ); ?></h2>
+				<h2><?php esc_html_e( 'Waiver document (versioned)', 'memberistic' ); ?></h2>
+				<?php $cur_ver = Waiver_Versions::current(); ?>
+				<?php if ( $cur_ver ) : ?>
+					<p class="description">
+						<?php
+						printf(
+							/* translators: 1: version id, 2: title, 3: date */
+							esc_html__( 'Currently in effect: version %1$d%2$s, published %3$s.', 'memberistic' ),
+							(int) $cur_ver['id'],
+							$cur_ver['title'] ? ' (' . esc_html( (string) $cur_ver['title'] ) . ')' : '',
+							esc_html( date_i18n( get_option( 'date_format' ), strtotime( (string) $cur_ver['effective_from'] ) ) )
+						);
+						?>
+					</p>
+				<?php endif; ?>
+				<form method="post">
+					<?php wp_nonce_field( 'memberistic_waivers' ); ?>
+					<input type="hidden" name="memberistic_waiver_action" value="publish_version">
+					<p>
+						<label for="waiver_text" style="font-weight:600;display:block;margin-bottom:6px;"><?php esc_html_e( 'Waiver text shown when signing (saving publishes a NEW version — past signatures keep their original text snapshot)', 'memberistic' ); ?></label>
+						<textarea id="waiver_text" name="waiver_text" rows="8" class="large-text" style="width:100%;"><?php echo esc_textarea( Waiver_Service::waiver_text() ); ?></textarea>
+					</p>
+					<p>
+						<label for="waiver_version_title" style="font-weight:600;"><?php esc_html_e( 'Version label (optional, e.g. "2026 insurance update")', 'memberistic' ); ?></label><br>
+						<input type="text" id="waiver_version_title" name="waiver_version_title" class="regular-text">
+					</p>
+					<p>
+						<label>
+							<input type="checkbox" name="waiver_requires_reconsent" value="1">
+							<strong><?php esc_html_e( 'Require re-consent', 'memberistic' ); ?></strong> —
+							<?php esc_html_e( 'everyone signed before this version must sign again (their status flips to "needs review" and waivers on file stop satisfying booking/check-in). Leave unchecked for wording tweaks: existing signatures then stay valid until their normal expiry.', 'memberistic' ); ?>
+						</label>
+					</p>
+					<p><button type="submit" class="button button-primary"><?php esc_html_e( 'Publish new version', 'memberistic' ); ?></button></p>
+				</form>
+				<?php $versions = Waiver_Versions::all( 10 ); ?>
+				<?php if ( $versions ) : ?>
+					<h3 style="margin-top:18px;"><?php esc_html_e( 'Version history', 'memberistic' ); ?></h3>
+					<table class="widefat striped">
+						<thead><tr>
+							<th><?php esc_html_e( 'Version', 'memberistic' ); ?></th>
+							<th><?php esc_html_e( 'Label', 'memberistic' ); ?></th>
+							<th><?php esc_html_e( 'Effective from', 'memberistic' ); ?></th>
+							<th><?php esc_html_e( 'Re-consent', 'memberistic' ); ?></th>
+							<th><?php esc_html_e( 'Published by', 'memberistic' ); ?></th>
+						</tr></thead>
+						<tbody>
+						<?php foreach ( $versions as $v ) : ?>
+							<tr>
+								<td>#<?php echo (int) $v['id']; ?><?php if ( $cur_ver && (int) $cur_ver['id'] === (int) $v['id'] ) : ?> <strong>(<?php esc_html_e( 'current', 'memberistic' ); ?>)</strong><?php endif; ?></td>
+								<td><?php echo esc_html( $v['title'] ?: '—' ); ?></td>
+								<td><?php echo esc_html( date_i18n( get_option( 'date_format' ) . ' H:i', strtotime( (string) $v['effective_from'] ) ) ); ?></td>
+								<td><?php echo $v['requires_reconsent'] ? '<span style="color:#b32d2e;font-weight:600;">' . esc_html__( 'Yes', 'memberistic' ) . '</span>' : esc_html__( 'No', 'memberistic' ); ?></td>
+								<td><?php $u = $v['created_by'] ? get_userdata( (int) $v['created_by'] ) : null; echo esc_html( $u ? $u->display_name : '—' ); ?></td>
+							</tr>
+						<?php endforeach; ?>
+						</tbody>
+					</table>
+				<?php endif; ?>
+			</div>
+
+			<div class="memberistic-card">
+				<h2><?php esc_html_e( 'Waiver schedule settings', 'memberistic' ); ?></h2>
 				<form method="post">
 					<?php wp_nonce_field( 'memberistic_waivers' ); ?>
 					<input type="hidden" name="memberistic_waiver_action" value="save_settings">
 					<p>
-						<label for="waiver_text" style="font-weight:600;display:block;margin-bottom:6px;"><?php esc_html_e( 'Waiver text shown to members when signing', 'memberistic' ); ?></label>
-						<textarea id="waiver_text" name="waiver_text" rows="8" class="large-text" style="width:100%;"><?php echo esc_textarea( Waiver_Service::waiver_text() ); ?></textarea>
-					</p>
-					<p>
 						<label for="waiver_validity_days" style="font-weight:600;"><?php esc_html_e( 'Validity (days before a signed waiver expires)', 'memberistic' ); ?></label><br>
 						<input type="number" min="1" id="waiver_validity_days" name="waiver_validity_days" value="<?php echo esc_attr( (string) Waiver_Service::validity_days() ); ?>" class="small-text">
+					</p>
+					<p>
+						<label for="waiver_renewal_reminder_days" style="font-weight:600;"><?php esc_html_e( 'Renewal reminder (days before expiry to email the member; 0 disables)', 'memberistic' ); ?></label><br>
+						<input type="number" min="0" max="365" id="waiver_renewal_reminder_days" name="waiver_renewal_reminder_days" value="<?php echo esc_attr( (string) Waiver_Service::renewal_reminder_days() ); ?>" class="small-text">
 					</p>
 					<p><button type="submit" class="button button-primary"><?php esc_html_e( 'Save waiver settings', 'memberistic' ); ?></button></p>
 				</form>

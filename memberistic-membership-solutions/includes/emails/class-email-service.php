@@ -102,6 +102,11 @@ final class Email_Service {
 					'description' => __( 'Reminds the member to complete an outstanding waiver before benefits unlock.', 'memberistic' ),
 				),
 				array(
+					'id'          => 'waiver_renewal',
+					'label'       => __( 'Waiver Renewal Reminder', 'memberistic' ),
+					'description' => __( 'Sent before a signed waiver expires so the member can re-sign in advance.', 'memberistic' ),
+				),
+				array(
 					'id'          => 'staff_manual',
 					'label'       => __( 'Staff Manual Message', 'memberistic' ),
 					'description' => __( 'Generic staff-initiated message sent from the member profile.', 'memberistic' ),
@@ -276,6 +281,9 @@ final class Email_Service {
 			'{linked_member_name}' => isset( $extra_context['linked_member_name'] ) ? (string) $extra_context['linked_member_name'] : '',
 			'{waiver_status}'      => ucwords( str_replace( '_', ' ', (string) ( $person['waiver_status'] ?? 'missing' ) ) ),
 			'{waiver_url}'         => $waiver_url ?: $account_url,
+			'{waiver_expires}'     => isset( $extra_context['waiver_expires'] )
+				? (string) $extra_context['waiver_expires']
+				: ( ! empty( $person['waiver_expires_at'] ) ? date_i18n( get_option( 'date_format' ), strtotime( (string) $person['waiver_expires_at'] ) ) : '' ),
 			'{staff_name}'         => $staff_name,
 			'{support_email}'      => (string) memberistic_get_setting( 'email_from_address', get_option( 'admin_email' ) ),
 			'{logo_url}'           => (string) memberistic_get_setting( 'logo_url', '' ),
@@ -366,6 +374,10 @@ final class Email_Service {
 			'waiver_missing'       => array(
 				'subject' => __( 'Sign your {brand_label} range waiver', 'memberistic' ),
 				'body'    => __( "Hi {member_name},\n\nA signed waiver is needed before your range benefits can be fully used. You can sign it now from any device in under a minute — no login required:\n\n{waiver_url}\n\nMembership: {membership_id}\n\nSee you at the range.\n\n{brand_label}\n{business_phone}", 'memberistic' ),
+			),
+			'waiver_renewal'       => array(
+				'subject' => __( 'Your {brand_label} range waiver expires soon', 'memberistic' ),
+				'body'    => __( "Hi {member_name},\n\nYour signed range waiver expires on {waiver_expires}. Re-sign it now from any device in under a minute — no login required — and skip the front-desk paperwork on your next visit:\n\n{waiver_url}\n\nMembership: {membership_id}\n\nSee you at the range.\n\n{brand_label}\n{business_phone}", 'memberistic' ),
 			),
 			'staff_manual'         => array(
 				'subject' => __( 'A message from {brand_label}', 'memberistic' ),

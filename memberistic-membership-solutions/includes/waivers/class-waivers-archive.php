@@ -106,6 +106,15 @@ final class Waivers_Archive {
 		$email  = strtolower( trim( (string) $email ) );
 		$cutoff = wp_date( 'Y-m-d H:i:s', current_time( 'timestamp' ) - ( Waiver_Service::validity_days() * DAY_IN_SECONDS ) );
 
+		// A re-consent waiver version raises the bar: signatures older than
+		// its effective date no longer satisfy the gate, even if unexpired.
+		if ( class_exists( '\WordPressistic\Memberistic\Waivers\Waiver_Versions' ) ) {
+			$boundary = Waiver_Versions::reconsent_boundary();
+			if ( '' !== $boundary && $boundary > $cutoff ) {
+				$cutoff = $boundary;
+			}
+		}
+
 		if ( '' !== $email ) {
 			// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
 			$row = $wpdb->get_row( $wpdb->prepare( "SELECT * FROM {$table} WHERE email = %s AND is_current = 1 AND signed_at IS NOT NULL AND signed_at >= %s ORDER BY signed_at DESC LIMIT 1", $email, $cutoff ), ARRAY_A );

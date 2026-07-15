@@ -319,6 +319,9 @@ final class Scheduler {
 		// re-enter the "missing/expired" pool and get re-nudged below.
 		if ( class_exists( '\WordPressistic\Memberistic\Waivers\Waiver_Service' ) ) {
 			\WordPressistic\Memberistic\Waivers\Waiver_Service::expire_due();
+			// Heads-up BEFORE expiry (default 30 days out, once per signing
+			// cycle) so members renew instead of arriving with a dead waiver.
+			\WordPressistic\Memberistic\Waivers\Waiver_Service::send_renewal_reminders();
 		}
 
 		$rows = People_Repository::get_active_missing_waiver();

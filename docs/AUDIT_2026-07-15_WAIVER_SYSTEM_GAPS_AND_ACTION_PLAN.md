@@ -317,3 +317,12 @@ endpoint.
 | Drawn signature | **Done.** Canvas draw-to-sign pad (pointer events, mobile-friendly) on both forms; exported as JPEG, validated server-side (base64/JPEG magic/size cap), stored in the hardened private document store linked to the signature. |
 | Server-side PDF (G7) | **Done.** New dependency-free `Waiver_PDF` emitter (`includes/waivers/class-waiver-pdf.php`) generates a canonical signed-waiver PDF (waiver-text snapshot, signer data, minors, audit trail, embedded signature image) on every signing; filed via `Documents::store_generated()` and linked as the signature's attachment. Verified by rendering the output with a real PDF engine. |
 | `waiver_version_id` groundwork | Column added (null for now) — Phase 2 wires versioning. |
+
+## Phase 2 status (updated 2026-07-15)
+
+| Task | Status |
+|---|---|
+| Version table (G9) | **Done.** New `memberistic_waiver_versions` table + `Waiver_Versions` class (`includes/waivers/class-waiver-versions.php`). Publishing creates an immutable new version (title, body, hash, effective date, author); the legacy `memberistic_waiver_text` option stays synced for back-compat. Migration 1.8.0 seeds version 1 from the existing text, backdated so current signatures stay valid. Signatures now record `waiver_version_id`; the CSV export includes it. |
+| Re-consent policy | **Done.** The admin "Publish new version" form has a **Require re-consent** switch. When on: all signed people flip to `needs_review` (every surface prompts a re-sign, and the existing weekly follow-up email targets them automatically), and a re-consent boundary raises the archive lookup cutoff so waivers on file stop satisfying booking/check-in. When off: wording tweaks leave existing signatures valid until normal expiry. `is_current()` also enforces the boundary. |
+| Renewal reminders | **Done.** Daily scheduler pass emails members whose waiver expires within a configurable window (default 30 days, 0 disables — Waivers → schedule settings) using the new `waiver_renewal` email template (`{waiver_expires}` merge tag), once per signing cycle (tracked via `people.waiver_renewal_reminded_at`; re-signing re-arms it). |
+| Admin console | Version history table (last 10, current flagged), publish form with version label, split schedule-settings card (validity days + reminder days). |
