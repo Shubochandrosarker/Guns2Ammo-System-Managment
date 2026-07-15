@@ -21,6 +21,9 @@ import type {
   SeoAnalytics,
   SiteHealthSummary,
   StoreAnalytics,
+  WaiverItem,
+  WaiverStats,
+  WaiverTodayPage,
   WpContentItem,
 } from '@/types/analytics'
 import type {
@@ -771,4 +774,36 @@ export const mockRouting: Record<string, string | null> = {
   email_drafts:      'm4',
   daily_summaries:   'm4',
   private_inventory: 'm5',
+}
+
+// ---------------------------------------------------------------------------
+// Waivers (dev fixtures)
+// ---------------------------------------------------------------------------
+
+export const waivers: WaiverItem[] = [
+  { id: 1, name: 'Marcus Webb',    email: 'marcus.webb@example.com',  phone: '(480) 555-0101', dob: '1985-03-14', signed_at: '2026-06-28 14:02:00', expires_at: '2027-06-28 14:02:00', source: 'esign:kiosk',  minor_name: '',             is_current: true, status: 'current',  matched: true,  has_pdf: true },
+  { id: 2, name: 'Alicia Ferrer',  email: 'alicia.f@example.com',     phone: '(480) 555-0144', dob: '1992-11-02', signed_at: '2026-07-10 10:31:00', expires_at: '2027-07-10 10:31:00', source: 'esign:guest',  minor_name: 'Diego Ferrer', is_current: true, status: 'current',  matched: false, has_pdf: true },
+  { id: 3, name: 'Tom Reiner',     email: 'tom.reiner@example.com',   phone: '(480) 555-0188', dob: '1978-01-22', signed_at: '2025-08-03 16:45:00', expires_at: '2026-08-03 16:45:00', source: 'ottertext',    minor_name: '',             is_current: true, status: 'expiring', matched: true,  has_pdf: true },
+  { id: 4, name: 'Sandra Oduya',   email: 'sandra.o@example.com',     phone: '(480) 555-0122', dob: '1990-06-30', signed_at: '2025-05-19 09:12:00', expires_at: '2026-05-19 09:12:00', source: 'ottertext',    minor_name: '',             is_current: true, status: 'expired',  matched: false, has_pdf: true },
+  { id: 5, name: 'Ray Calloway',   email: 'ray.c@example.com',        phone: '(480) 555-0177', dob: '1969-09-09', signed_at: '2026-07-14 18:20:00', expires_at: '2027-07-14 18:20:00', source: 'esign:self_serve', minor_name: '',         is_current: true, status: 'current',  matched: true,  has_pdf: true },
+]
+
+export const waiverStats: WaiverStats = {
+  active: true,
+  on_file: 1812,
+  current: 1391,
+  expiring_30d: 118,
+  expired: 303,
+  people: { signed: 402, missing: 38, expired: 21, needs_review: 6, total: 467 },
+  upcoming_missing_48h: 4,
+  validity_days: 365,
+}
+
+export const waiverToday: WaiverTodayPage = {
+  active: true,
+  items: [
+    { booking_id: 9101, name: 'Marcus Webb',   email: 'marcus.webb@example.com', start_at: '2026-07-15 10:00:00', status: 'paid',    waiver_signed: true,  waiver_ok: true },
+    { booking_id: 9102, name: 'Jenna Kwan',    email: 'jenna.kwan@example.com',  start_at: '2026-07-15 11:30:00', status: 'paid',    waiver_signed: false, waiver_ok: false },
+    { booking_id: 9103, name: 'Alicia Ferrer', email: 'alicia.f@example.com',    start_at: '2026-07-15 13:00:00', status: 'pending', waiver_signed: false, waiver_ok: true },
+  ],
 }

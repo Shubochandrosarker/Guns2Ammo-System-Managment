@@ -59,8 +59,19 @@ import type {
   ShooterInsights,
   SiteHealthSummary,
   StoreAnalytics,
+  WaiverDetail,
+  WaiverStats,
+  WaiversPage,
+  WaiverTodayPage,
   WpContentItem,
 } from '@/types/analytics'
+
+export interface WaiversListParams {
+  search?: string
+  status?: string
+  page?: number
+  perPage?: number
+}
 
 // ---------------------------------------------------------------------------
 // Legacy credential cleanup
@@ -675,6 +686,67 @@ export const api = {
       if (patch.status !== undefined) body.status = patch.status
       if (patch.assignedAgent !== undefined) body.assigned_agent = patch.assignedAgent
       return http<Lead>(`/leads/${id}`, { method: 'PATCH', body: JSON.stringify(body) })
+    },
+  },
+
+  waivers: {
+    async list(params: WaiversListParams = {}): Promise<WaiversPage> {
+      if (env.useMocks) {
+        let items = (await mocks()).waivers
+        if (params.status) items = items.filter(w => w.status === params.status)
+        if (params.search) {
+          const q = params.search.toLowerCase()
+          items = items.filter(w =>
+            w.name.toLowerCase().includes(q) ||
+            w.email.toLowerCase().includes(q) ||
+            w.phone.toLowerCase().includes(q),
+          )
+        }
+        const perPage = params.perPage || 25
+        const page = params.page || 1
+        return {
+          active: true,
+          items: items.slice((page - 1) * perPage, page * perPage),
+          total: items.length,
+          page,
+        }
+      }
+      const qs = new URLSearchParams()
+      if (params.search)  qs.set('search', params.search)
+      if (params.status)  qs.set('status', params.status)
+      if (params.page)    qs.set('page', String(params.page))
+      if (params.perPage) qs.set('per_page', String(params.perPage))
+      const suffix = qs.toString()
+      return http<WaiversPage>(`/waivers${suffix ? `?${suffix}` : ''}`)
+    },
+    stats(): Promise<WaiverStats> {
+      return env.useMocks ? mocks().then(m => m.waiverStats) : http<WaiverStats>('/waivers/stats')
+    },
+    today(): Promise<WaiverTodayPage> {
+      return env.useMocks ? mocks().then(m => m.waiverToday) : http<WaiverTodayPage>('/waivers/today')
+    },
+    async get(id: number): Promise<WaiverDetail> {
+      if (env.useMocks) {
+        const found = (await mocks()).waivers.find(w => w.id === id)
+        if (!found) throw new ApiError(404, 'Waiver not found')
+        return { ...found, emergency_name: '', emergency_phone: '', minor_age: '', history: [] }
+      }
+      return http<WaiverDetail>(`/waivers/${id}`)
+    },
+    sendLink(email: string): Promise<{ sent: boolean }> {
+      if (env.useMocks) return Promise.resolve({ sent: true })
+      return http<{ sent: boolean }>('/waivers/send-link', {
+        method: 'POST',
+        body: JSON.stringify({ email }),
+      })
+    },
+    voidWaiver(id: number): Promise<{ voided: boolean }> {
+      if (env.useMocks) return Promise.resolve({ voided: true })
+      return http<{ voided: boolean }>(`/waivers/${id}/void`, { method: 'POST' })
+    },
+    /** Direct URL for the signed PDF — rides the same HttpOnly session cookie. */
+    pdfUrl(id: number): string {
+      return `${env.apiBase}/waivers/${id}/pdf`
     },
   },
 

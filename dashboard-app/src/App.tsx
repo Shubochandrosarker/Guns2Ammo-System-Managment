@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { lazy, Suspense, useEffect, useMemo, useState } from 'react'
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
 import { AppLayout } from '@/components/layout/AppLayout'
 import { api, setUnauthorizedHandler } from '@/lib/api'
@@ -6,27 +6,32 @@ import type { SessionUser } from '@/types/auth'
 import { Spinner } from '@/components/ui/Spinner'
 import { Login } from '@/pages/Login'
 import { DashboardHome } from '@/pages/DashboardHome'
-import { BusinessAnalysis } from '@/pages/BusinessAnalysis'
-import { InsightisticAnalytics } from '@/pages/InsightisticAnalytics'
-import { BookingRevenue } from '@/pages/BookingRevenue'
-import { MembershipRevenue } from '@/pages/MembershipRevenue'
-import { WooStoreAnalytics } from '@/pages/WooStoreAnalytics'
-import { SEOGrowth } from '@/pages/SEOGrowth'
-import { ShooterInsights } from '@/pages/ShooterInsights'
-import { BusinessGaps } from '@/pages/BusinessGaps'
-import { AIInsights } from '@/pages/AIInsights'
-import { AutomationCenter } from '@/pages/AutomationCenter'
-import { AIAgents } from '@/pages/AIAgents'
-import { EmailManagement } from '@/pages/EmailManagement'
-import { Leads } from '@/pages/Leads'
-import { BridGistic } from '@/pages/BridGistic'
-import { AIModelsRAGs } from '@/pages/AIModels'
-import { Reports } from '@/pages/Reports'
-import { SystemHealth } from '@/pages/SystemHealth'
-import { Settings } from '@/pages/Settings'
-import { OpsQueue } from '@/pages/OpsQueue'
-import { Tasks } from '@/pages/Tasks'
-import { WebsiteContent } from '@/pages/WebsiteContent'
+
+// Route-level code splitting: only Login + the home screen ship in the main
+// bundle; every other page loads on first visit. Pages use named exports,
+// hence the `.then(m => ({ default: m.X }))` shims.
+const BusinessAnalysis      = lazy(() => import('@/pages/BusinessAnalysis').then(m => ({ default: m.BusinessAnalysis })))
+const InsightisticAnalytics = lazy(() => import('@/pages/InsightisticAnalytics').then(m => ({ default: m.InsightisticAnalytics })))
+const BookingRevenue        = lazy(() => import('@/pages/BookingRevenue').then(m => ({ default: m.BookingRevenue })))
+const MembershipRevenue     = lazy(() => import('@/pages/MembershipRevenue').then(m => ({ default: m.MembershipRevenue })))
+const WooStoreAnalytics     = lazy(() => import('@/pages/WooStoreAnalytics').then(m => ({ default: m.WooStoreAnalytics })))
+const SEOGrowth             = lazy(() => import('@/pages/SEOGrowth').then(m => ({ default: m.SEOGrowth })))
+const ShooterInsights       = lazy(() => import('@/pages/ShooterInsights').then(m => ({ default: m.ShooterInsights })))
+const BusinessGaps          = lazy(() => import('@/pages/BusinessGaps').then(m => ({ default: m.BusinessGaps })))
+const AIInsights            = lazy(() => import('@/pages/AIInsights').then(m => ({ default: m.AIInsights })))
+const AutomationCenter      = lazy(() => import('@/pages/AutomationCenter').then(m => ({ default: m.AutomationCenter })))
+const AIAgents              = lazy(() => import('@/pages/AIAgents').then(m => ({ default: m.AIAgents })))
+const EmailManagement       = lazy(() => import('@/pages/EmailManagement').then(m => ({ default: m.EmailManagement })))
+const Leads                 = lazy(() => import('@/pages/Leads').then(m => ({ default: m.Leads })))
+const Waivers               = lazy(() => import('@/pages/Waivers').then(m => ({ default: m.Waivers })))
+const BridGistic            = lazy(() => import('@/pages/BridGistic').then(m => ({ default: m.BridGistic })))
+const AIModelsRAGs          = lazy(() => import('@/pages/AIModels').then(m => ({ default: m.AIModelsRAGs })))
+const Reports               = lazy(() => import('@/pages/Reports').then(m => ({ default: m.Reports })))
+const SystemHealth          = lazy(() => import('@/pages/SystemHealth').then(m => ({ default: m.SystemHealth })))
+const Settings              = lazy(() => import('@/pages/Settings').then(m => ({ default: m.Settings })))
+const OpsQueue              = lazy(() => import('@/pages/OpsQueue').then(m => ({ default: m.OpsQueue })))
+const Tasks                 = lazy(() => import('@/pages/Tasks').then(m => ({ default: m.Tasks })))
+const WebsiteContent        = lazy(() => import('@/pages/WebsiteContent').then(m => ({ default: m.WebsiteContent })))
 
 export function App() {
   const [session, setSession] = useState<SessionUser | null>(null)
@@ -87,6 +92,7 @@ export function App() {
             <Route path="ai-agents"            element={<AIAgents />} />
             <Route path="email-management"     element={<EmailManagement />} />
             <Route path="leads"                element={<Leads />} />
+            <Route path="waivers"              element={<Waivers />} />
             <Route path="bridgistic"           element={<BridGistic />} />
             <Route path="ai-models"            element={<AIModelsRAGs />} />
             <Route path="reports"              element={<Reports />} />
@@ -113,5 +119,18 @@ export function App() {
     )
   }
 
-  return <BrowserRouter>{routes}</BrowserRouter>
+  return (
+    <BrowserRouter>
+      {/* Suspense boundary for the lazy route chunks above. */}
+      <Suspense
+        fallback={
+          <div className="min-h-full flex items-center justify-center">
+            <Spinner label="Loading…" />
+          </div>
+        }
+      >
+        {routes}
+      </Suspense>
+    </BrowserRouter>
+  )
 }

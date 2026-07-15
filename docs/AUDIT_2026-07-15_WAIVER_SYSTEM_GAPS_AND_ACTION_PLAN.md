@@ -336,3 +336,11 @@ endpoint.
 | Staff exit PIN | **Done.** Optional digits-only PIN (Kiosk stations card); when set, the attract screen shows a discreet server-verified "Staff exit" button (device-level guided access remains the real lock). |
 | Completion signal | **Done.** `memberistic_waiver_signed` action fires on every recorded signature (id + row) for live front-desk surfaces and Messageistic automations (Phase 5 hooks into this). |
 | Legacy plugin retirement | **Done.** `guns2ammo-waiver-manager` 1.5.1 now shows a retirement admin notice pointing to Memberistic's waiver system, and it is removed from the g2a-business-api health-provider tracked-plugin list. Kept in the repo for archival reference only. |
+
+## Phase 4 status (updated 2026-07-15)
+
+| Task | Status |
+|---|---|
+| Waiver REST API (G11) | **Done.** New `g2a/v1` `Waivers_Controller` (`g2a-business-api/includes/rest/class-waivers-controller.php`): `GET /waivers` (search by name/email/phone + status filter over the unified archive), `GET /waivers/stats` (on-file / current / expiring-30d / expired / member buckets / bookings-next-48h-without-waiver), `GET /waivers/today` (today's bookings with waiver flags), `GET /waivers/{id}` (detail + full per-email signature history), `GET /waivers/{id}/pdf` (streams the signed PDF under the dashboard's own session auth — resolves local mirror → attachment → generated e-sign PDF), `POST /waivers/send-link` (member tokenized link or guest link, audit-logged), `POST /waivers/{id}/void` (audit-logged; flips matched members to needs_review). Same permission model as every other controller; all handlers degrade gracefully when Memberistic is absent. |
+| Dashboard Waivers page | **Done.** New `/waivers` route + sidebar entry: five stat tiles, a "today's check-ins missing a waiver" attention strip with one-click send-link, search-first table (status pills, PDF links), a detail drawer (full fields, signature history, view PDF / send link / void), and a send-sign-link dialog. Accessible dialogs via the existing `useDialogA11y`, aria-labels on icon-only actions. |
+| UI debt | Route-level code splitting shipped (`React.lazy` + `Suspense` — only Login + Home in the entry bundle; every page is now its own chunk). Mock fixtures for the new page follow the dev-only tree-shaken pattern. |
