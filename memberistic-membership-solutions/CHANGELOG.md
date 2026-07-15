@@ -2,6 +2,13 @@
 
 All notable changes are tracked here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## 1.13.0 — Guaranteed Stripe cancellation (2026-07-15)
+
+- **Stripe first, local status second.** Cancelling a membership (members app REST action, admin edit screen, legacy wp-admin links) now confirms the Stripe subscription is stopped **before** the local record flips to cancelled. Previously the DB was marked cancelled first; if the Stripe call then failed, the site showed "cancelled" while Stripe kept billing the member.
+- On Stripe failure the membership keeps its current status, the operator gets an explicit error, a persistent admin notice lists every affected member, and retries run automatically with backoff (5m, 30m, 2h, 6h, 24h, 48h). A successful retry completes the local cancellation automatically.
+- Explicit override: `POST /memberships/{id}/cancel` with `force=true` cancels locally even when Stripe is failing (retries keep running until Stripe confirms).
+- Already-cancelled / missing subscriptions at Stripe still count as success (idempotent), and inbound webhook cancellations are unaffected.
+
 ## 1.12.0 — Crossmatch unification (2026-07-13)
 
 ### Changed
