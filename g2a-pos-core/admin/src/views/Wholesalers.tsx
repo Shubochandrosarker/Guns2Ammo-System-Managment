@@ -253,6 +253,12 @@ export default function Wholesalers() {
           </Field>
           <Field label="Account number">
             <input className="input" value={form.account_number} onChange={(e) => setForm({ ...form, account_number: e.target.value })} />
+            <span className="text-xs text-zinc-500 dark:text-zinc-400">
+              Required to run more than one account for the same provider (e.g. separate Lipsey&apos;s
+              firearms and accessories accounts) — feeds and syncs are matched to accounts by this
+              number. Saving without an account number always creates a new entry; it never updates
+              an existing one.
+            </span>
           </Field>
           <Field label="API endpoint">
             <input className="input" value={form.api_endpoint} onChange={(e) => setForm({ ...form, api_endpoint: e.target.value })} />

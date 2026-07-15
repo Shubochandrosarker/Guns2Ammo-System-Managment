@@ -3,6 +3,7 @@
 namespace G2A\POS\Wholesalers;
 
 use G2A\POS\Database\WholesalerRepository;
+use G2A\POS\Support\Logger;
 
 /**
  * Bridges the v0.6 distributor CSV pipeline (Inventory\SyncService +
@@ -38,6 +39,13 @@ final class WholesalerImportBridge {
 
 		try {
 			$wholesalerId = self::resolve_wholesaler_id( $provider, $context );
+		} catch ( AmbiguousWholesalerAccountException $e ) {
+			return array(
+				'ok'       => false,
+				'mirrored' => false,
+				'reason'   => 'ambiguous_wholesaler_account',
+				'error'    => $e->getMessage(),
+			);
 		} catch ( \Throwable $e ) {
 			return array(
 				'ok'       => false,
@@ -80,17 +88,73 @@ final class WholesalerImportBridge {
 		);
 	}
 
+	/**
+	 * Resolve the wholesaler account this feed belongs to.
+	 *
+	 * When the distributor row carries an account number, resolution is
+	 * exact on (provider_code, account_number) — creating the row with that
+	 * account number if it doesn't exist yet. Without an account number,
+	 * code-only resolution is allowed only while exactly one account exists
+	 * for the provider; with several accounts the item aborts loudly instead
+	 * of mirroring the feed into whichever row happens to have the lowest id.
+	 *
+	 * @throws AmbiguousWholesalerAccountException When multiple accounts exist and no account number was supplied.
+	 */
 	private static function resolve_wholesaler_id( WholesalerProviderInterface $provider, array $context ): int {
-		$repo     = new WholesalerRepository();
-		$existing = $repo->findByCode( $provider->code() );
-		if ( $existing ) {
-			return (int) $existing['id'];
+		$repo    = new WholesalerRepository();
+		$code    = $provider->code();
+		$account = trim( (string) ( $context['account_number'] ?? '' ) );
+
+		if ( $account !== '' ) {
+			$existing = $repo->findByCodeAndAccount( $code, $account );
+			if ( $existing ) {
+				WholesalerIntegrityChecker::clearSyncAmbiguity( $code );
+				return (int) $existing['id'];
+			}
+			$id = $repo->upsert(
+				array(
+					'provider_code'  => $code,
+					'display_name'   => (string) ( $context['display_name'] ?? $provider->displayName() ),
+					'account_number' => $account,
+					'status'         => 'active',
+					'settings'       => array( 'auto_created_by' => 'distributor_pipeline' ),
+				)
+			);
+			WholesalerIntegrityChecker::clearSyncAmbiguity( $code );
+			return $id;
 		}
+
+		$rows = $repo->findAllByCode( $code );
+		if ( count( $rows ) === 1 ) {
+			WholesalerIntegrityChecker::clearSyncAmbiguity( $code );
+			return (int) $rows[0]['id'];
+		}
+		if ( count( $rows ) > 1 ) {
+			$message = sprintf(
+				'%d wholesaler accounts exist for provider "%s" but this distributor feed carries no account number; refusing to guess which account the feed belongs to. Set the account number on the distributor row (and on each wholesaler account) so feeds resolve exactly.',
+				count( $rows ),
+				$code
+			);
+			Logger::error(
+				'Wholesaler mirror aborted: ambiguous account resolution',
+				array(
+					'provider_code' => $code,
+					'row_ids'       => array_map( static fn ( array $r ): int => (int) $r['id'], $rows ),
+					'accounts'      => array_map( static fn ( array $r ): string => (string) ( $r['account_number'] ?? '' ), $rows ),
+					'hint'          => 'Set account_number on the distributor feed and on each wholesaler row.',
+				)
+			);
+			WholesalerIntegrityChecker::recordSyncAmbiguity( $code, $message );
+			throw new AmbiguousWholesalerAccountException( $message );
+		}
+
+		// First time this provider is seen and the feed has no account
+		// number: create the provider's first (and only) row.
 		return $repo->upsert(
 			array(
-				'provider_code'  => $provider->code(),
+				'provider_code'  => $code,
 				'display_name'   => (string) ( $context['display_name'] ?? $provider->displayName() ),
-				'account_number' => (string) ( $context['account_number'] ?? '' ),
+				'account_number' => '',
 				'status'         => 'active',
 				'settings'       => array( 'auto_created_by' => 'distributor_pipeline' ),
 			)

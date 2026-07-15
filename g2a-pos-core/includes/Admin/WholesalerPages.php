@@ -134,7 +134,7 @@ final class WholesalerPages
         }
         echo '</select></td></tr>';
         echo '<tr><th>Display Name</th><td><input name="display_name" value="Lipsey\'s — Production"></td></tr>';
-        echo '<tr><th>Account Number</th><td><input name="account_number"></td></tr>';
+        echo '<tr><th>Account Number</th><td><input name="account_number"><p class="description">Required when running more than one account for the same provider (e.g. separate Lipsey\'s firearms and accessories accounts) — feeds and syncs match accounts by this number. Saving without an account number always creates a new entry.</p></td></tr>';
         echo '<tr><th>API Endpoint</th><td><input name="api_endpoint" value="https://api.lipseys.com" class="regular-text"></td></tr>';
         echo '<tr><th>API Email</th><td><input name="cred_email" type="email"></td></tr>';
         echo '<tr><th>API Password</th><td><input name="cred_password" type="password" autocomplete="new-password"><p class="description">Stored encrypted (AES-256) using your AUTH_KEY salt.</p></td></tr>';
