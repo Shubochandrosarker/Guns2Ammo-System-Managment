@@ -86,6 +86,7 @@ final class Plugin {
 			'includes/waivers/class-documents.php',
 			'includes/waivers/class-waiver-pdf.php',
 			'includes/waivers/class-waiver-versions.php',
+			'includes/waivers/class-waiver-kiosk.php',
 			'includes/waivers/class-waivers.php',
 			'includes/waivers/class-waivers-archive.php',
 			'includes/waivers/class-waiver-import.php',

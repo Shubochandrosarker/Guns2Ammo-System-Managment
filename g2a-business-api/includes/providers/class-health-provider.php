@@ -28,7 +28,6 @@ class Health_Provider {
 				'g2a-booking-engine'                                      => 'g2a-booking-engine',
 				'memberistic-membership-solutions'                        => 'memberistic-membership-solutions',
 				'advanced-ffl-checkout'                                   => 'advanced-ffl-checkout',
-				'guns2ammo-waiver-manager'                                => 'guns2ammo-waiver-manager',
 				'messageistic'                                            => 'messageistic',
 			) as $label => $slug
 		) {

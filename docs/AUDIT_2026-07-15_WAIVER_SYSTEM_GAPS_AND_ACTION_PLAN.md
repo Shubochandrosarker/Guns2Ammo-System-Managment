@@ -326,3 +326,13 @@ endpoint.
 | Re-consent policy | **Done.** The admin "Publish new version" form has a **Require re-consent** switch. When on: all signed people flip to `needs_review` (every surface prompts a re-sign, and the existing weekly follow-up email targets them automatically), and a re-consent boundary raises the archive lookup cutoff so waivers on file stop satisfying booking/check-in. When off: wording tweaks leave existing signatures valid until normal expiry. `is_current()` also enforces the boundary. |
 | Renewal reminders | **Done.** Daily scheduler pass emails members whose waiver expires within a configurable window (default 30 days, 0 disables — Waivers → schedule settings) using the new `waiver_renewal` email template (`{waiver_expires}` merge tag), once per signing cycle (tracked via `people.waiver_renewal_reminded_at`; re-signing re-arms it). |
 | Admin console | Version history table (last 10, current flagged), publish form with version label, split schedule-settings card (validity days + reminder days). |
+
+## Phase 3 status (updated 2026-07-15)
+
+| Task | Status |
+|---|---|
+| Station tokens (G8) | **Done.** New `Waiver_Kiosk` class (`includes/waivers/class-waiver-kiosk.php`): stateless HMAC tokens (`station\|expires` + SHA-256 HMAC over a site secret), 12-hour validity (filterable), minted per-shift from Memberistic → Waivers → Kiosk stations — the same pattern as the Booking Engine's check-in stations. Verified: round-trip, tampered-signature, forged-payload, expired, and garbage tokens all handled correctly. |
+| Kiosk signing surface | **Done.** A valid station token unlocks: full-screen attract screen (`?memberistic_kiosk=1&station=…`), throttle exemption on the guest form (the desk device signs many guests/hour; invalid/expired tokens degrade to the public throttled page), `source=kiosk` + station name stamped on every signature (schema migration 1.9.0; shown in CSV export + printable page), and an auto-reset loop — after signing, a 12-second countdown returns the device to the attract screen for the next guest. |
+| Staff exit PIN | **Done.** Optional digits-only PIN (Kiosk stations card); when set, the attract screen shows a discreet server-verified "Staff exit" button (device-level guided access remains the real lock). |
+| Completion signal | **Done.** `memberistic_waiver_signed` action fires on every recorded signature (id + row) for live front-desk surfaces and Messageistic automations (Phase 5 hooks into this). |
+| Legacy plugin retirement | **Done.** `guns2ammo-waiver-manager` 1.5.1 now shows a retirement admin notice pointing to Memberistic's waiver system, and it is removed from the g2a-business-api health-provider tracked-plugin list. Kept in the repo for archival reference only. |

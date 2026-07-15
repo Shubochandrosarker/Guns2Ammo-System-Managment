@@ -223,6 +223,7 @@ CREATE TABLE {$prefix}memberistic_waiver_signatures (
   emergency_phone VARCHAR(60) NULL,
   minors_json LONGTEXT NULL,
   waiver_version_id BIGINT UNSIGNED NULL,
+  station VARCHAR(100) NULL,
   created_at DATETIME NOT NULL,
   PRIMARY KEY  (id),
   KEY user_id (user_id),
