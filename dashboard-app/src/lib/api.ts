@@ -24,6 +24,14 @@
 import { env } from './env'
 import type { SessionResponse, SessionUser } from '@/types/auth'
 import type {
+  ApiEnvelope,
+  ApiErrorPayload,
+  ApiSuccess,
+  DashboardOverviewData,
+  Enveloped,
+  SystemHealthData,
+} from '@/types/api'
+import type {
   AIInsight,
   Agent,
   Automation,
@@ -51,7 +59,6 @@ import type {
   ShooterInsights,
   SiteHealthSummary,
   StoreAnalytics,
-  SystemHealthCheck,
   WpContentItem,
 } from '@/types/analytics'
 
@@ -195,6 +202,64 @@ async function http<T>(path: string, init?: RequestInit): Promise<T> {
   return (await res.json()) as T
 }
 
+// ---------------------------------------------------------------------------
+// Canonical envelope transport (Phase C endpoints)
+// ---------------------------------------------------------------------------
+//
+// /dashboard/overview and /system/health speak the canonical envelope:
+//   {"success":true,"data":...,"meta":{requestId,generatedAt,timezone,...}}
+//   {"success":false,"error":{"code","message","requestId"}}
+// This wrapper rides on the untouched Phase-2 http client (cookie session +
+// CSRF + 401/403 handling all still apply) and unwraps the envelope, keeping
+// `meta` visible to callers.
+
+// httpRaw throws ApiError(message = raw body text) for non-2xx responses and
+// only knows how to pull a WP_Error-style top-level `code`. Recover the
+// envelope's structured error ({success:false,error:{...}}) from that body
+// text so callers see the contract's code/message/requestId.
+function toEnvelopeError(err: ApiError): ApiError {
+  try {
+    const parsed = JSON.parse(err.message) as { success?: boolean; error?: ApiErrorPayload }
+    if (parsed && parsed.success === false && parsed.error?.message) {
+      const { code, message, requestId } = parsed.error
+      return new ApiError(err.status, requestId ? `${message} (request ${requestId})` : message, code)
+    }
+  } catch {
+    // Body was not a JSON envelope — keep the original error.
+  }
+  return err
+}
+
+async function httpEnvelope<T>(path: string): Promise<Enveloped<T>> {
+  let body: unknown
+  try {
+    body = await http<unknown>(path)
+  } catch (err) {
+    throw err instanceof ApiError ? toEnvelopeError(err) : err
+  }
+  const envelope = body as ApiEnvelope<T> | null
+  if (envelope && typeof envelope === 'object' && envelope.success === true) {
+    return { data: envelope.data, meta: envelope.meta }
+  }
+  // 200 body that is either {success:false,...} or not the envelope at all —
+  // both are contract violations the UI must surface as an ERROR state, not
+  // render as zeros.
+  const errPayload = (envelope as ApiFailureLike | null)?.error
+  throw new ApiError(
+    502,
+    errPayload?.message ?? `Malformed API envelope from ${path}`,
+    errPayload?.code ?? 'g2a_bad_envelope',
+  )
+}
+
+interface ApiFailureLike {
+  error?: ApiErrorPayload
+}
+
+function unwrapMockEnvelope<T>(envelope: ApiSuccess<T>): Enveloped<T> {
+  return { data: envelope.data, meta: envelope.meta }
+}
+
 // The g2a-business-api /content/* routes proxy wp/v2 in-process and relay
 // its X-WP-Total / X-WP-TotalPages pagination headers — read those off the
 // raw Response since the plain `http()` helper only returns the JSON body.
@@ -324,6 +389,20 @@ export const api = {
       })
       csrfToken = null
       return { ok: true, result }
+    },
+  },
+
+  dashboard: {
+    // GET {API_BASE}/dashboard/overview?from=YYYY-MM-DD&to=YYYY-MM-DD
+    // (canonical envelope). Omitting the range lets the server apply its
+    // default window (last 30 days); meta is surfaced to the caller.
+    overview(range?: Range): Promise<Enveloped<DashboardOverviewData>> {
+      if (env.useMocks) return mocks().then(m => unwrapMockEnvelope(m.dashboardOverview))
+      const qs =
+        range && range.from && range.to
+          ? `?from=${encodeURIComponent(range.from)}&to=${encodeURIComponent(range.to)}`
+          : ''
+      return httpEnvelope<DashboardOverviewData>(`/dashboard/overview${qs}`)
     },
   },
 
@@ -466,6 +545,14 @@ export const api = {
   },
 
   system: {
+    // GET {API_BASE}/system/health — canonical-envelope health report
+    // (plugins, cron, sessions, audit, integrations). Replaces the legacy
+    // SystemHealthCheck[] payload this route served pre-Phase-C.
+    health(): Promise<Enveloped<SystemHealthData>> {
+      return env.useMocks
+        ? mocks().then(m => unwrapMockEnvelope(m.systemHealth))
+        : httpEnvelope<SystemHealthData>('/system/health')
+    },
     integrations(): Promise<IntegrationsStatus> {
       return env.useMocks
         ? mocks().then(m => m.integrations)
@@ -679,12 +766,6 @@ export const api = {
         body: JSON.stringify(patch),
       })
       return res.settings
-    },
-  },
-
-  health: {
-    checks(): Promise<SystemHealthCheck[]> {
-      return env.useMocks ? mocks().then(m => m.health) : http<SystemHealthCheck[]>('/system/health')
     },
   },
 

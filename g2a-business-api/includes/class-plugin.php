@@ -62,6 +62,9 @@ class Plugin {
 		// BridGistic executor subscribes to the approval hook.
 		\WordPressistic\G2ABA\BridGistic\Executor::register();
 
+		// Reconciliation CLI — no-op unless running under WP-CLI.
+		\WordPressistic\G2ABA\CLI\Reconcile_Command::register();
+
 		// Owner-facing settings + operations screens.
 		if ( is_admin() ) {
 			\WordPressistic\G2ABA\Admin\Settings_Page::register();

@@ -2,7 +2,12 @@ import { formatCurrency, formatDelta, formatNumber, formatPercent } from '@/lib/
 
 interface Props {
   label: string
-  value: number
+  /**
+   * number → formatted per `format`. string → rendered verbatim (used by the
+   * envelope pages so money flows through the single formatCents helper
+   * instead of this component's float-division currency path).
+   */
+  value: number | string
   format?: 'currency' | 'number' | 'percent'
   deltaPct?: number
   sublabel?: string
@@ -25,7 +30,8 @@ export function StatCard({
   intent = 'default',
 }: Props) {
   const display =
-    format === 'currency' ? formatCurrency(value)
+    typeof value === 'string' ? value
+    : format === 'currency' ? formatCurrency(value)
     : format === 'percent' ? formatPercent(value)
     : formatNumber(value)
 

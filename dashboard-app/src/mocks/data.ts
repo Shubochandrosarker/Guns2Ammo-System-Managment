@@ -21,9 +21,14 @@ import type {
   SeoAnalytics,
   SiteHealthSummary,
   StoreAnalytics,
-  SystemHealthCheck,
   WpContentItem,
 } from '@/types/analytics'
+import type {
+  ApiMeta,
+  ApiSuccess,
+  DashboardOverviewData,
+  SystemHealthData,
+} from '@/types/api'
 
 const day = (n: number) => {
   const d = new Date('2026-07-02T00:00:00Z')
@@ -289,20 +294,110 @@ export const modelCatalog = [
   { id: 'qwen/qwen-2.5-72b-instruct', name: 'Qwen 2.5 72B Instruct' },
 ]
 
-export const health: SystemHealthCheck[] = [
-  { id: 'h1',  label: 'g2a-business-api plugin',      group: 'plugins',   status: 'ok',    detail: 'v0.1.0 running',                          lastCheckedAt: '2026-07-02T09:20:00Z' },
-  { id: 'h2',  label: 'g2a-booking-engine plugin',    group: 'plugins',   status: 'ok',    detail: 'v1.14.6',                                 lastCheckedAt: '2026-07-02T09:20:00Z' },
-  { id: 'h3',  label: 'memberistic plugin',           group: 'plugins',   status: 'ok',    detail: 'v1.9.9.4',                                lastCheckedAt: '2026-07-02T09:20:00Z' },
-  { id: 'h4',  label: 'GA4 Data API',                 group: 'apis',      status: 'ok',    detail: 'authorized property 4128... (2ms auth)',   lastCheckedAt: '2026-07-02T09:20:00Z' },
-  { id: 'h5',  label: 'Google Search Console',        group: 'apis',      status: 'ok',    detail: 'authorized property sc-domain:guns2ammo', lastCheckedAt: '2026-07-02T09:20:00Z' },
-  { id: 'h6',  label: 'WooCommerce REST',             group: 'apis',      status: 'ok',    detail: 'read/write consumer key valid',           lastCheckedAt: '2026-07-02T09:20:00Z' },
-  { id: 'h7',  label: 'WordPress cron',               group: 'cron',      status: 'warn',  detail: 'DISABLE_WP_CRON off — recommend real cron',lastCheckedAt: '2026-07-02T09:20:00Z' },
-  { id: 'h8',  label: 'Booking webhook (Stripe)',     group: 'webhooks',  status: 'ok',    detail: 'last event 12m ago, signature valid',      lastCheckedAt: '2026-07-02T09:20:00Z' },
-  { id: 'h9',  label: 'Messageistic email queue',     group: 'messaging', status: 'ok',    detail: '0 stuck, 24 sent last hour',              lastCheckedAt: '2026-07-02T09:20:00Z' },
-  { id: 'h10', label: 'Anthropic model connection',   group: 'ai',        status: 'ok',    detail: 'latency 240ms',                            lastCheckedAt: '2026-07-02T09:20:00Z' },
-  { id: 'h11', label: 'Local Ollama endpoint',        group: 'ai',        status: 'warn',  detail: 'Not tested since 2026-06-20',              lastCheckedAt: '2026-07-02T09:20:00Z' },
-  { id: 'h12', label: 'Security: 2FA on owner accounts',group: 'security',status: 'ok',    detail: 'All 3 owner accounts enrolled',            lastCheckedAt: '2026-07-02T09:20:00Z' },
-]
+// ---------------------------------------------------------------------------
+// Phase C canonical-envelope fixtures — shapes MUST match src/types/api.ts
+// (the fixed backend contract) exactly.
+// ---------------------------------------------------------------------------
+
+const envelopeMeta = (requestId: string, source: string[]): ApiMeta => ({
+  requestId,
+  generatedAt: '2026-07-02T09:20:00Z',
+  timezone: 'America/Phoenix',
+  currency: 'USD',
+  source,
+  freshness: { status: 'fresh', lastUpdatedAt: '2026-07-02T09:19:12Z' },
+})
+
+// GET /dashboard/overview — demonstrates the honest data states on purpose:
+//   bookings/memberships → available + data
+//   woocommerce          → available but STALE (banner/pill demo)
+//   waivers              → UNAVAILABLE (plugin inactive; card must never
+//                          render its zeros as real data)
+export const dashboardOverview: ApiSuccess<DashboardOverviewData> = {
+  success: true,
+  data: {
+    revenue: {
+      bookingsCents: 1_486_200,
+      membershipsCents: 1_219_400,
+      wooCents: 2_106_800,
+      totalCents: 4_812_400,
+    },
+    bookings: { count: 587, paid: 507, unpaid: 80, revenueCents: 1_486_200 },
+    memberships: { active: 612, new: 48, expired: 27, mrrCents: 1_219_400 },
+    woocommerce: { orders: 236, revenueCents: 2_106_800 },
+    waivers: { signed: 0, pending: 0 },
+    alerts: [
+      {
+        code: 'stripe_webhook_silent',
+        severity: 'critical',
+        message: 'No Stripe webhook events received in 26 hours — booking payments may not be reconciling.',
+      },
+      {
+        code: 'membership_renewal_gap',
+        severity: 'warning',
+        message: '27 memberships expired in this period against 39 renewals — renewal reminders are paused.',
+      },
+      {
+        code: 'woo_sync_delayed',
+        severity: 'info',
+        message: 'WooCommerce order sync is running 40 minutes behind; store figures may lag slightly.',
+      },
+    ],
+    modules: {
+      bookings: {
+        available: true,
+        source: ['g2a-booking-engine'],
+        freshness: { status: 'fresh', lastUpdatedAt: '2026-07-02T09:19:12Z' },
+      },
+      memberships: {
+        available: true,
+        source: ['memberistic'],
+        freshness: { status: 'fresh', lastUpdatedAt: '2026-07-02T09:18:40Z' },
+      },
+      woocommerce: {
+        available: true,
+        source: ['woocommerce'],
+        freshness: { status: 'stale', lastUpdatedAt: '2026-07-02T08:40:00Z' },
+      },
+      waivers: {
+        available: false,
+        source: ['g2a-waivers'],
+        freshness: { status: 'unavailable', lastUpdatedAt: null },
+      },
+    },
+  },
+  meta: envelopeMeta('req_mock_overview_01', ['g2a-booking-engine', 'memberistic', 'woocommerce']),
+}
+
+// GET /system/health — canonical envelope.
+export const systemHealth: ApiSuccess<SystemHealthData> = {
+  success: true,
+  data: {
+    plugins: [
+      { slug: 'g2a-business-api',   name: 'G2A Business API',   active: true,  version: '0.1.1' },
+      { slug: 'g2a-booking-engine', name: 'G2A Booking Engine', active: true,  version: '1.14.6' },
+      { slug: 'memberistic',        name: 'Memberistic',        active: true,  version: '1.9.9.4' },
+      { slug: 'woocommerce',        name: 'WooCommerce',        active: true,  version: '9.8.2' },
+      { slug: 'formistic',          name: 'Formistic',          active: true,  version: '2.3.0' },
+      { slug: 'messageistic',       name: 'Messageistic',       active: true,  version: '1.6.1' },
+      { slug: 'g2a-waivers',        name: 'G2A Waivers',        active: false, version: '0.9.0' },
+    ],
+    cron: [
+      { hook: 'g2aba_generate_insights',        nextRunAt: '2026-07-02T10:00:00Z' },
+      { hook: 'g2aba_run_booking_reminder',     nextRunAt: '2026-07-02T09:45:00Z' },
+      { hook: 'g2aba_run_membership_renewal',   nextRunAt: '2026-07-03T07:00:00Z' },
+      { hook: 'g2aba_run_weekly_report',        nextRunAt: '2026-07-06T14:00:00Z' },
+      { hook: 'g2aba_run_waiver_reminder',      nextRunAt: null },
+    ],
+    sessions: { table: true, activeCount: 3 },
+    audit: { recentFailures24h: 1 },
+    integrations: {
+      stripe: { configured: true },
+      woo: { active: true },
+    },
+  },
+  meta: envelopeMeta('req_mock_health_01', ['wordpress-core', 'g2a-business-api']),
+}
 
 // Phase 6 mocks.
 export const emailDrafts = [

@@ -10,6 +10,43 @@ export function formatCurrency(cents: number): string {
   })
 }
 
+// Canonical money renderer for the envelope endpoints (Phase C). The wire
+// carries integer USD cents; split into dollars + remainder with integer
+// math ONLY — no floating-point division on money values.
+export function formatCents(cents: number): string {
+  const whole = Math.trunc(cents) // guard against a non-integer sneaking in
+  const sign = whole < 0 ? '-' : ''
+  const abs = Math.abs(whole)
+  const dollars = (abs - (abs % 100)) / 100 // exact: abs-(abs%100) is a multiple of 100
+  const rem = abs % 100
+  const dollarsStr = dollars.toLocaleString('en-US')
+  return rem === 0
+    ? `${sign}$${dollarsStr}`
+    : `${sign}$${dollarsStr}.${String(rem).padStart(2, '0')}`
+}
+
+// Render an ISO-8601 UTC datetime in the business timezone from meta.timezone.
+// Falls back gracefully on an unparseable date or unknown IANA zone.
+export function formatDateTimeInZone(iso: string, timeZone: string): string {
+  const date = new Date(iso)
+  if (Number.isNaN(date.getTime())) return iso
+  const opts: Intl.DateTimeFormatOptions = {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+    timeZoneName: 'short',
+  }
+  try {
+    return new Intl.DateTimeFormat('en-US', { ...opts, timeZone }).format(date)
+  } catch {
+    // Unknown/invalid timezone id — render in the viewer's local zone
+    // rather than crashing.
+    return new Intl.DateTimeFormat('en-US', opts).format(date)
+  }
+}
+
 export function formatNumber(n: number): string {
   return n.toLocaleString('en-US')
 }

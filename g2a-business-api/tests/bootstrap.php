@@ -304,5 +304,38 @@ if ( ! function_exists( 'wp_generate_password' ) ) {
 	}
 }
 
+// Stubs added for the Phase-C aggregation layer (Response_Envelope,
+// analytics providers, Dashboard_Controller). Same controllable-globals
+// pattern as the auth stubs above.
+if ( ! function_exists( 'current_user_can' ) ) {
+	// Per-test capability list for the *current* user:
+	// $GLOBALS['g2aba_test_current_user_caps'] = ['g2a_dashboard', ...].
+	function current_user_can( $cap ) {
+		return in_array( $cap, $GLOBALS['g2aba_test_current_user_caps'] ?? array(), true );
+	}
+}
+$GLOBALS['g2aba_test_current_user_caps'] = array();
+if ( ! function_exists( 'rest_authorization_required_code' ) ) {
+	function rest_authorization_required_code() {
+		return ( $GLOBALS['g2aba_test_current_user_id'] ?? 0 ) ? 403 : 401;
+	}
+}
+if ( ! function_exists( 'wp_timezone_string' ) ) {
+	function wp_timezone_string() {
+		return $GLOBALS['g2aba_test_timezone_string'] ?? 'UTC';
+	}
+}
+if ( ! function_exists( 'register_rest_route' ) ) {
+	function register_rest_route( $ns, $route, $args = array() ) {
+		$GLOBALS['g2aba_test_rest_routes'][] = array(
+			'namespace' => $ns,
+			'route'     => $route,
+			'args'      => $args,
+		);
+		return true;
+	}
+}
+$GLOBALS['g2aba_test_rest_routes'] = array();
+
 require_once dirname( __DIR__ ) . '/includes/class-autoloader.php';
 \WordPressistic\G2ABA\Autoloader::register();
