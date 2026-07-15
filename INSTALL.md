@@ -8,15 +8,15 @@ All zips are at the repo root and can be uploaded directly via **WP Admin → Pl
 
 | Artifact | Filename | Current version |
 |---|---|---|
-| Theme | `WPistic-Theme-For-G2A-Version-1.8.9.zip` *(also in `releases/`, current archive `WPistic-Theme-For-G2A-Version-1.27.13.zip`)* | **1.27.13** |
-| Booking Engine plugin | `g2a-booking-engine.zip` (current archive `g2a-booking-engine-1.9.9.11.zip`) | **1.9.9.11** (DB schema 1.5.2) |
-| Memberistic Membership Solutions plugin | `memberistic-membership-solutions.zip` (current archive `memberistic-membership-solutions-1.10.7.zip`) | **1.10.7** |
-| G2A Theme Control plugin | `g2a-theme-control.zip` | **1.0.0** |
-| Verifyistic (age verification) plugin | `verifyistic.zip` (current archive `verifyistic-1.4.4.zip`) | **1.4.4** |
-| Advanced FFL Checkout (G2A Edition) plugin | `advanced-ffl-checkout.zip` (current archive `advanced-ffl-checkout-1.9.4.zip`) | **1.9.4** (DB schema 1.4.1) |
-| Messageistic (SMS / local gateway) plugin | `messageistic.zip` (current archive `messageistic-0.5.3.zip`) | **0.5.3** |
-| G2A POS Core plugin | `g2a-pos-core.zip` (current archive `g2a-pos-core-3.1.9.zip`) | **3.1.9** (PHP 8.1+, vendors included) |
-| Formistic (contact forms, inbox, newsletter, AI auto-reply) plugin | `formistic.zip` (current archive `formistic-2.1.0.zip`) | **2.1.0** (DB schema 1.3.0) |
+| Theme | `WPistic-Theme-For-G2A-Version-1.8.9.zip` *(also in `releases/`, current archive `WPistic-Theme-For-G2A-Version-1.27.13.zip`)* | **1.27.13** ✅ |
+| G2A Booking Engine plugin | `g2a-booking-engine.zip` (current archive `g2a-booking-engine-1.9.9.14.zip`) | **1.9.9.14** ✅ (DB schema 1.5.2, security hardening) |
+| Memberistic Membership Solutions plugin | `memberistic-membership-solutions.zip` (current archive `memberistic-membership-solutions-1.18.0.zip`) | **1.18.0** ✅ (family linking, group support) |
+| G2A Theme Control plugin | `g2a-theme-control.zip` | **1.0.0** ✅ |
+| Verifyistic (age verification) plugin | `verifyistic.zip` (current archive `verifyistic-1.4.4.zip`) | **1.4.4** ✅ (COPPA compliance) |
+| Advanced FFL Checkout (G2A Edition) plugin | `advanced-ffl-checkout.zip` (current archive `advanced-ffl-checkout-1.15.1.zip`) | **1.15.1** ✅ (NICS automation, dealer portal) |
+| Messageistic (SMS / local gateway) plugin | `messageistic.zip` (current archive `messageistic-0.8.0.zip`) | **0.8.0** ✅ (provider failover, multi-location) |
+| G2A POS Core plugin | `g2a-pos-core.zip` (current archive `g2a-pos-core-3.3.0.zip`) | **3.3.0** ✅ (dual-account hardening, integrity checks, PHP 8.1+) |
+| Formistic (contact forms, inbox, newsletter, AI auto-reply) plugin | `formistic.zip` (current archive `formistic-2.1.0.zip`) | **2.1.0** ✅ (unified inbox, smart tagging, GDPR) |
 
 > **Formistic is the site's sole contact-form/inbox/newsletter solution.** The
 > older "WPistic Contact Form" plugin has been retired and removed from this
@@ -29,19 +29,19 @@ All zips are at the repo root and can be uploaded directly via **WP Admin → Pl
 >
 > `releases/` keeps only the two most-recent versions of each artifact (current + previous) for easy rollback; older archives are pruned.
 
-## Install order (fresh site)
+## Install order (fresh site) — Release 2.1.0
 
 Plugins first, theme last, so the theme activation can see the plugins.
 
-1. **G2A Theme Control** — meta-box plugin used by the theme. Upload, activate.
-2. **G2A Booking Engine** — bookings + payments + reminders. Upload, activate. Confirm DB schema v1.6.1. Visit `Booking Engine → Resources` and `Booking Types` for seed data.
-3. **Memberistic Membership Solutions** — plans, member portal, content restriction. Upload, activate. Visit `Memberistic → Settings → Pages` to wire the linked pages.
-4. **Formistic** — contact forms, form builder, inbox, newsletter, spam protection, and AI auto-reply. Upload, activate. Visit `Formistic → Addons` to enable Newsletter/Auto-Responder/AI Automation, then `Formistic → Settings → AI & Automation → Seed Guns 2 Ammo defaults` (see `docs/FORMISTIC_G2A_SETUP.md`).
-5. **Verifyistic** — age verification popup + multi-webhook delivery. Upload, activate. Then `Verifyistic → Settings` (see `docs/VERIFYISTIC_SETUP_G2A.md`). Replaces Ottertext — see `docs/OTTERTEXT_REMOVAL.md`.
-6. **Advanced FFL Checkout (G2A Edition)** — FFL dealer search at checkout, transfer lifecycle, dealer confirmation portal, customer "My FFL Transfers" tab, NICS 3-day automation, WC↔transfer status bridge, SMS via Verifyistic. Upload `advanced-ffl-checkout.zip`, activate. Watch `Advanced FFL → Dashboard` for the auto-started ZIP centroid + ATF dealer sync. Mark firearm products **FFL Transfer Required** in their general product data. Optional: define `WPISTIC_FFL_TOKEN_SECRET` in `wp-config.php` for the strongest portal token security. Optional: define `wpistic_ffl_trusted_proxies` filter for accurate IPs behind Cloudflare/LB.
-7. **Messageistic** — SMS engine (local Android gateway / Jasmin / Twilio / OtterText). Upload, activate. Pick the provider under `Messageistic → Settings`, then enable the **SMS Notifications (Messageistic)** module in `Memberistic → Integrations` to turn on membership + booking texts.
-8. **G2A POS Core** — full FFL POS (requires PHP 8.1+; composer vendors ship inside the zip). Upload, activate, then enable the **POS Bridge** module in `Memberistic → Integrations` so the counter sees live membership status.
-9. **WPistic Theme (guns2ammo)** — upload as theme, activate. The theme ships system-aware light/dark mode (header toggle) and skins the booking widget automatically.
+1. **G2A Theme Control** (v1.0.0) — meta-box plugin used by the theme. Upload, activate.
+2. **G2A Booking Engine** (v1.9.9.14) — bookings + payments + reminders. Upload, activate. Confirm DB schema v1.5.2. Visit `Booking Engine → Resources` and `Booking Types` for seed data.
+3. **Memberistic Membership Solutions** (v1.18.0) — plans, member portal, family linking, content restriction. Upload, activate. Visit `Memberistic → Settings → Pages` to wire the linked pages. See `docs/MEMBERS_AND_USERS_EXPLAINED.md` for member/user relationships.
+4. **Formistic** (v2.1.0) — contact forms, form builder, inbox, newsletter, spam protection, and AI auto-reply. Upload, activate. Visit `Formistic → Addons` to enable Newsletter/Auto-Responder/AI Automation, then `Formistic → Settings → AI & Automation → Seed Guns 2 Ammo defaults` (see `docs/FORMISTIC_G2A_SETUP.md`).
+5. **Verifyistic** (v1.4.4) — age verification popup + multi-webhook delivery, COPPA compliance. Upload, activate. Then `Verifyistic → Settings` (see `docs/VERIFYISTIC_SETUP_G2A.md`). Replaces Ottertext — see `docs/OTTERTEXT_REMOVAL.md`.
+6. **Advanced FFL Checkout (G2A Edition)** (v1.15.1) — FFL dealer search at checkout, transfer lifecycle, dealer confirmation portal, customer "My FFL Transfers" tab, NICS 3-business-day automation (holiday-aware), WC↔transfer status bridge, SMS via Messageistic. Upload `advanced-ffl-checkout.zip`, activate. Watch `Advanced FFL → Dashboard` for the auto-started ZIP centroid + ATF dealer sync. Mark firearm products **FFL Transfer Required** in their general product data. Optional: define `WPISTIC_FFL_TOKEN_SECRET` in `wp-config.php` for the strongest portal token security. Optional: define `wpistic_ffl_trusted_proxies` filter for accurate IPs behind Cloudflare/LB.
+7. **Messageistic** (v0.8.0) — SMS engine with provider failover (Twilio / local Android gateway / Jasmin). Upload, activate. Pick the provider under `Messageistic → Settings`, then enable the **SMS Notifications (Messageistic)** module in `Memberistic → Integrations` to turn on membership + booking texts.
+8. **G2A POS Core** (v3.3.0) — full FFL POS with dual-account support and integrity checking (requires PHP 8.1+; composer vendors ship inside the zip). Upload, activate, then enable the **POS Bridge** module in `Memberistic → Integrations` so the counter sees live membership status.
+9. **WPistic Theme (guns2ammo)** (v1.27.13) — upload as theme, activate. The theme ships system-aware light/dark mode (header toggle) and skins the booking widget automatically.
 
 ## Upgrade in place (existing site)
 

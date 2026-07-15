@@ -1,5 +1,7 @@
 # Guns 2 Ammo — WordPress System
 
+**Latest Release: [v2.1.0](RELEASE-2.1.0.md)** — July 15, 2026 — Production-Ready System Build
+
 The complete source for **Guns 2 Ammo**'s web presence: an indoor shooting
 range, FFL firearm store, and NRA-certified training academy in Mesa,
 Arizona. This repository holds the WordPress theme, every custom plugin, a
@@ -12,6 +14,8 @@ purpose-built for this business — a shooting range and licensed firearms
 retailer — and the code reflects that: age verification, FFL transfer
 compliance, NICS wait-time math, waiver management, and range check-in are
 first-class concerns throughout, not bolted on.
+
+> **For clients:** See `RELEASE-2.1.0.md` for complete release notes, component versions, and deployment instructions. The `releases/` folder contains all installable packages ready for production deployment.
 
 ---
 
