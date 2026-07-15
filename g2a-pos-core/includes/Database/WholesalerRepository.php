@@ -2,6 +2,7 @@
 
 namespace G2A\POS\Database;
 
+use G2A\POS\Support\Logger;
 use G2A\POS\Wholesalers\Crypto\CredentialCipher;
 
 final class WholesalerRepository extends Repository {
@@ -19,13 +20,63 @@ final class WholesalerRepository extends Repository {
 		return $row ?: null;
 	}
 
+	/**
+	 * Resolve a wholesaler by provider code alone. Only safe when exactly one
+	 * account exists for the code: with multiple accounts (e.g. a Lipsey's
+	 * firearms account and a Lipsey's accessories account) picking one
+	 * implicitly would mirror the other account's feeds into it, so this
+	 * returns null and logs a structured error instead of guessing.
+	 */
 	public function findByCode( string $code ): ?array {
+		$rows = $this->findAllByCode( $code );
+		if ( count( $rows ) > 1 ) {
+			Logger::error(
+				'Ambiguous wholesaler lookup: multiple accounts share this provider code; refusing to pick one implicitly. Resolve by row id or exact account number, and give every account a unique account number on the Wholesalers screen.',
+				array(
+					'provider_code' => $code,
+					'row_ids'       => array_map( static fn ( array $r ): int => (int) $r['id'], $rows ),
+					'accounts'      => array_map( static fn ( array $r ): string => (string) ( $r['account_number'] ?? '' ), $rows ),
+				)
+			);
+			return null;
+		}
+		return $rows[0] ?? null;
+	}
+
+	/**
+	 * All accounts registered for a provider code, oldest first.
+	 *
+	 * @return array<int,array<string,mixed>>
+	 */
+	public function findAllByCode( string $code ): array {
+		global $wpdb;
+		$t = $this->table( 'g2a_wholesalers' );
+		return $wpdb->get_results(
+			$wpdb->prepare(
+				"SELECT * FROM {$t} WHERE provider_code=%s ORDER BY id ASC",
+				$code
+			),
+			ARRAY_A
+		) ?: array();
+	}
+
+	/**
+	 * Exact (provider_code, account_number) resolution. A blank account
+	 * number never matches anything — blank must not alias onto an existing
+	 * row (that is how one account's credentials used to overwrite another's).
+	 */
+	public function findByCodeAndAccount( string $code, string $account ): ?array {
+		$account = trim( $account );
+		if ( $account === '' ) {
+			return null;
+		}
 		global $wpdb;
 		$t   = $this->table( 'g2a_wholesalers' );
 		$row = $wpdb->get_row(
 			$wpdb->prepare(
-				"SELECT * FROM {$t} WHERE provider_code=%s ORDER BY id ASC LIMIT 1",
-				$code
+				"SELECT * FROM {$t} WHERE provider_code=%s AND account_number=%s ORDER BY id ASC LIMIT 1",
+				$code,
+				$account
 			),
 			ARRAY_A
 		);
@@ -38,7 +89,7 @@ final class WholesalerRepository extends Repository {
 		$now = $this->now();
 
 		$providerCode = sanitize_key( (string) ( $data['provider_code'] ?? '' ) );
-		$account      = (string) ( $data['account_number'] ?? '' );
+		$account      = trim( (string) ( $data['account_number'] ?? '' ) );
 
 		// Prefer an explicit id when the caller is editing a known row —
 		// matching on provider_code+account_number alone means changing the
@@ -48,12 +99,16 @@ final class WholesalerRepository extends Repository {
 			$row      = $this->find( (int) $data['id'] );
 			$existing = $row ? (int) $row['id'] : null;
 		}
-		if ( ! $existing ) {
+		// Without an id, only an exact non-blank (provider_code,
+		// account_number) pair may update an existing row. A blank incoming
+		// account number used to match any row with a NULL/blank account and
+		// silently replace its encrypted credentials (the admin "new account"
+		// form sends no id) — blank now always inserts a new row instead.
+		if ( ! $existing && $account !== '' ) {
 			$existing = $wpdb->get_var(
 				$wpdb->prepare(
-					"SELECT id FROM {$t} WHERE provider_code=%s AND (account_number=%s OR (%s='' AND (account_number IS NULL OR account_number='')))",
+					"SELECT id FROM {$t} WHERE provider_code=%s AND account_number=%s",
 					$providerCode,
-					$account,
 					$account
 				)
 			);

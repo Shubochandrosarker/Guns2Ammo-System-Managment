@@ -29,11 +29,27 @@ final class SystemController {
 			$checks[ $table ] = $exists;
 		}
 
+		try {
+			$integrity_issues = \G2A\POS\Wholesalers\WholesalerIntegrityChecker::issues();
+		} catch ( \Throwable $e ) {
+			$integrity_issues = array(
+				array(
+					'type'          => 'check_failed',
+					'provider_code' => '',
+					'message'       => $e->getMessage(),
+				),
+			);
+		}
+
 		return array(
-			'ok'         => ! in_array( false, $checks, true ),
-			'db_version' => get_option( 'g2a_pos_core_db_version' ),
-			'tables'     => $checks,
-			'time'       => current_time( 'mysql' ),
+			'ok'                   => ! in_array( false, $checks, true ),
+			'db_version'           => get_option( 'g2a_pos_core_db_version' ),
+			'tables'               => $checks,
+			'wholesaler_integrity' => array(
+				'ok'     => empty( $integrity_issues ),
+				'issues' => $integrity_issues,
+			),
+			'time'                 => current_time( 'mysql' ),
 		);
 	}
 }

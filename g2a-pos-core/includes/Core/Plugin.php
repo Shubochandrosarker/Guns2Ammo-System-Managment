@@ -23,6 +23,7 @@ use G2A\POS\Support\Cron;
 use G2A\POS\Support\Logger;
 use G2A\POS\Support\SecurityHeaders;
 use G2A\POS\Support\Privacy;
+use G2A\POS\Wholesalers\WholesalerIntegrityChecker;
 use G2A\POS\Wholesalers\WholesalerRegistry;
 
 final class Plugin {
@@ -97,6 +98,7 @@ final class Plugin {
 		add_action( self::COMPLIANCE_CALENDAR_HOOK, array( self::class, 'cron_compliance_calendar' ) );
 		add_action( self::VENDOR_PRICE_CAPTURE_HOOK, array( self::class, 'cron_vendor_price_capture' ) );
 		add_action( 'admin_menu', array( Menu::class, 'register' ) );
+		add_action( 'admin_notices', array( WholesalerIntegrityChecker::class, 'render_admin_notice' ) );
 		add_action( 'admin_enqueue_scripts', array( Assets::class, 'enqueue' ) );
 		WooSync::boot();
 		WooCatalogSync::boot();
