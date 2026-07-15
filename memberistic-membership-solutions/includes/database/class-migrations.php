@@ -53,7 +53,44 @@ final class Migrations {
 			'1.3.0' => array( self::class, 'migrate_1_3_0' ),
 			'1.4.0' => array( self::class, 'migrate_1_4_0' ),
 			'1.5.0' => array( self::class, 'migrate_1_5_0' ),
+			'1.6.0' => array( self::class, 'migrate_1_6_0' ),
 		);
+	}
+
+	/**
+	 * 1.6.0 — Backfill e-signatures into the waivers archive.
+	 *
+	 * New waiver signatures now mirror into memberistic_waivers_archive at
+	 * signing time (so the booking/check-in on-file lookup sees them). This
+	 * migration copies every signature recorded BEFORE that change. Idempotent
+	 * via the per-signature import_batch key inside upsert_from_signature().
+	 */
+	public static function migrate_1_6_0() {
+		global $wpdb;
+
+		if ( ! class_exists( '\WordPressistic\Memberistic\Waivers\Waivers_Archive' ) ) {
+			return true;
+		}
+
+		$sig_table = $wpdb->prefix . 'memberistic_waiver_signatures';
+		if ( ! $wpdb->get_var( $wpdb->prepare( 'SHOW TABLES LIKE %s', $sig_table ) ) ) {
+			return true;
+		}
+
+		$offset = 0;
+		do {
+			// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+			$rows = $wpdb->get_results(
+				$wpdb->prepare( "SELECT id, user_id, signer_name, signer_email, source, signed_at FROM {$sig_table} ORDER BY id ASC LIMIT 200 OFFSET %d", $offset ),
+				ARRAY_A
+			);
+			foreach ( (array) $rows as $row ) {
+				\WordPressistic\Memberistic\Waivers\Waivers_Archive::upsert_from_signature( $row );
+			}
+			$offset += 200;
+		} while ( is_array( $rows ) && 200 === count( $rows ) );
+
+		return true;
 	}
 
 	/**
