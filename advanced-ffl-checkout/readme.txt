@@ -4,7 +4,7 @@ Tags: FFL, firearms, WooCommerce, dealer, checkout, ATF, transfer, NICS, guns2am
 Requires at least: 6.4
 Tested up to: 6.7
 Requires PHP: 8.1
-Stable tag: 1.15.0
+Stable tag: 1.15.1
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -127,6 +127,9 @@ Deactivation preserves all data. Data is only removed on plugin deletion IF you 
 Yes. The plugin is fully self-contained. The dashboard integration is optional.
 
 == Changelog ==
+
+= 1.15.1 — 2026-07-15 — Lipsey's credential encryption =
+* Security: the Lipsey's dealer email/password stored in wp_options is now encrypted at rest (AES-256-GCM keyed from AUTH_KEY). Legacy plaintext values are re-encrypted transparently on first read; the settings screen and API client behave exactly as before. Rotate the Lipsey's password if this plugin previously ran in production with the plaintext credential.
 
 = 1.15.0 — 2026-07-13 — Cross-repo unification (crossmatch) =
 * CHANGE: **The two copies of this plugin are now byte-identical.** A full file-by-file crossmatch between the guns2ammo monorepo copy (still at 1.9.4) and this repo's 1.14.0 confirmed that the v1.14.0 backport had already captured every real fix made independently in the monorepo (checkout age-verification gate, dealer-endpoint rate limit + `notes` leak fix, federal-holiday-aware NICS math, theme Customizer email/phone key fix, iOS zoom CSS fix, atomic transfer-creation/status-advance race guards) — 1.14.0 was a strict functional superset. The unified 1.15.0 tree has been written to both repos so they can no longer drift.

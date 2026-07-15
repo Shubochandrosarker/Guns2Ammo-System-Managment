@@ -4,7 +4,7 @@ Tags: booking, reservation, scheduling, appointments, shooting range, firearms, 
 Requires at least: 6.2
 Tested up to: 6.5
 Requires PHP: 8.0
-Stable tag: 1.9.9.12
+Stable tag: 1.9.9.13
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -206,6 +206,11 @@ Yes. REST API at `/wp-json/g2a-booking/v1/` covers bookings, forms, calendar, fr
 7. Migration wizard — dry-run preview before live import.
 
 == Changelog ==
+
+= 1.9.9.13 =
+* Security: the Verifyistic module no longer accepts the legacy literal "1" cookie as a verified customer — only a server-minted verification token (>=16 chars) resolved against the Verifyistic log counts. The forged/legacy cookie could previously auto-satisfy the liability waiver on public bookings.
+* Security: when "require age verification before booking" is enabled but the Verifyistic plugin is not active, staff now see a persistent red admin notice that the requirement is NOT being enforced (the gate still fails open so bookings continue, but never silently).
+* Change: the admin manual-booking "Waiver already on file" checkbox now defaults to unchecked — skipping the waiver requirement is an explicit staff action.
 
 = 1.9.9.12 =
 *Released 2026-07-13 — crossmatch release unifying the monorepo and dedicated-repo lines of this plugin into one tree.*

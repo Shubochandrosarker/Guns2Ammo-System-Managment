@@ -72,6 +72,11 @@ final class G2AB_Module_Verifyistic {
 		// Block booking creation on the REST side if "require verification" is on.
 		add_filter( 'rest_pre_dispatch', array( $this, 'maybe_block_unverified_booking' ), 10, 3 );
 
+		// The gate fails OPEN when the Verifyistic plugin is missing (so a
+		// deactivation never becomes a booking outage) — but that state must
+		// be visible to staff, not silent: unverified guests are booking.
+		add_action( 'admin_notices', array( $this, 'render_fail_open_notice' ) );
+
 		// Enrich the booking row immediately after creation.
 		add_action( 'g2ab_booking_created', array( $this, 'enrich_booking_with_verification' ), 10, 2 );
 
@@ -85,6 +90,29 @@ final class G2AB_Module_Verifyistic {
 
 	public function verifyistic_active() {
 		return class_exists( 'Verifyistic_DB' ) || class_exists( 'Verifyistic_Frontend' );
+	}
+
+	public function require_before_booking() {
+		return 1 === (int) get_option( self::OPT_REQUIRE_VERIFICATION, 0 );
+	}
+
+	/**
+	 * Warn staff while "require verification before booking" is configured
+	 * but the Verifyistic plugin isn't loaded — the gate is failing open and
+	 * bookings are being accepted without any age verification.
+	 */
+	public function render_fail_open_notice() {
+		if ( ! current_user_can( 'manage_g2ab_bookings' ) && ! current_user_can( 'manage_options' ) ) {
+			return;
+		}
+		if ( ! $this->is_enabled() || ! $this->require_before_booking() || $this->verifyistic_active() ) {
+			return;
+		}
+		printf(
+			'<div class="notice notice-error"><p><strong>%1$s</strong> %2$s</p></div>',
+			esc_html__( 'G2A Booking Engine:', 'g2a-booking' ),
+			esc_html__( '"Require age verification before booking" is enabled, but the Verifyistic plugin is not active — the requirement is currently NOT being enforced and guests can book unverified. Reactivate Verifyistic or turn the requirement off.', 'g2a-booking' )
+		);
 	}
 
 	/**
@@ -102,20 +130,12 @@ final class G2AB_Module_Verifyistic {
 		if ( ! $this->verifyistic_active() ) return null;
 
 		$cookie_token = isset( $_COOKIE[ self::COOKIE_NAME ] ) ? sanitize_text_field( wp_unslash( $_COOKIE[ self::COOKIE_NAME ] ) ) : '';
-		if ( '' === $cookie_token || '1' === $cookie_token ) {
-			// Cookie present but plugin stored "1" instead of token — accept as "verified" but no name/dob lookup.
-			if ( '1' === $cookie_token ) {
-				return (object) array(
-					'verify_token'  => '1',
-					'verify_type'   => 'cookie_only',
-					'first_name'    => '',
-					'last_name'     => '',
-					'dob'           => null,
-					'age_at_verify' => 0,
-					'status'        => 'passed',
-					'verified_at'   => current_time( 'mysql' ),
-				);
-			}
+		// SECURITY: only a server-minted token (>=16 chars, [A-Za-z0-9_-])
+		// counts. The legacy literal "1" cookie used to be accepted here as
+		// "verified" with no DB evidence — anyone could forge it and it
+		// auto-satisfied the liability waiver. The Verifyistic plugin itself
+		// stopped issuing/accepting "1" long ago; this module now matches.
+		if ( strlen( $cookie_token ) < 16 || ! preg_match( '/^[A-Za-z0-9_-]+$/', $cookie_token ) ) {
 			return null;
 		}
 

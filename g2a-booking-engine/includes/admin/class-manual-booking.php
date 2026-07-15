@@ -210,7 +210,7 @@ final class G2AB_Admin_Manual_Booking {
 							<th><?php esc_html_e( 'Options', 'g2a-booking' ); ?></th>
 							<td>
 								<label><input type="checkbox" name="send_email" /> <?php esc_html_e( 'Email customer a confirmation', 'g2a-booking' ); ?></label><br />
-								<label><input type="checkbox" name="skip_waiver" checked /> <?php esc_html_e( 'Waiver already on file (skip waiver requirement)', 'g2a-booking' ); ?></label>
+								<label><input type="checkbox" name="skip_waiver" /> <?php esc_html_e( 'Waiver already on file (skip waiver requirement)', 'g2a-booking' ); ?></label>
 							</td>
 						</tr>
 					</table>

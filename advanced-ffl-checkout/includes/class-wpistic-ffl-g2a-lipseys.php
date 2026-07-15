@@ -55,10 +55,70 @@ class G2A_Lipseys {
 	// ── Settings ──────────────────────────────────────────────────────────
 
 	public static function settings(): array {
-		return wp_parse_args( (array) get_option( self::OPTION_KEY, [] ), [
+		$settings = wp_parse_args( (array) get_option( self::OPTION_KEY, [] ), [
 			'email'    => '',
 			'password' => '',
 		] );
+
+		if ( '' !== $settings['password'] ) {
+			if ( 0 === strpos( $settings['password'], self::SECRET_PREFIX ) ) {
+				$settings['password'] = self::decrypt_secret( $settings['password'] );
+			} else {
+				// Legacy plaintext password at rest — re-store it encrypted
+				// once, transparently. The decrypted value keeps flowing to
+				// the API client exactly as before.
+				$stored             = $settings;
+				$stored['password'] = self::encrypt_secret( $settings['password'] );
+				if ( 0 === strpos( $stored['password'], self::SECRET_PREFIX ) ) {
+					update_option( self::OPTION_KEY, $stored );
+				}
+			}
+		}
+
+		return $settings;
+	}
+
+	/**
+	 * Marker for encrypted values stored in wp_options.
+	 */
+	const SECRET_PREFIX = 'enc:v1:';
+
+	/**
+	 * AES-256-GCM key derived from the site's AUTH_KEY (wp_salt fallback).
+	 * Not perfect secrecy — the key lives on the same host — but the
+	 * credential is no longer readable from a bare wp_options dump/export.
+	 */
+	private static function secret_key(): string {
+		$material = defined( 'AUTH_KEY' ) && '' !== AUTH_KEY ? AUTH_KEY : wp_salt( 'auth' );
+		return hash( 'sha256', 'wpistic-ffl-lipseys|' . $material, true );
+	}
+
+	private static function encrypt_secret( string $plain ): string {
+		if ( '' === $plain || ! function_exists( 'openssl_encrypt' ) ) {
+			return $plain;
+		}
+		$iv     = random_bytes( 12 );
+		$tag    = '';
+		$cipher = openssl_encrypt( $plain, 'aes-256-gcm', self::secret_key(), OPENSSL_RAW_DATA, $iv, $tag );
+		if ( false === $cipher ) {
+			return $plain;
+		}
+		return self::SECRET_PREFIX . base64_encode( $iv . $tag . $cipher );
+	}
+
+	private static function decrypt_secret( string $stored ): string {
+		if ( 0 !== strpos( $stored, self::SECRET_PREFIX ) || ! function_exists( 'openssl_decrypt' ) ) {
+			return $stored;
+		}
+		$raw = base64_decode( substr( $stored, strlen( self::SECRET_PREFIX ) ), true );
+		if ( false === $raw || strlen( $raw ) <= 28 ) {
+			return '';
+		}
+		$iv     = substr( $raw, 0, 12 );
+		$tag    = substr( $raw, 12, 16 );
+		$cipher = substr( $raw, 28 );
+		$plain  = openssl_decrypt( $cipher, 'aes-256-gcm', self::secret_key(), OPENSSL_RAW_DATA, $iv, $tag );
+		return false === $plain ? '' : $plain;
 	}
 
 	public static function is_configured(): bool {
@@ -294,7 +354,7 @@ class G2A_Lipseys {
 			$password = $current['password'];
 		}
 
-		update_option( self::OPTION_KEY, [ 'email' => $email, 'password' => $password ] );
+		update_option( self::OPTION_KEY, [ 'email' => $email, 'password' => self::encrypt_secret( $password ) ] );
 		delete_transient( self::TOKEN_TRANSIENT );
 		wp_send_json_success();
 	}

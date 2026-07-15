@@ -5,8 +5,13 @@
  * Answers the G2A Booking Engine's `g2ab_waiver_satisfied` filter: when a
  * booking type requires a waiver and the customer didn't tick the form
  * checkbox, we satisfy it automatically if they already have a signed waiver
- * on file (matched by email, then name) — so returning customers never
- * re-sign at booking time.
+ * on file — so returning customers never re-sign at booking time.
+ *
+ * SECURITY: the booking form is public and its fields are attacker-
+ * controlled, so the match here is by EMAIL ONLY. The earlier name
+ * fallback meant any guest who typed a name matching any prior signer had
+ * the waiver requirement waived. Name/DOB matching remains available to
+ * the authenticated staff lookup screens via Waivers_Archive directly.
  *
  * @package Memberistic
  */
@@ -34,11 +39,10 @@ final class Waiver_Booking_Bridge {
 			return true;
 		}
 		$fields = is_array( $fields ) ? $fields : array();
-		$email  = isset( $fields['customer_email'] ) ? (string) $fields['customer_email'] : '';
-		$name   = isset( $fields['customer_name'] ) ? (string) $fields['customer_name'] : '';
-		if ( '' === $email && '' === $name ) {
-			return $ok;
+		$email  = isset( $fields['customer_email'] ) ? sanitize_email( (string) $fields['customer_email'] ) : '';
+		if ( '' === $email || ! is_email( $email ) ) {
+			return (bool) $ok;
 		}
-		return Waivers_Archive::has_on_file( $email, $name ) ? true : (bool) $ok;
+		return Waivers_Archive::has_on_file( $email ) ? true : (bool) $ok;
 	}
 }

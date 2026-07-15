@@ -3,7 +3,7 @@
  * Plugin Name: Guns2Ammo Waiver Manager
  * Plugin URI: https://wordpressistic.com/
  * Description: Guns2Ammo Waiver Manager is a custom-built WordPress plugin that automates the waiver and user management process for the Guns2Ammo site. It integrates tightly with ApproveMe WP E-Signature and Paid Memberships Pro (PMPro) to manage both membership and kiosk walk-in users, ensuring that waiver forms are signed, users are registered, and access is controlled — all hands-free.
- * Version: 1.4
+ * Version: 1.5
  * Author: Wordpressistic
  * Author URI: https://wordpressistic.com/
  */
@@ -12,7 +12,7 @@ if ( ! defined( 'ABSPATH' ) ) {
     exit;
 }
 
-define( 'G2A_WAIVER_VERSION', '1.4' );
+define( 'G2A_WAIVER_VERSION', '1.5' );
 
 // === CREATE CUSTOM "kiosk" ROLE ON PLUGIN ACTIVATION === //
 register_activation_hook(__FILE__, function () {
@@ -62,13 +62,52 @@ function pmpro_redirect_to_waiver_after_checkout($user_id) {
 }
 add_action('pmpro_after_checkout', 'pmpro_redirect_to_waiver_after_checkout');
 
-// === STORE WAIVER SIGN DATE AFTER THANK YOU PAGE === //
-// KNOWN LIMITATION (see docs/AUDIT_2026-07-02_REPO_SYNC_AND_FIXES.md):
-// stamping on thank-you page visit means any logged-in user who navigates
-// here is marked signed. The ApproveMe signing hook below is the
-// trustworthy source; once the membership document is confirmed to fire
-// that hook in production, this URL fallback should be removed.
+// === STORE WAIVER SIGN DATE FROM APPROVEME SIGNING EVENTS === //
+// The signed-document event is the trustworthy source for ALL documents
+// (membership and kiosk). Stamps the WP user matching the signer's email.
+add_action('esig_document_signed', 'guns2ammo_stamp_waiver_from_esig', 10, 1);
+add_action('esig_signature_saved', 'guns2ammo_stamp_waiver_from_esig', 10, 1);
+function guns2ammo_stamp_waiver_from_esig($args) {
+    $email = '';
+    if (is_array($args)) {
+        foreach (['user_email', 'recipient_email', 'signer_email', 'email'] as $key) {
+            if (!empty($args[$key]) && is_email($args[$key])) {
+                $email = $args[$key];
+                break;
+            }
+        }
+        // Some ApproveMe events pass an invitation/signature object instead.
+        if ('' === $email && !empty($args['invitation']) && is_array($args['invitation']) && !empty($args['invitation']['user_email'])) {
+            $email = $args['invitation']['user_email'];
+        }
+    } elseif (is_object($args) && !empty($args->user_email)) {
+        $email = $args->user_email;
+    }
+
+    if ('' === $email || !is_email($email)) {
+        // No email in the event payload; fall back to the logged-in signer.
+        if (is_user_logged_in()) {
+            update_user_meta(get_current_user_id(), 'waiver_signed_date', time());
+        }
+        return;
+    }
+
+    $user_id = email_exists(sanitize_email($email));
+    if ($user_id) {
+        update_user_meta((int) $user_id, 'waiver_signed_date', time());
+    }
+}
+
+// === LEGACY THANK-YOU-PAGE STAMP — DISABLED BY DEFAULT (SECURITY) === //
+// Stamping on a thank-you page VISIT marked any logged-in user who opened
+// the URL as signed, with no evidence a document was ever signed. It is now
+// an explicit opt-in fallback: enable only temporarily (option
+// g2a_waiver_url_stamp_fallback = 1) if the signing events above turn out
+// not to fire for the membership document on production, and investigate.
 add_action('template_redirect', function () {
+    if ( ! apply_filters( 'g2a_waiver_url_stamp_fallback', (bool) get_option( 'g2a_waiver_url_stamp_fallback', false ) ) ) {
+        return;
+    }
     if (!is_user_logged_in()) return;
 
     $user = wp_get_current_user();
@@ -82,6 +121,7 @@ add_action('template_redirect', function () {
     foreach ($valid_pages as $slug) {
         if (strpos($uri, $slug) !== false) {
             update_user_meta($user->ID, 'waiver_signed_date', time());
+            error_log('Guns2Ammo Waiver Manager: waiver stamped via legacy URL fallback for user #' . $user->ID . ' — the fallback should be disabled once ApproveMe signing events are confirmed.');
             break;
         }
     }
