@@ -92,6 +92,17 @@ final class Members_Page {
 		);
 
 		if ( isset( $status_map[ $action ] ) ) {
+			// Stripe first, local status second — a cancel only lands
+			// locally once remote billing is confirmed stopped. On failure
+			// the membership keeps its status; a retry is queued and will
+			// finish the cancel automatically when Stripe confirms.
+			if ( 'cancel' === $action ) {
+				$remote = \WordPressistic\Memberistic\Payments\Stripe_Service::cancel_remote_first( $membership_id );
+				if ( is_wp_error( $remote ) ) {
+					wp_safe_redirect( memberistic_admin_url( 'memberistic-members', array( 'id' => $membership_id, 'memberistic_notice' => 'stripe_cancel_failed', 'memberistic_notice_type' => 'error' ) ) );
+					exit;
+				}
+			}
 			Memberships_Repository::change_status( $membership_id, $status_map[ $action ] );
 			Activity_Repository::log(
 				array(

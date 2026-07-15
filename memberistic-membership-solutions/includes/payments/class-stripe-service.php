@@ -14,6 +14,7 @@ use WordPressistic\Memberistic\Database\People_Repository;
 use WordPressistic\Memberistic\Database\Plans_Repository;
 use WordPressistic\Memberistic\Emails\Email_Service;
 use function WordPressistic\Memberistic\memberistic_admin_url;
+use function WordPressistic\Memberistic\memberistic_current_user_can;
 use function WordPressistic\Memberistic\memberistic_get_page_url;
 use function WordPressistic\Memberistic\memberistic_get_setting;
 
@@ -37,6 +38,34 @@ final class Stripe_Service {
 	 * @var bool
 	 */
 	private static $processing_inbound_event = false;
+
+	/**
+	 * Cron hook for retrying failed remote cancellations.
+	 */
+	const CANCEL_RETRY_HOOK = 'memberistic_stripe_cancel_retry';
+
+	/**
+	 * Option holding memberships whose Stripe cancel failed and is being
+	 * retried — keeps the failure visible in wp-admin until resolved.
+	 */
+	const CANCEL_FAILURES_OPTION = 'memberistic_stripe_cancel_failures';
+
+	/**
+	 * Retry delays (seconds) per attempt. After the last one is exhausted the
+	 * failure stays on the admin notice until staff resolve it in Stripe.
+	 *
+	 * @var int[]
+	 */
+	const CANCEL_RETRY_DELAYS = array( 300, 1800, 7200, 21600, 86400, 172800 );
+
+	/**
+	 * Membership ids whose remote cancel was already attempted by
+	 * cancel_remote_first() during this request, so the status-change hook
+	 * listener doesn't call Stripe a second time for the same cancel.
+	 *
+	 * @var array<int,bool>
+	 */
+	private static $cancel_preflight_done = array();
 
 	public static function is_enabled() {
 		return 'yes' === memberistic_get_setting( 'stripe_enabled', 'no' ) && '' !== self::get_secret_key();
@@ -210,15 +239,79 @@ final class Stripe_Service {
 	 * @param string $status        New status.
 	 */
 	public static function maybe_cancel_remote_subscription( $membership_id, $status ) {
+		$membership_id = (int) $membership_id;
+
 		if ( 'cancelled' !== $status || self::$processing_inbound_event || ! self::is_enabled() ) {
 			return;
 		}
 
-		$membership = Memberships_Repository::get( (int) $membership_id );
+		// cancel_remote_first() already attempted (and logged) this cancel
+		// during the current request — success or failure, don't do it twice.
+		if ( isset( self::$cancel_preflight_done[ $membership_id ] ) ) {
+			return;
+		}
+
+		$membership = Memberships_Repository::get( $membership_id );
 		if ( ! is_array( $membership ) || empty( $membership['stripe_subscription_id'] ) ) {
 			return;
 		}
 
+		$result = self::attempt_remote_cancel( $membership_id, $membership );
+
+		if ( is_wp_error( $result ) ) {
+			self::record_cancel_failure( $membership_id, (string) $membership['stripe_subscription_id'], $result, 0 );
+		}
+	}
+
+	/**
+	 * Stop remote billing for a membership BEFORE the local record is
+	 * cancelled ("Stripe first, local status second").
+	 *
+	 * Returns true when it is safe to flip the local status: the Stripe
+	 * subscription was cancelled now, was already gone, the membership has
+	 * no subscription, or Stripe is disabled. Returns WP_Error when Stripe
+	 * failed — a retry is already queued, and the caller should NOT mark
+	 * the membership cancelled unless the operator explicitly forces a
+	 * local-only cancel.
+	 *
+	 * @param int $membership_id Membership id.
+	 * @return true|\WP_Error
+	 */
+	public static function cancel_remote_first( $membership_id ) {
+		$membership_id = (int) $membership_id;
+
+		self::$cancel_preflight_done[ $membership_id ] = true;
+
+		if ( ! self::is_enabled() ) {
+			return true;
+		}
+
+		$membership = Memberships_Repository::get( $membership_id );
+		if ( ! is_array( $membership ) || empty( $membership['stripe_subscription_id'] ) ) {
+			return true;
+		}
+
+		$result = self::attempt_remote_cancel( $membership_id, $membership );
+
+		if ( is_wp_error( $result ) ) {
+			self::record_cancel_failure( $membership_id, (string) $membership['stripe_subscription_id'], $result, 0 );
+			return $result;
+		}
+
+		return true;
+	}
+
+	/**
+	 * Perform one idempotent remote cancel attempt and log the outcome.
+	 *
+	 * "Already cancelled / no such subscription" answers from Stripe count
+	 * as success — remote billing is confirmed stopped either way.
+	 *
+	 * @param int                 $membership_id Membership id.
+	 * @param array<string,mixed> $membership    Membership row.
+	 * @return true|\WP_Error
+	 */
+	private static function attempt_remote_cancel( $membership_id, array $membership ) {
 		$subscription_id = (string) $membership['stripe_subscription_id'];
 
 		/**
@@ -242,25 +335,12 @@ final class Stripe_Service {
 			// already cancelled at Stripe — nothing left to stop. Stripe
 			// answers "No such subscription" (resource_missing, 404) or
 			// "…has been canceled…" for those cases.
-			if ( 404 === $http_status || 'resource_missing' === $stripe_code || false !== stripos( $result->get_error_message(), 'has been canceled' ) ) {
-				return;
+			if ( 404 !== $http_status && 'resource_missing' !== $stripe_code && false === stripos( $result->get_error_message(), 'has been canceled' ) ) {
+				return $result;
 			}
-
-			// Surface the failure instead of silently leaving billing live.
-			error_log( sprintf( 'Memberistic: failed to cancel Stripe subscription %s for membership #%d: %s', $subscription_id, $membership_id, $result->get_error_message() ) ); // phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log
-			Activity_Repository::log(
-				array(
-					'membership_id' => (int) $membership_id,
-					'activity_type' => 'membership_cancelled',
-					'title'         => sprintf(
-						/* translators: %s = Stripe error message */
-						__( 'Stripe cancellation FAILED — subscription may still be billing: %s', 'memberistic' ),
-						$result->get_error_message()
-					),
-				)
-			);
-			return;
 		}
+
+		self::clear_cancel_failure( $membership_id );
 
 		Activity_Repository::log(
 			array(
@@ -268,8 +348,165 @@ final class Stripe_Service {
 				'activity_type' => 'membership_cancelled',
 				'title'         => $at_period_end
 					? __( 'Stripe subscription set to cancel at period end', 'memberistic' )
-					: __( 'Stripe subscription cancelled', 'memberistic' ),
+					: __( 'Stripe subscription cancelled — billing stopped', 'memberistic' ),
 			)
+		);
+
+		return true;
+	}
+
+	/**
+	 * Record a failed remote cancel: loud activity entry, persistent admin
+	 * notice, and a scheduled retry with backoff.
+	 *
+	 * @param int       $membership_id   Membership id.
+	 * @param string    $subscription_id Stripe subscription id.
+	 * @param \WP_Error $error           Failure.
+	 * @param int       $attempt         Attempt that just failed (0 = first try).
+	 */
+	private static function record_cancel_failure( $membership_id, $subscription_id, $error, $attempt ) {
+		$membership_id = (int) $membership_id;
+		$next_attempt  = (int) $attempt + 1;
+		$exhausted     = $next_attempt > count( self::CANCEL_RETRY_DELAYS );
+
+		error_log( sprintf( 'Memberistic: failed to cancel Stripe subscription %s for membership #%d (attempt %d): %s', $subscription_id, $membership_id, $attempt + 1, $error->get_error_message() ) ); // phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log
+
+		Activity_Repository::log(
+			array(
+				'membership_id' => $membership_id,
+				'activity_type' => 'membership_cancelled',
+				'title'         => $exhausted
+					? sprintf(
+						/* translators: %s = Stripe error message */
+						__( 'Stripe cancellation FAILED and retries are exhausted — cancel the subscription manually in the Stripe Dashboard: %s', 'memberistic' ),
+						$error->get_error_message()
+					)
+					: sprintf(
+						/* translators: %s = Stripe error message */
+						__( 'Stripe cancellation FAILED — subscription may still be billing. A retry is queued: %s', 'memberistic' ),
+						$error->get_error_message()
+					),
+			)
+		);
+
+		$failures = get_option( self::CANCEL_FAILURES_OPTION, array() );
+		$failures = is_array( $failures ) ? $failures : array();
+
+		$failures[ $membership_id ] = array(
+			'subscription_id' => $subscription_id,
+			'message'         => $error->get_error_message(),
+			'attempts'        => $attempt + 1,
+			'exhausted'       => $exhausted,
+			'last_failed_at'  => time(),
+		);
+		update_option( self::CANCEL_FAILURES_OPTION, $failures, false );
+
+		if ( ! $exhausted ) {
+			$delay = self::CANCEL_RETRY_DELAYS[ $next_attempt - 1 ];
+			if ( ! wp_next_scheduled( self::CANCEL_RETRY_HOOK, array( $membership_id, $next_attempt ) ) ) {
+				wp_schedule_single_event( time() + $delay, self::CANCEL_RETRY_HOOK, array( $membership_id, $next_attempt ) );
+			}
+		}
+	}
+
+	/**
+	 * Cron: retry a failed remote cancellation.
+	 *
+	 * On success the local membership is cancelled too if the operator's
+	 * original cancel was blocked by the failure (Stripe-first ordering).
+	 *
+	 * @param int $membership_id Membership id.
+	 * @param int $attempt       Attempt number (1-based).
+	 */
+	public static function run_cancel_retry( $membership_id, $attempt = 1 ) {
+		$membership_id = (int) $membership_id;
+
+		$failures = get_option( self::CANCEL_FAILURES_OPTION, array() );
+		if ( ! is_array( $failures ) || ! isset( $failures[ $membership_id ] ) ) {
+			return; // Resolved elsewhere (webhook, staff, later success).
+		}
+
+		if ( ! self::is_enabled() ) {
+			return;
+		}
+
+		$membership = Memberships_Repository::get( $membership_id );
+		if ( ! is_array( $membership ) || empty( $membership['stripe_subscription_id'] ) ) {
+			self::clear_cancel_failure( $membership_id );
+			return;
+		}
+
+		$result = self::attempt_remote_cancel( $membership_id, $membership );
+
+		if ( is_wp_error( $result ) ) {
+			self::record_cancel_failure( $membership_id, (string) $membership['stripe_subscription_id'], $result, (int) $attempt );
+			return;
+		}
+
+		// Remote billing is now confirmed stopped. If the membership is
+		// still not cancelled locally (the original cancel was blocked by
+		// the Stripe failure), finish the job.
+		if ( 'cancelled' !== (string) $membership['status'] ) {
+			self::$cancel_preflight_done[ $membership_id ] = true;
+			Memberships_Repository::update( $membership_id, array( 'cancelled_at' => current_time( 'mysql' ) ) );
+			Memberships_Repository::change_status( $membership_id, 'cancelled' );
+			Activity_Repository::log(
+				array(
+					'membership_id' => $membership_id,
+					'activity_type' => 'membership_cancelled',
+					'title'         => __( 'Membership cancelled after Stripe retry succeeded', 'memberistic' ),
+				)
+			);
+		}
+	}
+
+	/**
+	 * Remove a membership from the failed-cancel notice.
+	 *
+	 * @param int $membership_id Membership id.
+	 */
+	private static function clear_cancel_failure( $membership_id ) {
+		$failures = get_option( self::CANCEL_FAILURES_OPTION, array() );
+		if ( is_array( $failures ) && isset( $failures[ (int) $membership_id ] ) ) {
+			unset( $failures[ (int) $membership_id ] );
+			if ( empty( $failures ) ) {
+				delete_option( self::CANCEL_FAILURES_OPTION );
+			} else {
+				update_option( self::CANCEL_FAILURES_OPTION, $failures, false );
+			}
+		}
+	}
+
+	/**
+	 * Persistent wp-admin notice while any Stripe cancellation is failed or
+	 * retrying, so a still-billing subscription can never go unnoticed.
+	 */
+	public static function render_cancel_failure_notice() {
+		if ( ! memberistic_current_user_can( 'edit_memberistic_members' ) ) {
+			return;
+		}
+
+		$failures = get_option( self::CANCEL_FAILURES_OPTION, array() );
+		if ( ! is_array( $failures ) || empty( $failures ) ) {
+			return;
+		}
+
+		$lines = array();
+		foreach ( $failures as $membership_id => $failure ) {
+			$lines[] = sprintf(
+				/* translators: 1: membership id, 2: attempts, 3: error message */
+				esc_html__( 'Membership #%1$d (attempt %2$d): %3$s', 'memberistic' ),
+				(int) $membership_id,
+				isset( $failure['attempts'] ) ? (int) $failure['attempts'] : 1,
+				esc_html( isset( $failure['message'] ) ? (string) $failure['message'] : '' )
+			);
+		}
+
+		printf(
+			'<div class="notice notice-error"><p><strong>%1$s</strong></p><p>%2$s</p><p>%3$s</p></div>',
+			esc_html__( 'Memberistic: Stripe subscription cancellation failed — these members may still be billed.', 'memberistic' ),
+			implode( '<br>', $lines ), // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- lines escaped above.
+			esc_html__( 'Automatic retries are running. If this persists, cancel the subscription manually in the Stripe Dashboard; the notice clears when Stripe confirms.', 'memberistic' )
 		);
 	}
 

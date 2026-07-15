@@ -4,7 +4,7 @@ Tags: membership, operations, staff dashboard, stripe, woocommerce, rest api
 Requires at least: 6.0
 Requires PHP: 8.0
 Tested up to: 6.7
-Stable tag: 1.12.0
+Stable tag: 1.13.0
 License: GPLv2 or later
 
 A modern membership operations engine for service businesses. Co-developed by WordPressistic and launch partner Guns 2 Ammo (https://guns2ammo.com).
@@ -71,6 +71,10 @@ Set Settings > Advanced > "Delete data on uninstall" to Yes before removing the 
 See CHANGELOG.md for the full history.
 
 Note: the plugin's version numbering was reset after 1.46.1 back to a 1.9.9.x line. Entries below are in release order (newest first), so 1.46.1 and the earlier "legacy line" 1.10.0 release predate the 1.9.9.2–1.12.0 entries above them.
+
+= 1.13.0 =
+* Fix: guaranteed Stripe cancellation — cancelling a membership on the site now stops the Stripe subscription FIRST and only then marks the membership cancelled. If Stripe cannot be reached, the membership keeps its current status (no more "cancelled locally but still billing"), the failure is shown as a persistent wp-admin notice, and automatic retries (5 min → 48 h backoff) finish the cancellation the moment Stripe confirms. Staff can still force a local-only cancel explicitly (REST force=true).
+* New: memberistic_stripe_cancel_retry cron + persistent failed-cancel notice; every attempt, failure, and retry is logged to the membership activity feed.
 
 = 1.12.0 =
 * Change: unified the monorepo (1.10.7) and dedicated-repo (1.11.0) lines of the plugin into one tree — both the 1.10.x fixes (Stripe cancel propagation, token-bridge stylesheet) and the Advanced FFL Checkout bridge are now present everywhere. No functional changes beyond the merge.

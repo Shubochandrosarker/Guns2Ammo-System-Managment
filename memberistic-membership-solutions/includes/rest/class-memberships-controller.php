@@ -1308,11 +1308,25 @@ final class Memberships_Controller extends REST_Controller {
 			return new \WP_Error( 'memberistic_membership_not_found', __( 'Membership not found.', 'memberistic' ), array( 'status' => 404 ) );
 		}
 
-		// Stamp cancelled_at first, then flip the status through
-		// change_status() so the memberistic_membership_status_changed hook
-		// fires — that is what propagates the cancel to Stripe (and the
-		// coreSTORE bridge). A raw update() here used to skip the hook,
-		// leaving the Stripe subscription live and billing.
+		// Stripe first, local status second: remote billing must be
+		// confirmed stopped before the membership reads "cancelled". If
+		// Stripe fails, the membership stays in its current status, a retry
+		// is queued (which completes the cancel automatically on success),
+		// and the operator can pass force=true to cancel locally anyway.
+		$remote = \WordPressistic\Memberistic\Payments\Stripe_Service::cancel_remote_first( $id );
+		$force  = rest_sanitize_boolean( $request->get_param( 'force' ) );
+		if ( is_wp_error( $remote ) && ! $force ) {
+			return new \WP_Error(
+				'memberistic_stripe_cancel_failed',
+				sprintf(
+					/* translators: %s = Stripe error message */
+					__( 'The membership was NOT cancelled: Stripe could not stop the subscription (%s). A retry is queued and will finish the cancellation automatically once Stripe confirms. To cancel locally anyway (billing may continue until a retry succeeds), repeat with force=true.', 'memberistic' ),
+					$remote->get_error_message()
+				),
+				array( 'status' => 502 )
+			);
+		}
+
 		\WordPressistic\Memberistic\Database\Memberships_Repository::update( $id, array( 'cancelled_at' => current_time( 'mysql' ) ) );
 		\WordPressistic\Memberistic\Database\Memberships_Repository::change_status( $id, 'cancelled' );
 		\WordPressistic\Memberistic\Database\Activity_Repository::log( array( 'membership_id' => $id, 'activity_type' => 'membership_cancelled', 'title' => __( 'Membership cancelled', 'memberistic' ), 'created_by' => get_current_user_id() ) );

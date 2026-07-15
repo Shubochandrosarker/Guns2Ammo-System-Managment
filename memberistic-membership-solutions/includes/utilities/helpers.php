@@ -266,6 +266,7 @@ function memberistic_admin_notices() {
 		'member_saved'        => __( 'Membership saved successfully.', 'memberistic' ),
 		'member_not_found'    => __( 'The requested membership was not found.', 'memberistic' ),
 		'member_save_failed'  => __( 'Membership could not be saved.', 'memberistic' ),
+		'stripe_cancel_failed'=> __( 'The membership was NOT cancelled: Stripe could not stop the subscription, so billing would have continued. A retry is queued and the cancellation will complete automatically once Stripe confirms — see the notice on this screen for details.', 'memberistic' ),
 		'person_added'        => __( 'Linked member added successfully.', 'memberistic' ),
 		'person_limit_reached'=> __( 'This membership plan has reached its included people limit.', 'memberistic' ),
 		'payment_added'       => __( 'Payment record added successfully.', 'memberistic' ),
