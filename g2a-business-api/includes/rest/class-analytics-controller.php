@@ -11,9 +11,7 @@
 namespace WordPressistic\G2ABA\REST;
 
 use WordPressistic\G2ABA\Cache;
-use WordPressistic\G2ABA\Providers\Booking_Provider;
 use WordPressistic\G2ABA\Providers\Insightistic_Provider;
-use WordPressistic\G2ABA\Providers\Membership_Provider;
 use WordPressistic\G2ABA\Providers\Revenue_Provider;
 use WordPressistic\G2ABA\Providers\Segments_Provider;
 use WordPressistic\G2ABA\Providers\SEO_Provider;
@@ -31,11 +29,12 @@ class Analytics_Controller extends REST_Controller {
 			'to'   => array( 'type' => 'string' ),
 		);
 
+		// NOTE: /analytics/bookings and /analytics/memberships moved to
+		// Analytics_Detail_Controller in 0.4.0 (canonical envelope + detail
+		// payloads). /analytics/overview stays here untouched.
 		foreach (
 			array(
 				'overview'         => 'overview',
-				'bookings'         => 'bookings',
-				'memberships'      => 'memberships',
 				'store'            => 'store',
 				'seo'              => 'seo',
 				'insightistic'     => 'insightistic',
@@ -62,30 +61,6 @@ class Analytics_Controller extends REST_Controller {
 			60,
 			static function () use ( $range ) {
 				return ( new Revenue_Provider() )->overview( $range );
-			}
-		);
-		return $this->ok( $data );
-	}
-
-	public function bookings( \WP_REST_Request $req ) {
-		$range = Range::from_request( $req );
-		$data  = Cache::remember(
-			'bookings_' . $range->from . '_' . $range->to,
-			60,
-			static function () use ( $range ) {
-				return ( new Booking_Provider() )->analytics( $range );
-			}
-		);
-		return $this->ok( $data );
-	}
-
-	public function memberships( \WP_REST_Request $req ) {
-		$range = Range::from_request( $req );
-		$data  = Cache::remember(
-			'memberships_' . $range->from . '_' . $range->to,
-			60,
-			static function () use ( $range ) {
-				return ( new Membership_Provider() )->analytics( $range );
 			}
 		);
 		return $this->ok( $data );

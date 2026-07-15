@@ -17,6 +17,7 @@ const NAV = [
     items: [
       { to: '/booking-revenue',      label: 'Booking Revenue',       icon: '◉' },
       { to: '/membership-revenue',   label: 'Membership Revenue',    icon: '✦' },
+      { to: '/waiver-analytics',     label: 'Waiver Analytics',      icon: '✎' },
       { to: '/leads',                label: 'Leads',                 icon: '☍' },
       { to: '/waivers',              label: 'Waivers',               icon: '✍' },
       { to: '/email-management',     label: 'Email Management',      icon: '✉' },

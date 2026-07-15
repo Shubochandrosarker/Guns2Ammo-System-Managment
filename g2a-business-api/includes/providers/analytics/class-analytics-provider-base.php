@@ -123,6 +123,251 @@ abstract class Analytics_Provider_Base implements Analytics_Provider_Interface {
 		return is_array( $summary ) ? $summary : $this->unavailable_summary( $range );
 	}
 
+	// ---- Phase-D detail payloads (additive; overview summaries unchanged) ----
+
+	/**
+	 * Concrete detail aggregation for the /analytics/<module> endpoints.
+	 * Defaults to the overview summary; providers with richer detail
+	 * (byType, series, trends, ...) override this. Only called when
+	 * is_available() is true; may throw — detail() owns the catch.
+	 *
+	 * @return array<string, mixed>
+	 */
+	protected function build_detail( Range $range ): array {
+		return $this->build_summary( $range );
+	}
+
+	/**
+	 * Keys the detail payload carries beyond `available` + range; used to
+	 * build the honest unavailable skeleton for the detail endpoints.
+	 *
+	 * @return array<string, mixed>
+	 */
+	protected function empty_detail(): array {
+		return $this->empty_summary();
+	}
+
+	/**
+	 * Detail payload for the range. Same never-throws contract as summary().
+	 *
+	 * @return array<string, mixed>
+	 */
+	public function detail( Range $range ): array {
+		try {
+			if ( ! $this->is_available() ) {
+				return $this->unavailable_detail( $range );
+			}
+
+			$out              = $this->build_detail( $range );
+			$out['available'] = true;
+			$out['range']     = $range->to_array();
+
+			$this->last_freshness = array(
+				'status'        => Response_Envelope::FRESH,
+				'lastUpdatedAt' => $out['lastUpdatedAt'] ?? Response_Envelope::now_iso(),
+			);
+
+			return $out;
+		} catch ( \Throwable $e ) {
+			// Deliberately swallowed: no SQL/paths/traces may reach a response.
+			return $this->unavailable_detail( $range );
+		}
+	}
+
+	/**
+	 * detail() behind the same short transient as cached_summary(), under a
+	 * DISTINCT key (`<provider>-detail`) so detail payloads never collide
+	 * with overview summaries.
+	 *
+	 * @return array<string, mixed>
+	 */
+	public function cached_detail( Range $range ): array {
+		return $this->remember_payload(
+			$this->provider_key() . '-detail',
+			$range,
+			function () use ( $range ) {
+				return $this->detail( $range );
+			},
+			function () use ( $range ) {
+				return $this->unavailable_detail( $range );
+			}
+		);
+	}
+
+	/**
+	 * Honest degraded detail payload — stable shape, zeroed metrics.
+	 *
+	 * @return array<string, mixed>
+	 */
+	public function unavailable_detail( Range $range ): array {
+		$this->last_freshness = $this->availability_freshness( false );
+
+		return array_merge(
+			$this->empty_detail(),
+			array(
+				'available'     => false,
+				'range'         => $range->to_array(),
+				'lastUpdatedAt' => null,
+			)
+		);
+	}
+
+	/**
+	 * Per-day recognised net revenue for the range, keyed 'YYYY-MM-DD' =>
+	 * int cents (days with no revenue may be absent — callers zero-fill).
+	 * Providers that feed the dashboard revenue series override this.
+	 * Only called when is_available() is true; may throw.
+	 *
+	 * @return array<string, int>
+	 */
+	protected function build_daily_revenue( Range $range ): array {
+		return array();
+	}
+
+	/**
+	 * Daily revenue behind the never-throws availability contract.
+	 *
+	 * @return array{available:bool, days:array<string, int>}
+	 */
+	public function daily_revenue( Range $range ): array {
+		try {
+			if ( ! $this->is_available() ) {
+				return array(
+					'available' => false,
+					'days'      => array(),
+				);
+			}
+			return array(
+				'available' => true,
+				'days'      => $this->build_daily_revenue( $range ),
+			);
+		} catch ( \Throwable $e ) {
+			return array(
+				'available' => false,
+				'days'      => array(),
+			);
+		}
+	}
+
+	/**
+	 * daily_revenue() behind a transient under a DISTINCT key
+	 * (`<provider>-series`).
+	 *
+	 * @return array{available:bool, days:array<string, int>}
+	 */
+	public function cached_daily_revenue( Range $range ): array {
+		return $this->remember_payload(
+			$this->provider_key() . '-series',
+			$range,
+			function () use ( $range ) {
+				return $this->daily_revenue( $range );
+			},
+			static function () {
+				return array(
+					'available' => false,
+					'days'      => array(),
+				);
+			},
+			false
+		);
+	}
+
+	/**
+	 * Shared transient plumbing for the Phase-D payloads: same TTL/filter and
+	 * capability-tier keying as cached_summary(), parameterised by cache
+	 * identity so every payload kind gets its own key.
+	 *
+	 * @param callable():array $producer          Builds the payload on a miss.
+	 * @param callable():array $degraded          Fallback when the cache holds garbage.
+	 * @param bool             $track_freshness   Rebuild last_freshness from cache hits.
+	 * @return array<string, mixed>
+	 */
+	protected function remember_payload( string $cache_identity, Range $range, callable $producer, callable $degraded, bool $track_freshness = true ): array {
+		$ttl = (int) apply_filters( 'g2aba_analytics_cache_ttl', self::CACHE_TTL, $this->provider_key() );
+		$key = self::cache_key( $cache_identity, $range, self::capability_tier() );
+
+		$payload = Cache::remember( $key, $ttl, $producer );
+
+		if ( $track_freshness && is_array( $payload ) ) {
+			$available            = (bool) ( $payload['available'] ?? false );
+			$this->last_freshness = $available
+				? array(
+					'status'        => Response_Envelope::FRESH,
+					'lastUpdatedAt' => $payload['lastUpdatedAt'] ?? null,
+				)
+				: $this->availability_freshness( false );
+		}
+
+		return is_array( $payload ) ? $payload : $degraded();
+	}
+
+	/**
+	 * Percentage delta between periods; null when the previous value is zero
+	 * (an all-zero previous period must yield null deltas, never INF/100%).
+	 *
+	 * @internal Exposed (pure) for tests.
+	 */
+	public static function pct_delta( int $current, int $previous ): ?float {
+		if ( 0 === $previous ) {
+			return null;
+		}
+		return round( ( ( $current - $previous ) / $previous ) * 100, 2 );
+	}
+
+	/**
+	 * Canonical trends block: the previous period's raw figures + deltas.
+	 *
+	 * @internal Exposed (pure) for tests.
+	 *
+	 * @param int $current_count    Current-period count.
+	 * @param int $current_revenue  Current-period revenue cents.
+	 * @param array{count:int, revenueCents:int, netCents:int} $previous
+	 * @return array{previous:array, deltas:array{countPct:?float, revenuePct:?float}}
+	 */
+	public static function build_trends( int $current_count, int $current_revenue, array $previous ): array {
+		return array(
+			'previous' => array(
+				'count'        => (int) ( $previous['count'] ?? 0 ),
+				'revenueCents' => (int) ( $previous['revenueCents'] ?? 0 ),
+				'netCents'     => (int) ( $previous['netCents'] ?? 0 ),
+			),
+			'deltas'   => array(
+				'countPct'   => self::pct_delta( $current_count, (int) ( $previous['count'] ?? 0 ) ),
+				'revenuePct' => self::pct_delta( $current_revenue, (int) ( $previous['revenueCents'] ?? 0 ) ),
+			),
+		);
+	}
+
+	/**
+	 * Expand sparse per-day rows into a dense series covering every day of
+	 * the range (missing days filled with the zero template), oldest first.
+	 *
+	 * @internal Exposed (pure) for tests.
+	 *
+	 * @param array<string, array<string, int>> $by_date 'YYYY-MM-DD' => row.
+	 * @param array<string, int>                $zero    Template for missing days.
+	 * @return array<int, array<string, mixed>> Each row: ['date' => ...] + values.
+	 */
+	public static function fill_daily_series( Range $range, array $by_date, array $zero ): array {
+		$out    = array();
+		$cursor = strtotime( $range->from . ' 00:00:00 UTC' );
+		$end    = strtotime( $range->to . ' 00:00:00 UTC' );
+		if ( false === $cursor || false === $end ) {
+			return $out;
+		}
+		// Hard bound: never emit more than the API's max window.
+		$guard = 0;
+		while ( $cursor <= $end && $guard < 400 ) {
+			$date  = gmdate( 'Y-m-d', $cursor );
+			$row   = isset( $by_date[ $date ] ) && is_array( $by_date[ $date ] ) ? $by_date[ $date ] : $zero;
+			$out[] = array_merge( array( 'date' => $date ), $row );
+
+			$cursor = strtotime( '+1 day', $cursor );
+			$guard++;
+		}
+		return $out;
+	}
+
 	/**
 	 * Deterministic cache key. Public+static so tests can assert isolation.
 	 *

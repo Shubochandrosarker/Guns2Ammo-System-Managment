@@ -12,6 +12,7 @@ namespace WordPressistic\G2ABA;
 
 use WordPressistic\G2ABA\REST\Agents_Controller;
 use WordPressistic\G2ABA\REST\Analytics_Controller;
+use WordPressistic\G2ABA\REST\Analytics_Detail_Controller;
 use WordPressistic\G2ABA\REST\Auth_Controller;
 use WordPressistic\G2ABA\REST\Auth_Session_Controller;
 use WordPressistic\G2ABA\REST\Automations_Controller;
@@ -52,6 +53,7 @@ class Router {
 			Auth_Controller::class,
 			Auth_Session_Controller::class,
 			Analytics_Controller::class,
+			Analytics_Detail_Controller::class,
 			Dashboard_Controller::class,
 			Insights_Controller::class,
 			Gaps_Controller::class,

@@ -62,15 +62,22 @@ class Reconcile_Command {
 	 * [--to=<YYYY-MM-DD>]
 	 * : Window end (default: today, site timezone).
 	 *
+	 * [--verbose]
+	 * : Additionally print the provider's daily net-revenue series (the same
+	 *   figures the /analytics/<source> and /dashboard/overview `series`
+	 *   blocks report) plus its sum, so per-day numbers can be cross-checked
+	 *   against the endpoint.
+	 *
 	 * ## EXAMPLES
 	 *
-	 *     wp g2a-business reconcile bookings --from=2026-06-01 --to=2026-06-30
+	 *     wp g2a-business reconcile bookings --from=2026-06-01 --to=2026-06-30 --verbose
 	 *
 	 * @param array $args       Positional args.
-	 * @param array $assoc_args --from/--to.
+	 * @param array $assoc_args --from/--to/--verbose.
 	 */
 	public function __invoke( $args, $assoc_args ) {
-		$source = (string) ( $args[0] ?? '' );
+		$source  = (string) ( $args[0] ?? '' );
+		$verbose = ! empty( $assoc_args['verbose'] );
 
 		$parsed = Dashboard_Controller::parse_range(
 			(string) ( $assoc_args['from'] ?? '' ),
@@ -84,20 +91,62 @@ class Reconcile_Command {
 
 		switch ( $source ) {
 			case 'bookings':
-				$result = $this->reconcile_bookings( $range );
+				$result   = $this->reconcile_bookings( $range );
+				$provider = new Booking_Analytics_Provider();
 				break;
 			case 'memberships':
-				$result = $this->reconcile_memberships( $range );
+				$result   = $this->reconcile_memberships( $range );
+				$provider = new Membership_Analytics_Provider();
 				break;
 			case 'woo':
-				$result = $this->reconcile_woo( $range );
+				$result   = $this->reconcile_woo( $range );
+				$provider = new Woo_Analytics_Provider();
 				break;
 			default:
 				\WP_CLI::error( 'Unknown source. Use one of: bookings, memberships, woo.' );
 				return;
 		}
 
+		if ( $verbose && ! isset( $result['unavailable'] ) ) {
+			// Uncached, like the provider summary above — a stale transient
+			// must never mask a per-day drift.
+			$this->render_daily_series( $range, $provider->daily_revenue( $range ) );
+		}
+
 		$this->render( $source, $range, $result );
+	}
+
+	/**
+	 * --verbose output: one line per day with recognised net cents, then the
+	 * sum — the exact figures the endpoint `series` blocks report, so
+	 * `sum(series) == provider net` can be eyeballed (or grepped) directly.
+	 *
+	 * @param array{available:bool, days:array<string, int>} $daily
+	 */
+	private function render_daily_series( Range $range, array $daily ): void {
+		\WP_CLI::line( '' );
+		\WP_CLI::line( sprintf( 'Daily net revenue series (%s .. %s):', $range->from, $range->to ) );
+
+		if ( empty( $daily['available'] ) ) {
+			\WP_CLI::warning( 'Provider unavailable — no daily series.' );
+			return;
+		}
+
+		$days = $daily['days'];
+		$sum  = 0;
+		$rows = \WordPressistic\G2ABA\Providers\Analytics\Analytics_Provider_Base::fill_daily_series(
+			$range,
+			array_map(
+				static fn( $cents ) => array( 'revenueCents' => (int) $cents ),
+				$days
+			),
+			array( 'revenueCents' => 0 )
+		);
+		foreach ( $rows as $row ) {
+			\WP_CLI::line( sprintf( '  %s  %12d cents', $row['date'], $row['revenueCents'] ) );
+			$sum += (int) $row['revenueCents'];
+		}
+		\WP_CLI::line( sprintf( '  %-10s  %12d cents', 'SUM', $sum ) );
 	}
 
 	// ---- bookings ---------------------------------------------------------

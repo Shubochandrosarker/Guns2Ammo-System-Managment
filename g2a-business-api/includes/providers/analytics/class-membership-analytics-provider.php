@@ -33,6 +33,9 @@ class Membership_Analytics_Provider extends Analytics_Provider_Base {
 	/** Payment status recognised as revenue. */
 	public const REVENUE_PAYMENT_STATUS = 'completed';
 
+	/** Documented churn formula shipped inside the payload. */
+	public const CHURN_CALCULATION = 'cancelled_in_range/active_at_start';
+
 	public function source_slug(): string {
 		return 'memberistic-membership-solutions';
 	}
@@ -191,6 +194,287 @@ class Membership_Analytics_Provider extends Analytics_Provider_Base {
 			'planBreakdown'    => $plan_breakdown,
 			'lastUpdatedAt'    => self::iso_from_db( $last_updated ),
 		);
+	}
+
+	protected function empty_detail(): array {
+		return array_merge(
+			$this->empty_summary(),
+			array(
+				'renewalsInRange' => 0,
+				'failedRenewals'  => 0,
+				'churn'           => array(
+					'rate'          => null,
+					'activeAtStart' => null,
+					'calculation'   => self::CHURN_CALCULATION,
+				),
+				'series'          => array(),
+				'trends'          => array(
+					'previous' => array(
+						'count'        => 0,
+						'revenueCents' => 0,
+						'netCents'     => 0,
+					),
+					'deltas'   => array(
+						'countPct'   => null,
+						'revenuePct' => null,
+					),
+				),
+			)
+		);
+	}
+
+	/**
+	 * Detail payload for GET /analytics/memberships.
+	 *
+	 * RENEWAL RULE (chosen from the Memberistic schema): the
+	 * `{prefix}memberistic_activity` log is the source of truth.
+	 *  - renewalsInRange   = COUNT of activity rows with
+	 *    activity_type = 'membership_renewed' in the window. Memberistic
+	 *    writes exactly one such row when a membership's renewal_date is
+	 *    advanced and it re-activates (Memberships_Controller::renew).
+	 *  - failedRenewals    = COUNT of activity rows with
+	 *    activity_type = 'payment_past_due' in the window — the row logged
+	 *    on a past_due transition (failed auto-renewal charge).
+	 * The activity table ships in the same dbDelta schema as the memberships
+	 * table; if it is somehow absent both counters report 0 (the frontend
+	 * contract types them as plain numbers).
+	 *
+	 * churn.activeAtStart reconstructs the active count at range start from
+	 * current rows: created before the window AND (currently active/past_due,
+	 * OR cancelled/expired only after the window began).
+	 */
+	protected function build_detail( Range $range ): array {
+		global $wpdb;
+
+		$out = $this->build_summary( $range );
+
+		$memberships = $wpdb->prefix . 'memberistic_memberships';
+		$activity    = $wpdb->prefix . 'memberistic_activity';
+		$payments    = $wpdb->prefix . 'memberistic_payments';
+		$plans       = $wpdb->prefix . 'memberistic_plans';
+		$has_activity = $this->table_exists( $activity );
+		$has_payments = $this->table_exists( $payments );
+		$has_plans    = $this->table_exists( $plans );
+		list( $from, $to ) = self::range_bounds( $range );
+
+		// Renewals + failed renewals — one GROUP BY over the activity log.
+		$renewals        = 0;
+		$failed_renewals = 0;
+		if ( $has_activity ) {
+			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+			$activity_rows = $wpdb->get_results(
+				$wpdb->prepare(
+					"SELECT activity_type, COUNT(*) AS c
+					 FROM {$activity}
+					 WHERE activity_type IN ('membership_renewed', 'payment_past_due')
+					   AND created_at BETWEEN %s AND %s
+					 GROUP BY activity_type",
+					$from,
+					$to
+				),
+				ARRAY_A
+			);
+			foreach ( (array) $activity_rows as $row ) {
+				$count = (int) ( $row['c'] ?? 0 );
+				if ( 'membership_renewed' === ( $row['activity_type'] ?? '' ) ) {
+					$renewals = $count;
+				} elseif ( 'payment_past_due' === ( $row['activity_type'] ?? '' ) ) {
+					$failed_renewals = $count;
+				}
+			}
+		}
+
+		// activeAtStart — reconstruction from current lifecycle columns.
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+		$active_at_start_raw = $wpdb->get_var(
+			$wpdb->prepare(
+				"SELECT COUNT(*) FROM {$memberships}
+				 WHERE COALESCE(start_date, created_at) < %s
+				   AND (
+					 status IN ('active', 'past_due')
+					 OR (status = 'cancelled' AND COALESCE(cancelled_at, updated_at, created_at) >= %s)
+					 OR (status = 'expired' AND COALESCE(end_date, updated_at, created_at) >= %s)
+				   )",
+				$from,
+				$from,
+				$from
+			)
+		);
+		$active_at_start = null === $active_at_start_raw ? null : (int) $active_at_start_raw;
+
+		// Daily newMembers series — one GROUP BY DATE pass, zero-filled.
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+		$daily_rows = $wpdb->get_results(
+			$wpdb->prepare(
+				"SELECT DATE(created_at) AS d, COUNT(*) AS c
+				 FROM {$memberships}
+				 WHERE created_at BETWEEN %s AND %s
+				 GROUP BY DATE(created_at)",
+				$from,
+				$to
+			),
+			ARRAY_A
+		);
+		$series_map = array();
+		foreach ( (array) $daily_rows as $row ) {
+			$series_map[ (string) ( $row['d'] ?? '' ) ] = array( 'newMembers' => (int) ( $row['c'] ?? 0 ) );
+		}
+		$series = self::fill_daily_series( $range, $series_map, array( 'newMembers' => 0 ) );
+
+		// Trends — previous period of equal length, same recognition rules.
+		$previous = $range->previous();
+		list( $prev_from, $prev_to ) = self::range_bounds( $previous );
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+		$prev_new = (int) $wpdb->get_var(
+			$wpdb->prepare(
+				"SELECT COUNT(*) FROM {$memberships} WHERE created_at BETWEEN %s AND %s",
+				$prev_from,
+				$prev_to
+			)
+		);
+		$prev_revenue = 0;
+		if ( $has_payments ) {
+			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+			$prev_revenue_raw = $wpdb->get_var(
+				$wpdb->prepare(
+					"SELECT COALESCE(SUM(amount), 0) FROM {$payments}
+					 WHERE status = %s AND COALESCE(paid_at, created_at) BETWEEN %s AND %s",
+					self::REVENUE_PAYMENT_STATUS,
+					$prev_from,
+					$prev_to
+				)
+			);
+			$prev_revenue = Money::to_cents_from_string( (string) $prev_revenue_raw );
+		}
+
+		// planBreakdown enrichment: the frontend detail table renders
+		// {planId, name, active, mrrCents}. `count` in the overview rows IS
+		// the active-membership count per plan; per-plan MRR comes from one
+		// GROUP BY plan_id pass with the same CASE normalisation as mrrCents.
+		$mrr_by_plan = $this->mrr_cents_by_plan( $memberships, $plans, $has_plans );
+		$breakdown   = array();
+		foreach ( (array) $out['planBreakdown'] as $row ) {
+			$plan_id          = (int) ( $row['planId'] ?? 0 );
+			$row['active']    = (int) ( $row['count'] ?? 0 );
+			$row['mrrCents']  = (int) ( $mrr_by_plan[ $plan_id ] ?? 0 );
+			$breakdown[]      = $row;
+		}
+		$out['planBreakdown'] = $breakdown;
+
+		$out['renewalsInRange'] = $renewals;
+		$out['failedRenewals']  = $failed_renewals;
+		$out['churn']           = self::churn( (int) $out['cancelledInRange'], $active_at_start );
+		$out['series']          = $series;
+		// Memberistic has no partial-refund ledger, so net == recognised revenue.
+		$out['trends'] = self::build_trends(
+			(int) $out['newInRange'],
+			(int) $out['revenueCents'],
+			array(
+				'count'        => $prev_new,
+				'revenueCents' => $prev_revenue,
+				'netCents'     => $prev_revenue,
+			)
+		);
+
+		return $out;
+	}
+
+	/**
+	 * Churn block: cancelledInRange / activeAtStart, expressed as a PERCENT
+	 * (5.0 = 5%) because the dashboard renders it through formatPercent().
+	 * Rate is null whenever activeAtStart is null or zero — never a
+	 * fabricated 0% or division by zero.
+	 *
+	 * @internal Exposed (pure) for tests.
+	 *
+	 * @return array{rate:?float, activeAtStart:?int, calculation:string}
+	 */
+	public static function churn( int $cancelled_in_range, ?int $active_at_start ): array {
+		$rate = null;
+		if ( null !== $active_at_start && $active_at_start > 0 ) {
+			$rate = round( ( $cancelled_in_range / $active_at_start ) * 100, 2 );
+		}
+		return array(
+			'rate'          => $rate,
+			'activeAtStart' => $active_at_start,
+			'calculation'   => self::CHURN_CALCULATION,
+		);
+	}
+
+	/**
+	 * Per-plan monthly run-rate in cents over active memberships — the same
+	 * CASE normalisation as mrr_cents(), grouped by plan_id in one pass.
+	 *
+	 * @return array<int, int> plan_id => MRR cents.
+	 */
+	private function mrr_cents_by_plan( string $memberships, string $plans, bool $has_plans ): array {
+		global $wpdb;
+
+		$annual_cycles = "('annual','annually','yearly','year')";
+		if ( $has_plans ) {
+			$sql = "SELECT m.plan_id AS plan_id, COALESCE(SUM(
+					CASE WHEN LOWER(COALESCE(m.billing_cycle, '')) IN {$annual_cycles}
+						THEN COALESCE(NULLIF(m.billing_amount, 0), p.annual_price, 0) / 12
+						ELSE COALESCE(NULLIF(m.billing_amount, 0), p.monthly_price, 0)
+					END), 0) AS mrr_sum
+				FROM {$memberships} m
+				LEFT JOIN {$plans} p ON p.id = m.plan_id
+				WHERE m.status = 'active'
+				GROUP BY m.plan_id";
+		} else {
+			$sql = "SELECT plan_id, COALESCE(SUM(
+					CASE WHEN LOWER(COALESCE(billing_cycle, '')) IN {$annual_cycles}
+						THEN COALESCE(billing_amount, 0) / 12
+						ELSE COALESCE(billing_amount, 0)
+					END), 0) AS mrr_sum
+				FROM {$memberships}
+				WHERE status = 'active'
+				GROUP BY plan_id";
+		}
+
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.NotPrepared -- table names trusted, no user input.
+		$rows = $wpdb->get_results( $sql, ARRAY_A );
+
+		$out = array();
+		foreach ( (array) $rows as $row ) {
+			$out[ (int) ( $row['plan_id'] ?? 0 ) ] = Money::to_cents_from_string( (string) ( $row['mrr_sum'] ?? '0' ) );
+		}
+		return $out;
+	}
+
+	/**
+	 * Completed-payment revenue per day — one GROUP BY DATE pass.
+	 *
+	 * @return array<string, int> 'YYYY-MM-DD' => cents.
+	 */
+	protected function build_daily_revenue( Range $range ): array {
+		global $wpdb;
+
+		$payments = $wpdb->prefix . 'memberistic_payments';
+		if ( ! $this->table_exists( $payments ) ) {
+			return array();
+		}
+		list( $from, $to ) = self::range_bounds( $range );
+
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+		$rows = $wpdb->get_results(
+			$wpdb->prepare(
+				"SELECT DATE(COALESCE(paid_at, created_at)) AS d, COALESCE(SUM(amount), 0) AS amount_sum
+				 FROM {$payments}
+				 WHERE status = %s AND COALESCE(paid_at, created_at) BETWEEN %s AND %s
+				 GROUP BY DATE(COALESCE(paid_at, created_at))",
+				self::REVENUE_PAYMENT_STATUS,
+				$from,
+				$to
+			),
+			ARRAY_A
+		);
+
+		$out = array();
+		foreach ( (array) $rows as $row ) {
+			$out[ (string) ( $row['d'] ?? '' ) ] = Money::to_cents_from_string( (string) ( $row['amount_sum'] ?? '0' ) );
+		}
+		return $out;
 	}
 
 	/**

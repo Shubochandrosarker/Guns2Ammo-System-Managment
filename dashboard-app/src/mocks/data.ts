@@ -5,7 +5,6 @@ import type {
   AIInsight,
   Agent,
   Automation,
-  BookingAnalytics,
   BrainQueryResult,
   BrainStats,
   BusinessGap,
@@ -14,23 +13,28 @@ import type {
   IntegrationsStatus,
   Lead,
   LeadStats,
-  MembershipAnalytics,
   ModelConnection,
   NamespacesStatus,
   RevenueOverview,
   SeoAnalytics,
   SiteHealthSummary,
-  StoreAnalytics,
   WaiverItem,
   WaiverStats,
   WaiverTodayPage,
   WpContentItem,
 } from '@/types/analytics'
 import type {
+  AnalyticsSeriesPoint,
   ApiMeta,
   ApiSuccess,
+  BookingsAnalyticsData,
   DashboardOverviewData,
+  MembershipsAnalyticsData,
+  MembershipSeriesPoint,
+  OverviewSeriesPoint,
   SystemHealthData,
+  WaiversAnalyticsData,
+  WooAnalyticsData,
 } from '@/types/api'
 
 const day = (n: number) => {
@@ -60,76 +64,10 @@ export const revenueOverview: RevenueOverview = {
   series: trend(160_000, 55_000),
 }
 
-export const bookings: BookingAnalytics = {
-  range: revenueOverview.range,
-  bookingsByType: [
-    { type: 'Range Lane',    count: 412, revenue: 828_400 },
-    { type: 'CCW Class',     count:  74, revenue: 336_600 },
-    { type: 'Ladies Tuesday',count:  61, revenue:  92_400 },
-    { type: 'Private Event', count:  18, revenue: 178_200 },
-    { type: 'Group Training',count:  22, revenue:  50_600 },
-  ],
-  paidVsUnpaid: { paid: 507, unpaid: 80 },
-  cancellationRate: 6.2,
-  noShowRate: 3.4,
-  conversionRate: 41.7,
-  topBookingType: 'Range Lane',
-  revenueSeries: trend(49_000, 18_000),
-}
-
-export const memberships: MembershipAnalytics = {
-  range: revenueOverview.range,
-  active: 612,
-  newThisPeriod: 48,
-  expired: 27,
-  renewals: 39,
-  corporate: 11,
-  mrr: 1_219_400,
-  churnRiskCount: 34,
-  planPerformance: [
-    { plan: 'Defender',   active: 318, revenue: 445_200 },
-    { plan: 'Patriot',    active: 201, revenue: 502_500 },
-    { plan: 'Guardian',   active:  82, revenue: 246_000 },
-    { plan: 'Instructor', active:  11, revenue:  25_700 },
-  ],
-  renewalOpportunityCount: 46,
-}
-
-export const store: StoreAnalytics = {
-  range: revenueOverview.range,
-  orders: 236,
-  revenue: 2_106_800,
-  averageOrderValue: 8_925,
-  repeatCustomerPct: 34.1,
-  refundCount: 4,
-  refundAmount: 41_200,
-  topProducts: [
-    { id: 101, name: 'Federal 9mm 115gr FMJ 1000rd',      sku: 'FED-9M-1000', revenue: 218_400, units: 66 },
-    { id: 102, name: 'Glock 19 Gen5 9mm',                  sku: 'G19-G5',      revenue: 189_600, units: 12 },
-    { id: 103, name: 'Range Membership Pack — CCW',        sku: 'PACK-CCW',    revenue: 152_100, units: 21 },
-    { id: 104, name: 'AR-15 Mid-length 5.56 Complete',     sku: 'AR15-ML',     revenue: 138_800, units:  8 },
-    { id: 105, name: 'Sig Sauer P365 XL',                  sku: 'P365-XL',     revenue: 126_400, units: 11 },
-  ],
-  categoryRevenue: [
-    { category: 'Ammunition', revenue: 812_000 },
-    { category: 'Handguns',   revenue: 604_200 },
-    { category: 'Rifles',     revenue: 318_400 },
-    { category: 'Optics',     revenue: 172_600 },
-    { category: 'Accessories',revenue: 199_600 },
-  ],
-  brandRevenue: [
-    { brand: 'Federal',    revenue: 412_600 },
-    { brand: 'Glock',      revenue: 306_200 },
-    { brand: 'Sig Sauer',  revenue: 241_800 },
-    { brand: 'Smith & Wesson', revenue: 188_400 },
-    { brand: 'CZ',         revenue: 106_800 },
-  ],
-  slowMovers: [
-    { id: 220, name: 'Bulk Lead Round Nose 38SPL',        daysWithoutSale: 41 },
-    { id: 221, name: 'Cheap Import Holster Left-Hand',    daysWithoutSale: 62 },
-    { id: 222, name: '.22LR Subsonic — 500 rd',           daysWithoutSale: 38 },
-  ],
-}
+// The legacy BookingAnalytics/MembershipAnalytics/StoreAnalytics fixtures
+// were deleted in Phase D — /analytics/bookings and /analytics/memberships
+// now speak the canonical envelope (fixtures further down this file) and
+// /analytics/store was replaced by /analytics/woocommerce.
 
 export const seo: SeoAnalytics = {
   range: revenueOverview.range,
@@ -311,6 +249,24 @@ const envelopeMeta = (requestId: string, source: string[]): ApiMeta => ({
   freshness: { status: 'fresh', lastUpdatedAt: '2026-07-02T09:19:12Z' },
 })
 
+// Daily per-channel revenue for /dashboard/overview `data.series` —
+// zero-filled per the fixed contract: every day of the window is present,
+// including a genuinely revenue-free day (i === 6) so charts prove they
+// render zeros instead of skipping days.
+const overviewSeries: OverviewSeriesPoint[] = Array.from({ length: 30 }, (_, i) => {
+  const closedDay = i === 6
+  const bookingsCents = closedDay ? 0 : Math.round(49_000 + Math.sin(i / 2.9) * 16_000)
+  const membershipsCents = closedDay ? 0 : Math.round(40_600 + Math.cos(i / 4.1) * 6_500)
+  const wooCents = closedDay ? 0 : Math.round(70_200 + Math.sin(i / 3.6) * 21_000)
+  return {
+    date: day(i),
+    bookingsCents,
+    membershipsCents,
+    wooCents,
+    totalCents: bookingsCents + membershipsCents + wooCents,
+  }
+})
+
 // GET /dashboard/overview — demonstrates the honest data states on purpose:
 //   bookings/memberships → available + data
 //   woocommerce          → available but STALE (banner/pill demo)
@@ -368,8 +324,152 @@ export const dashboardOverview: ApiSuccess<DashboardOverviewData> = {
         freshness: { status: 'unavailable', lastUpdatedAt: null },
       },
     },
+    series: overviewSeries,
   },
   meta: envelopeMeta('req_mock_overview_01', ['g2a-booking-engine', 'memberistic', 'woocommerce']),
+}
+
+// ---------------------------------------------------------------------------
+// Phase D analytics fixtures — canonical envelopes matching src/types/api.ts.
+// Deliberately exercise the honest states:
+//   bookings    → FRESH, positive trend deltas
+//   memberships → STALE meta (banner demo) + a null countPct delta ("n/a")
+//   woocommerce → STALE meta + truncated:true (first-5,000-orders warning)
+//   waivers     → UNAVAILABLE meta (plugin inactive; page must not render
+//                 the zeros as real data)
+// ---------------------------------------------------------------------------
+
+// Zero-filled 30-day analytics series (count + integer cents per day); day
+// i === 6 is a genuine zero day, matching overviewSeries.
+const analyticsSeries = (baseCount: number, baseCents: number): AnalyticsSeriesPoint[] =>
+  Array.from({ length: 30 }, (_, i) => {
+    const closedDay = i === 6
+    return {
+      date: day(i),
+      count: closedDay ? 0 : Math.max(0, Math.round(baseCount + Math.sin(i / 2.8) * baseCount * 0.45)),
+      revenueCents: closedDay ? 0 : Math.max(0, Math.round(baseCents + Math.cos(i / 3.2) * baseCents * 0.4)),
+    }
+  })
+
+// GET /analytics/bookings — fresh data, both deltas present.
+export const bookingsAnalytics: ApiSuccess<BookingsAnalyticsData> = {
+  success: true,
+  data: {
+    count: 587,
+    paid: 507,
+    unpaid: 80,
+    revenueCents: 1_486_200,
+    byType: [
+      { typeId: 1, name: 'Range Lane',     count: 412, revenueCents: 828_400 },
+      { typeId: 2, name: 'CCW Class',      count:  74, revenueCents: 336_600 },
+      { typeId: 3, name: 'Ladies Tuesday', count:  61, revenueCents:  92_400 },
+      { typeId: 4, name: 'Private Event',  count:  18, revenueCents: 178_200 },
+      { typeId: 5, name: 'Group Training', count:  22, revenueCents:  50_600 },
+    ],
+    series: analyticsSeries(20, 49_540),
+    trends: {
+      previous: { count: 542, revenueCents: 1_392_800, netCents: 1_361_400 },
+      deltas: { countPct: 8.3, revenuePct: 6.7 },
+    },
+  },
+  meta: envelopeMeta('req_mock_bookings_01', ['g2a-booking-engine']),
+}
+
+const membershipSeries: MembershipSeriesPoint[] = Array.from({ length: 30 }, (_, i) => ({
+  date: day(i),
+  newMembers: i === 6 ? 0 : Math.max(0, Math.round(1.6 + Math.sin(i / 2.4) * 1.6)),
+}))
+
+// GET /analytics/memberships — STALE meta + countPct:null (no previous-
+// window baseline) so the UI's "n/a" delta path is exercised.
+export const membershipsAnalytics: ApiSuccess<MembershipsAnalyticsData> = {
+  success: true,
+  data: {
+    active: 612,
+    new: 48,
+    expired: 27,
+    mrrCents: 1_219_400,
+    planBreakdown: [
+      { planId: 11, name: 'Defender',   active: 318, mrrCents: 445_200 },
+      { planId: 12, name: 'Patriot',    active: 201, mrrCents: 502_500 },
+      { planId: 13, name: 'Guardian',   active:  82, mrrCents: 246_000 },
+      { planId: 14, name: 'Instructor', active:  11, mrrCents:  25_700 },
+    ],
+    newInRange: 48,
+    renewalsInRange: 39,
+    failedRenewals: 6,
+    churn: { rate: 4.2, calculation: 'expired ÷ active at period start (27 / 639)' },
+    series: membershipSeries,
+    trends: {
+      previous: { count: 0, revenueCents: 1_183_600, netCents: 1_151_200 },
+      deltas: { countPct: null, revenuePct: 3.0 },
+    },
+  },
+  meta: {
+    ...envelopeMeta('req_mock_memberships_01', ['memberistic']),
+    freshness: { status: 'stale', lastUpdatedAt: '2026-07-02T05:10:00Z' },
+  },
+}
+
+// GET /analytics/woocommerce — STALE meta, negative deltas, truncated:true
+// (the visible "first 5,000 orders" warning must render).
+export const wooAnalytics: ApiSuccess<WooAnalyticsData> = {
+  success: true,
+  data: {
+    orders: 236,
+    revenueCents: 2_106_800,
+    topProducts: [
+      { productId: 101, name: 'Federal 9mm 115gr FMJ 1000rd',  qty: 66, revenueCents: 218_400 },
+      { productId: 102, name: 'Glock 19 Gen5 9mm',              qty: 12, revenueCents: 189_600 },
+      { productId: 103, name: 'Range Membership Pack — CCW',    qty: 21, revenueCents: 152_100 },
+      { productId: 104, name: 'AR-15 Mid-length 5.56 Complete', qty:  8, revenueCents: 138_800 },
+      { productId: 105, name: 'Sig Sauer P365 XL',              qty: 11, revenueCents: 126_400 },
+    ],
+    byCategory: [
+      { term: 'ammunition',  name: 'Ammunition',  revenueCents: 812_000, qty: 214 },
+      { term: 'handguns',    name: 'Handguns',    revenueCents: 604_200, qty:  41 },
+      { term: 'rifles',      name: 'Rifles',      revenueCents: 318_400, qty:  12 },
+      { term: 'accessories', name: 'Accessories', revenueCents: 199_600, qty:  88 },
+      { term: 'optics',      name: 'Optics',      revenueCents: 172_600, qty:  26 },
+    ],
+    series: analyticsSeries(8, 70_226),
+    trends: {
+      previous: { count: 251, revenueCents: 2_215_400, netCents: 2_174_200 },
+      deltas: { countPct: -6.0, revenuePct: -4.9 },
+    },
+    truncated: true,
+  },
+  meta: {
+    ...envelopeMeta('req_mock_woo_01', ['woocommerce']),
+    freshness: { status: 'stale', lastUpdatedAt: '2026-07-02T08:40:00Z' },
+  },
+}
+
+// Last 12 months (oldest first), YYYY-MM, ending at the fixture "now".
+const signingMonth = (n: number) => {
+  const d = new Date(Date.UTC(2026, 6, 1)) // 2026-07
+  d.setUTCMonth(d.getUTCMonth() - (11 - n))
+  return d.toISOString().slice(0, 7)
+}
+
+// GET /analytics/waivers — UNAVAILABLE (g2a-waivers inactive, matching the
+// overview module fixture). Counts only, no PII; the page must render the
+// unavailable state, never these zeros.
+export const waiversAnalytics: ApiSuccess<WaiversAnalyticsData> = {
+  success: true,
+  data: {
+    signed: 0,
+    pending: 0,
+    expiring: { d30: 0, d60: 0, d90: 0 },
+    signings: {
+      archive: Array.from({ length: 12 }, (_, i) => ({ month: signingMonth(i), count: 0 })),
+      people:  Array.from({ length: 12 }, (_, i) => ({ month: signingMonth(i), count: 0 })),
+    },
+  },
+  meta: {
+    ...envelopeMeta('req_mock_waivers_01', ['g2a-waivers']),
+    freshness: { status: 'unavailable', lastUpdatedAt: null },
+  },
 }
 
 // GET /system/health — canonical envelope.

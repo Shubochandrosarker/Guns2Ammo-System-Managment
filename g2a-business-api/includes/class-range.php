@@ -45,6 +45,18 @@ class Range {
 		);
 	}
 
+	/**
+	 * The immediately-preceding period of equal length: ends the day before
+	 * `from`, spans the same number of days. Used for trend deltas.
+	 */
+	public function previous(): self {
+		$days    = $this->days();
+		$to_ts   = strtotime( $this->from . ' -1 day' );
+		$prev_to = $to_ts ? gmdate( 'Y-m-d', $to_ts ) : $this->from;
+		$from_ts = strtotime( $prev_to . ' -' . ( $days - 1 ) . ' days' );
+		return new self( $from_ts ? gmdate( 'Y-m-d', $from_ts ) : $prev_to, $prev_to );
+	}
+
 	public function days(): int {
 		$from = strtotime( $this->from . ' 00:00:00' );
 		$to   = strtotime( $this->to . ' 00:00:00' );

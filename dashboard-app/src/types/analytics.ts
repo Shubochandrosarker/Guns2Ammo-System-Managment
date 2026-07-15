@@ -38,43 +38,10 @@ export interface RevenueOverview {
   series: SeriesPoint[]
 }
 
-export interface BookingAnalytics {
-  range: Range
-  bookingsByType: { type: string; count: number; revenue: number }[]
-  paidVsUnpaid: { paid: number; unpaid: number }
-  cancellationRate: number
-  noShowRate: number
-  conversionRate: number
-  topBookingType: string
-  revenueSeries: SeriesPoint[]
-}
-
-export interface MembershipAnalytics {
-  range: Range
-  active: number
-  newThisPeriod: number
-  expired: number
-  renewals: number
-  corporate: number
-  mrr: number
-  churnRiskCount: number
-  planPerformance: { plan: string; active: number; revenue: number }[]
-  renewalOpportunityCount: number
-}
-
-export interface StoreAnalytics {
-  range: Range
-  orders: number
-  revenue: number
-  averageOrderValue: number
-  repeatCustomerPct: number
-  refundCount: number
-  refundAmount: number
-  topProducts: { id: number; name: string; sku: string; revenue: number; units: number }[]
-  categoryRevenue: { category: string; revenue: number }[]
-  brandRevenue: { brand: string; revenue: number }[]
-  slowMovers: { id: number; name: string; daysWithoutSale: number }[]
-}
+// NOTE (Phase D): the legacy BookingAnalytics / MembershipAnalytics /
+// StoreAnalytics shapes were deleted — /analytics/bookings and
+// /analytics/memberships now speak the canonical envelope (src/types/api.ts)
+// and /analytics/store was superseded by /analytics/woocommerce.
 
 export interface ShooterInsights {
   knownShooters: number
