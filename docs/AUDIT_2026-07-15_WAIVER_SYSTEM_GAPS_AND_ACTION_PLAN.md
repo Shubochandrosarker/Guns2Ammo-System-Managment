@@ -295,3 +295,15 @@ never re-signs while valid — at booking, self check-in, or front desk; staff
 answer "waiver on file?" from one dashboard page; text changes are versioned;
 reminders actually send; and every PDF is served only through the gated
 endpoint.
+
+---
+
+## Phase 0 status (updated 2026-07-15)
+
+| Task | Status |
+|---|---|
+| 0.1 Repo/live reconcile | **Blocked — ops.** The site's management bridge returns HTTP 202 (security layer) on plugin listing, so live versions could not be verified from here. Before the next deploy: export the live `g2a-booking-engine` + `memberistic` plugins and diff against this repo (the staff waiver console documented in `SYSTEM_WORKFLOW_v1.12.2.md` is still absent from source). |
+| 0.2 Waiver-reminder SQL bug | **Fixed.** Column-aware query (`waiver_signed = 0`, real `customer_email`/`customer_name` columns), skips people already on file, links to the real Memberistic guest sign page. |
+| 0.3 Unify waiver stores | **Fixed.** `record_signature()` now mirrors every new e-signature into `memberistic_waivers_archive` (idempotent `sig:{id}` key); DB migration 1.6.0 backfills all pre-existing signatures. The booking/check-in on-file lookup now sees Ottertext imports **and** new signings. |
+| 0.4 Self check-in matching | **Fixed.** `g2ab_waiver_satisfied` at self check-in now receives the booking's `customer_email`/`customer_name` so the bridge can match. |
+| 0.5 PDF exposure path | **Fixed.** `Waivers_Archive::pdf_url()` now always returns the capability + nonce gated streaming endpoint (never a raw media URL or otterwaiver.com link); the endpoint streams linked attachments instead of exposing their public URLs. |

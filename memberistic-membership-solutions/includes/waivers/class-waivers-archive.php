@@ -145,17 +145,109 @@ final class Waivers_Archive {
 	}
 
 	/**
-	 * The public/staff URL to view a waiver PDF for an archive row. Prefers the
-	 * locally-mirrored attachment; falls back to the external Ottertext URL.
+	 * Mirror a new e-signature (a memberistic_waiver_signatures row) into this
+	 * archive so the booking/check-in "waiver on file?" lookup sees people who
+	 * signed AFTER the Ottertext migration, not just the historical import.
+	 *
+	 * Idempotent: keyed on import_batch = "sig:{signature_id}", so re-running
+	 * (live signing + the backfill migration) never duplicates a row.
+	 *
+	 * @param array|null $sig Signature row (id, signer_name, signer_email,
+	 *                        source, signed_at, user_id).
+	 * @return int Archive row id (existing or new), 0 when unmatchable.
+	 */
+	public static function upsert_from_signature( $sig ) {
+		if ( ! is_array( $sig ) || empty( $sig['id'] ) ) {
+			return 0;
+		}
+		$email = strtolower( trim( (string) ( $sig['signer_email'] ?? '' ) ) );
+		$name  = trim( (string) ( $sig['signer_name'] ?? '' ) );
+		if ( '' === $email && '' === $name ) {
+			return 0;
+		}
+
+		global $wpdb;
+		$table = self::table();
+		$batch = 'sig:' . (int) $sig['id'];
+		// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+		$existing = $wpdb->get_var( $wpdb->prepare( "SELECT id FROM {$table} WHERE import_batch = %s LIMIT 1", $batch ) );
+		if ( $existing ) {
+			return (int) $existing;
+		}
+
+		// Same "First … Last" split convention as find_on_file().
+		$parts = preg_split( '/\s+/', $name );
+		$last  = (string) array_pop( $parts );
+		$first = implode( ' ', $parts );
+
+		$key = self::dedupe_key( $email, $first, $last, '' );
+		$id  = self::insert(
+			array(
+				'first_name'      => $first,
+				'last_name'       => $last,
+				'email'           => $email,
+				'signed_at'       => ! empty( $sig['signed_at'] ) ? (string) $sig['signed_at'] : null,
+				'source'          => 'esign' . ( ! empty( $sig['source'] ) ? ':' . sanitize_key( (string) $sig['source'] ) : '' ),
+				'matched_user_id' => ! empty( $sig['user_id'] ) ? (int) $sig['user_id'] : null,
+				'dedupe_key'      => $key,
+				'raw_json'        => (string) wp_json_encode( array( 'signature_id' => (int) $sig['id'] ) ),
+				'import_batch'    => $batch,
+			)
+		);
+		if ( $id > 0 ) {
+			self::set_current_newest( $key );
+		}
+		return $id;
+	}
+
+	/**
+	 * Recompute which row is "current" for a de-dupe key: the newest signed_at
+	 * wins (rows with no signed_at lose to any dated row).
+	 */
+	public static function set_current_newest( $dedupe_key ) {
+		global $wpdb;
+		$table = self::table();
+		// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+		$keep = $wpdb->get_var( $wpdb->prepare( "SELECT id FROM {$table} WHERE dedupe_key = %s ORDER BY ( signed_at IS NULL ), signed_at DESC, id DESC LIMIT 1", $dedupe_key ) );
+		if ( $keep ) {
+			self::set_current( $dedupe_key, (int) $keep );
+		}
+	}
+
+	/**
+	 * The staff URL to view a waiver document for an archive row.
+	 *
+	 * Always the capability + nonce gated streaming endpoint — never a raw
+	 * media-library URL (public even inside a .htaccess-denied directory on
+	 * Nginx hosts) and never the external media.otterwaiver.com link (dead
+	 * once the Ottertext account closes; a third-party PII exposure before
+	 * that). The endpoint itself resolves local mirror → attachment →
+	 * external redirect, in that order.
 	 */
 	public static function pdf_url( array $row ) {
-		if ( ! empty( $row['attachment_id'] ) ) {
-			$url = wp_get_attachment_url( (int) $row['attachment_id'] );
-			if ( $url ) {
-				return $url;
-			}
+		$id = isset( $row['id'] ) ? (int) $row['id'] : 0;
+		if ( $id <= 0 ) {
+			return '';
 		}
-		return ! empty( $row['external_url'] ) ? (string) $row['external_url'] : '';
+		if ( empty( $row['local_path'] ) && empty( $row['attachment_id'] ) && empty( $row['external_url'] ) ) {
+			return '';
+		}
+		return self::stream_url( $id );
+	}
+
+	/** Nonced, staff-only streaming URL for an archive row's document. */
+	public static function stream_url( $id ) {
+		$id = (int) $id;
+		return wp_nonce_url(
+			add_query_arg(
+				array(
+					'action' => 'memberistic_waiver_pdf',
+					'id'     => $id,
+				),
+				admin_url( 'admin-post.php' )
+			),
+			'memberistic_waiver_pdf_' . $id
+		);
 	}
 
 	/** Aggregate stats for the admin screen. */

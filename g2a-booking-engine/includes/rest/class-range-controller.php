@@ -358,9 +358,21 @@ final class G2AB_REST_Range_Controller {
 			return new WP_Error( 'g2ab_not_found', __( 'Booking not found.', 'g2a-booking' ), array( 'status' => 404 ) );
 		}
 
-		// Waiver validation — accept the on-file flag or an integration's answer.
+		// Waiver validation — accept the on-file flag or an integration's
+		// answer. Pass the booking's contact fields so integrations (e.g.
+		// Memberistic's waiver-on-file bridge, which matches by email) can
+		// actually look the customer up; an empty array made the filter a
+		// no-op and sent on-file customers to the front desk.
 		$waiver_ok = ( (int) $row->waiver_signed === 1 );
-		$waiver_ok = (bool) apply_filters( 'g2ab_waiver_satisfied', $waiver_ok, array(), $row );
+		$waiver_ok = (bool) apply_filters(
+			'g2ab_waiver_satisfied',
+			$waiver_ok,
+			array(
+				'customer_email' => (string) $row->customer_email,
+				'customer_name'  => (string) $row->customer_name,
+			),
+			$row
+		);
 
 		if ( class_exists( 'G2AB_Checkin_Service' ) ) {
 			$res = G2AB_Checkin_Service::check_in( $booking_id, array(
