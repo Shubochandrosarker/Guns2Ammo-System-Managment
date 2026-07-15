@@ -90,6 +90,171 @@ class Waiver_Summary_Provider extends Analytics_Provider_Base {
 		);
 	}
 
+	protected function empty_detail(): array {
+		return array_merge(
+			$this->empty_summary(),
+			array(
+				'expiring'        => array(
+					'd30' => 0,
+					'd60' => 0,
+					'd90' => 0,
+				),
+				'signings' => array(
+					'archive' => array(),
+					'people'  => array(),
+				),
+			)
+		);
+	}
+
+	/**
+	 * Detail payload for GET /analytics/waivers — still COUNTS ONLY, no PII.
+	 *
+	 * Adds:
+	 *  - expiring{d30,d60,d90}: cumulative windows — signed roster waivers
+	 *    whose waiver_expires_at falls within the next 30/60/90 days (d30 is
+	 *    a subset of d60 is a subset of d90).
+	 *  - signings: signings per calendar month for the last 12 months,
+	 *    reported PER SOURCE (archive = memberistic_waivers_archive.signed_at,
+	 *    people = memberistic_people.waiver_signed_at). The two stores overlap
+	 *    for imported members, so they are labelled separately instead of
+	 *    being summed into a number nobody can reconcile.
+	 */
+	protected function build_detail( Range $range ): array {
+		global $wpdb;
+
+		$out = $this->build_summary( $range );
+
+		$people  = $wpdb->prefix . 'memberistic_people';
+		$archive = $wpdb->prefix . 'memberistic_waivers_archive';
+
+		$has_people  = $this->table_exists( $people );
+		$has_archive = $this->table_exists( $archive );
+
+		$now = current_time( 'mysql' );
+
+		// Expiring buckets — one CASE aggregate over the roster.
+		$expiring = array(
+			'd30' => 0,
+			'd60' => 0,
+			'd90' => 0,
+		);
+		if ( $has_people ) {
+			$h30 = gmdate( 'Y-m-d H:i:s', strtotime( $now . ' +30 days' ) );
+			$h60 = gmdate( 'Y-m-d H:i:s', strtotime( $now . ' +60 days' ) );
+			$h90 = gmdate( 'Y-m-d H:i:s', strtotime( $now . ' +90 days' ) );
+			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+			$row = $wpdb->get_row(
+				$wpdb->prepare(
+					"SELECT
+						SUM(CASE WHEN waiver_expires_at > %s AND waiver_expires_at <= %s THEN 1 ELSE 0 END) AS d30,
+						SUM(CASE WHEN waiver_expires_at > %s AND waiver_expires_at <= %s THEN 1 ELSE 0 END) AS d60,
+						SUM(CASE WHEN waiver_expires_at > %s AND waiver_expires_at <= %s THEN 1 ELSE 0 END) AS d90
+					 FROM {$people}
+					 WHERE waiver_status = 'signed' AND waiver_expires_at IS NOT NULL",
+					$now,
+					$h30,
+					$now,
+					$h60,
+					$now,
+					$h90
+				),
+				ARRAY_A
+			);
+			if ( is_array( $row ) ) {
+				$expiring['d30'] = (int) ( $row['d30'] ?? 0 );
+				$expiring['d60'] = (int) ( $row['d60'] ?? 0 );
+				$expiring['d90'] = (int) ( $row['d90'] ?? 0 );
+			}
+		}
+
+		// Monthly signings, last 12 calendar months, one GROUP BY per store.
+		$window_start = gmdate( 'Y-m-01 00:00:00', strtotime( $now . ' -11 months' ) );
+		$months       = self::last_twelve_months( $now );
+
+		$archive_series = array();
+		if ( $has_archive ) {
+			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+			$rows           = $wpdb->get_results(
+				$wpdb->prepare(
+					"SELECT DATE_FORMAT(signed_at, '%%Y-%%m') AS m, COUNT(*) AS c
+					 FROM {$archive}
+					 WHERE signed_at IS NOT NULL AND signed_at >= %s AND signed_at <= %s
+					 GROUP BY DATE_FORMAT(signed_at, '%%Y-%%m')",
+					$window_start,
+					$now
+				),
+				ARRAY_A
+			);
+			$archive_series = self::fill_monthly_series( $months, (array) $rows );
+		}
+
+		$people_series = array();
+		if ( $has_people ) {
+			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+			$rows          = $wpdb->get_results(
+				$wpdb->prepare(
+					"SELECT DATE_FORMAT(waiver_signed_at, '%%Y-%%m') AS m, COUNT(*) AS c
+					 FROM {$people}
+					 WHERE waiver_signed_at IS NOT NULL AND waiver_signed_at >= %s AND waiver_signed_at <= %s
+					 GROUP BY DATE_FORMAT(waiver_signed_at, '%%Y-%%m')",
+					$window_start,
+					$now
+				),
+				ARRAY_A
+			);
+			$people_series = self::fill_monthly_series( $months, (array) $rows );
+		}
+
+		$out['expiring']        = $expiring;
+		$out['signings'] = array(
+			'archive' => $archive_series,
+			'people'  => $people_series,
+		);
+
+		return $out;
+	}
+
+	/**
+	 * The last 12 calendar months, oldest first, ending with $now's month.
+	 *
+	 * @internal Exposed (pure) for tests.
+	 *
+	 * @return array<int, string> 'YYYY-MM' labels.
+	 */
+	public static function last_twelve_months( string $now ): array {
+		$out    = array();
+		$anchor = strtotime( gmdate( 'Y-m-01 00:00:00', strtotime( $now ) ?: time() ) );
+		for ( $i = 11; $i >= 0; $i-- ) {
+			$out[] = gmdate( 'Y-m', strtotime( "-{$i} months", $anchor ) );
+		}
+		return $out;
+	}
+
+	/**
+	 * Expand sparse (m, c) rows into a dense 12-month series.
+	 *
+	 * @internal Exposed (pure) for tests.
+	 *
+	 * @param array<int, string>               $months 'YYYY-MM' labels, oldest first.
+	 * @param array<int, array<string, mixed>> $rows   Sparse GROUP BY month rows.
+	 * @return array<int, array{month:string, count:int}>
+	 */
+	public static function fill_monthly_series( array $months, array $rows ): array {
+		$by_month = array();
+		foreach ( $rows as $row ) {
+			$by_month[ (string) ( $row['m'] ?? '' ) ] = (int) ( $row['c'] ?? 0 );
+		}
+		$out = array();
+		foreach ( $months as $month ) {
+			$out[] = array(
+				'month' => $month,
+				'count' => $by_month[ $month ] ?? 0,
+			);
+		}
+		return $out;
+	}
+
 	protected function build_summary( Range $range ): array {
 		global $wpdb;
 

@@ -80,6 +80,16 @@ class Dashboard_Controller extends REST_Controller {
 		);
 		$revenue['totalCents'] = $revenue['bookingsCents'] + $revenue['membershipsCents'] + $revenue['wooCents'];
 
+		// Daily revenue series (0.4.0) — one GROUP-BY-date pass per provider,
+		// cached under distinct `-series` keys; unavailable providers simply
+		// contribute zeros (their module block already says so).
+		$series = self::build_series(
+			$range,
+			$bookings_provider->cached_daily_revenue( $range )['days'],
+			$memberships_provider->cached_daily_revenue( $range )['days'],
+			$woo_provider->cached_daily_revenue( $range )['days']
+		);
+
 		$stripe_cancel_failures = self::stripe_cancel_failures_count();
 
 		$modules_block = array();
@@ -106,6 +116,7 @@ class Dashboard_Controller extends REST_Controller {
 		$data = array(
 			'range'       => $range->to_array(),
 			'revenue'     => $revenue,
+			'series'      => $series,
 			'bookings'    => $bookings,
 			'memberships' => $memberships,
 			'woocommerce' => $woo,
@@ -121,6 +132,58 @@ class Dashboard_Controller extends REST_Controller {
 				Response_Envelope::combine_freshness( $freshness_set )
 			)
 		);
+	}
+
+	/**
+	 * Merge the per-provider daily revenue maps into one dense, zero-filled
+	 * series covering every day of the range. Pure given its inputs, so the
+	 * "series sums == module revenue totals" invariant is unit-testable.
+	 *
+	 * @internal Exposed for tests.
+	 *
+	 * @param array<string, int> $bookings_days    'YYYY-MM-DD' => cents.
+	 * @param array<string, int> $memberships_days 'YYYY-MM-DD' => cents.
+	 * @param array<string, int> $woo_days         'YYYY-MM-DD' => cents.
+	 * @return array<int, array{date:string, bookingsCents:int, membershipsCents:int, wooCents:int, totalCents:int}>
+	 */
+	public static function build_series( Range $range, array $bookings_days, array $memberships_days, array $woo_days ): array {
+		$by_date = array();
+		foreach (
+			array(
+				'bookingsCents'    => $bookings_days,
+				'membershipsCents' => $memberships_days,
+				'wooCents'         => $woo_days,
+			) as $key => $days
+		) {
+			foreach ( $days as $date => $cents ) {
+				$date = (string) $date;
+				if ( ! isset( $by_date[ $date ] ) ) {
+					$by_date[ $date ] = array(
+						'bookingsCents'    => 0,
+						'membershipsCents' => 0,
+						'wooCents'         => 0,
+					);
+				}
+				$by_date[ $date ][ $key ] = (int) $cents;
+			}
+		}
+
+		$series = \WordPressistic\G2ABA\Providers\Analytics\Analytics_Provider_Base::fill_daily_series(
+			$range,
+			$by_date,
+			array(
+				'bookingsCents'    => 0,
+				'membershipsCents' => 0,
+				'wooCents'         => 0,
+			)
+		);
+
+		foreach ( $series as &$row ) {
+			$row['totalCents'] = $row['bookingsCents'] + $row['membershipsCents'] + $row['wooCents'];
+		}
+		unset( $row );
+
+		return $series;
 	}
 
 	/**

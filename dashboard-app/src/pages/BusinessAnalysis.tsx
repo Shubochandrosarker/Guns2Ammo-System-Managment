@@ -5,14 +5,18 @@ import { Spinner } from '@/components/ui/Spinner'
 import { ErrorState } from '@/components/ui/ErrorState'
 import { useAsync } from '@/lib/hooks'
 import { api } from '@/lib/api'
-import { formatCurrency, formatNumber, formatPercent } from '@/lib/format'
+import { formatCents, formatCurrency, formatNumber, formatPercent } from '@/lib/format'
 import { BarChart, Bar, ResponsiveContainer, Tooltip, XAxis, YAxis, CartesianGrid, LineChart, Line } from 'recharts'
 
 export function BusinessAnalysis() {
+  // revenueOverview + seo are still legacy endpoints (migrate in a later
+  // phase); bookings/memberships/woocommerce are the Phase-D canonical
+  // envelopes — the old /analytics/bookings|memberships payload shapes and
+  // /analytics/store no longer exist on the wire.
   const revenue    = useAsync(() => api.analytics.revenueOverview(), [])
   const bookings   = useAsync(() => api.analytics.bookings(),        [])
   const memberships= useAsync(() => api.analytics.memberships(),     [])
-  const store      = useAsync(() => api.analytics.store(),           [])
+  const store      = useAsync(() => api.analytics.woocommerce(),     [])
   const seo        = useAsync(() => api.analytics.seo(),             [])
 
   if (revenue.loading) return <Spinner label="Crunching numbers…" />
@@ -40,9 +44,9 @@ export function BusinessAnalysis() {
   }
 
   const r = revenue.data
-  const b = bookings.data
-  const m = memberships.data
-  const s = store.data
+  const b = bookings.data.data
+  const m = memberships.data.data
+  const s = store.data.data
   const seoData = seo.data
 
   const channelBars = [
@@ -62,8 +66,8 @@ export function BusinessAnalysis() {
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
         <StatCard label="Total revenue"    value={r.totalRevenue}       format="currency" deltaPct={r.revenueGrowthPct} />
         <StatCard label="Avg order value"  value={r.averageOrderValue}  format="currency" sublabel="Store orders" />
-        <StatCard label="Conversion"       value={b.conversionRate}     format="percent"  sublabel="Booking flow" intent="success" />
-        <StatCard label="Repeat customers" value={s.repeatCustomerPct}  format="percent"  intent="warn" />
+        <StatCard label="Bookings"         value={formatNumber(b.count)} sublabel={`${formatNumber(b.paid)} paid · ${formatNumber(b.unpaid)} unpaid`} intent="success" />
+        <StatCard label="Store orders"     value={formatNumber(s.orders)} sublabel={s.truncated ? 'First 5,000 orders of the period' : undefined} intent="warn" />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mt-6">
@@ -84,10 +88,18 @@ export function BusinessAnalysis() {
         <Card title="Growth signals">
           <ul className="space-y-3 text-sm">
             <Signal label="Revenue growth"     value={formatPercent(r.revenueGrowthPct)} good={r.revenueGrowthPct >= 0} />
-            <Signal label="Membership churn risk" value={`${m.churnRiskCount}`}         good={m.churnRiskCount < 25} />
-            <Signal label="Renewal opportunities" value={`${m.renewalOpportunityCount}`} good />
-            <Signal label="SEO clicks"           value={formatNumber(seoData.clicks)}   good />
-            <Signal label="Booking conversion"   value={formatPercent(b.conversionRate)}good={b.conversionRate >= 40} />
+            <Signal
+              label="Membership churn"
+              value={m.churn.rate === null ? 'n/a' : formatPercent(m.churn.rate)}
+              good={m.churn.rate === null || m.churn.rate < 5}
+            />
+            <Signal label="Failed renewals"    value={formatNumber(m.failedRenewals)}  good={m.failedRenewals === 0} />
+            <Signal label="SEO clicks"         value={formatNumber(seoData.clicks)}    good />
+            <Signal
+              label="Bookings vs prev. period"
+              value={b.trends.deltas.countPct === null ? 'n/a' : formatPercent(b.trends.deltas.countPct)}
+              good={b.trends.deltas.countPct === null || b.trends.deltas.countPct >= 0}
+            />
           </ul>
         </Card>
       </div>
@@ -96,12 +108,12 @@ export function BusinessAnalysis() {
         <Card title="Category revenue (Woo)" subtitle="Top-selling product categories">
           <div className="h-56">
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={s.categoryRevenue} layout="vertical" margin={{ top: 5, right: 10, left: 30, bottom: 0 }}>
+              <BarChart data={s.byCategory} layout="vertical" margin={{ top: 5, right: 10, left: 30, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="var(--chart-grid)" />
-                <XAxis type="number" tick={{ fontSize: 11, fill: 'var(--chart-axis)' }} tickFormatter={v => `$${Math.round(v / 100)}`} />
-                <YAxis dataKey="category" type="category" tick={{ fontSize: 12, fill: 'var(--chart-axis)' }} width={100} />
-                <Tooltip formatter={(v: number) => [formatCurrency(v), 'Revenue']} />
-                <Bar dataKey="revenue" fill="var(--brand)" radius={[0, 4, 4, 0]} />
+                <XAxis type="number" tick={{ fontSize: 11, fill: 'var(--chart-axis)' }} tickFormatter={v => formatCents(v - (v % 100))} />
+                <YAxis dataKey="name" type="category" tick={{ fontSize: 12, fill: 'var(--chart-axis)' }} width={100} />
+                <Tooltip formatter={(v: number) => [formatCents(v), 'Revenue']} />
+                <Bar dataKey="revenueCents" fill="var(--brand)" radius={[0, 4, 4, 0]} />
               </BarChart>
             </ResponsiveContainer>
           </div>
@@ -110,12 +122,12 @@ export function BusinessAnalysis() {
         <Card title="Booking revenue trend" subtitle="Daily booking revenue">
           <div className="h-56">
             <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={b.revenueSeries} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+              <LineChart data={b.series} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="var(--chart-grid)" />
                 <XAxis dataKey="date" tickFormatter={d => d.slice(5)} tick={{ fontSize: 11, fill: 'var(--chart-axis)' }} />
-                <YAxis tick={{ fontSize: 11, fill: 'var(--chart-axis)' }} tickFormatter={v => `$${Math.round(v / 100)}`} width={44} />
-                <Tooltip formatter={(v: number) => [formatCurrency(v), 'Revenue']} />
-                <Line type="monotone" dataKey="value" stroke="var(--info)" strokeWidth={2.5} dot={false} />
+                <YAxis tick={{ fontSize: 11, fill: 'var(--chart-axis)' }} tickFormatter={v => formatCents(v - (v % 100))} width={54} />
+                <Tooltip formatter={(v: number) => [formatCents(v), 'Revenue']} />
+                <Line type="monotone" dataKey="revenueCents" stroke="var(--info)" strokeWidth={2.5} dot={false} />
               </LineChart>
             </ResponsiveContainer>
           </div>

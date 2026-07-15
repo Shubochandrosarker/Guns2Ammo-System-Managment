@@ -76,8 +76,10 @@ All other routes require `g2a_dashboard` (read) or `g2a_dashboard_admin`
 | POST   | `/auth/session/logout`                      | session cookie + CSRF |
 | POST   | `/auth/session/revoke-all`                  | session cookie + CSRF |
 | GET    | `/analytics/overview?from=&to=`             | read   |
-| GET    | `/analytics/bookings?from=&to=`             | read   |
-| GET    | `/analytics/memberships?from=&to=`          | read   |
+| GET    | `/analytics/bookings?from=&to=` (0.4.0 envelope) | read |
+| GET    | `/analytics/memberships?from=&to=` (0.4.0 envelope) | read |
+| GET    | `/analytics/woocommerce?from=&to=` (0.4.0)  | read   |
+| GET    | `/analytics/waivers` (0.4.0)                | read   |
 | GET    | `/analytics/store?from=&to=`                | read   |
 | GET    | `/analytics/seo?from=&to=`                  | read   |
 | GET    | `/ai/insights`                              | read   |
@@ -114,10 +116,11 @@ All other routes require `g2a_dashboard` (read) or `g2a_dashboard_admin`
 | GET    | `/content/categories?per_page=&page=&search=` | read |
 | GET    | `/content/tags?per_page=&page=&search=`     | read   |
 
-## Aggregation layer (0.3.0, canonical envelope)
+## Aggregation layer (0.3.0+, canonical envelope)
 
-`GET /dashboard/overview` and `GET /system/health` return the canonical
-Phase-C envelope:
+`GET /dashboard/overview`, `GET /system/health`, and (0.4.0) the four
+`/analytics/{bookings|memberships|woocommerce|waivers}` detail routes return
+the canonical envelope:
 
 ```json
 {
@@ -149,6 +152,12 @@ days. `data`:
 - `revenue` — `{bookingsCents, membershipsCents, wooCents, totalCents}`
   (bookings = net of refunds; memberships = completed Memberistic payments
   in range; woo = net of refunds over completed+processing orders).
+- `series` (0.4.0) — dense daily revenue series for the requested range,
+  `[{date: "YYYY-MM-DD", bookingsCents, membershipsCents, wooCents,
+  totalCents}]`, missing days zero-filled, one GROUP-BY-date pass per
+  provider (cached under distinct `-series` keys). Per-module sums equal the
+  `revenue` block, so the home revenue-trend chart can retire the legacy
+  `/analytics/overview` route (which remains registered and untouched).
 - `bookings` — contract keys `count/paid/unpaid/revenueCents` plus
   `revenue{gross,refund,net}Cents`, `byStatus`, `avgBookingValueCents`,
   `reconciliation{warnings, paidBookingsWithoutPayment, unknownStatusPayments}`.
@@ -183,6 +192,75 @@ Every provider is capability-tier cached for 120s (filter
 table existence before touching a sibling plugin's schema, and degrades to
 an explicit `available: false` payload instead of fataling.
 
+### Analytics detail endpoints (0.4.0, canonical envelope)
+
+Four per-module detail routes behind the same read gate, range validation
+(defaults last 30 days, bounded at 366), envelope, and provider plumbing as
+`/dashboard/overview`. Each payload is the module's overview block PLUS the
+detail below; every payload is cached for 120s under a distinct
+`<provider>-detail` key. A missing source is signalled the same way the
+overview signals it — `meta.freshness.status: "unavailable"` with an empty
+`meta.source` — while `data` keeps every detail key present and zeroed/null
+(no separate `data.available` boolean on these routes).
+`/analytics/bookings` and `/analytics/memberships` supersede the pre-0.4.0
+bare-payload routes at the same paths (the legacy `/analytics/overview`,
+`/analytics/store`, `/analytics/seo`, `/analytics/insightistic` routes are
+untouched).
+
+All three revenue-bearing routes share the same `trends` block:
+`{previous: {count, revenueCents, netCents}, deltas: {countPct,
+revenuePct}}`, computed against the immediately-preceding period of equal
+length with the identical status mappings; a delta is `null` whenever the
+previous value is zero (an all-zero previous period yields all-null deltas).
+All `series` are dense (missing days zero-filled) and built from single-pass
+`GROUP BY` date aggregates — never per-day queries.
+
+- **`GET /analytics/bookings?from=&to=`** — overview payload plus
+  `byType[]` (`{typeId, name, count, revenueCents}` — counts from bookings
+  created in range, revenue = net recognised payments joined to the
+  booking's type), `series[]` (`{date, count, revenueCents}`), `trends`.
+- **`GET /analytics/woocommerce?from=&to=`** — overview payload plus
+  `topProducts[]` (top 10 by net line revenue, `{productId, name, qty,
+  revenueCents}`), `byCategory[]` (top 10 `product_cat` terms, `{term,
+  name, revenueCents, qty}`), `series[]` (`{date, count, revenueCents}` —
+  count = orders that day), `trends`. Everything derives from the same
+  5000-order capped scan as the overview: when the cap trips, `truncated`
+  and `topProductsTruncated` are `true` (top products come from the capped
+  set).
+- **`GET /analytics/memberships?from=&to=`** — overview payload plus
+  `newInRange`, `renewalsInRange`, `failedRenewals`, `churn`, daily
+  `series[]` (`{date, newMembers}`), `trends` (count = new memberships;
+  Memberistic tracks no partial refunds, so `netCents` = `revenueCents`),
+  and `planBreakdown[]` rows additionally carry `active` (active
+  memberships on the plan) and `mrrCents` (per-plan monthly run-rate, same
+  annual/12 normalisation as the top-level `mrrCents`) alongside the
+  overview `count`/`revenueCents` keys.
+  **Renewal rule** (from the Memberistic schema): the
+  `memberistic_activity` log is the source of truth —
+  `renewalsInRange` counts `activity_type = 'membership_renewed'` rows in
+  range (written exactly once when a membership's `renewal_date` is
+  advanced and it re-activates); `failedRenewals` counts
+  `activity_type = 'payment_past_due'` rows (the past_due transition logged
+  on a failed auto-renewal charge). The activity table ships in the same
+  Memberistic schema as the memberships table; if it is somehow absent both
+  counters report 0.
+  `churn` = `{rate, activeAtStart, calculation:
+  "cancelled_in_range/active_at_start"}` — `rate` is the PERCENT form of
+  cancelledInRange / activeAtStart (5.0 = 5%), where `activeAtStart` is
+  reconstructed from current rows (created before the window AND currently
+  active/past_due, or cancelled/expired only after the window began);
+  `rate` is `null` when `activeAtStart` is null or zero.
+- **`GET /analytics/waivers`** — counts only, never PII. Overview payload
+  plus `expiring{d30, d60, d90}` (cumulative windows: signed roster waivers
+  expiring within 30/60/90 days) and `signings{archive: [{month:
+  "YYYY-MM", count}], people: [...]}` — signings per calendar month for the
+  last 12 months, oldest first,
+  labelled per source (`memberistic_waivers_archive.signed_at` vs
+  `memberistic_people.waiver_signed_at`; the stores overlap, so they are
+  never summed). The route is called without range params (the payload is
+  point-in-time); `from`/`to` are still accepted for envelope/cache
+  symmetry.
+
 ### `GET /system/health` (read, envelope — replaced the pre-0.3.0 checklist payload)
 
 `data`: `plugins[]` (`{slug, name, active, version}` for booking engine,
@@ -196,7 +274,7 @@ only — no credentials, secrets, or filesystem paths.
 ## Reconciliation CLI
 
 ```
-wp g2a-business reconcile <bookings|memberships|woo> [--from=YYYY-MM-DD] [--to=YYYY-MM-DD]
+wp g2a-business reconcile <bookings|memberships|woo> [--from=YYYY-MM-DD] [--to=YYYY-MM-DD] [--verbose]
 ```
 
 Registered only when `WP_CLI` is defined. Independently recomputes revenue
@@ -207,6 +285,11 @@ per-status reasons (the status-mapping table), gross/refund/net cents for
 both sides, the difference, and **PASS/FAIL** (PASS = zero unexplained
 difference). Use it after imports, migrations, or webhook incidents to
 prove the dashboard numbers still tie out.
+
+`--verbose` (0.4.0) additionally prints the provider's uncached daily
+net-revenue series — one line per day plus the SUM — the same figures the
+`/analytics/<source>` and `/dashboard/overview` `series` blocks report, so
+per-day endpoint numbers can be cross-checked directly.
 
 ## System discovery & website content
 

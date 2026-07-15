@@ -98,8 +98,19 @@ class DashboardControllerTest extends TestCase {
 
 		$data = $body['data'];
 		$this->assertSame(
-			array( 'range', 'revenue', 'bookings', 'memberships', 'woocommerce', 'waivers', 'alerts', 'modules' ),
+			array( 'range', 'revenue', 'series', 'bookings', 'memberships', 'woocommerce', 'waivers', 'alerts', 'modules' ),
 			array_keys( $data )
+		);
+		$this->assertCount( 30, $data['series'], 'series is zero-filled across the whole range even when every source is unavailable' );
+		$this->assertSame(
+			array(
+				'date'             => '2026-06-01',
+				'bookingsCents'    => 0,
+				'membershipsCents' => 0,
+				'wooCents'         => 0,
+				'totalCents'       => 0,
+			),
+			$data['series'][0]
 		);
 		$this->assertSame(
 			array(

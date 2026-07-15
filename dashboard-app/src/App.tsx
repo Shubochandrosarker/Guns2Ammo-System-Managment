@@ -14,6 +14,7 @@ const BusinessAnalysis      = lazy(() => import('@/pages/BusinessAnalysis').then
 const InsightisticAnalytics = lazy(() => import('@/pages/InsightisticAnalytics').then(m => ({ default: m.InsightisticAnalytics })))
 const BookingRevenue        = lazy(() => import('@/pages/BookingRevenue').then(m => ({ default: m.BookingRevenue })))
 const MembershipRevenue     = lazy(() => import('@/pages/MembershipRevenue').then(m => ({ default: m.MembershipRevenue })))
+const WaiverAnalytics       = lazy(() => import('@/pages/WaiverAnalytics').then(m => ({ default: m.WaiverAnalytics })))
 const WooStoreAnalytics     = lazy(() => import('@/pages/WooStoreAnalytics').then(m => ({ default: m.WooStoreAnalytics })))
 const SEOGrowth             = lazy(() => import('@/pages/SEOGrowth').then(m => ({ default: m.SEOGrowth })))
 const ShooterInsights       = lazy(() => import('@/pages/ShooterInsights').then(m => ({ default: m.ShooterInsights })))
@@ -83,6 +84,7 @@ export function App() {
             <Route path="insightistic"         element={<InsightisticAnalytics />} />
             <Route path="booking-revenue"      element={<BookingRevenue />} />
             <Route path="membership-revenue"   element={<MembershipRevenue />} />
+            <Route path="waiver-analytics"     element={<WaiverAnalytics />} />
             <Route path="woo-store-analytics"  element={<WooStoreAnalytics />} />
             <Route path="seo-growth"           element={<SEOGrowth />} />
             <Route path="shooter-insights"     element={<ShooterInsights />} />

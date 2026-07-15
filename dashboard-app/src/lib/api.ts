@@ -27,15 +27,18 @@ import type {
   ApiEnvelope,
   ApiErrorPayload,
   ApiSuccess,
+  BookingsAnalyticsData,
   DashboardOverviewData,
   Enveloped,
+  MembershipsAnalyticsData,
   SystemHealthData,
+  WaiversAnalyticsData,
+  WooAnalyticsData,
 } from '@/types/api'
 import type {
   AIInsight,
   Agent,
   Automation,
-  BookingAnalytics,
   BrainIngestResult,
   BrainQueryResult,
   BrainStats,
@@ -50,7 +53,6 @@ import type {
   LeadsPage,
   LeadStats,
   LeadStatus,
-  MembershipAnalytics,
   ModelConnection,
   NamespacesStatus,
   Range,
@@ -58,7 +60,6 @@ import type {
   SeoAnalytics,
   ShooterInsights,
   SiteHealthSummary,
-  StoreAnalytics,
   WaiverDetail,
   WaiverStats,
   WaiversPage,
@@ -333,6 +334,14 @@ const defaultRange = (): Range => {
   return { from: '', to: '' }
 }
 
+// Envelope endpoints treat an omitted range as "apply the server default
+// window (last 30 days)" — only emit ?from&to when both bounds are set.
+function rangeQuery(range?: Range): string {
+  return range && range.from && range.to
+    ? `?from=${encodeURIComponent(range.from)}&to=${encodeURIComponent(range.to)}`
+    : ''
+}
+
 export const api = {
   auth: {
     // POST {API_BASE}/auth/session/login — the server validates the
@@ -409,34 +418,47 @@ export const api = {
     // default window (last 30 days); meta is surfaced to the caller.
     overview(range?: Range): Promise<Enveloped<DashboardOverviewData>> {
       if (env.useMocks) return mocks().then(m => unwrapMockEnvelope(m.dashboardOverview))
-      const qs =
-        range && range.from && range.to
-          ? `?from=${encodeURIComponent(range.from)}&to=${encodeURIComponent(range.to)}`
-          : ''
-      return httpEnvelope<DashboardOverviewData>(`/dashboard/overview${qs}`)
+      return httpEnvelope<DashboardOverviewData>(`/dashboard/overview${rangeQuery(range)}`)
     },
   },
 
   analytics: {
+    // Legacy (non-envelope) /analytics/overview. The DashboardHome trend
+    // chart migrated to dashboard.overview().data.series in Phase D; this
+    // method is RETAINED because Business Analysis still reads it. Remove it
+    // together with that page's migration in a later phase.
     revenueOverview(range: Range = defaultRange()): Promise<RevenueOverview> {
       return env.useMocks
         ? mocks().then(m => m.revenueOverview)
         : http<RevenueOverview>(`/analytics/overview?from=${range.from}&to=${range.to}`)
     },
-    bookings(range: Range = defaultRange()): Promise<BookingAnalytics> {
-      return env.useMocks
-        ? mocks().then(m => m.bookings)
-        : http<BookingAnalytics>(`/analytics/bookings?from=${range.from}&to=${range.to}`)
+    // GET {API_BASE}/analytics/bookings?from&to — canonical envelope
+    // (Phase D fixed contract): overview booking fields + byType + zero-
+    // filled daily series + previous-window trends.
+    bookings(range?: Range): Promise<Enveloped<BookingsAnalyticsData>> {
+      if (env.useMocks) return mocks().then(m => unwrapMockEnvelope(m.bookingsAnalytics))
+      return httpEnvelope<BookingsAnalyticsData>(`/analytics/bookings${rangeQuery(range)}`)
     },
-    memberships(range: Range = defaultRange()): Promise<MembershipAnalytics> {
-      return env.useMocks
-        ? mocks().then(m => m.memberships)
-        : http<MembershipAnalytics>(`/analytics/memberships?from=${range.from}&to=${range.to}`)
+    // GET {API_BASE}/analytics/memberships?from&to — canonical envelope:
+    // lifecycle counts + planBreakdown + renewals/churn + daily new-member
+    // series + trends.
+    memberships(range?: Range): Promise<Enveloped<MembershipsAnalyticsData>> {
+      if (env.useMocks) return mocks().then(m => unwrapMockEnvelope(m.membershipsAnalytics))
+      return httpEnvelope<MembershipsAnalyticsData>(`/analytics/memberships${rangeQuery(range)}`)
     },
-    store(range: Range = defaultRange()): Promise<StoreAnalytics> {
-      return env.useMocks
-        ? mocks().then(m => m.store)
-        : http<StoreAnalytics>(`/analytics/store?from=${range.from}&to=${range.to}`)
+    // GET {API_BASE}/analytics/woocommerce?from&to — canonical envelope:
+    // aggregates + topProducts/byCategory (≤10 each) + series + trends +
+    // `truncated` (period capped at its first 5,000 orders).
+    woocommerce(range?: Range): Promise<Enveloped<WooAnalyticsData>> {
+      if (env.useMocks) return mocks().then(m => unwrapMockEnvelope(m.wooAnalytics))
+      return httpEnvelope<WooAnalyticsData>(`/analytics/woocommerce${rangeQuery(range)}`)
+    },
+    // GET {API_BASE}/analytics/waivers — canonical envelope: overview waiver
+    // fields + expiry buckets + 12-month signing history. Counts only — this
+    // wire carries NO PII. No range parameter in the fixed contract.
+    waivers(): Promise<Enveloped<WaiversAnalyticsData>> {
+      if (env.useMocks) return mocks().then(m => unwrapMockEnvelope(m.waiversAnalytics))
+      return httpEnvelope<WaiversAnalyticsData>('/analytics/waivers')
     },
     seo(range: Range = defaultRange()): Promise<SeoAnalytics> {
       return env.useMocks

@@ -1,7 +1,11 @@
-// Phase C canonical API envelope + payload types for the two NEW endpoints:
+// Phase C/D canonical API envelope + payload types for the enveloped endpoints:
 //
 //   GET {API_BASE}/dashboard/overview?from=YYYY-MM-DD&to=YYYY-MM-DD
 //   GET {API_BASE}/system/health
+//   GET {API_BASE}/analytics/bookings?from&to      (Phase D)
+//   GET {API_BASE}/analytics/memberships?from&to   (Phase D)
+//   GET {API_BASE}/analytics/woocommerce?from&to   (Phase D)
+//   GET {API_BASE}/analytics/waivers               (Phase D)
 //
 // FIXED CONTRACT — the backend is being built to exactly these shapes:
 //   success  → {"success":true,"data":<payload>,"meta":{...}}
@@ -119,6 +123,16 @@ export interface OverviewWaivers {
   pending: number
 }
 
+/** One day of the overview revenue series (zero-filled; all integer cents). */
+export interface OverviewSeriesPoint {
+  /** YYYY-MM-DD in the business timezone. */
+  date: ISODate
+  bookingsCents: number
+  membershipsCents: number
+  wooCents: number
+  totalCents: number
+}
+
 export interface DashboardOverviewData {
   revenue: OverviewRevenue
   bookings: OverviewBookings
@@ -127,6 +141,147 @@ export interface DashboardOverviewData {
   waivers: OverviewWaivers
   alerts: OverviewAlert[]
   modules: Record<OverviewModuleKey, ModuleStatus>
+  /** Daily per-channel revenue, zero-filled across the requested range. */
+  series: OverviewSeriesPoint[]
+}
+
+// ---------------------------------------------------------------------------
+// Phase D analytics endpoints — shared building blocks
+// ---------------------------------------------------------------------------
+
+/** One zero-filled day of an analytics series (count + integer cents). */
+export interface AnalyticsSeriesPoint {
+  /** YYYY-MM-DD. */
+  date: ISODate
+  count: number
+  revenueCents: number
+}
+
+/**
+ * Previous-comparable-window trend block shared by the bookings /
+ * memberships / woocommerce analytics payloads. `deltas.*Pct` are null when
+ * the previous window has no baseline (division by zero) — render "n/a",
+ * never 0%.
+ */
+export interface AnalyticsTrends {
+  previous: {
+    count: number
+    revenueCents: number
+    netCents: number
+  }
+  deltas: {
+    countPct: number | null
+    revenuePct: number | null
+  }
+}
+
+// ---------------------------------------------------------------------------
+// GET /analytics/bookings?from&to
+// ---------------------------------------------------------------------------
+
+export interface BookingsByType {
+  typeId: number
+  name: string
+  count: number
+  revenueCents: number
+}
+
+/** Overview booking fields PLUS byType / series / trends. */
+export interface BookingsAnalyticsData extends OverviewBookings {
+  byType: BookingsByType[]
+  series: AnalyticsSeriesPoint[]
+  trends: AnalyticsTrends
+}
+
+// ---------------------------------------------------------------------------
+// GET /analytics/memberships?from&to
+// ---------------------------------------------------------------------------
+
+export interface MembershipPlanBreakdown {
+  planId: number
+  name: string
+  active: number
+  mrrCents: number
+}
+
+export interface MembershipChurn {
+  /** Percent (e.g. 4.2) or null when it cannot be computed. */
+  rate: number | null
+  /** Human-readable formula the backend used, shown verbatim in the UI. */
+  calculation: string
+}
+
+/** One day of the memberships series — new members signed that day. */
+export interface MembershipSeriesPoint {
+  /** YYYY-MM-DD. */
+  date: ISODate
+  newMembers: number
+}
+
+/** Overview membership lifecycle counts PLUS plan/renewal/churn detail. */
+export interface MembershipsAnalyticsData extends OverviewMemberships {
+  planBreakdown: MembershipPlanBreakdown[]
+  newInRange: number
+  renewalsInRange: number
+  failedRenewals: number
+  churn: MembershipChurn
+  series: MembershipSeriesPoint[]
+  trends: AnalyticsTrends
+}
+
+// ---------------------------------------------------------------------------
+// GET /analytics/woocommerce?from&to
+// ---------------------------------------------------------------------------
+
+export interface WooTopProduct {
+  productId: number
+  name: string
+  qty: number
+  revenueCents: number
+}
+
+export interface WooCategoryRevenue {
+  /** Category term slug. */
+  term: string
+  name: string
+  revenueCents: number
+  qty: number
+}
+
+/** Overview Woo aggregates PLUS products/categories/series/trends. */
+export interface WooAnalyticsData extends OverviewWoocommerce {
+  /** ≤ 10 rows. */
+  topProducts: WooTopProduct[]
+  /** ≤ 10 rows. */
+  byCategory: WooCategoryRevenue[]
+  series: AnalyticsSeriesPoint[]
+  trends: AnalyticsTrends
+  /** true → the backend capped the period at its first 5,000 orders. */
+  truncated: boolean
+}
+
+// ---------------------------------------------------------------------------
+// GET /analytics/waivers  (counts only — NO PII on this wire)
+// ---------------------------------------------------------------------------
+
+export interface WaiversMonthCount {
+  /** YYYY-MM. */
+  month: string
+  count: number
+}
+
+/** Overview waiver fields PLUS expiry buckets + 12-month signing history. */
+export interface WaiversAnalyticsData extends OverviewWaivers {
+  expiring: {
+    d30: number
+    d60: number
+    d90: number
+  }
+  signings: {
+    /** Last 12 months, oldest first. */
+    archive: WaiversMonthCount[]
+    people: WaiversMonthCount[]
+  }
 }
 
 // ---------------------------------------------------------------------------

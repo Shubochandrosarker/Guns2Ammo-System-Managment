@@ -9,6 +9,7 @@ import { Skeleton } from '@/components/ui/Skeleton'
 import { ErrorState } from '@/components/ui/ErrorState'
 import { api } from '@/lib/api'
 import { useAsync } from '@/lib/hooks'
+import { sourceNames } from '@/lib/sources'
 import { formatCents, formatDateTimeInZone, formatNumber } from '@/lib/format'
 import type { ModuleStatus, OverviewAlert, OverviewModuleKey, SystemHealthData } from '@/types/api'
 
@@ -21,30 +22,14 @@ const ALERT_SEVERITY: Record<string, { label: string; pill: string }> = {
   info:     { label: 'Info',     pill: 'pill-blue' },
 }
 
-// Human names for the plugin slugs modules[].source carries, so the
-// UNAVAILABLE state can say which plugin is missing/inactive.
-const SOURCE_LABEL: Record<string, string> = {
-  'g2a-booking-engine': 'G2A Booking Engine',
-  memberistic: 'Memberistic',
-  woocommerce: 'WooCommerce',
-  'g2a-waivers': 'G2A Waivers',
-  formistic: 'Formistic',
-  messageistic: 'Messageistic',
-}
-
-const sourceNames = (source: string[]): string =>
-  source.length > 0 ? source.map(s => SOURCE_LABEL[s] ?? s).join(', ') : 'its source plugin'
-
 export function DashboardHome() {
   // NEW canonical endpoint: revenue + per-module summaries + alerts + module
-  // availability all come from GET /dashboard/overview (no explicit range →
-  // the server's default last-30-days window).
+  // availability + the daily revenue series (Phase D) all come from
+  // GET /dashboard/overview (no explicit range → the server's default
+  // last-30-days window). Zero legacy analytics fetches remain on this page.
   const overview = useAsync(() => api.dashboard.overview(), [])
   // NEW canonical endpoint for the health summary card.
   const health = useAsync(() => api.system.health(), [])
-  // NOT covered by /dashboard/overview (no daily series in its contract):
-  // the trend chart keeps its legacy source until a later phase migrates it.
-  const trendQ = useAsync(() => api.analytics.revenueOverview(), [])
   // Other modules' plumbing — untouched, they migrate in later phases.
   const seo = useAsync(() => api.analytics.seo(), [])
   const insights = useAsync(() => api.insights.list(), [])
@@ -124,23 +109,28 @@ export function DashboardHome() {
           className="lg:col-span-2"
           actions={<Link to="/business-analysis" className="btn-ghost text-xs">Open Business Analysis →</Link>}
         >
-          {trendQ.loading ? (
+          {overview.loading ? (
             <Spinner label="Loading trend…" />
-          ) : trendQ.error || !trendQ.data ? (
-            <ErrorState message={trendQ.error ?? 'No trend data'} onRetry={trendQ.refresh} />
+          ) : overview.error || !ov ? (
+            <ErrorState message={overview.error ?? 'No trend data'} onRetry={overview.refresh} />
+          ) : ov.data.series.length === 0 ? (
+            <div className="text-sm text-ink-500 bg-ink-50 rounded-lg p-3">No revenue recorded in this period.</div>
           ) : (
             <div className="h-64">
               <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={trendQ.data.series} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+                <LineChart data={ov.data.series} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="var(--chart-grid)" />
                   <XAxis dataKey="date" tick={{ fontSize: 11, fill: 'var(--chart-axis)' }} tickFormatter={d => d.slice(5)} />
                   <YAxis tick={{ fontSize: 11, fill: 'var(--chart-axis)' }} tickFormatter={v => formatCents(v - (v % 100))} width={54} />
                   <Tooltip
                     contentStyle={{ fontSize: 12 }}
                     labelFormatter={(d: string) => d}
-                    formatter={(v: number) => [formatCents(v), 'Revenue']}
+                    formatter={(v: number, name: string) => [formatCents(v), name]}
                   />
-                  <Line type="monotone" dataKey="value" stroke="var(--brand)" strokeWidth={2.5} dot={false} />
+                  <Line type="monotone" dataKey="totalCents"       name="Total"       stroke="var(--brand)"   strokeWidth={2.5} dot={false} />
+                  <Line type="monotone" dataKey="bookingsCents"    name="Bookings"    stroke="var(--info)"    strokeWidth={1.5} dot={false} />
+                  <Line type="monotone" dataKey="membershipsCents" name="Memberships" stroke="var(--warn)"    strokeWidth={1.5} dot={false} />
+                  <Line type="monotone" dataKey="wooCents"         name="Store"       stroke="var(--success)" strokeWidth={1.5} dot={false} />
                 </LineChart>
               </ResponsiveContainer>
             </div>
