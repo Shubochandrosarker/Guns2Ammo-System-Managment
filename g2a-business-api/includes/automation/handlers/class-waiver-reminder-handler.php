@@ -37,10 +37,33 @@ class Waiver_Reminder_Handler extends Handler_Base {
 		$now    = gmdate( 'Y-m-d H:i:s' );
 		$window = gmdate( 'Y-m-d H:i:s', strtotime( '+25 hours' ) );
 
+		// The Booking Engine installer creates `waiver_signed` TINYINT (the
+		// old `waiver_signed_at IS NULL` filter hit a nonexistent column, so
+		// this handler errored and never drafted anything). Detect which
+		// column the live schema actually has to stay tolerant of installs
+		// running a different Booking Engine version.
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+		$columns = (array) $wpdb->get_col( "SHOW COLUMNS FROM {$table}" );
+		if ( in_array( 'waiver_signed', $columns, true ) ) {
+			$waiver_where = 'waiver_signed = 0';
+		} elseif ( in_array( 'waiver_signed_at', $columns, true ) ) {
+			$waiver_where = 'waiver_signed_at IS NULL';
+		} else {
+			return 'Skipped — no waiver column on the bookings table.';
+		}
+
+		// Same drift tolerance for the contact columns (the installer creates
+		// customer_email / customer_name; `email` / `name` never existed).
+		$email_col = in_array( 'customer_email', $columns, true ) ? 'customer_email' : 'email';
+		$name_col  = in_array( 'customer_name', $columns, true ) ? 'customer_name' : 'name';
+		if ( ! in_array( $email_col, $columns, true ) ) {
+			return 'Skipped — no email column on the bookings table.';
+		}
+
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.PreparedSQL.InterpolatedNotPrepared
 		$rows = $wpdb->get_results(
 			$wpdb->prepare(
-				"SELECT id, user_id, email, name FROM {$table} WHERE waiver_signed_at IS NULL AND status IN ('paid','completed','pending','unpaid') AND start_at BETWEEN %s AND %s",
+				"SELECT id, user_id, {$email_col} AS email, {$name_col} AS name FROM {$table} WHERE {$waiver_where} AND status IN ('paid','completed','pending','unpaid') AND start_at BETWEEN %s AND %s", // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
 				$now,
 				$window
 			),
@@ -57,6 +80,13 @@ class Waiver_Reminder_Handler extends Handler_Base {
 				$email = $user ? (string) $user->user_email : '';
 			}
 			if ( '' === $email ) {
+				continue;
+			}
+			// Don't nag someone whose waiver is already on file (booking rows
+			// only carry the checkbox state from booking time; Memberistic's
+			// archive is the source of truth).
+			if ( class_exists( '\WordPressistic\Memberistic\Waivers\Waivers_Archive' )
+				&& \WordPressistic\Memberistic\Waivers\Waivers_Archive::has_on_file( $email ) ) {
 				continue;
 			}
 			$store->enqueue(
@@ -79,9 +109,18 @@ class Waiver_Reminder_Handler extends Handler_Base {
 		return sprintf(
 			"Hi %s,\n\n" .
 			"Our records show you don't have a signed waiver on file yet. To check in faster tomorrow, please sign it in advance:\n\n" .
-			"https://guns2ammo.com/waiver\n\n" .
+			"%s\n\n" .
 			"Takes about a minute. See you soon!\n",
-			'' === $name ? 'there' : $name
+			'' === $name ? 'there' : $name,
+			self::waiver_link()
 		);
+	}
+
+	/** The real e-sign page when Memberistic is active; marketing URL otherwise. */
+	public static function waiver_link(): string {
+		if ( class_exists( '\WordPressistic\Memberistic\Waivers\Waiver_Public' ) ) {
+			return (string) \WordPressistic\Memberistic\Waivers\Waiver_Public::guest_url();
+		}
+		return 'https://guns2ammo.com/waiver';
 	}
 }

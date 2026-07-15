@@ -85,10 +85,7 @@ final class Waiver_Archive_Admin {
 							<?php if ( ! empty( $lookup['dob'] ) ) : ?> · DOB <?php echo esc_html( $lookup['dob'] ); ?><?php endif; ?>
 						</p>
 						<p style="margin:8px 0 0;">
-							<?php
-							$has_local = ! empty( $lookup['local_path'] ) && false !== strpos( (string) $lookup['local_path'], Waiver_Import::SUBDIR );
-							$pdf       = $has_local ? self::pdf_view_url( $lookup['id'] ) : Waivers_Archive::pdf_url( $lookup );
-							?>
+							<?php $pdf = Waivers_Archive::pdf_url( $lookup ); // Always the gated streaming endpoint. ?>
 							<?php if ( $pdf ) : ?><a class="button" href="<?php echo esc_url( $pdf ); ?>" target="_blank" rel="noopener"><?php esc_html_e( 'View signed PDF', 'memberistic' ); ?></a><?php endif; ?>
 						</p>
 					</div>
@@ -171,12 +168,27 @@ final class Waiver_Archive_Admin {
 		global $wpdb;
 		$table = Waivers_Archive::table();
 		// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
-		$row = $wpdb->get_row( $wpdb->prepare( "SELECT local_path, external_url FROM {$table} WHERE id = %d", $id ), ARRAY_A );
+		$row = $wpdb->get_row( $wpdb->prepare( "SELECT local_path, external_url, attachment_id FROM {$table} WHERE id = %d", $id ), ARRAY_A );
 		if ( ! $row ) {
 			wp_die( esc_html__( 'Waiver not found.', 'memberistic' ) );
 		}
 		if ( empty( $row['local_path'] ) ) {
-			// No mirror — fall back to the source URL.
+			// No mirror — try a linked attachment (streamed, not its public
+			// URL), then fall back to the external source URL.
+			if ( ! empty( $row['attachment_id'] ) ) {
+				$att = get_attached_file( (int) $row['attachment_id'] );
+				$att = $att ? realpath( $att ) : false;
+				$ubase = realpath( wp_upload_dir()['basedir'] );
+				if ( $att && $ubase && 0 === strpos( $att, $ubase ) && is_readable( $att ) ) {
+					$type = wp_check_filetype( $att );
+					nocache_headers();
+					header( 'Content-Type: ' . ( ! empty( $type['type'] ) ? $type['type'] : 'application/pdf' ) );
+					header( 'Content-Disposition: inline; filename="waiver.' . ( ! empty( $type['ext'] ) ? $type['ext'] : 'pdf' ) . '"' );
+					header( 'Content-Length: ' . filesize( $att ) );
+					readfile( $att ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_read_readfile
+					exit;
+				}
+			}
 			if ( ! empty( $row['external_url'] ) ) {
 				wp_redirect( esc_url_raw( $row['external_url'] ) ); // phpcs:ignore WordPress.Security.SafeRedirect.wp_redirect_wp_redirect
 				exit;

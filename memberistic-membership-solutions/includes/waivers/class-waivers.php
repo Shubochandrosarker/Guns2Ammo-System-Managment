@@ -256,7 +256,16 @@ final class Waiver_Service {
 			),
 			array( '%d', '%d', '%d', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%d', '%s' )
 		);
-		return (int) $wpdb->insert_id;
+		$sig_id = (int) $wpdb->insert_id;
+
+		// Mirror into the waivers archive — the store the booking/check-in
+		// "waiver on file?" lookup reads — so people who sign the new e-waiver
+		// (guest or member) are found at their next visit, exactly like the
+		// imported Ottertext signers.
+		if ( $sig_id > 0 ) {
+			Waivers_Archive::upsert_from_signature( self::get_signature( $sig_id ) );
+		}
+		return $sig_id;
 	}
 
 	public static function signatures_table() {
