@@ -96,10 +96,10 @@ final class SettingsController {
 		if ( ! in_array( $mode, array( 'test', 'live' ), true ) ) {
 			return new \WP_Error( 'invalid_mode', 'mode must be test or live', array( 'status' => 400 ) );
 		}
-		$current['mode']              = $mode;
-		$current['publishable_key']   = sanitize_text_field( (string) ( $body['publishable_key'] ?? ( $current['publishable_key'] ?? '' ) ) );
-		$current['account_id']        = sanitize_text_field( (string) ( $body['account_id'] ?? ( $current['account_id'] ?? '' ) ) );
-		$current                      = self::sealSecretField( $current, $body, 'secret_key' );
+		$current['mode']            = $mode;
+		$current['publishable_key'] = sanitize_text_field( (string) ( $body['publishable_key'] ?? ( $current['publishable_key'] ?? '' ) ) );
+		$current['account_id']      = sanitize_text_field( (string) ( $body['account_id'] ?? ( $current['account_id'] ?? '' ) ) );
+		$current                    = self::sealSecretField( $current, $body, 'secret_key' );
 		update_option( 'g2a_pos_stripe', $current, false );
 		( new AuditLogRepository() )->add( 'settings.stripe.update', 'option', 'g2a_pos_stripe', null, array( 'mode' => $mode ) );
 		return self::maskSecrets( $current, array( 'secret_key' ) );
@@ -120,7 +120,7 @@ final class SettingsController {
 			$current['endpoint'] = $url;
 		}
 		$current['dealer_id'] = sanitize_text_field( (string) ( $body['dealer_id'] ?? ( $current['dealer_id'] ?? '' ) ) );
-		$current               = self::sealSecretField( $current, $body, 'api_key' );
+		$current              = self::sealSecretField( $current, $body, 'api_key' );
 		update_option( 'g2a_pos_dros_credentials', $current, false );
 		( new AuditLogRepository() )->add( 'settings.dros.update', 'option', 'g2a_pos_dros_credentials', null, array( 'endpoint' => $current['endpoint'] ?? '' ) );
 		return self::maskSecrets( $current, array( 'api_key' ) );
