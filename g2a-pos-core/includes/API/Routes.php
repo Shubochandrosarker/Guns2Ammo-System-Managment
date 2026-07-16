@@ -452,6 +452,15 @@ final class Routes {
 			'g2a-pos/v1',
 			'/atf/nics',
 			array(
+				'methods'             => 'GET',
+				'callback'            => array( NICSController::class, 'index' ),
+				'permission_callback' => static fn() => current_user_can( 'g2a_pos_process_firearm_sale' ),
+			)
+		);
+		register_rest_route(
+			'g2a-pos/v1',
+			'/atf/nics',
+			array(
 				'methods'             => 'POST',
 				'callback'            => array( NICSController::class, 'initiate' ),
 				'permission_callback' => static fn() => current_user_can( 'g2a_pos_process_firearm_sale' ),

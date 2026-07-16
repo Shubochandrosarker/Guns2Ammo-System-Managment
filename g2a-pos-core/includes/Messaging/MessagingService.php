@@ -6,9 +6,14 @@ use G2A\POS\Database\MessagingRepository;
 
 /**
  * Transactional outbox for email + SMS. Email goes through wp_mail() by
- * default (so existing SMTP plugins keep working). SMS uses Twilio when
- * credentials are configured under the `g2a_pos_messaging_twilio` option;
- * otherwise it queues and logs.
+ * default (so existing SMTP plugins keep working — including Formistic's
+ * optional wp_mail capture, which logs a copy into its inbox when enabled).
+ * SMS routes through Messageistic's SMS_Service when that plugin is active
+ * — it resolves the site's actual configured provider, enforces opt-out/
+ * consent/frequency compliance policy, and logs to its own conversation
+ * history — falling back to a direct Twilio call (via the
+ * `g2a_pos_messaging_twilio` option) only when Messageistic isn't
+ * installed.
  */
 final class MessagingService {
 
@@ -98,6 +103,39 @@ final class MessagingService {
 	}
 
 	private static function send_sms( array $msg ): bool {
+		if ( class_exists( '\Messageistic\Messaging\SMS_Service' ) ) {
+			return self::send_sms_via_messageistic( $msg );
+		}
+		return self::send_sms_via_twilio( $msg );
+	}
+
+	/**
+	 * Messageistic is the canonical SMS system on sites that have it —
+	 * routing through its SMS_Service (rather than dialing a provider API
+	 * directly) means opt-out/consent/frequency-cap compliance checks and
+	 * conversation logging happen exactly the same way as every other SMS
+	 * the business sends. A WP_Error here (including a compliance block) is
+	 * a real failure and must NOT silently fall back to Twilio — that would
+	 * bypass the exact policy this integration exists to respect.
+	 */
+	private static function send_sms_via_messageistic( array $msg ): bool {
+		$service = new \Messageistic\Messaging\SMS_Service();
+		$result  = $service->send(
+			array(
+				'phone'           => (string) $msg['to_address'],
+				'body'            => (string) $msg['body'],
+				'classification'  => 'transactional',
+				'source'          => 'g2a_pos',
+				'idempotency_key' => 'g2a_pos_msg_' . (int) $msg['id'],
+			)
+		);
+		if ( is_wp_error( $result ) ) {
+			throw new \RuntimeException( 'messageistic: ' . $result->get_error_message() );
+		}
+		return true;
+	}
+
+	private static function send_sms_via_twilio( array $msg ): bool {
 		$cfg   = (array) get_option( 'g2a_pos_messaging_twilio', array() );
 		$sid   = $cfg['account_sid'] ?? '';
 		$token = $cfg['auth_token'] ?? '';

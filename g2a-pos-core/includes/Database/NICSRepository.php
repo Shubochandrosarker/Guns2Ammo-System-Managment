@@ -35,6 +35,31 @@ final class NICSRepository extends Repository {
 		return (bool) $wpdb->update( $t, $fields, array( 'id' => $id ) );
 	}
 
+	/**
+	 * @param array{status?:string,limit?:int} $filters
+	 * @return array<int,array<string,mixed>>
+	 */
+	public function list( array $filters = array() ): array {
+		global $wpdb;
+		$t    = $this->table( 'g2a_nics_transactions' );
+		$f    = $this->table( 'g2a_form_4473' );
+		$where = array( '1=1' );
+		$args  = array();
+		if ( ! empty( $filters['status'] ) ) {
+			$where[] = 'n.response_status = %s';
+			$args[]  = sanitize_key( (string) $filters['status'] );
+		}
+		$limit  = max( 1, min( 500, (int) ( $filters['limit'] ?? 100 ) ) );
+		$sql    = "SELECT n.id, n.form_4473_id, n.ntn, n.response_status, n.initiated_at,
+                       n.default_proceed_eligible_at, n.transferred,
+                       f.form_serial, f.transferee_last, f.transferee_first
+                FROM {$t} n
+                LEFT JOIN {$f} f ON f.id = n.form_4473_id
+                WHERE " . implode( ' AND ', $where ) . ' ORDER BY n.initiated_at DESC LIMIT %d';
+		$args[] = $limit;
+		return $wpdb->get_results( $wpdb->prepare( $sql, $args ), ARRAY_A ) ?: array();
+	}
+
 	public function pending_delayed_ready_for_default_proceed(): array {
 		global $wpdb;
 		$t   = $this->table( 'g2a_nics_transactions' );

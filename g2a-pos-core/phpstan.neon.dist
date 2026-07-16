@@ -16,6 +16,10 @@ parameters:
         # WooCommerce symbols — we rely on WC at runtime; stubs are not loaded here.
         - '#Function (wc_get_product|wc_get_order|wc_price|wc_update_product_stock|is_checkout) not found\.#'
         - '#Call to an undefined method object::get_price\(\)\.#'
+        # Messageistic\Messaging\SMS_Service — optional sibling plugin, guarded at
+        # runtime by class_exists() in MessagingService::send_sms(); not a
+        # composer dependency so PHPStan has no stub for it.
+        - '#(Instantiated class|Call to method \S+\(\) on an unknown class) Messageistic\\Messaging\\SMS_Service#'
         # DB_NAME comes from wp-config.php, not WP core stubs.
         - '#Constant DB_NAME not found\.#'
         # Repository::table() builds names like "{prefix}name"; many internal SQL strings
