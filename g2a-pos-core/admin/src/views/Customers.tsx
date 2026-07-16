@@ -88,7 +88,22 @@ export default function Customers() {
   };
 
   const cols: Column<CustomerRow>[] = [
-    { key: 'name', label: 'Customer', render: (r) => <button className="link" onClick={() => openCustomer(r.id)}>{r.name}</button> },
+    {
+      key: 'name',
+      label: 'Customer',
+      render: (r) => {
+        // Accounts created without an explicit display name (e.g. guest
+        // checkout, bulk CSV import) fall back to the email as the WP user's
+        // display_name — showing that as if it were a real name reads as a
+        // data bug rather than what it is: nobody's entered a name yet.
+        const looksLikeEmail = !r.name || r.name === r.email || r.name.includes('@');
+        return (
+          <button className="link" onClick={() => openCustomer(r.id)}>
+            {looksLikeEmail ? <span className="italic text-zinc-500">{r.name || r.email || '(no name)'}</span> : r.name}
+          </button>
+        );
+      },
+    },
     { key: 'email', label: 'Email' },
     { key: 'phone', label: 'Phone' },
     { key: 'pos_order_count', label: 'POS Orders', align: 'right' },
