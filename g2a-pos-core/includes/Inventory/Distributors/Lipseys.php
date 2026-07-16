@@ -44,6 +44,7 @@ final class Lipseys implements Adapter {
 			'msrp'                    => AdapterHelpers::money( $raw, array( 'msrp', 'MSRP', 'retailMap' ) ),
 			'dealer_cost'             => AdapterHelpers::money( $raw, array( 'dealerPrice', 'DealerPrice', 'price' ) ),
 			'quantity'                => AdapterHelpers::int( $raw, array( 'quantity', 'Quantity', 'qtyAvailable' ) ),
+			'image_filename'          => AdapterHelpers::pick( $raw, array( 'imageName', 'ImageName', 'IMAGENAME' ) ),
 			'metadata'                => array(
 				'lipseys_item' => $h,
 				'finish'       => AdapterHelpers::pick( $raw, array( 'finish', 'Finish' ) ),

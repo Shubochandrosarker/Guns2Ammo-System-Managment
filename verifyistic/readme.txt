@@ -3,7 +3,7 @@ Contributors: wordpressistic
 Tags: age verification, age gate, age check, firearms, alcohol, adult, cannabis, popup, COPPA
 Requires at least: 5.8
 Tested up to: 6.7
-Stable tag: 1.4.4
+Stable tag: 1.4.5
 Requires PHP: 7.4
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
@@ -101,6 +101,13 @@ No. All verification is handled locally. The webhook integration is optional and
 8. Frontend popup — ID & Face upload mode
 
 == Changelog ==
+
+= 1.4.5 =
+* Uninstall is now non-destructive by default: the age-verification log
+  and webhook delivery history are kept when the plugin is deleted, unless
+  an admin explicitly opts in via a new "Delete verification records on
+  uninstall" toggle on the Settings page. Previously every uninstall
+  silently dropped both tables with no way to recover the audit trail.
 
 = 1.4.1 =
 * FIX: Visitors on page-cached sites were walled off with "Network error.

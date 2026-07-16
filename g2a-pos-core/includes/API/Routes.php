@@ -1081,7 +1081,13 @@ final class Routes {
 		);
 		register_rest_route(
 			'g2a-pos/v1',
-			'/wholesalers/(?P<wholesaler_id>\d+)/products/(?P<vendor_sku>[\w\-\.]+)/mirror-image',
+			// Real vendor SKUs (Lipsey's and others) routinely contain
+			// spaces, #, &, and other characters outside \w\-\. — the admin
+			// UI sends them encodeURIComponent()'d, but the narrower
+			// pattern still rejected any SKU containing one of those
+			// characters with a bare "no route found" 404. Match anything
+			// but the path separator, same as external_ref above.
+			'/wholesalers/(?P<wholesaler_id>\d+)/products/(?P<vendor_sku>[^/]+)/mirror-image',
 			array(
 				'methods'             => 'POST',
 				'callback'            => array( WholesalerController::class, 'mirror_image' ),
@@ -1090,7 +1096,8 @@ final class Routes {
 		);
 		register_rest_route(
 			'g2a-pos/v1',
-			'/wholesalers/(?P<wholesaler_id>\d+)/products/(?P<vendor_sku>[\w\-\.]+)/promote',
+			// Same vendor-sku character-set issue as mirror-image above.
+			'/wholesalers/(?P<wholesaler_id>\d+)/products/(?P<vendor_sku>[^/]+)/promote',
 			array(
 				'methods'             => 'POST',
 				'callback'            => array( WholesalerController::class, 'promote' ),

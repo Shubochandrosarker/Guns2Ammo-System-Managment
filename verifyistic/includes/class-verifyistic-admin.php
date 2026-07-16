@@ -192,6 +192,7 @@ class Verifyistic_Admin {
         register_setting( 'verifyistic_settings', 'verifyistic_cookie_domain', array( 'sanitize_callback' => array( $this, 'sanitize_cookie_domain' ) ) );
         register_setting( 'verifyistic_settings', 'verifyistic_strict_mode', array( 'sanitize_callback' => 'intval' ) );
         register_setting( 'verifyistic_settings', 'verifyistic_skip_bot_detection', array( 'sanitize_callback' => 'intval' ) );
+        register_setting( 'verifyistic_settings', 'verifyistic_uninstall_destroy_data', array( 'sanitize_callback' => 'intval' ) );
     }
 
     /**
@@ -271,12 +272,13 @@ class Verifyistic_Admin {
             'verifyistic_selfie_label'      => 'sanitize_text_field',
             'verifyistic_strict_mode'       => 'intval',
             'verifyistic_skip_bot_detection'=> 'intval',
+            'verifyistic_uninstall_destroy_data' => 'intval',
         );
 
         foreach ( $fields as $key => $sanitize ) {
             $value = isset( $_POST[ $key ] ) ? $_POST[ $key ] : '';
             // Checkboxes
-            if ( in_array( $key, array( 'verifyistic_enabled', 'verifyistic_id_verification', 'verifyistic_webhook_enabled', 'verifyistic_remember_me', 'verifyistic_strict_mode', 'verifyistic_skip_bot_detection' ), true ) ) {
+            if ( in_array( $key, array( 'verifyistic_enabled', 'verifyistic_id_verification', 'verifyistic_webhook_enabled', 'verifyistic_remember_me', 'verifyistic_strict_mode', 'verifyistic_skip_bot_detection', 'verifyistic_uninstall_destroy_data' ), true ) ) {
                 $value = isset( $_POST[ $key ] ) ? 1 : 0;
             }
             update_option( $key, call_user_func( $sanitize, $value ) );

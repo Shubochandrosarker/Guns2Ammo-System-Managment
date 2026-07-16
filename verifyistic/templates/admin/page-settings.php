@@ -387,6 +387,19 @@ function vfya_opt( $key, $default = '' ) {
               </div>
             </div>
 
+            <div class="vfya-field">
+              <div class="vfya-toggle-wrap">
+                <label class="vfya-toggle">
+                  <input type="checkbox" name="verifyistic_uninstall_destroy_data" value="1" <?php checked(vfya_opt('verifyistic_uninstall_destroy_data','0'),'1'); ?>>
+                  <span class="vfya-toggle-slider"></span>
+                </label>
+                <div>
+                  <span class="vfya-toggle-label">Delete verification records on uninstall</span>
+                  <span class="vfya-label-sub" style="display:block;margin-top:2px;">Off by default — the age-verification log and webhook delivery history are kept if the plugin is ever deleted. Enable this only if you want that data permanently destroyed on uninstall.</span>
+                </div>
+              </div>
+            </div>
+
             <div class="vfya-section-divider">Webhook / API Integration</div>
 
             <div class="vfya-field">
