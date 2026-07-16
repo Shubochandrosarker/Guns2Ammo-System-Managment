@@ -23,6 +23,17 @@ final class WholesalerIntegrityChecker {
 	public const AMBIGUITY_OPTION = 'g2a_pos_wholesaler_sync_ambiguities';
 
 	/**
+	 * Per-user "I've seen this" acknowledgement. Keyed by a hash of the
+	 * current issue set, so editing/adding an account number (which changes
+	 * the issues) always re-surfaces the notice even if a stale dismissal is
+	 * on file, and an untouched, still-broken condition comes back after
+	 * DISMISS_TTL_DAYS instead of being silenced forever.
+	 */
+	public const DISMISS_META_KEY     = 'g2a_pos_wholesaler_notice_dismissed';
+	public const DISMISS_TTL_DAYS     = 3;
+	public const DISMISS_NONCE_ACTION = 'g2a_pos_dismiss_wholesaler_notice';
+
+	/**
 	 * @param array<int,array<string,mixed>>|null $rows Rows to inspect (defaults to all wholesaler rows).
 	 * @return array<int,array{type:string,provider_code:string,message:string}>
 	 */
@@ -138,7 +149,9 @@ final class WholesalerIntegrityChecker {
 	/**
 	 * Admin notice (hooked on admin_notices) surfacing integrity issues to
 	 * staff who can act on them. Read-only — mirrors the plugin's existing
-	 * notice-warning pattern.
+	 * notice-warning pattern. Dismissible per-user; a dismissal only holds
+	 * while the underlying issue set is unchanged, and expires after
+	 * DISMISS_TTL_DAYS so a still-broken condition keeps coming back.
 	 */
 	public static function render_admin_notice(): void {
 		if ( ! function_exists( 'current_user_can' )
@@ -153,10 +166,62 @@ final class WholesalerIntegrityChecker {
 		if ( ! $issues ) {
 			return;
 		}
-		echo '<div class="notice notice-warning"><p><strong>G2A POS — wholesaler account check:</strong></p><ul style="list-style:disc;margin-left:20px;">';
+
+		$hash = self::issuesHash( $issues );
+		if ( self::isDismissed( $hash ) ) {
+			return;
+		}
+
+		echo '<div id="g2a-pos-wholesaler-notice" class="notice notice-warning is-dismissible" data-g2a-issue-hash="' . esc_attr( $hash ) . '">';
+		echo '<p><strong>G2A POS — wholesaler account check:</strong></p><ul style="list-style:disc;margin-left:20px;">';
 		foreach ( $issues as $issue ) {
 			echo '<li>' . esc_html( (string) $issue['message'] ) . '</li>';
 		}
 		echo '</ul><p>' . esc_html( 'Give every wholesaler account a unique, non-blank account number on the Wholesalers screen. No rows were merged or deleted automatically.' ) . '</p></div>';
+
+		if ( function_exists( 'wp_create_nonce' ) ) {
+			$nonce = wp_create_nonce( self::DISMISS_NONCE_ACTION );
+			echo '<script>(function(){var n=document.getElementById("g2a-pos-wholesaler-notice");if(!n)return;document.addEventListener("click",function(e){if(!e.target.closest("#g2a-pos-wholesaler-notice .notice-dismiss"))return;var b=new FormData();b.append("action","g2a_pos_dismiss_wholesaler_notice");b.append("nonce","' . esc_js( $nonce ) . '");b.append("hash",n.dataset.g2aIssueHash);fetch(ajaxurl,{method:"POST",credentials:"same-origin",body:b});});})();</script>';
+		}
+	}
+
+	/**
+	 * wp_ajax_g2a_pos_dismiss_wholesaler_notice — records the current user's
+	 * dismissal against the issue-set hash they saw, so the same unresolved
+	 * problem can't be waved away and then silently forgotten forever.
+	 */
+	public static function handle_dismiss_ajax(): void {
+		if ( ! function_exists( 'check_ajax_referer' ) || ! check_ajax_referer( self::DISMISS_NONCE_ACTION, 'nonce', false ) ) {
+			wp_send_json_error( array( 'message' => 'Invalid nonce' ), 403 );
+		}
+		if ( ! current_user_can( 'g2a_pos_manage_wholesalers' ) && ! current_user_can( 'manage_options' ) ) {
+			wp_send_json_error( array( 'message' => 'Forbidden' ), 403 );
+		}
+		$hash = isset( $_POST['hash'] ) ? sanitize_text_field( wp_unslash( $_POST['hash'] ) ) : '';
+		if ( $hash === '' ) {
+			wp_send_json_error( array( 'message' => 'Missing hash' ), 400 );
+		}
+		update_user_meta(
+			get_current_user_id(),
+			self::DISMISS_META_KEY,
+			array(
+				'hash'         => $hash,
+				'dismissed_at' => time(),
+			)
+		);
+		wp_send_json_success();
+	}
+
+	private static function issuesHash( array $issues ): string {
+		return md5( (string) wp_json_encode( array_column( $issues, 'message' ) ) );
+	}
+
+	private static function isDismissed( string $currentHash ): bool {
+		$record = get_user_meta( get_current_user_id(), self::DISMISS_META_KEY, true );
+		if ( ! is_array( $record ) || ( $record['hash'] ?? '' ) !== $currentHash ) {
+			return false;
+		}
+		$dismissedAt = (int) ( $record['dismissed_at'] ?? 0 );
+		return $dismissedAt > 0 && ( time() - $dismissedAt ) < ( self::DISMISS_TTL_DAYS * DAY_IN_SECONDS );
 	}
 }

@@ -332,12 +332,28 @@ final class Gateway {
 			if ( $code !== '' ) {
 				$out .= ' [' . $code . ']';
 			}
-			return $msg === '' && $code === '' ? $out . ': ' . self::snippet( $rawBody ) : $out;
+			$out = $msg === '' && $code === '' ? $out . ': ' . self::snippet( $rawBody ) : $out;
+			return $out . self::actionable_hint( $msg );
 		}
 		if ( is_string( $err ) && trim( $err ) !== '' ) {
-			return 'HTTP ' . $status . ': ' . trim( $err );
+			$msg = trim( $err );
+			return 'HTTP ' . $status . ': ' . $msg . self::actionable_hint( $msg );
 		}
 		return 'HTTP ' . $status . ': ' . self::snippet( $rawBody );
+	}
+
+	/**
+	 * OpenRouter's "no endpoints match your guardrail restrictions and data
+	 * policy" error is an account-level Privacy/Guardrails setting at
+	 * openrouter.ai — nothing this plugin sends can override it per-request.
+	 * Point staff at the actual fix instead of leaving them to guess from the
+	 * raw provider error text.
+	 */
+	private static function actionable_hint( string $msg ): string {
+		if ( $msg !== '' && ( stripos( $msg, 'data policy' ) !== false || stripos( $msg, 'guardrail' ) !== false ) ) {
+			return ' — this is an OpenRouter account setting, not a plugin bug: check https://openrouter.ai/settings/privacy (Privacy) and https://openrouter.ai/docs/guides/features/guardrails (Guardrails), or pick a different Chat model on the AI Settings page.';
+		}
+		return '';
 	}
 
 	private static function snippet( string $raw ): string {
