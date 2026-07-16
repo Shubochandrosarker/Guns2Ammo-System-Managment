@@ -6,6 +6,8 @@ use G2A\POS\Database\AuditLogRepository;
 use G2A\POS\Database\ExternalRefRepository;
 use G2A\POS\Inventory\Distributors\Adapter;
 use G2A\POS\Inventory\Distributors\AdapterRegistry;
+use G2A\POS\Wholesalers\Media\LipseysImageUrls;
+use G2A\POS\Wholesalers\Media\VendorImageMirror;
 
 /**
  * Normalizes distributor / UPC CSV rows into WooCommerce products and
@@ -129,6 +131,8 @@ final class Importer {
 
 				$refs->upsert( $product_id, $source, $source_ref, $upc, $mfg_sku, $norm['metadata'] ?? array() );
 
+				$this->mirror_image_if_available( $product_id, $norm, $mfg_sku ?: $source_ref );
+
 				if ( $existing_pid ) {
 					++$stats['rows_updated'];
 				} else {
@@ -218,6 +222,47 @@ final class Importer {
 		}
 
 		return (int) $product_id;
+	}
+
+	/**
+	 * Mirrors a distributor's product image into the media library and sets
+	 * it as the featured image, when the adapter surfaced one and the
+	 * product doesn't already have one. Only Lipsey's CDN mapping exists
+	 * today; other distributors are silently skipped until their own
+	 * image URL builder is added. Never throws — a mirror failure (bad
+	 * filename, CDN timeout) must not fail the whole row import.
+	 */
+	private function mirror_image_if_available( int $product_id, array $norm, ?string $vendor_sku ): void {
+		if ( ! function_exists( 'has_post_thumbnail' ) || has_post_thumbnail( $product_id ) ) {
+			return;
+		}
+
+		$image_filename = $norm['image_filename'] ?? null;
+		if ( ! $image_filename ) {
+			return;
+		}
+
+		if ( ( $norm['source'] ?? null ) !== 'lipseys' ) {
+			return;
+		}
+
+		$cdn_url = LipseysImageUrls::cdnUrl( (string) $image_filename );
+		if ( ! $cdn_url ) {
+			return;
+		}
+
+		try {
+			VendorImageMirror::mirror(
+				$cdn_url,
+				array(
+					'wc_product_id' => $product_id,
+					'vendor_sku'    => $vendor_sku,
+					'set_featured'  => true,
+				)
+			);
+		} catch ( \Throwable $e ) {
+			// Image mirroring is best-effort; the product itself already imported.
+		}
 	}
 
 	private function upsert_barcode( int $product_id, string $upc ): void {
