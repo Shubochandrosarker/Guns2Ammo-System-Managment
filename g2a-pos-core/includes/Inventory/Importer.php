@@ -6,6 +6,7 @@ use G2A\POS\Database\AuditLogRepository;
 use G2A\POS\Database\ExternalRefRepository;
 use G2A\POS\Inventory\Distributors\Adapter;
 use G2A\POS\Inventory\Distributors\AdapterRegistry;
+use G2A\POS\Support\Logger;
 use G2A\POS\Wholesalers\Media\LipseysImageUrls;
 use G2A\POS\Wholesalers\Media\VendorImageMirror;
 
@@ -261,7 +262,7 @@ final class Importer {
 				)
 			);
 		} catch ( \Throwable $e ) {
-			// Image mirroring is best-effort; the product itself already imported.
+			Logger::exception( 'Vendor image mirror failed', $e, array( 'product_id' => $product_id, 'vendor_sku' => $vendor_sku ) );
 		}
 	}
 
