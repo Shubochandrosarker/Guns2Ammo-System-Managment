@@ -6,6 +6,7 @@ use G2A\POS\Database\WholesalerRepository;
 use G2A\POS\Database\WholesalerProductRepository;
 use G2A\POS\Database\WholesalerCategoryRepository;
 use G2A\POS\Database\WholesalerOrderRepository;
+use G2A\POS\Support\Logger;
 use G2A\POS\Wholesalers\Lipseys\LipseysProvider;
 use G2A\POS\Wholesalers\Media\LipseysImageUrls;
 use G2A\POS\Wholesalers\Media\VendorImageMirror;
@@ -443,14 +444,26 @@ final class WholesalerController {
 		$wcProductId = isset( $body['wc_product_id'] ) ? (int) $body['wc_product_id'] : (int) ( $product['wc_product_id'] ?? 0 );
 		$setFeatured = ! empty( $body['set_featured'] );
 
-		$result               = VendorImageMirror::mirror(
-			$url,
-			array(
-				'vendor_sku'    => $sku,
-				'wc_product_id' => $wcProductId,
-				'set_featured'  => $setFeatured,
-			)
-		);
+		try {
+			$result = VendorImageMirror::mirror(
+				$url,
+				array(
+					'vendor_sku'    => $sku,
+					'wc_product_id' => $wcProductId,
+					'set_featured'  => $setFeatured,
+				)
+			);
+		} catch ( \Throwable $e ) {
+			Logger::exception(
+				'Vendor image mirror REST call failed',
+				$e,
+				array(
+					'wholesaler_id' => $wholesalerId,
+					'vendor_sku'    => $sku,
+				)
+			);
+			return new WP_Error( 'mirror_failed', 'Image mirroring failed: ' . $e->getMessage(), array( 'status' => 500 ) );
+		}
 		$result['source_url'] = $url;
 
 		return new WP_REST_Response( $result, ! empty( $result['ok'] ) ? 200 : 422 );
@@ -462,16 +475,28 @@ final class WholesalerController {
 		if ( $sku === '' ) {
 			return new WP_Error( 'no_sku', 'vendor_sku is required', array( 'status' => 400 ) );
 		}
-		$body   = $req->get_json_params() ?: $req->get_params();
-		$result = VendorProductPromoter::promote(
-			$wholesalerId,
-			$sku,
-			array(
-				'publish'    => ! empty( $body['publish'] ),
-				'markup_pct' => isset( $body['markup_pct'] ) ? (float) $body['markup_pct'] : null,
-				'sell_price' => isset( $body['sell_price'] ) ? (float) $body['sell_price'] : null,
-			)
-		);
+		$body = $req->get_json_params() ?: $req->get_params();
+		try {
+			$result = VendorProductPromoter::promote(
+				$wholesalerId,
+				$sku,
+				array(
+					'publish'    => ! empty( $body['publish'] ),
+					'markup_pct' => isset( $body['markup_pct'] ) ? (float) $body['markup_pct'] : null,
+					'sell_price' => isset( $body['sell_price'] ) ? (float) $body['sell_price'] : null,
+				)
+			);
+		} catch ( \Throwable $e ) {
+			Logger::exception(
+				'Vendor product promote REST call failed',
+				$e,
+				array(
+					'wholesaler_id' => $wholesalerId,
+					'vendor_sku'    => $sku,
+				)
+			);
+			return new WP_Error( 'promote_failed', 'Promotion failed: ' . $e->getMessage(), array( 'status' => 500 ) );
+		}
 		return new WP_REST_Response( $result, ! empty( $result['ok'] ) ? 200 : 422 );
 	}
 

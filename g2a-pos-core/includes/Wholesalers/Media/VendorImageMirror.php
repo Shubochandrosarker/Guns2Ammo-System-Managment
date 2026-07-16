@@ -84,6 +84,16 @@ final class VendorImageMirror {
 			'tmp_name' => $tmp,
 		);
 
+		// Core's own admin-ajax upload handler raises PHP's memory limit before
+		// generating attachment thumbnails (wp_ajax_upload_attachment calls this
+		// same helper) — without it, a large-but-ordinary product photo can blow
+		// past a stock host's default limit during resizing and fatal with a raw
+		// "There has been a critical error on this website" page instead of a
+		// clean JSON error response.
+		if ( function_exists( 'wp_raise_memory_limit' ) ) {
+			wp_raise_memory_limit( 'image' );
+		}
+
 		$parent_post_id = (int) ( $opts['wc_product_id'] ?? 0 );
 		$attachment_id  = media_handle_sideload( $file_array, $parent_post_id ?: 0 );
 		if ( is_wp_error( $attachment_id ) ) {

@@ -99,6 +99,7 @@ final class Plugin {
 		add_action( self::VENDOR_PRICE_CAPTURE_HOOK, array( self::class, 'cron_vendor_price_capture' ) );
 		add_action( 'admin_menu', array( Menu::class, 'register' ) );
 		add_action( 'admin_notices', array( WholesalerIntegrityChecker::class, 'render_admin_notice' ) );
+		add_action( 'wp_ajax_g2a_pos_dismiss_wholesaler_notice', array( WholesalerIntegrityChecker::class, 'handle_dismiss_ajax' ) );
 		add_action( 'admin_enqueue_scripts', array( Assets::class, 'enqueue' ) );
 		WooSync::boot();
 		WooCatalogSync::boot();

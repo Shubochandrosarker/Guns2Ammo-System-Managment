@@ -6,6 +6,7 @@ use G2A\POS\Database\MapRuleRepository;
 use G2A\POS\Database\WholesalerCategoryRepository;
 use G2A\POS\Database\WholesalerProductRepository;
 use G2A\POS\Database\WholesalerRepository;
+use G2A\POS\Support\Logger;
 use G2A\POS\Wholesalers\Media\LipseysImageUrls;
 use G2A\POS\Wholesalers\Media\VendorImageMirror;
 
@@ -188,14 +189,32 @@ final class VendorProductPromoter {
 		if ( ! $url ) {
 			return null;
 		}
-		return VendorImageMirror::mirror(
-			$url,
-			array(
-				'vendor_sku'    => $vendorSku,
-				'wc_product_id' => $productId,
-				'set_featured'  => true,
-			)
-		);
+		try {
+			return VendorImageMirror::mirror(
+				$url,
+				array(
+					'vendor_sku'    => $vendorSku,
+					'wc_product_id' => $productId,
+					'set_featured'  => true,
+				)
+			);
+		} catch ( \Throwable $e ) {
+			// Genuinely best-effort, as the caller's comment already promises —
+			// the product itself is created/updated regardless of whether its
+			// photo could be mirrored.
+			Logger::exception(
+				'Vendor image mirror failed during promotion',
+				$e,
+				array(
+					'product_id' => $productId,
+					'vendor_sku' => $vendorSku,
+				)
+			);
+			return array(
+				'ok'    => false,
+				'error' => 'exception',
+			);
+		}
 	}
 
 	private static function asFloat( $v ): ?float {
