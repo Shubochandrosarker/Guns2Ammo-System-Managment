@@ -41,8 +41,8 @@ final class NICSRepository extends Repository {
 	 */
 	public function list( array $filters = array() ): array {
 		global $wpdb;
-		$t    = $this->table( 'g2a_nics_transactions' );
-		$f    = $this->table( 'g2a_form_4473' );
+		$t     = $this->table( 'g2a_nics_transactions' );
+		$f     = $this->table( 'g2a_form_4473' );
 		$where = array( '1=1' );
 		$args  = array();
 		if ( ! empty( $filters['status'] ) ) {
