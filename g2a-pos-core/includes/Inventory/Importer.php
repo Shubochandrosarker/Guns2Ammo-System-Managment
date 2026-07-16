@@ -262,7 +262,14 @@ final class Importer {
 				)
 			);
 		} catch ( \Throwable $e ) {
-			Logger::exception( 'Vendor image mirror failed', $e, array( 'product_id' => $product_id, 'vendor_sku' => $vendor_sku ) );
+			Logger::exception(
+				'Vendor image mirror failed',
+				$e,
+				array(
+					'product_id' => $product_id,
+					'vendor_sku' => $vendor_sku,
+				)
+			);
 		}
 	}
 
