@@ -45,6 +45,22 @@ final class Waiver_Service {
 	 *  any waiver links already emailed keep resolving. */
 	const TOKEN_META = 'memberistic_waiver_token';
 
+	/**
+	 * When the current token was minted (unix timestamp, as user meta).
+	 * Used to bound how long a self-serve signing link stays valid — see
+	 * get_or_create_token()/user_by_token().
+	 */
+	const TOKEN_ISSUED_META = 'memberistic_waiver_token_issued_at';
+
+	/**
+	 * How many days a minted signing token/link stays valid before it is
+	 * silently rotated on next use. The token used to be permanent (minted
+	 * once per user, never expiring) — anyone who obtained a copy of an
+	 * old emailed/SMS'd link (forwarded mail, shared device, browser
+	 * history) could sign as that member indefinitely. Filterable.
+	 */
+	const DEFAULT_TOKEN_VALIDITY_DAYS = 60;
+
 	/** Public query var. */
 	const QUERY = 'memberistic_waiver';
 
@@ -88,16 +104,46 @@ final class Waiver_Service {
 		return (string) apply_filters( 'memberistic_waiver_text', $saved );
 	}
 
+	/**
+	 * Days a minted token/link stays valid before rotating automatically.
+	 */
+	public static function token_validity_days() {
+		return (int) apply_filters( 'memberistic_waiver_token_validity_days', self::DEFAULT_TOKEN_VALIDITY_DAYS );
+	}
+
 	public static function get_or_create_token( $user_id ) {
 		$user_id = (int) $user_id;
 		if ( $user_id <= 0 ) {
 			return '';
 		}
-		$t = (string) get_user_meta( $user_id, self::TOKEN_META, true );
-		if ( '' === $t ) {
+		$t         = (string) get_user_meta( $user_id, self::TOKEN_META, true );
+		$issued_at = (int) get_user_meta( $user_id, self::TOKEN_ISSUED_META, true );
+		$max_age   = self::token_validity_days() * DAY_IN_SECONDS;
+		$expired   = $max_age > 0 && $issued_at > 0 && ( time() - $issued_at ) > $max_age;
+
+		if ( '' === $t || 0 === $issued_at || $expired ) {
 			$t = wp_generate_password( 40, false, false );
 			update_user_meta( $user_id, self::TOKEN_META, $t );
+			update_user_meta( $user_id, self::TOKEN_ISSUED_META, time() );
 		}
+		return $t;
+	}
+
+	/**
+	 * Force-rotate a member's signing token, invalidating any previously
+	 * issued link immediately. Used when staff explicitly resend a link
+	 * (so a stale/possibly-shared old link stops working) and after a
+	 * waiver is completed (the link that just signed it should not remain
+	 * a standing "sign as this member" credential).
+	 */
+	public static function rotate_token( $user_id ) {
+		$user_id = (int) $user_id;
+		if ( $user_id <= 0 ) {
+			return '';
+		}
+		$t = wp_generate_password( 40, false, false );
+		update_user_meta( $user_id, self::TOKEN_META, $t );
+		update_user_meta( $user_id, self::TOKEN_ISSUED_META, time() );
 		return $t;
 	}
 
@@ -119,7 +165,33 @@ final class Waiver_Service {
 				$token
 			)
 		);
-		return $uid ?: 0;
+		if ( ! $uid ) {
+			return 0;
+		}
+
+		// Reject an expired token exactly like an unrecognized one — the
+		// caller already renders "invalid or has expired" either way, so a
+		// leaked old link stops working silently rather than remaining a
+		// standing bearer credential for this member.
+		//
+		// Tokens minted before this validity window existed have no
+		// issued-at timestamp. Rejecting those outright would instantly
+		// invalidate every link already emailed/texted to members on
+		// deploy day, so a missing timestamp is backfilled to "now" —
+		// granting one full fresh window — instead of being treated as
+		// already expired. Every token gets a real timestamp going
+		// forward, and this path only ever fires once per legacy token.
+		$max_age = self::token_validity_days() * DAY_IN_SECONDS;
+		if ( $max_age > 0 ) {
+			$issued_at = (int) get_user_meta( $uid, self::TOKEN_ISSUED_META, true );
+			if ( 0 === $issued_at ) {
+				update_user_meta( $uid, self::TOKEN_ISSUED_META, time() );
+			} elseif ( ( time() - $issued_at ) > $max_age ) {
+				return 0;
+			}
+		}
+
+		return $uid;
 	}
 
 	/**
@@ -1113,6 +1185,12 @@ final class Waiver_Public {
 			}
 			$ip     = isset( $_SERVER['REMOTE_ADDR'] ) ? sanitize_text_field( wp_unslash( $_SERVER['REMOTE_ADDR'] ) ) : '';
 			$sig_id = (int) Waiver_Service::mark_signed( $user_id, $typed, array_merge( array( 'ip' => $ip, 'source' => 'self_serve' ), $extra['fields'] ) );
+
+			// The link that just signed the waiver should not remain a
+			// standing "sign as this member" credential — rotate now so a
+			// copy of this exact URL (email history, shared device,
+			// forwarded message) can't be replayed later.
+			Waiver_Service::rotate_token( $user_id );
 
 			$membership = Memberships_Repository::get_by_user_id( $user_id );
 			$person     = $membership ? People_Repository::get_primary_by_membership( (int) $membership['id'] ) : null;

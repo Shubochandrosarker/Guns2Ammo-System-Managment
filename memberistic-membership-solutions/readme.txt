@@ -4,7 +4,7 @@ Tags: membership, operations, staff dashboard, stripe, woocommerce, rest api
 Requires at least: 6.0
 Requires PHP: 8.0
 Tested up to: 6.7
-Stable tag: 1.13.1
+Stable tag: 1.18.1
 License: GPLv2 or later
 
 A modern membership operations engine for service businesses. Co-developed by WordPressistic and launch partner Guns 2 Ammo (https://guns2ammo.com).
@@ -71,6 +71,11 @@ Set Settings > Advanced > "Delete data on uninstall" to Yes before removing the 
 See CHANGELOG.md for the full history.
 
 Note: the plugin's version numbering was reset after 1.46.1 back to a 1.9.9.x line. Entries below are in release order (newest first), so 1.46.1 and the earlier "legacy line" 1.10.0 release predate the 1.9.9.2–1.12.0 entries above them.
+
+Note: entries for 1.14.0–1.18.0 (the native waiver e-signature engine, kiosk mode, dashboard Waivers page, and SMS automations) are not yet documented here — see CHANGELOG.md and the merged PR history in the meantime.
+
+= 1.18.1 =
+* Security: the self-serve waiver signing link/token no longer lives forever. It now expires after 60 days (`memberistic_waiver_token_validity_days` filter) and rotates automatically the next time a link is generated (e.g. a reminder email); it also rotates immediately the moment a member completes their waiver, so the exact link that was just used to sign can't be replayed later. Previously the token was minted once per member and never changed — a copy of an old emailed/texted link (forwarded mail, shared device, browser history) remained a standing "sign as this member" credential indefinitely. Already-issued links keep working (backfilled with a fresh window on first use after the update) — nothing breaks for members who haven't signed yet.
 
 = 1.13.1 =
 * Security: the booking-engine waiver bridge now auto-satisfies the booking waiver by EMAIL match only. The previous name fallback let a guest who typed a name matching any prior signer skip the waiver checkbox on the public booking form. Staff lookup screens keep name/DOB search.
