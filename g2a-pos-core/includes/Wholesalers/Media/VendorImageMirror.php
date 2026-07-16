@@ -35,6 +35,16 @@ final class VendorImageMirror {
 
 		$existing = self::findExistingAttachment( $cdnUrl );
 		if ( $existing ) {
+			// The attachment already exists (e.g. two products sharing one
+			// vendor photo, or this exact URL was mirrored on an earlier
+			// import run) — skip the re-download, but still attach it to
+			// *this* product. Reuse previously meant "skip the download AND
+			// skip the attach," which left the image sitting in the media
+			// library while the current product stayed imageless.
+			$parent_post_id = (int) ( $opts['wc_product_id'] ?? 0 );
+			if ( $parent_post_id > 0 && ! empty( $opts['set_featured'] ) ) {
+				set_post_thumbnail( $parent_post_id, $existing );
+			}
 			return array(
 				'ok'            => true,
 				'attachment_id' => $existing,
