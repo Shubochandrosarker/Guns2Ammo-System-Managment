@@ -10,9 +10,22 @@ if ( ! defined( 'WP_UNINSTALL_PLUGIN' ) ) {
 
 global $wpdb;
 
-// Drop custom table
-$table = $wpdb->prefix . 'verifyistic_logs';
-$wpdb->query( "DROP TABLE IF EXISTS {$table}" ); // phpcs:ignore
+// Verification records (and any pending webhook deliveries) are retained
+// unless an administrator deliberately enabled destructive cleanup before
+// uninstall. This prevents silent, unrecoverable loss of the age-verification
+// audit log just because the plugin was deactivated/removed.
+$destroy_data = ( '1' === (string) get_option( 'verifyistic_uninstall_destroy_data', '0' ) );
+
+if ( $destroy_data ) {
+    $tables = array(
+        'verifyistic_logs',
+        'verifyistic_webhook_deliveries',
+    );
+    foreach ( $tables as $table_name ) {
+        $table = $wpdb->prefix . $table_name;
+        $wpdb->query( "DROP TABLE IF EXISTS {$table}" ); // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+    }
+}
 
 // Delete all plugin options
 $options = array(
