@@ -29,8 +29,8 @@ final class WholesalerIntegrityChecker {
 	 * on file, and an untouched, still-broken condition comes back after
 	 * DISMISS_TTL_DAYS instead of being silenced forever.
 	 */
-	public const DISMISS_META_KEY = 'g2a_pos_wholesaler_notice_dismissed';
-	public const DISMISS_TTL_DAYS = 3;
+	public const DISMISS_META_KEY     = 'g2a_pos_wholesaler_notice_dismissed';
+	public const DISMISS_TTL_DAYS     = 3;
 	public const DISMISS_NONCE_ACTION = 'g2a_pos_dismiss_wholesaler_notice';
 
 	/**
