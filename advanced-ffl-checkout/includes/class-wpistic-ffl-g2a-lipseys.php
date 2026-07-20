@@ -45,7 +45,6 @@ class G2A_Lipseys {
 	const DROPSHIP_FIREARM_PATH = 'integration/order/DropShipFirearm';
 
 	public function __construct() {
-		add_action( 'admin_menu', [ $this, 'register_admin_page' ], 49 );
 		add_action( 'wp_ajax_wpistic_ffl_lipseys_save_settings',    [ __CLASS__, 'ajax_save_settings' ] );
 		add_action( 'wp_ajax_wpistic_ffl_lipseys_test_connection',  [ __CLASS__, 'ajax_test_connection' ] );
 		add_action( 'wp_ajax_wpistic_ffl_lipseys_sync_catalog',     [ __CLASS__, 'ajax_sync_catalog' ] );
@@ -54,71 +53,23 @@ class G2A_Lipseys {
 
 	// ── Settings ──────────────────────────────────────────────────────────
 
+	/**
+	 * Crypto context string -- MUST stay 'lipseys' forever. It's folded
+	 * into the AES key derivation (see G2A_Distributor_Support::secret_key()),
+	 * so changing it would permanently orphan every already-encrypted
+	 * password at rest on any site that ran an earlier version of this
+	 * class (before v1.17.0, this logic lived here directly with the same
+	 * 'wpistic-ffl-lipseys|' key material -- refactored to share code with
+	 * the other distributor clients, not to change the derived key).
+	 */
+	const CONTEXT = 'lipseys';
+
 	public static function settings(): array {
 		$settings = wp_parse_args( (array) get_option( self::OPTION_KEY, [] ), [
 			'email'    => '',
 			'password' => '',
 		] );
-
-		if ( '' !== $settings['password'] ) {
-			if ( 0 === strpos( $settings['password'], self::SECRET_PREFIX ) ) {
-				$settings['password'] = self::decrypt_secret( $settings['password'] );
-			} else {
-				// Legacy plaintext password at rest — re-store it encrypted
-				// once, transparently. The decrypted value keeps flowing to
-				// the API client exactly as before.
-				$stored             = $settings;
-				$stored['password'] = self::encrypt_secret( $settings['password'] );
-				if ( 0 === strpos( $stored['password'], self::SECRET_PREFIX ) ) {
-					update_option( self::OPTION_KEY, $stored );
-				}
-			}
-		}
-
-		return $settings;
-	}
-
-	/**
-	 * Marker for encrypted values stored in wp_options.
-	 */
-	const SECRET_PREFIX = 'enc:v1:';
-
-	/**
-	 * AES-256-GCM key derived from the site's AUTH_KEY (wp_salt fallback).
-	 * Not perfect secrecy — the key lives on the same host — but the
-	 * credential is no longer readable from a bare wp_options dump/export.
-	 */
-	private static function secret_key(): string {
-		$material = defined( 'AUTH_KEY' ) && '' !== AUTH_KEY ? AUTH_KEY : wp_salt( 'auth' );
-		return hash( 'sha256', 'wpistic-ffl-lipseys|' . $material, true );
-	}
-
-	private static function encrypt_secret( string $plain ): string {
-		if ( '' === $plain || ! function_exists( 'openssl_encrypt' ) ) {
-			return $plain;
-		}
-		$iv     = random_bytes( 12 );
-		$tag    = '';
-		$cipher = openssl_encrypt( $plain, 'aes-256-gcm', self::secret_key(), OPENSSL_RAW_DATA, $iv, $tag );
-		if ( false === $cipher ) {
-			return $plain;
-		}
-		return self::SECRET_PREFIX . base64_encode( $iv . $tag . $cipher );
-	}
-
-	private static function decrypt_secret( string $stored ): string {
-		if ( 0 !== strpos( $stored, self::SECRET_PREFIX ) || ! function_exists( 'openssl_decrypt' ) ) {
-			return $stored;
-		}
-		$raw = base64_decode( substr( $stored, strlen( self::SECRET_PREFIX ) ), true );
-		if ( false === $raw || strlen( $raw ) <= 28 ) {
-			return '';
-		}
-		$iv     = substr( $raw, 0, 12 );
-		$tag    = substr( $raw, 12, 16 );
-		$cipher = substr( $raw, 28 );
-		$plain  = openssl_decrypt( $cipher, 'aes-256-gcm', self::secret_key(), OPENSSL_RAW_DATA, $iv, $tag );
-		return false === $plain ? '' : $plain;
+		return G2A_Distributor_Support::decrypt_settings_secrets( $settings, [ 'password' ], self::CONTEXT, self::OPTION_KEY );
 	}
 
 	public static function is_configured(): bool {
@@ -234,31 +185,21 @@ class G2A_Lipseys {
 		$total    = count( $items );
 		$imported = 0;
 
-		global $wpdb;
-		$table = DB::table( 'distributor_products' );
 		foreach ( array_slice( $items, 0, $limit ) as $item ) {
 			$item_no = (string) ( $item['itemNo'] ?? $item['ItemNo'] ?? '' );
 			if ( '' === $item_no ) {
 				continue;
 			}
-			$wpdb->query( $wpdb->prepare( // phpcs:ignore WordPress.DB.DirectDatabaseQuery
-				"INSERT INTO {$table}
-				 ( distributor, item_no, description, manufacturer, model, upc, price, quantity, is_firearm, last_synced )
-				 VALUES ( 'lipseys', %s, %s, %s, %s, %s, %f, %d, %d, %s )
-				 ON DUPLICATE KEY UPDATE
-				   description = VALUES(description), manufacturer = VALUES(manufacturer),
-				   model = VALUES(model), upc = VALUES(upc), price = VALUES(price),
-				   quantity = VALUES(quantity), is_firearm = VALUES(is_firearm), last_synced = VALUES(last_synced)",
-				$item_no,
-				(string) ( $item['description'] ?? $item['Description'] ?? '' ),
-				(string) ( $item['manufacturer'] ?? $item['Manufacturer'] ?? '' ),
-				(string) ( $item['model'] ?? $item['Model'] ?? '' ),
-				(string) ( $item['upc'] ?? $item['Upc'] ?? '' ),
-				(float) ( $item['price'] ?? $item['Price'] ?? 0 ),
-				(int) ( $item['quantity'] ?? $item['Quantity'] ?? 0 ),
-				! empty( $item['itemType'] ) && false !== stripos( (string) $item['itemType'], 'firearm' ) ? 1 : 0,
-				current_time( 'mysql' )
-			) );
+			G2A_Distributor_Support::upsert_catalog_item( 'lipseys', [
+				'item_no'      => $item_no,
+				'description'  => (string) ( $item['description'] ?? $item['Description'] ?? '' ),
+				'manufacturer' => (string) ( $item['manufacturer'] ?? $item['Manufacturer'] ?? '' ),
+				'model'        => (string) ( $item['model'] ?? $item['Model'] ?? '' ),
+				'upc'          => (string) ( $item['upc'] ?? $item['Upc'] ?? '' ),
+				'price'        => (float) ( $item['price'] ?? $item['Price'] ?? 0 ),
+				'quantity'     => (int) ( $item['quantity'] ?? $item['Quantity'] ?? 0 ),
+				'is_firearm'   => ! empty( $item['itemType'] ) && false !== stripos( (string) $item['itemType'], 'firearm' ),
+			] );
 			++$imported;
 		}
 
@@ -277,13 +218,7 @@ class G2A_Lipseys {
 	 * @return array|\WP_Error
 	 */
 	public static function submit_dropship_firearm_order( int $transfer_id, string $item_no, int $quantity, string $note = '' ) {
-		global $wpdb;
-		$t = $wpdb->get_row( $wpdb->prepare( // phpcs:ignore WordPress.DB.DirectDatabaseQuery
-			'SELECT t.*, d.license_number, d.business_name, d.phone AS dealer_phone
-			 FROM ' . DB::table( 'transfers' ) . ' t
-			 LEFT JOIN ' . DB::table( 'dealers' ) . ' d ON d.id = t.dealer_id
-			 WHERE t.id = %d', $transfer_id
-		) );
+		$t = G2A_Distributor_Support::transfer_with_dealer( $transfer_id );
 		if ( ! $t ) {
 			return new \WP_Error( 'lipseys_no_transfer', __( 'Transfer not found.', 'advanced-ffl-checkout' ) );
 		}
@@ -303,12 +238,10 @@ class G2A_Lipseys {
 
 		$result = self::request( 'POST', self::DROPSHIP_FIREARM_PATH, $body );
 
-		$status  = is_wp_error( $result ) ? 'failed' : 'submitted';
-		$ref     = ! is_wp_error( $result ) ? (string) ( $result['orderNumber'] ?? $result['OrderNumber'] ?? $result['referenceNumber'] ?? '' ) : '';
-		$response_json = wp_json_encode( is_wp_error( $result ) ? [ 'error' => $result->get_error_message() ] : $result );
+		$status = is_wp_error( $result ) ? 'failed' : 'submitted';
+		$ref    = ! is_wp_error( $result ) ? (string) ( $result['orderNumber'] ?? $result['OrderNumber'] ?? $result['referenceNumber'] ?? '' ) : '';
 
-		$wpdb->insert( DB::table( 'distributor_orders' ), [ // phpcs:ignore WordPress.DB.DirectDatabaseQuery
-			'distributor'           => 'lipseys',
+		G2A_Distributor_Support::record_distributor_order( 'lipseys', [
 			'transfer_id'           => $transfer_id,
 			'po_number'             => $t->transfer_ref,
 			'item_no'               => $item_no,
@@ -316,20 +249,12 @@ class G2A_Lipseys {
 			'ship_to_ffl'           => $t->license_number,
 			'status'                => $status,
 			'distributor_order_ref' => $ref,
-			'response_json'         => $response_json,
-			'submitted_by'          => get_current_user_id() ?: null,
-		] );
-
-		$wpdb->insert( DB::table( 'events' ), [ // phpcs:ignore WordPress.DB.DirectDatabaseQuery
-			'transfer_id' => $transfer_id,
-			'event_type'  => 'distributor_order_' . $status,
-			'notes'       => sprintf(
+			'response_json'         => wp_json_encode( is_wp_error( $result ) ? [ 'error' => $result->get_error_message() ] : $result ),
+			'note'                  => sprintf(
 				'Lipsey\'s drop-ship order (item %s x%d) %s.%s',
 				$item_no, $quantity, $status,
 				$ref ? ' Distributor ref: ' . $ref : ''
 			),
-			'actor'       => wp_get_current_user()->user_login ?: 'staff',
-			'actor_ip'    => Token::client_ip(),
 		] );
 
 		return is_wp_error( $result ) ? $result : [ 'status' => $status, 'ref' => $ref ];
@@ -354,7 +279,7 @@ class G2A_Lipseys {
 			$password = $current['password'];
 		}
 
-		update_option( self::OPTION_KEY, [ 'email' => $email, 'password' => self::encrypt_secret( $password ) ] );
+		update_option( self::OPTION_KEY, [ 'email' => $email, 'password' => G2A_Distributor_Support::encrypt_secret( $password, self::CONTEXT ) ] );
 		delete_transient( self::TOKEN_TRANSIENT );
 		wp_send_json_success();
 	}
@@ -407,20 +332,9 @@ class G2A_Lipseys {
 		wp_send_json_success( $result );
 	}
 
-	// ── Admin page ────────────────────────────────────────────────────────
+	// ── Admin panel (rendered inside the shared "📦 Distributors" page — see G2A_Distributors_Admin) ──
 
-	public function register_admin_page(): void {
-		add_submenu_page(
-			'wpistic-ffl',
-			__( 'Distributor (Lipsey\'s)', 'advanced-ffl-checkout' ),
-			__( '📦 Distributor', 'advanced-ffl-checkout' ),
-			'manage_woocommerce',
-			'wpistic-ffl-lipseys',
-			[ $this, 'render_admin_page' ]
-		);
-	}
-
-	public function render_admin_page(): void {
+	public static function render_panel(): void {
 		global $wpdb;
 		$nonce    = wp_create_nonce( 'wpistic_ffl_admin_nonce' );
 		$settings = self::settings();
@@ -439,14 +353,9 @@ class G2A_Lipseys {
 			 WHERE status NOT IN ('transferred','cancelled') ORDER BY created_at DESC LIMIT 100"
 		);
 		?>
-		<div class="wrap wpistic-ffl-admin">
-			<h1 style="display:flex;align-items:center;gap:12px;">
-				<span style="font-size:24px;">📦</span>
-				<?php esc_html_e( 'Distributor Drop-Ship (Lipsey\'s)', 'advanced-ffl-checkout' ); ?>
-			</h1>
-			<p class="description" style="max-width:760px;">
-				<?php esc_html_e( 'Real client against Lipsey\'s dealer API (api.lipseys.com) — requires an approved Lipsey\'s dealer account. Catalog sync is free to run any time; submitting a drop-ship order is always an explicit click here and is never triggered automatically by any transfer event.', 'advanced-ffl-checkout' ); ?>
-			</p>
+		<p class="description" style="max-width:760px;">
+			<?php esc_html_e( 'Real client against Lipsey\'s dealer API (api.lipseys.com) — requires an approved Lipsey\'s dealer account. Catalog sync is free to run any time; submitting a drop-ship order is always an explicit click here and is never triggered automatically by any transfer event.', 'advanced-ffl-checkout' ); ?>
+		</p>
 
 			<div style="background:#fff;padding:20px;border:1px solid #ccd0d4;border-radius:10px;margin-top:20px;">
 				<h2 style="margin-top:0;border-bottom:2px solid #DCB45F;padding-bottom:8px;">⚙️ <?php esc_html_e( 'Credentials', 'advanced-ffl-checkout' ); ?></h2>
@@ -554,7 +463,6 @@ class G2A_Lipseys {
 					</tbody>
 				</table>
 			</div>
-		</div>
 
 		<script>
 		(function(){

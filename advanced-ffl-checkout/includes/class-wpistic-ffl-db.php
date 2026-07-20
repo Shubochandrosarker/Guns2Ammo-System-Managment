@@ -12,8 +12,20 @@ defined( 'ABSPATH' ) || exit;
 
 class DB {
 
-	/** Current schema version */
-	const SCHEMA_VERSION = '1.11.0';
+	/**
+	 * Current schema version. Bootstrap re-runs install() whenever
+	 * get_option('wpistic_ffl_db_version') !== this constant (the only path
+	 * that upgrades an already-activated site, since a plugin ZIP upgrade
+	 * does not re-fire register_activation_hook) -- so this MUST be bumped
+	 * whenever a new dbDelta() table is added, or that table is silently
+	 * never created on any site that already has the plugin running.
+	 * This had drifted since 1.11.0 through several rounds that each added
+	 * a table (regulatory_watch, fraud_scores, distributor_products/orders)
+	 * without bumping it; bumping it now re-runs dbDelta for all of them --
+	 * safe, since dbDelta is idempotent and won't touch tables that already
+	 * exist.
+	 */
+	const SCHEMA_VERSION = '1.12.0';
 
 	/**
 	 * Install or upgrade all plugin tables.
@@ -513,6 +525,53 @@ CREATE TABLE {$p}distributor_orders (
 ) $charset;
 " );
 
+		// ── 16. GunBroker marketplace sync (v1.18.0) ────────────────────────────
+		// Targets GunBroker's real, documented REST API (api.gunbroker.com) --
+		// see G2A_Gunbroker class docblock for exactly what was confirmed
+		// (production reference code found on GitHub) vs. inferred/unconfirmed
+		// (rate limits, DevKey approval terms, full category taxonomy, and the
+		// exact JSON field names an order's FFL/buyer data comes back under).
+		// One row per WC product listed on GunBroker -- product_id is the
+		// source of truth, gunbroker_item_id is GunBroker's own assigned ID
+		// once a listing exists (needed for the update/end-listing endpoints).
+		dbDelta( "
+CREATE TABLE {$p}gunbroker_listings (
+  id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  product_id BIGINT UNSIGNED NOT NULL,
+  gunbroker_item_id VARCHAR(30) DEFAULT NULL,
+  category_id VARCHAR(20) NOT NULL DEFAULT '',
+  status VARCHAR(20) NOT NULL DEFAULT 'pending',
+  last_error TEXT DEFAULT NULL,
+  last_synced DATETIME DEFAULT NULL,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY  (id),
+  UNIQUE KEY uidx_product (product_id),
+  UNIQUE KEY uidx_gunbroker_item (gunbroker_item_id),
+  KEY idx_status (status)
+) $charset;
+" );
+
+		// One row per GunBroker order pulled in by the daily/hourly sweep --
+		// gunbroker_order_id is GunBroker's own order ID, deduped on before
+		// any WC order is created for it. wc_order_id stays NULL until an
+		// order is actually built (e.g. a 'needs_dealer' row awaiting manual
+		// staff dealer assignment has no WC order yet).
+		dbDelta( "
+CREATE TABLE {$p}gunbroker_orders (
+  id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  gunbroker_order_id VARCHAR(40) NOT NULL DEFAULT '',
+  wc_order_id BIGINT UNSIGNED DEFAULT NULL,
+  ffl_license_number VARCHAR(50) NOT NULL DEFAULT '',
+  dealer_id BIGINT UNSIGNED DEFAULT NULL,
+  status VARCHAR(20) NOT NULL DEFAULT 'needs_dealer',
+  raw_json LONGTEXT DEFAULT NULL,
+  imported_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY  (id),
+  UNIQUE KEY uidx_gunbroker_order (gunbroker_order_id),
+  KEY idx_status (status)
+) $charset;
+" );
+
 		// Seed state compliance rules if empty
 		self::seed_state_rules();
 
@@ -585,7 +644,7 @@ CREATE TABLE {$p}distributor_orders (
 		global $wpdb;
 		$p = $wpdb->prefix . WPISTIC_FFL_DB_PREFIX;
 
-		$tables = [ 'distributor_orders', 'distributor_products', 'fraud_scores', 'regulatory_watch', 'id_verifications', 'multi_sale_flags', 'ad_ledger', 'ffl_verifications', 'ffl_verification_documents', 'signatures', 'analytics_events', 'dealer_tokens', 'events', 'transfers', 'dealers', 'zip_coords', 'state_rules' ];
+		$tables = [ 'gunbroker_orders', 'gunbroker_listings', 'distributor_orders', 'distributor_products', 'fraud_scores', 'regulatory_watch', 'id_verifications', 'multi_sale_flags', 'ad_ledger', 'ffl_verifications', 'ffl_verification_documents', 'signatures', 'analytics_events', 'dealer_tokens', 'events', 'transfers', 'dealers', 'zip_coords', 'state_rules' ];
 		foreach ( $tables as $table ) {
 			$wpdb->query( "DROP TABLE IF EXISTS {$p}{$table}" ); // phpcs:ignore WordPress.DB.PreparedSQL
 		}
