@@ -442,6 +442,13 @@ select.vfy-dob-part option { color: var(--color-ink); }
    in this codebase (e.g. G2AB_Booking_Statuses::color NO_SHOW). */
 html[data-theme="light"] .vfy-error svg { stroke: #C62828; }
 
+/* Required-field asterisks (popup.php <span class="vfy-required">) — were
+   inline style="color:#f87171;" (same translucent-pink-tuned-for-dark
+   value as .vfy-error above: ~7:1 dark, fails on the light-mode card).
+   Same fix, same red, moved into a class so both modes are covered. */
+.vfy-required { color: #f87171; }
+html[data-theme="light"] .vfy-required { color: #C62828; }
+
 /* ── Success ───────────────────────────────────────────── */
 .vfy-success-state {
   text-align: center;

@@ -63,3 +63,9 @@
 .bonus .c { max-width:1280px; margin:0 auto; display:flex; justify-content:space-between; align-items:center; gap:20px; flex-wrap:wrap; }
 .bonus h4 { font-family: var(--font-display); font-size:28px; letter-spacing:0.02em; }
 .bonus p { margin:0; font-family: var(--font-condensed); font-weight:600; letter-spacing:0.06em; text-transform: uppercase; font-size:14px; }
+
+/* Editor-only "no featured machine guns yet" CMS hint (edit_pages capability
+   gate in template-machine-gun.php) — #c9a84c text on its own 8% tint was
+   ~6.7:1 on the dark page bg but only ~1.9:1 once --color-void flips light. */
+.g2a-mg-admin-note { color: #C9A84C; }
+html[data-theme="light"] .g2a-mg-admin-note { color: #7A4E20; }
