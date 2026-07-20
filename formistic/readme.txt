@@ -4,7 +4,7 @@ Tags: contact form, form builder, wordpress, submissions, inbox, ai, spam protec
 Requires at least: 6.2
 Tested up to: 6.9
 Requires PHP: 7.4
-Stable tag: 2.1.0
+Stable tag: 2.1.1
 License: GPL-2.0+
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
