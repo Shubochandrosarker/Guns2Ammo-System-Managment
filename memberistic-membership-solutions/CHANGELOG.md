@@ -2,6 +2,12 @@
 
 All notable changes are tracked here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## 1.18.4 - Account dashboard color-contrast fix (2026-07-20)
+
+### Fixed
+- The member account dashboard's `--ma-*` color variables were hardcoded hex snapshots instead of live theme tokens, so the "Welcome back" banner, member-since fields, status pills, sign-out link, and digital member card were structurally incapable of following the site's light/dark mode toggle. Rewired to the live token bridge and added light-mode-specific overrides where the digital card's face stays dark in both modes by design.
+- Fixed a CSS specificity bug that made member avatar initials nearly invisible (~1.05:1 contrast) in both modes.
+
 ## 1.18.3 - Stripe incident hotfix (2026-07-20)
 
 ### Fixed

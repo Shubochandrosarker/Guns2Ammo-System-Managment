@@ -102,6 +102,9 @@ No. All verification is handled locally. The webhook integration is optional and
 
 == Changelog ==
 
+= 1.4.7 =
+* Fix: age-gate popup and admin settings page color-contrast issues in dark/light mode, including a required-field-asterisk color and a dynamic-CSS color sanitizer that was permanently overriding the plugin's own theme integration with fixed hex values instead of the live theme tokens.
+
 = 1.4.6 =
 * Hotfix: client IP resolution now trusts Cloudflare/forwarded headers only when the origin request came from a trusted proxy, with IPv4 and IPv6 CIDR support.
 * Hotfix: token minting, failed verification attempts, and successful verifications use separate limiter buckets.

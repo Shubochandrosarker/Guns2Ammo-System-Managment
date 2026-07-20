@@ -4,7 +4,7 @@
  * Plugin Name:       Formistic — Smart Contact Forms for WordPress Leads
  * Plugin URI:        https://www.wordpressistic.com/marketplace/plugins/formistic/
  * Description:       Formistic centralizes form capture, lead inbox management, replies, analytics, automation, and AI-assisted workflows in WordPress.
- * Version:           2.1.0
+ * Version:           2.1.1
  * Requires at least: 6.2
  * Requires PHP:      7.4
  * Author:            Wordpressistic Organization

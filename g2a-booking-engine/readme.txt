@@ -207,6 +207,10 @@ Yes. REST API at `/wp-json/g2a-booking/v1/` covers bookings, forms, calendar, fr
 
 == Changelog ==
 
+= 1.9.9.16 =
+* Fix: events-calendar widget's "sold out" indicator was hardcoded to a light-mode-safe red regardless of the widget's own theme="dark"|"light" attribute (default dark), failing contrast (~2.7-3.1:1) in its default dark state. Now uses a per-variant color.
+* Fix: several dark/light mode color-contrast issues in customer-facing shortcodes (self-check-in, events, event booking, banner) and staff-facing views (booking statuses, front desk, range console) as part of a sitewide contrast audit.
+
 = 1.9.9.15 =
 * Hotfix: Stripe webhook signature lookup now accepts WordPress-normalized headers and standard Stripe headers, with symmetric timestamp tolerance.
 * Hotfix: verified foreign/unhandled webhook events are acknowledged instead of returning generic 422 failures; retryable failures still return 5xx.

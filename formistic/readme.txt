@@ -106,6 +106,9 @@ This plugin can connect to third-party services when enabled by the site adminis
 
 == Changelog ==
 
+= 2.1.1 =
+* Fix: contact/newsletter form field color-contrast issue in dark mode (form card is a fixed white surface that was inheriting ambient dark-mode page text) as part of a sitewide contrast audit.
+
 = 2.1.0 =
 * New: branded HTML email system (`Wpistic_Formistic_Emails`) — the auto-responder acknowledgement and newsletter emails now use a modern branded shell instead of plain text, and the newsletter gains a welcome/confirmation email.
 * New: newsletter one-click unsubscribe — a stateless HMAC unsubscribe token, RFC 2369/8058 `List-Unsubscribe` / `List-Unsubscribe-Post` headers (native Gmail/Yahoo unsubscribe affordance), and a branded unsubscribe landing page.

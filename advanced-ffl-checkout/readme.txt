@@ -128,6 +128,9 @@ Yes. The plugin is fully self-contained. The dashboard integration is optional.
 
 == Changelog ==
 
+= 1.21.1 =
+* Fix: Google Maps InfoWindow dealer-search content color-contrast issue (dark, non-flipping values, since the InfoWindow's own chrome is white and can't be restyled) as part of a sitewide dark/light mode contrast audit.
+
 = 1.21.0 — 2026-07-16 — Distributors as toggleable add-ons =
 * NEW: "🧩 Add-ons" admin page (Advanced FFL → 🧩 Add-ons) — each of the five distributor drop-ship clients (Lipsey's, Sports South, RSR, Bill Hicks & Co., Chattanooga) is now independently toggleable, so a store only carries the hooks/admin surface for the ones it actually uses instead of all five unconditionally.
 * A disabled distributor's class is never instantiated by the main bootstrap — no `wp_ajax_*` actions register, no settings/catalog AJAX handlers exist, and its tab disappears from the "📦 Distributors" page. Disabling never deletes that distributor's settings, credentials, or catalog/order history — turning it back on picks up exactly where it left off.
