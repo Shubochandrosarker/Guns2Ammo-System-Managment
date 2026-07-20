@@ -16,14 +16,14 @@ This is a comprehensive system release featuring plugin integration updates, sec
 
 | Component | Version | Status | Notes |
 |-----------|---------|--------|-------|
-| **WPistic Theme for G2A** | 1.27.13 | ✅ Current | Theme with design tokens, SEO/AEO, business info |
-| **g2a-booking-engine** | 1.9.9.15 | ✅ Current | Lane bookings, events, payments, waivers |
+| **WPistic Theme for G2A** | 1.27.14 | ✅ Current | Theme with design tokens, SEO/AEO, business info |
+| **g2a-booking-engine** | 1.9.9.16 | ✅ Current | Lane bookings, events, payments, waivers |
 | **g2a-pos-core** | 3.3.5 | ✅ Current | Point-of-sale, ATF compliance, audit trails |
-| **memberistic-membership-solutions** | 1.18.3 | ✅ Current | Memberships, renewals, family linking |
+| **memberistic-membership-solutions** | 1.18.4 | ✅ Current | Memberships, renewals, family linking |
 | **messageistic** | 0.8.0 | ✅ Current | SMS/communication engine (Twilio, Android gateway) |
-| **verifyistic** | 1.4.6 | ✅ Current | Age verification popup, COPPA compliance |
-| **advanced-ffl-checkout** | 1.21.0 | ✅ Current | FFL dealer search, NICS automation, 5-distributor drop-ship, GunBroker sync, Credova financing |
-| **formistic** | 2.1.0 | ✅ Current | Contact forms, inbox, newsletter, AI auto-reply |
+| **verifyistic** | 1.4.7 | ✅ Current | Age verification popup, COPPA compliance |
+| **advanced-ffl-checkout** | 1.21.1 | ✅ Current | FFL dealer search, NICS automation, 5-distributor drop-ship, GunBroker sync, Credova financing |
+| **formistic** | 2.1.1 | ✅ Current | Contact forms, inbox, newsletter, AI auto-reply |
 | **g2a-business-api** | (Bundled) | ✅ Current | REST API for staff dashboard |
 | **dashboard-app** | (See deployment) | ✅ Current | React SPA at app.guns2ammo.com |
 
@@ -112,7 +112,7 @@ This is a comprehensive system release featuring plugin integration updates, sec
 See `INSTALL.md` for complete artifact table and step-by-step setup.
 
 **Quick reference:**
-1. Install theme: **WPistic-Theme-For-G2A-Version-1.27.13.zip**
+1. Install theme: **WPistic-Theme-For-G2A-Version-1.27.14.zip**
 2. Install core plugins (in order):
    - g2a-pos-core-3.3.0.zip
    - g2a-booking-engine-1.9.9.14.zip
@@ -120,7 +120,7 @@ See `INSTALL.md` for complete artifact table and step-by-step setup.
    - messageistic-0.8.0.zip
    - verifyistic-1.4.4.zip
    - advanced-ffl-checkout-1.15.1.zip
-   - formistic-2.1.0.zip
+   - formistic-2.1.1.zip
    - g2a-theme-control-1.0.0.zip
 
 3. Run `scripts/build-release-zips.sh` after activation
