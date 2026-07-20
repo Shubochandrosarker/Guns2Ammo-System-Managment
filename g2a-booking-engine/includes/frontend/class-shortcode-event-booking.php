@@ -285,7 +285,7 @@ final class G2AB_Frontend_Shortcode_Event_Booking {
 		.g2ab-evb__check{display:flex;align-items:flex-start;gap:10px;font-size:13px;color:var(--evb-text);margin:6px 0 14px;cursor:pointer;line-height:1.4;}
 		.g2ab-evb__check input{margin-top:2px;}
 		.g2ab-evb__error{background:rgba(198,40,40,.15);border:1px solid rgba(198,40,40,.4);color:#F08A8A;border-radius:5px;padding:10px 12px;font-size:13px;margin-bottom:12px;}
-		.g2ab-evb__cta{width:100%;background:var(--evb-orange);color:#fff;border:2px solid var(--evb-orange);border-radius:5px;padding:14px 18px;font-family:'Inter','Segoe UI',system-ui,-apple-system,sans-serif;font-size:16px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;cursor:pointer;transition:all .15s ease;}
+		.g2ab-evb__cta{width:100%;background:var(--evb-orange);color:#111;border:2px solid var(--evb-orange);border-radius:5px;padding:14px 18px;font-family:'Inter','Segoe UI',system-ui,-apple-system,sans-serif;font-size:16px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;cursor:pointer;transition:all .15s ease;}
 		.g2ab-evb__cta:hover:not(:disabled){background:transparent;color:var(--evb-orange);}
 		.g2ab-evb__cta:disabled{opacity:.6;cursor:not-allowed;}
 		.g2ab-evb__done{text-align:center;padding:18px 8px;}

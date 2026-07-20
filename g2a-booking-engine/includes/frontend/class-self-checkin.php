@@ -129,10 +129,22 @@ final class G2AB_Frontend_Self_Checkin {
 		);
 		?>
 		<style id="g2ab-sci-styles">
-		.g2ab-sci{--bg:#1A191E;--surface:#26252C;--border:#2A323D;--text:#EDEFF2;--muted:#9AA4B2;--orange:#E8802F;--green:#36C26B;background:var(--surface);border:1px solid var(--border);border-top:4px solid var(--orange);border-radius:16px;padding:24px;color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;}
+		/* Wired to the theme's live --color-* tokens (with the original
+		   hardcoded hex kept only as a fallback) instead of a fixed
+		   dark-only local palette, so this widget follows the site's
+		   light/dark toggle like everything else instead of always
+		   rendering as a dark card, including on a light-mode page. */
+		.g2ab-sci{--bg:var(--color-void, #1A191E);--surface:var(--color-gunmetal, #26252C);--border:var(--color-steel, #2A323D);--text:var(--color-white, #EDEFF2);--muted:var(--color-silver, #9AA4B2);--orange:var(--color-ember, #E8802F);--green:var(--color-active, #36C26B);--ink:var(--color-ink, #111);--err:#F2A0A2;--warn:#F2B33D;background:var(--surface);border:1px solid var(--border);border-top:4px solid var(--orange);border-radius:16px;padding:24px;color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;}
+		/* --err/--warn keep today's dark-mode values as-is (untouched) and
+		   only get a darker light-mode pairing below — the translucent
+		   washes behind them stay light-appropriate automatically since
+		   they sit on --surface, which now flips; the fixed light text
+		   colors above did not, and --warn in particular (~1.7:1) would
+		   have gone invisible on a light card without this override. */
+		html[data-theme="light"] .g2ab-sci{--err:#991B1B;--warn:#8A5A00;}
 		.g2ab-sci *{box-sizing:border-box;}
 		.g2ab-sci__eyebrow{display:block;color:var(--orange);font-family:'Inter','Segoe UI',system-ui,-apple-system,sans-serif;font-size:12px;letter-spacing:.2em;font-weight:700;}
-		.g2ab-sci__title{margin:6px 0 4px;color:#fff;font-family:'Inter','Segoe UI',system-ui,-apple-system,sans-serif;font-size:30px;letter-spacing:.02em;text-transform:uppercase;}
+		.g2ab-sci__title{margin:6px 0 4px;color:var(--text);font-family:'Inter','Segoe UI',system-ui,-apple-system,sans-serif;font-size:30px;letter-spacing:.02em;text-transform:uppercase;}
 		.g2ab-sci__sub{margin:0 0 18px;color:var(--muted);font-size:14px;line-height:1.5;}
 		.g2ab-sci__step{display:none;}
 		.g2ab-sci__step.is-active{display:block;animation:g2ab-sci-in .25s ease both;}
@@ -142,8 +154,8 @@ final class G2AB_Frontend_Self_Checkin {
 		.g2ab-sci__field input{width:100%;background:var(--bg);border:1px solid var(--border);border-radius:9px;color:var(--text);padding:13px 14px;font-size:16px;}
 		.g2ab-sci__field input:focus{outline:none;border-color:var(--orange);}
 		.g2ab-sci__or{text-align:center;color:var(--muted);font-size:12px;text-transform:uppercase;letter-spacing:.1em;margin:6px 0;}
-		.g2ab-sci__err{background:rgba(229,72,77,.16);border:1px solid rgba(229,72,77,.4);color:#F2A0A2;border-radius:9px;padding:11px 13px;font-size:14px;margin-bottom:12px;}
-		.g2ab-sci__btn{width:100%;background:var(--orange);color:#fff;border:2px solid var(--orange);border-radius:10px;padding:15px;font-family:'Inter','Segoe UI',system-ui,-apple-system,sans-serif;font-size:17px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;cursor:pointer;transition:all .15s ease;}
+		.g2ab-sci__err{background:rgba(229,72,77,.16);border:1px solid rgba(229,72,77,.4);color:var(--err);border-radius:9px;padding:11px 13px;font-size:14px;margin-bottom:12px;}
+		.g2ab-sci__btn{width:100%;background:var(--orange);color:var(--ink);border:2px solid var(--orange);border-radius:10px;padding:15px;font-family:'Inter','Segoe UI',system-ui,-apple-system,sans-serif;font-size:17px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;cursor:pointer;transition:all .15s ease;}
 		.g2ab-sci__btn:hover{background:transparent;color:var(--orange);}
 		.g2ab-sci__btn:disabled{opacity:.6;cursor:not-allowed;}
 		.g2ab-sci__picklabel{color:var(--muted);font-size:13px;margin:0 0 10px;}
@@ -156,8 +168,8 @@ final class G2AB_Frontend_Self_Checkin {
 		.g2ab-sci__back:hover{color:var(--orange);}
 		.g2ab-sci__done{text-align:center;padding:14px 6px;}
 		.g2ab-sci__done-check{width:78px;height:78px;line-height:78px;margin:0 auto 14px;border-radius:50%;background:rgba(54,194,107,.16);color:var(--green);font-size:42px;border:2px solid var(--green);}
-		.g2ab-sci__done-check.is-warn{background:rgba(242,179,61,.16);color:#F2B33D;border-color:#F2B33D;}
-		.g2ab-sci__done-title{margin:0 0 8px;color:#fff;font-family:'Inter','Segoe UI',system-ui,-apple-system,sans-serif;font-size:26px;letter-spacing:.02em;}
+		.g2ab-sci__done-check.is-warn{background:rgba(242,179,61,.16);color:var(--warn);border-color:var(--warn);}
+		.g2ab-sci__done-title{margin:0 0 8px;color:var(--text);font-family:'Inter','Segoe UI',system-ui,-apple-system,sans-serif;font-size:26px;letter-spacing:.02em;}
 		.g2ab-sci__done-msg{color:var(--muted);font-size:15px;line-height:1.55;max-width:40ch;margin:0 auto;}
 		</style>
 		<script>

@@ -460,7 +460,14 @@
 .g2ab-form__error {
 	background: color-mix(in srgb, #FF5577 18%, var(--g2ab-surface2));
 	border: 1px solid color-mix(in srgb, #FF5577 50%, transparent);
-	color: #FFB3C0;
+	/* Text uses the normal (theme-flipping) ink token instead of a fixed
+	   light pink — the pink read fine on the dark surface it was designed
+	   against (~7.6:1) but on the light-mode surface the 18%-tinted bg is
+	   itself very pale, so light pink text landed at ~1.2:1 (effectively
+	   invisible). Mirrors the theme's .alert.danger pattern: only the
+	   background/border carry the "error" color, body text stays on the
+	   token that already resolves correctly in both modes. */
+	color: var(--g2ab-text);
 	padding: 10px 14px;
 	border-radius: calc(var(--g2ab-radius) - 6px);
 	font-size: 13px;

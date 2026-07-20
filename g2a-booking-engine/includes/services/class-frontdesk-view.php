@@ -118,8 +118,11 @@ final class G2AB_Frontdesk_View {
 		.g2ab-fd-row__time{font-weight:700;font-size:18px;color:#0f2044;}
 		.g2ab-fd-row__status{display:inline-block;padding:3px 10px;border-radius:999px;color:#fff;font-size:11px;letter-spacing:.05em;text-transform:uppercase;}
 		.g2ab-fd-row__pay{display:inline-block;padding:3px 10px;border-radius:6px;border:1px solid currentColor;font-size:11px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;}
-		.g2ab-fd-row__pay.paid{color:#10B981;}
-		.g2ab-fd-row__pay.partial{color:#F59E0B;}
+		/* paid/partial darkened to match the G2AB_Booking_Statuses::color()
+		   fix -- the original #10B981/#F59E0B text on this row white
+		   background only hit 2.5:1 / 2.2:1 (fails the WCAG AA 4.5:1 min). */
+		.g2ab-fd-row__pay.paid{color:#047857;}
+		.g2ab-fd-row__pay.partial{color:#B45309;}
 		.g2ab-fd-row__pay.unpaid{color:#C62828;}
 		.g2ab-fd-row__pay.no_charge{color:#6B7280;}
 		.g2ab-fd-row__body{display:grid;grid-template-columns:2fr 2fr 1fr;gap:14px;font-size:14px;}
