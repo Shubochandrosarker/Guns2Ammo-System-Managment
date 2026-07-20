@@ -186,7 +186,14 @@ final class Scheduler {
 					continue;
 				}
 
-				if ( null === $stripe_status && ! self::is_beyond_recurring_grace_period( $row ) ) {
+				if ( null === $stripe_status ) {
+					Activity_Repository::log(
+						array(
+							'membership_id' => $membership_id,
+							'activity_type' => 'stripe_reconciliation_inconclusive',
+							'title'         => __( 'Stripe reconciliation inconclusive; membership left active', 'memberistic' ),
+						)
+					);
 					// Stripe lookup was inconclusive (API disabled/unreachable) —
 					// fall back to the short grace window as a safety net.
 					continue;

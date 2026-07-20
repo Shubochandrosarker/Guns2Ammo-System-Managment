@@ -261,8 +261,10 @@ All crons use WordPress's built-in `wp-cron`, so they fire on each page request.
 Confirm each of these is done before going live:
 
 - [ ] Stripe live keys entered in **Settings → Payments → Stripe**
-- [ ] Stripe webhook endpoint added in Stripe dashboard → `https://guns2ammo.com/wp-json/g2a-booking/v1/webhooks/stripe`
-- [ ] Stripe webhook secret (`whsec_…`) pasted into **Settings → Payments → Stripe → Webhook secret**
+- [ ] Booking webhook endpoint added in Stripe dashboard → `https://guns2ammo.com/wp-json/g2a-booking/v1/webhooks/stripe`, events: `checkout.session.completed` + `charge.refunded`
+- [ ] Booking webhook secret (`whsec_…`) pasted into **Settings → Payments → Stripe → Webhook secret**
+- [ ] **Membership webhook endpoint added separately** → `https://guns2ammo.com/wp-json/memberistic/v1/webhooks/stripe`, events: `checkout.session.completed`, `invoice.payment_succeeded`, `invoice.payment_failed`, `customer.subscription.deleted` — membership activation depends on this endpoint independently of the booking one; see `docs/INCIDENT-AUDIT-2026-07-19-STRIPE-SIGNUP.md`
+- [ ] Membership webhook secret (a **different** `whsec_…`) pasted into **Memberistic → Settings → Webhook secret**
 - [ ] SMTP plugin installed and verified (FluentSMTP recommended)
 - [ ] Email From-name + From-address set in **Settings → Email**
 - [ ] Brand color set in **Settings → General** (drives `{brand_color}` in email templates)

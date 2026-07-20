@@ -30,14 +30,35 @@
         // ── Fetch a fresh signed form token + nonce ──────────────
         // Deliberately sends no nonce: this endpoint is the recovery
         // path for a stale nonce, so it must not depend on one.
-        refreshToken: function (done) {
+        refreshToken: function (done, force) {
             var self = this;
+            var cacheKey = 'verifyistic_token_cache';
+            if (!force && window.sessionStorage) {
+                try {
+                    var cached = JSON.parse(sessionStorage.getItem(cacheKey) || 'null');
+                    if (cached && cached.token && cached.nonce && cached.expiresAt && cached.expiresAt > Date.now()) {
+                        $('#vfy-form-token').val(cached.token);
+                        self.data.nonce = cached.nonce;
+                        if (typeof done === 'function') { done(); }
+                        return;
+                    }
+                } catch (e) {}
+            }
             $.post(this.data.ajaxUrl, {
                 action: 'verifyistic_token'
             }, function (res) {
                 if (res && res.success && res.data) {
                     if (res.data.token) { $('#vfy-form-token').val(res.data.token); }
                     if (res.data.nonce) { self.data.nonce = res.data.nonce; }
+                    if (window.sessionStorage && res.data.token && res.data.nonce) {
+                        try {
+                            sessionStorage.setItem(cacheKey, JSON.stringify({
+                                token: res.data.token,
+                                nonce: res.data.nonce,
+                                expiresAt: Date.now() + (10 * 60 * 1000)
+                            }));
+                        } catch (e) {}
+                    }
                 }
             }).always(function () {
                 if (typeof done === 'function') { done(); }
@@ -152,7 +173,7 @@
                             self.showError($err, res.data.message || self.data.strings.ageError);
                             // Mint a fresh token so the user's next attempt
                             // isn't blocked by an expired or stale-cache token.
-                            self.refreshToken();
+                            self.refreshToken(null, true);
                         }
                     },
                     error: function (xhr) {
@@ -162,12 +183,12 @@
                         // instead of walling the visitor off with an error.
                         if (!retriedAuth && xhr && xhr.status === 403) {
                             retriedAuth = true;
-                            self.refreshToken(send);
+                            self.refreshToken(send, true);
                             return;
                         }
                         self.setButtonLoading($btn, false);
                         self.showError($err, 'Network error. Please try again.');
-                        self.refreshToken();
+                        self.refreshToken(null, true);
                     }
                 });
             }
@@ -217,20 +238,20 @@
                         self.onVerified(res.data, null);
                     } else {
                         self.showYesNoError((res && res.data && res.data.message) || 'Verification failed. Please try again.');
-                        self.refreshToken();
+                        self.refreshToken(null, true);
                     }
                 }).fail(function (xhr) {
                     // Stale cached nonce → 403: refresh + retry once before
                     // treating it as a real failure.
                     if (!retriedAuth && xhr && xhr.status === 403) {
                         retriedAuth = true;
-                        self.refreshToken(sendYes);
+                        self.refreshToken(sendYes, true);
                         return;
                     }
                     self.setButtonLoading($btn, false);
                     // SECURITY: do NOT let through on network failure. Fail closed.
                     self.showYesNoError('Network error. Please try again.');
-                    self.refreshToken();
+                    self.refreshToken(null, true);
                 });
             }
             sendYes();

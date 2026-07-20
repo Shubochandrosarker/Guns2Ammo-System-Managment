@@ -175,8 +175,8 @@ class Verifyistic_Security {
 	 */
 	public static function atomic_check_and_increment( $key, $max, $ttl ) {
 		if ( ! self::acquire_lock( $key ) ) {
-			// Fail closed: refuse rather than risk an unguarded read-modify-write.
-			return false;
+			error_log( '[Verifyistic] Rate-limit lock timeout; allowing request to avoid false shared-user 429.' );
+			return true;
 		}
 		try {
 			$count = (int) get_transient( $key );
@@ -236,7 +236,7 @@ class Verifyistic_Security {
 	}
 
 	private static function is_trusted_proxy( $remote ) {
-		$list = array();
+		$list = self::default_trusted_proxy_ranges();
 		if ( defined( 'VERIFYISTIC_TRUSTED_PROXIES' ) && is_string( VERIFYISTIC_TRUSTED_PROXIES ) ) {
 			$list = array_merge( $list, array_filter( array_map( 'trim', explode( ',', VERIFYISTIC_TRUSTED_PROXIES ) ) ) );
 		}
@@ -244,6 +244,7 @@ class Verifyistic_Security {
 		if ( '' !== $opt ) {
 			$list = array_merge( $list, array_filter( array_map( 'trim', explode( ',', $opt ) ) ) );
 		}
+		$list = apply_filters( 'verifyistic_trusted_proxies', array_values( array_unique( $list ) ) );
 		if ( empty( $list ) ) return false;
 		foreach ( $list as $range ) {
 			if ( self::ip_in_cidr( $remote, $range ) ) return true;
@@ -251,15 +252,45 @@ class Verifyistic_Security {
 		return false;
 	}
 
+	private static function default_trusted_proxy_ranges() {
+		return array(
+			'173.245.48.0/20',
+			'103.21.244.0/22',
+			'103.22.200.0/22',
+			'103.31.4.0/22',
+			'141.101.64.0/18',
+			'108.162.192.0/18',
+			'190.93.240.0/20',
+			'188.114.96.0/20',
+			'197.234.240.0/22',
+			'198.41.128.0/17',
+			'162.158.0.0/15',
+			'104.16.0.0/13',
+			'104.24.0.0/14',
+			'172.64.0.0/13',
+			'131.0.72.0/22',
+			'2400:cb00::/32',
+			'2606:4700::/32',
+			'2803:f800::/32',
+			'2405:b500::/32',
+			'2405:8100::/32',
+			'2a06:98c0::/29',
+			'2c0f:f248::/32',
+		);
+	}
+
 	private static function ip_in_cidr( $ip, $range ) {
 		if ( false === strpos( $range, '/' ) ) return $ip === $range;
 		list( $subnet, $bits ) = explode( '/', $range, 2 );
-		$bits = (int) $bits;
-		if ( filter_var( $ip, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4 ) && filter_var( $subnet, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4 ) ) {
-			if ( $bits < 0 || $bits > 32 ) return false;
-			$mask = $bits === 0 ? 0 : ( ~0 << ( 32 - $bits ) );
-			return ( ip2long( $ip ) & $mask ) === ( ip2long( $subnet ) & $mask );
-		}
-		return false;
+		$ip_bin     = @inet_pton( $ip );
+		$subnet_bin = @inet_pton( $subnet );
+		if ( false === $ip_bin || false === $subnet_bin || strlen( $ip_bin ) !== strlen( $subnet_bin ) ) return false;
+		$bits      = max( 0, min( strlen( $ip_bin ) * 8, (int) $bits ) );
+		$full      = intdiv( $bits, 8 );
+		$remainder = $bits % 8;
+		if ( $full && substr( $ip_bin, 0, $full ) !== substr( $subnet_bin, 0, $full ) ) return false;
+		if ( 0 === $remainder ) return true;
+		$mask = ( 0xff << ( 8 - $remainder ) ) & 0xff;
+		return ( ord( $ip_bin[ $full ] ) & $mask ) === ( ord( $subnet_bin[ $full ] ) & $mask );
 	}
 }

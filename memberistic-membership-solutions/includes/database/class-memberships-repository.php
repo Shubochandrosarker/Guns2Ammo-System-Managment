@@ -356,6 +356,16 @@ final class Memberships_Repository {
 		return $row ?: null;
 	}
 
+	public static function get_by_stripe_checkout_session_id( $session_id ) {
+		global $wpdb;
+		$session_id = sanitize_text_field( (string) $session_id );
+		if ( '' === $session_id ) {
+			return null;
+		}
+		$row = $wpdb->get_row( $wpdb->prepare( 'SELECT * FROM ' . self::table() . ' WHERE stripe_checkout_session_id = %s LIMIT 1', $session_id ), ARRAY_A );
+		return $row ?: null;
+	}
+
 	public static function get_by_user_id( $user_id ) {
 		global $wpdb;
 		$row = $wpdb->get_row( $wpdb->prepare( 'SELECT * FROM ' . self::table() . ' WHERE primary_user_id = %d ORDER BY created_at DESC LIMIT 1', absint( $user_id ) ), ARRAY_A );
@@ -748,6 +758,7 @@ final class Memberships_Repository {
 			'payment_source',
 			'stripe_customer_id',
 			'stripe_subscription_id',
+			'stripe_checkout_session_id',
 			'pos_customer_id',
 		);
 
@@ -757,7 +768,7 @@ final class Memberships_Repository {
 			}
 		}
 
-		$date_fields = array( 'start_date', 'renewal_date', 'end_date', 'cancelled_at' );
+		$date_fields = array( 'start_date', 'renewal_date', 'end_date', 'cancelled_at', 'stripe_checkout_expires_at' );
 		foreach ( $date_fields as $field ) {
 			if ( isset( $data[ $field ] ) ) {
 				$clean[ $field ] = self::sanitize_datetime( $data[ $field ] );

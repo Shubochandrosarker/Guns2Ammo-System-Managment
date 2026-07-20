@@ -2,6 +2,21 @@
 
 All notable changes are tracked here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## 1.18.3 - Stripe incident hotfix (2026-07-20)
+
+### Fixed
+- Stripe webhook processing no longer marks an event processed before the handler finishes, and retryable failures now propagate to Stripe as 5xx instead of silent success.
+- Pending signup retries reuse or reconcile the saved Checkout Session before any new Stripe Checkout Session is created.
+- Checkout completion validates the authoritative Stripe session/subscription state against the local membership, plan, amount, currency, email, billing cycle, and site mode before activation.
+- The thank-you shortcode no longer assumes success from query parameters; it confirms Stripe state server-side and shows honest active, processing, failed, or manual-review states.
+- Renewal handlers support both legacy and nested Stripe invoice subscription references.
+- Inconclusive Stripe API reconciliation no longer downgrades active recurring members.
+- Membership role sync now runs after account provisioning.
+
+### Added
+- `stripe_checkout_session_id` and `stripe_checkout_expires_at` membership columns for safe pending checkout reuse.
+- Admin webhook health notices and WP-CLI `memberistic stripe-audit` / `memberistic stripe-reconcile` commands.
+
 ## 1.13.1 — Waiver bridge hardening (2026-07-15)
 
 - **Security:** `Waiver_Booking_Bridge` (the `g2ab_waiver_satisfied` hooker) now matches an on-file waiver by **email only**. The name fallback meant the public booking form's attacker-controlled `customer_name` could satisfy the waiver requirement by matching any prior signer. `Waivers_Archive::find_on_file()` keeps name/DOB matching for authenticated staff screens.

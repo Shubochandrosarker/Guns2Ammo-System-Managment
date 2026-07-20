@@ -215,9 +215,14 @@ final class G2AB_Gateway_Fortis {
 		$event_id = (string) ( $event['id'] ?? ( $event['event_id'] ?? '' ) );
 		$tx       = $event['data'] ?? ( $event['transaction'] ?? array() );
 
-		// Idempotency: skip duplicates. Fortis retries non-2xx events.
-		if ( $event_id && function_exists( 'g2ab_webhook_event_is_new' ) && ! g2ab_webhook_event_is_new( 'fortis', $event_id ) ) {
-			return array( 'handled' => true, 'type' => $type, 'reason' => 'duplicate_event', 'event_id' => $event_id );
+		if ( $event_id && function_exists( 'g2ab_webhook_event_claim' ) ) {
+			$claim = g2ab_webhook_event_claim( 'fortis', $event_id, $type, wp_json_encode( $event ) );
+			if ( is_wp_error( $claim ) ) {
+				return $claim;
+			}
+			if ( 'duplicate' === $claim ) {
+				return array( 'handled' => true, 'type' => $type, 'reason' => 'duplicate_event', 'event_id' => $event_id );
+			}
 		}
 
 		// Event-type whitelist: previously we trusted any payload with a "success-looking"
@@ -239,21 +244,41 @@ final class G2AB_Gateway_Fortis {
 		$status = strtolower( (string) ( $tx['status_code'] ?? ( $tx['status'] ?? '' ) ) );
 		$tx_type = strtolower( (string) ( $tx['transaction_type'] ?? ( $tx['type'] ?? '' ) ) );
 
-		// Refund branch.
+		$result = null;
 		if ( in_array( $type, $refund_event_types, true ) || false !== stripos( $type, 'refund' ) || false !== stripos( $type, 'void' ) || 'refund' === $tx_type ) {
-			return $this->mark_booking_refunded( $tx );
+			$result = $this->mark_booking_refunded( $tx );
+		} else {
+			// Paid branch: event-type AND a success status AND an explicit sale/capture type.
+			$is_paid_event   = in_array( $type, $paid_event_types, true );
+			$is_success_code = in_array( $status, array( 'approved', 'success', '101', 'completed', 'captured' ), true );
+			$is_sale_type    = '' === $tx_type || in_array( $tx_type, array( 'sale', 'authcapture', 'capture', 'auth_capture' ), true );
+
+			if ( $is_paid_event && $is_success_code && $is_sale_type ) {
+				$result = $this->mark_booking_paid( $tx );
+			} else {
+				$result = array( 'handled' => true, 'type' => $type, 'reason' => 'verified_event_ignored' );
+			}
 		}
 
-		// Paid branch: event-type AND a success status AND an explicit sale/capture type.
-		$is_paid_event   = in_array( $type, $paid_event_types, true );
-		$is_success_code = in_array( $status, array( 'approved', 'success', '101', 'completed', 'captured' ), true );
-		$is_sale_type    = '' === $tx_type || in_array( $tx_type, array( 'sale', 'authcapture', 'capture', 'auth_capture' ), true );
-
-		if ( $is_paid_event && $is_success_code && $is_sale_type ) {
-			return $this->mark_booking_paid( $tx );
+		if ( is_wp_error( $result ) ) {
+			if ( $event_id && function_exists( 'g2ab_webhook_event_mark_failed' ) ) {
+				g2ab_webhook_event_mark_failed( 'fortis', $event_id, $result->get_error_message() );
+			}
+			return $result;
 		}
 
-		return array( 'handled' => false, 'type' => $type, 'reason' => 'event_type_or_status_not_eligible' );
+		if ( ! empty( $result['retryable'] ) ) {
+			if ( $event_id && function_exists( 'g2ab_webhook_event_mark_failed' ) ) {
+				g2ab_webhook_event_mark_failed( 'fortis', $event_id, wp_json_encode( $result ) );
+			}
+			return $result;
+		}
+
+		if ( $event_id && function_exists( 'g2ab_webhook_event_mark_processed' ) ) {
+			g2ab_webhook_event_mark_processed( 'fortis', $event_id );
+		}
+
+		return $result;
 	}
 
 	private function mark_booking_paid( $tx ) {
@@ -270,6 +295,7 @@ final class G2AB_Gateway_Fortis {
 			return array( 'handled' => true, 'booking_id' => (int) $booking->id, 'status' => $booking->status, 'reason' => 'already_paid' );
 		}
 
+		$previous_status = (string) $booking->status;
 		$amount = isset( $tx['transaction_amount'] ) ? ( (int) $tx['transaction_amount'] ) / 100.0 : 0;
 		if ( $amount <= 0 ) $amount = (float) $booking->total_amount;
 		$tx_id = $tx['id'] ?? '';
@@ -287,7 +313,10 @@ final class G2AB_Gateway_Fortis {
 			return array( 'handled' => false, 'reason' => 'amount_mismatch', 'paid' => $amount, 'expected' => (float) $booking->total_amount );
 		}
 
-		$wpdb->update( $bt, array( 'status' => 'paid', 'paid_amount' => $amount, 'updated_at' => current_time( 'mysql' ) ), array( 'id' => $booking->id ), array( '%s', '%f', '%s' ), array( '%d' ) );
+		$updated = $wpdb->update( $bt, array( 'status' => 'paid', 'paid_amount' => $amount, 'updated_at' => current_time( 'mysql' ) ), array( 'id' => $booking->id ), array( '%s', '%f', '%s' ), array( '%d' ) );
+		if ( false === $updated ) {
+			return array( 'handled' => false, 'retryable' => true, 'reason' => 'booking_update_failed' );
+		}
 
 		$pt = $wpdb->prefix . 'g2ab_payments';
 		$existing = $wpdb->get_var( $wpdb->prepare( "SELECT id FROM {$pt} WHERE booking_id = %d AND gateway = 'fortis' ORDER BY id DESC LIMIT 1", $booking->id ) );
@@ -307,7 +336,16 @@ final class G2AB_Gateway_Fortis {
 			'context' => wp_json_encode( array( 'transaction_id' => $tx_id ) ),
 			'created_at' => current_time( 'mysql' ),
 		) );
-		do_action( 'g2ab_payment_succeeded', $booking->id, 'fortis', $tx );
+		if ( function_exists( 'g2ab_queue_booking_paid_side_effects' ) ) {
+			$queued = g2ab_queue_booking_paid_side_effects( $booking->id, 'fortis', $previous_status, $tx );
+		} else {
+			$queued = false;
+		}
+		if ( ! $queued ) {
+			do_action( 'g2ab_payment_succeeded', $booking->id, 'fortis', $tx );
+			do_action( 'g2ab_booking_paid', $booking, array( 'gateway' => 'fortis', 'transaction_id' => $tx_id ) );
+			do_action( 'g2ab_booking_status_changed', $booking->id, 'paid', $previous_status );
+		}
 		return array( 'handled' => true, 'booking_id' => $booking->id, 'status' => 'paid' );
 	}
 

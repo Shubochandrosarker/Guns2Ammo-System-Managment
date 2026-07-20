@@ -1603,7 +1603,13 @@ final class Memberships_Controller extends REST_Controller {
 		}
 
 		$payload = $request->get_body();
-		$header  = isset( $_SERVER['HTTP_STRIPE_SIGNATURE'] ) ? sanitize_text_field( wp_unslash( $_SERVER['HTTP_STRIPE_SIGNATURE'] ) ) : '';
+		$header  = $request->get_header( 'stripe-signature' );
+		if ( '' === (string) $header ) {
+			$header = $request->get_header( 'stripe_signature' );
+		}
+		if ( '' === (string) $header && isset( $_SERVER['HTTP_STRIPE_SIGNATURE'] ) ) {
+			$header = sanitize_text_field( wp_unslash( $_SERVER['HTTP_STRIPE_SIGNATURE'] ) );
+		}
 
 		if ( '' === $payload || '' === $header ) {
 			return new \WP_Error( 'memberistic_stripe_bad_signature', __( 'Invalid Stripe webhook signature.', 'memberistic' ), array( 'status' => 400 ) );
@@ -1612,6 +1618,7 @@ final class Memberships_Controller extends REST_Controller {
 		if ( ! \WordPressistic\Memberistic\Payments\Stripe_Service::verify_webhook_signature( $payload, $header ) ) {
 			return new \WP_Error( 'memberistic_stripe_bad_signature', __( 'Invalid Stripe webhook signature.', 'memberistic' ), array( 'status' => 400 ) );
 		}
+		update_option( 'memberistic_stripe_webhook_last_verified_at', current_time( 'mysql' ), false );
 
 		$event = json_decode( $payload, true );
 
@@ -1619,8 +1626,14 @@ final class Memberships_Controller extends REST_Controller {
 			return new \WP_Error( 'memberistic_stripe_bad_payload', __( 'Invalid Stripe webhook payload.', 'memberistic' ), array( 'status' => 400 ) );
 		}
 
-		\WordPressistic\Memberistic\Payments\Stripe_Service::process_webhook_event( $event );
+		update_option( 'memberistic_stripe_webhook_last_received_at', current_time( 'mysql' ), false );
+		$result = \WordPressistic\Memberistic\Payments\Stripe_Service::process_webhook_event( $event );
+		if ( is_wp_error( $result ) ) {
+			update_option( 'memberistic_stripe_webhook_last_failed_at', current_time( 'mysql' ), false );
+			return $result;
+		}
+		update_option( 'memberistic_stripe_webhook_last_processed_at', current_time( 'mysql' ), false );
 
-		return rest_ensure_response( array( 'received' => true ) );
+		return rest_ensure_response( array( 'received' => true, 'result' => $result ) );
 	}
 }

@@ -195,6 +195,14 @@ final class Stripe_Service {
 		return self::request( 'GET', '/subscriptions/' . rawurlencode( $subscription_id ) );
 	}
 
+	public static function get_checkout_session( $session_id ) {
+		$session_id = trim( (string) $session_id );
+		if ( '' === $session_id ) {
+			return new \WP_Error( 'memberistic_missing_checkout_session', __( 'No Checkout Session id provided.', 'memberistic' ) );
+		}
+		return self::request( 'GET', '/checkout/sessions/' . rawurlencode( $session_id ) . '?expand[]=subscription' );
+	}
+
 	public static function create_billing_portal_session( $customer_id, $return_url ) {
 		return self::request(
 			'POST',
@@ -510,6 +518,41 @@ final class Stripe_Service {
 		);
 	}
 
+	public static function render_webhook_health_notice() {
+		if ( ! current_user_can( 'manage_options' ) || ! self::is_enabled() ) {
+			return;
+		}
+
+		$last_verified  = get_option( 'memberistic_stripe_webhook_last_verified_at', '' );
+		$last_failed    = get_option( 'memberistic_stripe_webhook_last_failed_at', '' );
+		$last_processed = get_option( 'memberistic_stripe_webhook_last_processed_at', '' );
+		$manual_review  = get_option( 'memberistic_stripe_manual_review', array() );
+		$warnings       = array();
+
+		if ( '' === (string) $last_verified || strtotime( (string) $last_verified ) < ( time() - DAY_IN_SECONDS ) ) {
+			$warnings[] = __( 'Memberistic Stripe webhook has not verified a signed event in the last 24 hours.', 'memberistic' );
+		}
+		if ( $last_failed && ( ! $last_processed || strtotime( (string) $last_failed ) > strtotime( (string) $last_processed ) ) ) {
+			$warnings[] = __( 'The most recent Memberistic Stripe webhook attempt failed.', 'memberistic' );
+		}
+		if ( is_array( $manual_review ) && ! empty( $manual_review ) ) {
+			$warnings[] = sprintf(
+				/* translators: %d: manual review count */
+				_n( '%d Stripe membership item needs manual review.', '%d Stripe membership items need manual review.', count( $manual_review ), 'memberistic' ),
+				count( $manual_review )
+			);
+		}
+		if ( ! $warnings ) {
+			return;
+		}
+
+		printf(
+			'<div class="notice notice-warning"><p><strong>%1$s</strong> %2$s</p></div>',
+			esc_html__( 'Memberistic webhook health:', 'memberistic' ),
+			esc_html( implode( ' ', $warnings ) )
+		);
+	}
+
 	public static function handle_checkout_request() {
 		if ( empty( $_POST['_wpnonce'] ) || ! wp_verify_nonce( sanitize_text_field( wp_unslash( $_POST['_wpnonce'] ) ), 'memberistic_checkout' ) ) {
 			wp_die( esc_html__( 'Checkout request could not be verified.', 'memberistic' ) );
@@ -527,18 +570,6 @@ final class Stripe_Service {
 		// scripted concurrent burst can't have two requests both read the
 		// same stale count and both slip through — the lost-update race
 		// that plain get_transient()-then-set_transient() is exposed to.
-		$mem_ip  = isset( $_SERVER['HTTP_CF_CONNECTING_IP'] ) && filter_var( wp_unslash( $_SERVER['HTTP_CF_CONNECTING_IP'] ), FILTER_VALIDATE_IP )
-			? sanitize_text_field( wp_unslash( $_SERVER['HTTP_CF_CONNECTING_IP'] ) )
-			: ( isset( $_SERVER['REMOTE_ADDR'] ) ? sanitize_text_field( wp_unslash( $_SERVER['REMOTE_ADDR'] ) ) : '0.0.0.0' );
-		$mem_rl_key = 'memberistic_checkout_rl_' . md5( $mem_ip );
-		if ( ! self::atomic_check_and_increment( $mem_rl_key, (int) apply_filters( 'memberistic_checkout_rate_limit', 8 ), 10 * MINUTE_IN_SECONDS ) ) {
-			wp_die(
-				esc_html__( 'Too many checkout attempts. Please wait a few minutes and try again.', 'memberistic' ),
-				esc_html__( 'Slow down', 'memberistic' ),
-				array( 'response' => 429 )
-			);
-		}
-
 		$plan_id       = isset( $_POST['plan_id'] ) ? absint( $_POST['plan_id'] ) : 0;
 		$billing_cycle = isset( $_POST['billing_cycle'] ) ? sanitize_key( wp_unslash( $_POST['billing_cycle'] ) ) : 'monthly';
 		$full_name     = isset( $_POST['full_name'] ) ? sanitize_text_field( wp_unslash( $_POST['full_name'] ) ) : '';
@@ -594,15 +625,39 @@ final class Stripe_Service {
 		// duplicate.
 		$pending_existing = Memberships_Repository::get_pending_by_person_email( $email );
 		if ( $pending_existing && ! empty( $pending_existing['id'] ) ) {
-			$existing_session = self::create_checkout_session( (int) $pending_existing['id'], $plan, $billing_cycle, $email );
-			if ( ! is_wp_error( $existing_session ) && ! empty( $existing_session['url'] ) ) {
+			$existing_session = self::resume_pending_checkout_session( $pending_existing, $plan, $billing_cycle, $email );
+			if ( is_wp_error( $existing_session ) ) {
+				wp_die( esc_html( $existing_session->get_error_message() ) );
+			}
+			if ( ! empty( $existing_session['url'] ) ) {
 				$redirect_url  = esc_url_raw( $existing_session['url'] );
 				$redirect_host = wp_parse_url( $redirect_url, PHP_URL_HOST );
-				if ( in_array( $redirect_host, array( 'checkout.stripe.com', 'billing.stripe.com' ), true ) ) {
+				if ( in_array( $redirect_host, array( 'checkout.stripe.com', 'billing.stripe.com', wp_parse_url( home_url( '/' ), PHP_URL_HOST ) ), true ) ) {
 					wp_redirect( $redirect_url ); // phpcs:ignore WordPress.Security.SafeRedirect.wp_redirect_wp_redirect
 					exit;
 				}
 			}
+		}
+
+		$mem_rl_key = 'memberistic_checkout_rl_' . md5( self::client_ip() . '|' . hash( 'sha256', strtolower( $email ) ) );
+		$limit_check = self::atomic_check_and_increment( $mem_rl_key, (int) apply_filters( 'memberistic_checkout_rate_limit', 8 ), 10 * MINUTE_IN_SECONDS );
+		if ( is_wp_error( $limit_check ) ) {
+			wp_die(
+				esc_html( $limit_check->get_error_message() ),
+				esc_html__( 'Checkout temporarily unavailable', 'memberistic' ),
+				array( 'response' => 503 )
+			);
+		}
+		if ( ! $limit_check ) {
+			if ( ! headers_sent() ) {
+				status_header( 429 );
+				header( 'Retry-After: 600' );
+			}
+			wp_die(
+				esc_html__( 'Too many checkout attempts. Please wait a few minutes and try again.', 'memberistic' ),
+				esc_html__( 'Slow down', 'memberistic' ),
+				array( 'response' => 429 )
+			);
 		}
 
 		$membership_id = Memberships_Repository::create(
@@ -751,6 +806,137 @@ final class Stripe_Service {
 		return (int) $user_id;
 	}
 
+	private static function resume_pending_checkout_session( $pending, $plan, $billing_cycle, $email ) {
+		$membership_id = isset( $pending['id'] ) ? (int) $pending['id'] : 0;
+		if ( ! $membership_id ) {
+			return new \WP_Error( 'memberistic_missing_membership', __( 'Pending membership could not be found.', 'memberistic' ) );
+		}
+
+		$customer_id = '';
+		if ( ! empty( $pending['stripe_checkout_session_id'] ) ) {
+			$session = self::get_checkout_session( (string) $pending['stripe_checkout_session_id'] );
+			if ( is_wp_error( $session ) ) {
+				return $session;
+			}
+
+			$customer_id = isset( $session['customer'] ) ? sanitize_text_field( (string) $session['customer'] ) : '';
+			$valid = self::validate_checkout_session_for_membership( $session, $membership_id, $plan, $billing_cycle, $email );
+			if ( is_wp_error( $valid ) ) {
+				self::record_manual_review( 'checkout_session_mismatch', $membership_id, array(
+					'session_id' => self::mask_stripe_id( (string) $pending['stripe_checkout_session_id'] ),
+					'message'    => $valid->get_error_message(),
+				) );
+				return $valid;
+			}
+
+			$paid = self::checkout_session_is_paid( $session );
+			if ( is_wp_error( $paid ) ) {
+				return $paid;
+			}
+			if ( $paid ) {
+				$result = self::handle_checkout_completed( $session );
+				if ( is_wp_error( $result ) ) {
+					return $result;
+				}
+				return array(
+					'url' => add_query_arg(
+						array(
+							'memberistic_checkout' => 'success',
+							'membership_id'        => $membership_id,
+							'session_id'           => sanitize_text_field( (string) $session['id'] ),
+						),
+						memberistic_get_page_url( 'thank_you_page_id', 'memberistic-thank-you', home_url( '/' ) )
+					),
+				);
+			}
+
+			if ( self::checkout_session_is_open( $session ) && ! empty( $session['url'] ) ) {
+				return $session;
+			}
+		}
+
+		$active_subscription = self::find_active_subscription_for_membership( $membership_id, $customer_id );
+		if ( is_wp_error( $active_subscription ) ) {
+			return $active_subscription;
+		}
+		if ( is_array( $active_subscription ) ) {
+			self::record_manual_review( 'active_subscription_for_pending_membership', $membership_id, array(
+				'subscription_id' => self::mask_stripe_id( (string) ( $active_subscription['id'] ?? '' ) ),
+				'status'          => sanitize_text_field( (string) ( $active_subscription['status'] ?? '' ) ),
+			) );
+			return new \WP_Error( 'memberistic_duplicate_subscription_review', __( 'A Stripe subscription already appears to exist for this pending membership. Staff must review before creating another checkout.', 'memberistic' ) );
+		}
+
+		return self::create_checkout_session( $membership_id, $plan, $billing_cycle, $email );
+	}
+
+	public static function confirm_checkout_return( $membership_id, $session_id ) {
+		$membership_id = absint( $membership_id );
+		$session_id    = sanitize_text_field( (string) $session_id );
+		if ( '' === $session_id ) {
+			return array( 'state' => 'processing', 'title' => __( 'Payment Processing', 'memberistic' ), 'message' => __( 'We are waiting for Stripe confirmation. Please refresh this page in a moment or contact staff if it does not update.', 'memberistic' ) );
+		}
+
+		$session = self::get_checkout_session( $session_id );
+		if ( is_wp_error( $session ) ) {
+			return array( 'state' => 'manual_review', 'title' => __( 'Manual Review Required', 'memberistic' ), 'message' => __( 'Stripe confirmation could not be retrieved. Staff can reconcile this payment from Stripe.', 'memberistic' ) );
+		}
+
+		$metadata_id = ! empty( $session['metadata']['membership_id'] ) ? absint( $session['metadata']['membership_id'] ) : 0;
+		if ( $membership_id && $metadata_id && $membership_id !== $metadata_id ) {
+			self::record_manual_review( 'thank_you_membership_mismatch', $membership_id, array(
+				'session_id'        => self::mask_stripe_id( $session_id ),
+				'metadata_member_id'=> $metadata_id,
+			) );
+			return array( 'state' => 'manual_review', 'title' => __( 'Manual Review Required', 'memberistic' ), 'message' => __( 'The Stripe session does not match this membership record.', 'memberistic' ) );
+		}
+
+		$membership_id = $metadata_id ?: $membership_id;
+		$membership    = $membership_id ? Memberships_Repository::get( $membership_id ) : null;
+		if ( ! $membership ) {
+			return array( 'state' => 'manual_review', 'title' => __( 'Manual Review Required', 'memberistic' ), 'message' => __( 'No matching membership record was found for this Stripe session.', 'memberistic' ) );
+		}
+
+		$plan = Plans_Repository::get( (int) $membership['plan_id'] );
+		if ( ! $plan ) {
+			return array( 'state' => 'manual_review', 'title' => __( 'Manual Review Required', 'memberistic' ), 'message' => __( 'The membership plan could not be verified.', 'memberistic' ) );
+		}
+
+		$person = People_Repository::get_primary_by_membership( $membership_id );
+		$email  = ! empty( $person['email'] ) ? (string) $person['email'] : '';
+		$valid  = self::validate_checkout_session_for_membership( $session, $membership_id, $plan, (string) $membership['billing_cycle'], $email );
+		if ( is_wp_error( $valid ) ) {
+			self::record_manual_review( 'thank_you_session_validation_failed', $membership_id, array(
+				'session_id' => self::mask_stripe_id( $session_id ),
+				'message'    => $valid->get_error_message(),
+			) );
+			return array( 'state' => 'manual_review', 'title' => __( 'Manual Review Required', 'memberistic' ), 'message' => __( 'The Stripe session did not pass membership verification.', 'memberistic' ) );
+		}
+
+		$paid = self::checkout_session_is_paid( $session );
+		if ( is_wp_error( $paid ) ) {
+			return array( 'state' => 'processing', 'title' => __( 'Payment Processing', 'memberistic' ), 'message' => __( 'Stripe has not returned a final subscription state yet. Please refresh this page in a moment.', 'memberistic' ) );
+		}
+		if ( ! $paid ) {
+			$session_status = isset( $session['status'] ) ? (string) $session['status'] : '';
+			return array(
+				'state'   => 'expired' === $session_status ? 'failed' : 'processing',
+				'title'   => 'expired' === $session_status ? __( 'Payment Not Completed', 'memberistic' ) : __( 'Payment Processing', 'memberistic' ),
+				'message' => 'expired' === $session_status ? __( 'The Stripe checkout session expired before payment completed.', 'memberistic' ) : __( 'Stripe has not confirmed payment yet.', 'memberistic' ),
+			);
+		}
+
+		$result = self::handle_checkout_completed( $session );
+		if ( is_wp_error( $result ) ) {
+			return array( 'state' => 'manual_review', 'title' => __( 'Manual Review Required', 'memberistic' ), 'message' => __( 'Payment was found, but local activation could not complete automatically.', 'memberistic' ) );
+		}
+		if ( false === $result || ( is_array( $result ) && 'manual_review' === (string) ( $result['status'] ?? '' ) ) ) {
+			return array( 'state' => 'manual_review', 'title' => __( 'Manual Review Required', 'memberistic' ), 'message' => __( 'Payment was found, but staff must review this membership before activation can be completed.', 'memberistic' ) );
+		}
+
+		return array( 'state' => 'active', 'title' => __( 'Membership Active', 'memberistic' ), 'message' => __( 'Your payment is confirmed and your membership is active.', 'memberistic' ) );
+	}
+
 	public static function create_checkout_session( $membership_id, $plan, $billing_cycle, $email ) {
 		$amount   = 'annual' === $billing_cycle ? (float) $plan['annual_price'] : (float) $plan['monthly_price'];
 		$interval = 'annual' === $billing_cycle ? 'year' : 'month';
@@ -769,10 +955,14 @@ final class Stripe_Service {
 			$currency = 'usd';
 		}
 
+		$success_return_url = add_query_arg( array( 'memberistic_checkout' => 'success', 'membership_id' => $membership_id, 'session_id' => '{CHECKOUT_SESSION_ID}' ), $success_url );
+		$success_return_url = str_replace( rawurlencode( '{CHECKOUT_SESSION_ID}' ), '{CHECKOUT_SESSION_ID}', $success_return_url );
+
 		$payload = array(
 			'mode'                                      => 'subscription',
 			'customer_email'                            => $email,
-			'success_url'                               => add_query_arg( array( 'memberistic_checkout' => 'success', 'membership_id' => $membership_id ), $success_url ),
+			'client_reference_id'                       => (string) $membership_id,
+			'success_url'                               => $success_return_url,
 			'cancel_url'                                => add_query_arg( array( 'memberistic_checkout' => 'cancelled', 'membership_id' => $membership_id ), $cancel_url ),
 			'line_items[0][quantity]'                   => 1,
 			'line_items[0][price_data][currency]'       => $currency,
@@ -787,17 +977,34 @@ final class Stripe_Service {
 			'subscription_data[metadata][billing_cycle]'=> $billing_cycle,
 		);
 
-		return self::request( 'POST', '/checkout/sessions', $payload );
+		$session = self::request(
+			'POST',
+			'/checkout/sessions',
+			$payload,
+			array( 'Idempotency-Key' => 'memberistic_checkout_' . absint( $membership_id ) . '_' . sanitize_key( $billing_cycle ) . '_' . md5( strtolower( (string) $email ) ) )
+		);
+
+		if ( ! is_wp_error( $session ) && ! empty( $session['id'] ) ) {
+			Memberships_Repository::update(
+				(int) $membership_id,
+				array(
+					'stripe_checkout_session_id' => sanitize_text_field( (string) $session['id'] ),
+					'stripe_checkout_expires_at' => ! empty( $session['expires_at'] ) ? wp_date( 'Y-m-d H:i:s', (int) $session['expires_at'] ) : null,
+				)
+			);
+		}
+
+		return $session;
 	}
 
-	public static function request( $method, $endpoint, $payload = array() ) {
+	public static function request( $method, $endpoint, $payload = array(), $headers = array() ) {
 		$args = array(
 			'method'  => $method,
 			'timeout' => 30,
-			'headers' => array(
+			'headers' => array_merge( array(
 				'Authorization'  => 'Bearer ' . self::get_secret_key(),
 				'Stripe-Version' => self::API_VERSION,
-			),
+			), (array) $headers ),
 		);
 
 		if ( ! empty( $payload ) ) {
@@ -819,6 +1026,140 @@ final class Stripe_Service {
 		}
 
 		return is_array( $body ) ? $body : array();
+	}
+
+	private static function validate_checkout_session_for_membership( $session, $membership_id, $plan, $billing_cycle, $email = '' ) {
+		if ( empty( $session['id'] ) ) {
+			return new \WP_Error( 'memberistic_session_missing_id', __( 'Stripe Checkout Session is missing an id.', 'memberistic' ) );
+		}
+		if ( 'subscription' !== (string) ( $session['mode'] ?? '' ) ) {
+			return new \WP_Error( 'memberistic_session_wrong_mode', __( 'Stripe Checkout Session mode is not subscription.', 'memberistic' ) );
+		}
+
+		$metadata = isset( $session['metadata'] ) && is_array( $session['metadata'] ) ? $session['metadata'] : array();
+		if ( absint( $metadata['membership_id'] ?? 0 ) !== absint( $membership_id ) ) {
+			return new \WP_Error( 'memberistic_session_membership_mismatch', __( 'Stripe Checkout Session does not belong to this membership.', 'memberistic' ) );
+		}
+		if ( ! empty( $metadata['plan_id'] ) && absint( $metadata['plan_id'] ) !== absint( $plan['id'] ?? 0 ) ) {
+			return new \WP_Error( 'memberistic_session_plan_mismatch', __( 'Stripe Checkout Session plan does not match the membership.', 'memberistic' ) );
+		}
+		if ( ! empty( $metadata['billing_cycle'] ) && sanitize_key( (string) $metadata['billing_cycle'] ) !== sanitize_key( (string) $billing_cycle ) ) {
+			return new \WP_Error( 'memberistic_session_cycle_mismatch', __( 'Stripe Checkout Session billing cycle does not match the membership.', 'memberistic' ) );
+		}
+
+		$site_live = 'live' === memberistic_get_setting( 'stripe_mode', 'test' );
+		if ( array_key_exists( 'livemode', $session ) && (bool) $session['livemode'] !== $site_live ) {
+			return new \WP_Error( 'memberistic_session_mode_mismatch', __( 'Stripe Checkout Session mode does not match this site.', 'memberistic' ) );
+		}
+
+		$expected_amount = 'annual' === sanitize_key( (string) $billing_cycle ) ? (float) ( $plan['annual_price'] ?? 0 ) : (float) ( $plan['monthly_price'] ?? 0 );
+		$amount_total    = isset( $session['amount_total'] ) ? (int) $session['amount_total'] : 0;
+		if ( $amount_total > 0 && (int) round( $expected_amount * 100 ) !== $amount_total ) {
+			return new \WP_Error( 'memberistic_session_amount_mismatch', __( 'Stripe Checkout Session amount does not match the selected plan.', 'memberistic' ) );
+		}
+
+		$currency = strtolower( (string) memberistic_get_setting( 'currency', 'USD' ) );
+		if ( ! in_array( $currency, array( 'usd', 'eur', 'gbp', 'cad', 'aud' ), true ) ) {
+			$currency = 'usd';
+		}
+		if ( ! empty( $session['currency'] ) && strtolower( (string) $session['currency'] ) !== $currency ) {
+			return new \WP_Error( 'memberistic_session_currency_mismatch', __( 'Stripe Checkout Session currency does not match this site.', 'memberistic' ) );
+		}
+
+		$expected_email = strtolower( trim( (string) $email ) );
+		$session_email  = strtolower( trim( (string) ( $session['customer_email'] ?? ( $session['customer_details']['email'] ?? '' ) ) ) );
+		if ( '' !== $expected_email && '' !== $session_email && $expected_email !== $session_email ) {
+			return new \WP_Error( 'memberistic_session_email_mismatch', __( 'Stripe Checkout Session email does not match the membership.', 'memberistic' ) );
+		}
+
+		return true;
+	}
+
+	private static function checkout_session_is_open( $session ) {
+		if ( 'open' !== (string) ( $session['status'] ?? '' ) ) {
+			return false;
+		}
+		$expires_at = isset( $session['expires_at'] ) ? (int) $session['expires_at'] : 0;
+		return ! $expires_at || $expires_at > time();
+	}
+
+	private static function checkout_session_is_paid( $session ) {
+		$payment_status = (string) ( $session['payment_status'] ?? '' );
+		if ( ! in_array( $payment_status, array( 'paid', 'no_payment_required' ), true ) ) {
+			return false;
+		}
+
+		$subscription = $session['subscription'] ?? '';
+		if ( is_array( $subscription ) ) {
+			$status = (string) ( $subscription['status'] ?? '' );
+		} elseif ( '' !== (string) $subscription ) {
+			$subscription = self::get_subscription( (string) $subscription );
+			if ( is_wp_error( $subscription ) ) {
+				return $subscription;
+			}
+			$status = (string) ( $subscription['status'] ?? '' );
+		} else {
+			return new \WP_Error( 'memberistic_session_missing_subscription', __( 'Stripe Checkout Session has no subscription reference.', 'memberistic' ), array( 'status' => 503 ) );
+		}
+
+		if ( ! in_array( $status, array( 'active', 'trialing' ), true ) ) {
+			return false;
+		}
+
+		return true;
+	}
+
+	private static function find_active_subscription_for_membership( $membership_id, $customer_id ) {
+		$customer_id = trim( (string) $customer_id );
+		if ( '' === $customer_id ) {
+			return null;
+		}
+
+		$response = self::request( 'GET', '/subscriptions?customer=' . rawurlencode( $customer_id ) . '&status=all&limit=20' );
+		if ( is_wp_error( $response ) ) {
+			return $response;
+		}
+
+		foreach ( (array) ( $response['data'] ?? array() ) as $subscription ) {
+			if ( ! is_array( $subscription ) ) {
+				continue;
+			}
+			$status = (string) ( $subscription['status'] ?? '' );
+			if ( ! in_array( $status, array( 'active', 'trialing' ), true ) ) {
+				continue;
+			}
+			$metadata_id = absint( $subscription['metadata']['membership_id'] ?? 0 );
+			if ( $metadata_id && $metadata_id === absint( $membership_id ) ) {
+				return $subscription;
+			}
+		}
+
+		return null;
+	}
+
+	private static function record_manual_review( $type, $membership_id, $context = array() ) {
+		$items = get_option( 'memberistic_stripe_manual_review', array() );
+		if ( ! is_array( $items ) ) {
+			$items = array();
+		}
+		$items[] = array(
+			'type'          => sanitize_key( (string) $type ),
+			'membership_id' => absint( $membership_id ),
+			'context'       => is_array( $context ) ? $context : array(),
+			'created_at'    => current_time( 'mysql' ),
+		);
+		if ( count( $items ) > 200 ) {
+			$items = array_slice( $items, -200 );
+		}
+		update_option( 'memberistic_stripe_manual_review', $items, false );
+	}
+
+	private static function mask_stripe_id( $id ) {
+		$id = sanitize_text_field( (string) $id );
+		if ( strlen( $id ) <= 10 ) {
+			return $id;
+		}
+		return substr( $id, 0, 6 ) . '...' . substr( $id, -4 );
 	}
 
 	/**
@@ -922,20 +1263,16 @@ final class Stripe_Service {
 		// simultaneous deliveries of the same event id (a documented Stripe
 		// behavior) would otherwise both read is_event_processed() as false
 		// before either finished mark_event_processed(), letting both through.
+		$lock_key = '';
 		if ( '' !== $event_id ) {
 			$lock_key = 'stripe_evt_' . $event_id;
 			if ( ! self::acquire_lock( $lock_key ) ) {
-				// Fail closed: refuse rather than risk double-processing.
-				return new WP_Error( 'memberistic_stripe_webhook_locked', __( 'Could not acquire the idempotency lock; try again.', 'memberistic' ) );
+				return new \WP_Error( 'memberistic_stripe_webhook_locked', __( 'Could not acquire the idempotency lock; try again.', 'memberistic' ), array( 'status' => 503 ) );
 			}
-			try {
-				if ( self::is_event_processed( $event_id ) ) {
-					do_action( 'memberistic_stripe_webhook_event_duplicate', $event_id, $type );
-					return true;
-				}
-				self::mark_event_processed( $event_id );
-			} finally {
+			if ( self::is_event_processed( $event_id ) ) {
 				self::release_lock( $lock_key );
+				do_action( 'memberistic_stripe_webhook_event_duplicate', $event_id, $type );
+				return array( 'status' => 'duplicate', 'event_id' => $event_id );
 			}
 		}
 
@@ -949,24 +1286,47 @@ final class Stripe_Service {
 		try {
 			switch ( $type ) {
 				case 'checkout.session.completed':
-					return self::handle_checkout_completed( $obj );
+					$result = self::handle_checkout_completed( $obj );
+					break;
 				case 'customer.subscription.deleted':
-					return self::handle_subscription_deleted( $obj );
+					$result = self::handle_subscription_deleted( $obj );
+					break;
 				case 'invoice.payment_failed':
-					return self::handle_invoice_failed( $obj );
+					$result = self::handle_invoice_failed( $obj );
+					break;
 				case 'invoice.payment_succeeded':
-					return self::handle_invoice_succeeded( $obj );
+					$result = self::handle_invoice_succeeded( $obj );
+					break;
 				case 'payment_intent.succeeded':
 				case 'payment_intent.payment_failed':
 					// Payment-intent events are handled by the invoice events for
 					// subscriptions; one-off PaymentIntents are not currently used
 					// but the hook above lets integrations extend.
-					return true;
+					$result = true;
+					break;
+				default:
+					$result = true;
+					break;
 			}
 
-			return true;
+			if ( is_wp_error( $result ) ) {
+				return $result;
+			}
+			if ( false === $result ) {
+				self::record_manual_review( 'webhook_permanent_mismatch', 0, array(
+					'event_id' => self::mask_stripe_id( $event_id ),
+					'type'     => sanitize_text_field( (string) $type ),
+				) );
+			}
+			if ( '' !== $event_id ) {
+				self::mark_event_processed( $event_id );
+			}
+			return false === $result ? array( 'status' => 'permanent_mismatch', 'type' => $type ) : $result;
 		} finally {
 			self::$processing_inbound_event = false;
+			if ( '' !== $lock_key ) {
+				self::release_lock( $lock_key );
+			}
 		}
 	}
 
@@ -975,14 +1335,30 @@ final class Stripe_Service {
 	 *
 	 * @param array<string, mixed> $invoice Invoice object payload.
 	 */
-	private static function handle_invoice_succeeded( $invoice ) {
-		$subscription_id = ! empty( $invoice['subscription'] ) ? sanitize_text_field( (string) $invoice['subscription'] ) : '';
+	private static function invoice_subscription_id( $invoice ) {
+		if ( ! empty( $invoice['subscription'] ) && is_string( $invoice['subscription'] ) ) {
+			return sanitize_text_field( (string) $invoice['subscription'] );
+		}
+		if ( ! empty( $invoice['parent']['subscription_details']['subscription'] ) ) {
+			return sanitize_text_field( (string) $invoice['parent']['subscription_details']['subscription'] );
+		}
+		if ( ! empty( $invoice['subscription_details']['subscription'] ) ) {
+			return sanitize_text_field( (string) $invoice['subscription_details']['subscription'] );
+		}
+		return '';
+	}
 
-		if ( '' === $subscription_id ) {
+	private static function handle_invoice_succeeded( $invoice ) {
+		$subscription_id = self::invoice_subscription_id( $invoice );
+
+		if ( '' === $subscription_id && empty( $invoice['metadata']['membership_id'] ) ) {
 			return false;
 		}
 
-		$membership = Memberships_Repository::get_by_stripe_subscription_id( $subscription_id );
+		$membership = '' !== $subscription_id ? Memberships_Repository::get_by_stripe_subscription_id( $subscription_id ) : null;
+		if ( ! $membership && ! empty( $invoice['metadata']['membership_id'] ) ) {
+			$membership = Memberships_Repository::get( absint( $invoice['metadata']['membership_id'] ) );
+		}
 
 		if ( ! $membership ) {
 			return false;
@@ -1085,10 +1461,62 @@ final class Stripe_Service {
 			return false;
 		}
 
+		$lock_key = 'membership_activate_' . $membership_id;
+		if ( ! self::acquire_lock( $lock_key ) ) {
+			return new \WP_Error( 'memberistic_membership_locked', __( 'Membership activation is already processing.', 'memberistic' ), array( 'status' => 503 ) );
+		}
+
+		try {
 		$membership = Memberships_Repository::get( $membership_id );
 
 		if ( ! $membership ) {
 			return false;
+		}
+
+		$plan = Plans_Repository::get( (int) $membership['plan_id'] );
+		if ( ! $plan ) {
+			return false;
+		}
+
+		$person = People_Repository::get_primary_by_membership( $membership_id );
+		$email  = ! empty( $person['email'] ) ? (string) $person['email'] : '';
+		$valid  = self::validate_checkout_session_for_membership( $session, $membership_id, $plan, (string) $membership['billing_cycle'], $email );
+		if ( is_wp_error( $valid ) ) {
+			self::record_manual_review( 'checkout_completed_validation_failed', $membership_id, array(
+				'session_id' => self::mask_stripe_id( (string) ( $session['id'] ?? '' ) ),
+				'message'    => $valid->get_error_message(),
+			) );
+			return false;
+		}
+
+		$paid = self::checkout_session_is_paid( $session );
+		if ( is_wp_error( $paid ) ) {
+			return $paid;
+		}
+		if ( ! $paid ) {
+			return false;
+		}
+
+		$session_id = isset( $session['id'] ) ? sanitize_text_field( (string) $session['id'] ) : '';
+		$subscription_id = '';
+		if ( isset( $session['subscription'] ) && is_array( $session['subscription'] ) ) {
+			$subscription_id = sanitize_text_field( (string) ( $session['subscription']['id'] ?? '' ) );
+		} elseif ( isset( $session['subscription'] ) ) {
+			$subscription_id = sanitize_text_field( (string) $session['subscription'] );
+		}
+
+		if ( 'active' === (string) ( $membership['status'] ?? '' ) ) {
+			$same_session = '' !== $session_id && $session_id === (string) ( $membership['stripe_checkout_session_id'] ?? '' );
+			$same_sub     = '' !== $subscription_id && $subscription_id === (string) ( $membership['stripe_subscription_id'] ?? '' );
+			if ( $same_session || $same_sub ) {
+				return true;
+			}
+			self::record_manual_review( 'active_membership_subscription_conflict', $membership_id, array(
+				'existing_subscription_id' => self::mask_stripe_id( (string) ( $membership['stripe_subscription_id'] ?? '' ) ),
+				'incoming_subscription_id' => self::mask_stripe_id( $subscription_id ),
+				'incoming_session_id'      => self::mask_stripe_id( $session_id ),
+			) );
+			return array( 'status' => 'manual_review', 'reason' => 'active_subscription_conflict' );
 		}
 
 		// User creation is deferred from checkout-start to here so an
@@ -1109,7 +1537,9 @@ final class Stripe_Service {
 				'start_date'             => $start_date,
 				'renewal_date'           => $renewal_date,
 				'stripe_customer_id'      => isset( $session['customer'] ) ? sanitize_text_field( (string) $session['customer'] ) : '',
-				'stripe_subscription_id'  => isset( $session['subscription'] ) ? sanitize_text_field( (string) $session['subscription'] ) : '',
+				'stripe_subscription_id'  => $subscription_id,
+				'stripe_checkout_session_id' => $session_id,
+				'stripe_checkout_expires_at' => ! empty( $session['expires_at'] ) ? wp_date( 'Y-m-d H:i:s', (int) $session['expires_at'] ) : null,
 			)
 		);
 
@@ -1164,6 +1594,9 @@ final class Stripe_Service {
 		do_action( 'memberistic_membership_activated', $membership_id );
 
 		return true;
+		} finally {
+			self::release_lock( $lock_key );
+		}
 	}
 
 	private static function handle_subscription_deleted( $subscription ) {
@@ -1203,13 +1636,16 @@ final class Stripe_Service {
 	}
 
 	private static function handle_invoice_failed( $invoice ) {
-		$subscription_id = ! empty( $invoice['subscription'] ) ? sanitize_text_field( (string) $invoice['subscription'] ) : '';
+		$subscription_id = self::invoice_subscription_id( $invoice );
 
-		if ( '' === $subscription_id ) {
+		if ( '' === $subscription_id && empty( $invoice['metadata']['membership_id'] ) ) {
 			return false;
 		}
 
-		$membership = Memberships_Repository::get_by_stripe_subscription_id( $subscription_id );
+		$membership = '' !== $subscription_id ? Memberships_Repository::get_by_stripe_subscription_id( $subscription_id ) : null;
+		if ( ! $membership && ! empty( $invoice['metadata']['membership_id'] ) ) {
+			$membership = Memberships_Repository::get( absint( $invoice['metadata']['membership_id'] ) );
+		}
 
 		if ( ! $membership ) {
 			return false;
@@ -1239,8 +1675,7 @@ final class Stripe_Service {
 	 */
 	private static function atomic_check_and_increment( $key, $max, $ttl ) {
 		if ( ! self::acquire_lock( $key ) ) {
-			// Fail closed: refuse rather than risk an unguarded read-modify-write.
-			return false;
+			return new \WP_Error( 'memberistic_rate_lock_timeout', __( 'Checkout is busy. Please try again in a moment.', 'memberistic' ), array( 'status' => 503 ) );
 		}
 		try {
 			$count = (int) get_transient( $key );
@@ -1252,6 +1687,120 @@ final class Stripe_Service {
 		} finally {
 			self::release_lock( $key );
 		}
+	}
+
+	private static function client_ip() {
+		$remote_addr = isset( $_SERVER['REMOTE_ADDR'] ) ? trim( (string) wp_unslash( $_SERVER['REMOTE_ADDR'] ) ) : '';
+		if ( '' === $remote_addr || ! filter_var( $remote_addr, FILTER_VALIDATE_IP ) ) {
+			return '0.0.0.0';
+		}
+
+		if ( self::remote_is_trusted_proxy( $remote_addr ) ) {
+			$candidates = array();
+			if ( ! empty( $_SERVER['HTTP_CF_CONNECTING_IP'] ) ) {
+				$candidates[] = trim( (string) wp_unslash( $_SERVER['HTTP_CF_CONNECTING_IP'] ) );
+			}
+			if ( ! empty( $_SERVER['HTTP_X_REAL_IP'] ) ) {
+				$candidates[] = trim( (string) wp_unslash( $_SERVER['HTTP_X_REAL_IP'] ) );
+			}
+			if ( ! empty( $_SERVER['HTTP_X_FORWARDED_FOR'] ) ) {
+				$parts = explode( ',', (string) wp_unslash( $_SERVER['HTTP_X_FORWARDED_FOR'] ) );
+				if ( ! empty( $parts[0] ) ) {
+					$candidates[] = trim( $parts[0] );
+				}
+			}
+			foreach ( $candidates as $candidate ) {
+				if ( filter_var( $candidate, FILTER_VALIDATE_IP ) ) {
+					return sanitize_text_field( $candidate );
+				}
+			}
+		}
+
+		return sanitize_text_field( $remote_addr );
+	}
+
+	private static function remote_is_trusted_proxy( $ip ) {
+		foreach ( self::trusted_proxy_ranges() as $range ) {
+			$range = trim( (string) $range );
+			if ( '' === $range ) {
+				continue;
+			}
+			if ( false === strpos( $range, '/' ) ) {
+				if ( $ip === $range ) {
+					return true;
+				}
+				continue;
+			}
+			if ( self::ip_in_cidr( $ip, $range ) ) {
+				return true;
+			}
+		}
+		return false;
+	}
+
+	private static function trusted_proxy_ranges() {
+		$ranges = array(
+			'173.245.48.0/20',
+			'103.21.244.0/22',
+			'103.22.200.0/22',
+			'103.31.4.0/22',
+			'141.101.64.0/18',
+			'108.162.192.0/18',
+			'190.93.240.0/20',
+			'188.114.96.0/20',
+			'197.234.240.0/22',
+			'198.41.128.0/17',
+			'162.158.0.0/15',
+			'104.16.0.0/13',
+			'104.24.0.0/14',
+			'172.64.0.0/13',
+			'131.0.72.0/22',
+			'2400:cb00::/32',
+			'2606:4700::/32',
+			'2803:f800::/32',
+			'2405:b500::/32',
+			'2405:8100::/32',
+			'2a06:98c0::/29',
+			'2c0f:f248::/32',
+		);
+		if ( defined( 'MEMBERISTIC_TRUSTED_PROXIES' ) && MEMBERISTIC_TRUSTED_PROXIES ) {
+			$configured = array_filter( array_map( 'trim', explode( ',', (string) MEMBERISTIC_TRUSTED_PROXIES ) ) );
+			if ( $configured ) {
+				$ranges = array_merge( $ranges, $configured );
+			}
+		}
+		$option = get_option( 'memberistic_trusted_proxies', array() );
+		if ( is_string( $option ) ) {
+			$option = array_filter( array_map( 'trim', preg_split( '/[\r\n,]+/', $option ) ) );
+		}
+		if ( is_array( $option ) ) {
+			$ranges = array_merge( $ranges, $option );
+		}
+		return apply_filters( 'memberistic_trusted_proxies', array_values( array_unique( $ranges ) ) );
+	}
+
+	private static function ip_in_cidr( $ip, $cidr ) {
+		$parts = explode( '/', (string) $cidr, 2 );
+		if ( 2 !== count( $parts ) ) {
+			return false;
+		}
+		list( $subnet, $bits ) = $parts;
+		$ip_bin     = @inet_pton( $ip );
+		$subnet_bin = @inet_pton( $subnet );
+		if ( false === $ip_bin || false === $subnet_bin || strlen( $ip_bin ) !== strlen( $subnet_bin ) ) {
+			return false;
+		}
+		$bits      = max( 0, min( strlen( $ip_bin ) * 8, (int) $bits ) );
+		$full      = intdiv( $bits, 8 );
+		$remainder = $bits % 8;
+		if ( $full && substr( $ip_bin, 0, $full ) !== substr( $subnet_bin, 0, $full ) ) {
+			return false;
+		}
+		if ( 0 === $remainder ) {
+			return true;
+		}
+		$mask = ( 0xff << ( 8 - $remainder ) ) & 0xff;
+		return ( ord( $ip_bin[ $full ] ) & $mask ) === ( ord( $subnet_bin[ $full ] ) & $mask );
 	}
 
 	/**
