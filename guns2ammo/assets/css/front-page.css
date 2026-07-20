@@ -95,6 +95,13 @@
   .mg-callout .dot { width: 8px; height: 8px; border-radius: 50%; background: #4ADE80; box-shadow: 0 0 8px #4ADE80; flex: 0 0 auto; }
   .mg-callout .t { font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.18em; color: #86EFAC; text-transform: uppercase; }
   .mg-callout .t strong { color: #4ADE80; font-weight: 700; }
+  /* Light mode only: the 4% green tint over --color-void is close enough
+     to plain white that #86EFAC/#4ADE80 drop to ~1.2-1.5:1 (fails WCAG AA)
+     — this is the homepage machine-gun-rental callout text, so it's on
+     every visit to the front page. Same dark green used for the footer
+     newsletter / status-badge light-mode fixes, for consistency. */
+  html[data-theme="light"] .mg-callout .t,
+  html[data-theme="light"] .mg-callout .t strong { color: #0F6B32; }
 
   .mg-bullets { display: grid; grid-template-columns: 1fr 1fr; gap: 18px 32px; margin-top: 8px; }
   @media (max-width: 600px) { .mg-bullets { grid-template-columns: 1fr; } }
