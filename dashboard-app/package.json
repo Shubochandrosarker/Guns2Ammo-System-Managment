@@ -1,6 +1,6 @@
 {
   "name": "g2a-dashboard-app",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "private": true,
   "description": "Guns2Ammo Business Control Center — app.guns2ammo.com",
   "type": "module",

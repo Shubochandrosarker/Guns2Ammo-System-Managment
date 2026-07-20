@@ -1,6 +1,6 @@
 # Guns 2 Ammo — WordPress System
 
-**Latest Release: [v2.1.0](RELEASE-2.1.0.md)** — July 15, 2026 — Production-Ready System Build
+**Latest Release: [v2.5.0](RELEASE-2.5.0.md)** — July 20, 2026 — Stripe webhook incident fix, six-plugin crossmatch, sitewide contrast fix
 
 The complete source for **Guns 2 Ammo**'s web presence: an indoor shooting
 range, FFL firearm store, and NRA-certified training academy in Mesa,
@@ -15,7 +15,7 @@ retailer — and the code reflects that: age verification, FFL transfer
 compliance, NICS wait-time math, waiver management, and range check-in are
 first-class concerns throughout, not bolted on.
 
-> **For clients:** See `RELEASE-2.1.0.md` for complete release notes, component versions, and deployment instructions. The `releases/` folder contains all installable packages ready for production deployment.
+> **For clients:** See `RELEASE-2.5.0.md` for complete release notes, component versions, and deployment instructions (`RELEASE-2.1.0.md` is kept as a historical record of the July 15 release). The `releases/` folder contains all installable packages ready for production deployment.
 
 ---
 

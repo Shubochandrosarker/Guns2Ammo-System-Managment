@@ -17,12 +17,12 @@ This release closes out the 2026-07-19 Stripe webhook/membership-activation inci
 | **verifyistic** | 1.4.4 | **1.4.7** | ✅ Stripe incident fix (rate-limit/Cloudflare) + contrast fixes |
 | **advanced-ffl-checkout** | 1.15.1 | **1.21.1** | ✅ crossmatched 6 versions of distributor/marketplace/financing features from its dedicated repo, then contrast fix |
 | **formistic** | 2.1.0 | **2.1.1** | ✅ contrast fix |
-| **g2a-pos-core** | 3.3.0 | 3.3.5 | already current as of 2.1.0's later patches; confirmed in sync with its dedicated repo and live site |
-| **messageistic** | 0.8.0 | 0.8.0 | unchanged |
-| **g2a-theme-control** | 1.0.0 | 1.0.0 | unchanged |
-| **g2a-business-api** | (bundled) | 0.4.2 | unchanged |
-| **dashboard-app** | (see deployment) | 0.1.0 | unchanged |
-| **cloudflare-rag-worker** | — | 1.0.0 | unchanged |
+| **g2a-pos-core** | 3.3.0 | **3.3.6** | confirmed in sync with its dedicated repo and live site (no functional change); version bump to align with this release |
+| **messageistic** | 0.8.0 | **0.8.1** | no functional change; version bump to align with this release. (Backfilled a missing changelog entry for 0.8.0 itself while here — it shipped in a July 15 commit that never wrote it up: two new SMS lifecycle triggers, `waiver.signed` and `waiver.renewal_due`.) |
+| **g2a-theme-control** | 1.0.0 | **1.0.1** | no functional change; version bump to align with this release |
+| **g2a-business-api** | (bundled) | **0.4.3** | no functional change; version bump to align with this release |
+| **dashboard-app** | (see deployment) | **0.1.1** | no functional change; version bump to align with this release |
+| **cloudflare-rag-worker** | — | **1.0.1** | no functional change; version bump to align with this release |
 | **guns2ammo-waiver-manager** | — | 1.5.1 | **retired** — superseded by Memberistic's built-in waiver module; the plugin shows its own "deactivate and delete" admin notice. Kept in the repo for historical reference only, not part of the install order. |
 
 No dedicated repo exists for messageistic, g2a-theme-control, g2a-business-api, dashboard-app, cloudflare-rag-worker, or guns2ammo-waiver-manager — those six are monorepo-only.
@@ -58,6 +58,7 @@ Triggered by member-reported near-invisible text on the account dashboard and Wo
 - `releases/` pruned to the two most-recent versions per component (current + previous), per the policy already documented in `INSTALL.md` but not enforced since — it had drifted to as many as 10 zips for a single plugin. Nothing is lost: every pruned zip is reproducible from its corresponding git commit if ever needed.
 - Verified no stray `-main`/duplicate plugin folders, no committed backup/swap files, and no accidentally-committed secrets anywhere in the tracked tree.
 - `INSTALL.md` and this doc's Component Versions table are now cross-checked directly against each plugin's own version header, not copied forward from the prior release doc.
+- The six components with no functional change this release (g2a-pos-core, messageistic, g2a-theme-control, g2a-business-api, dashboard-app, cloudflare-rag-worker) were still given a version bump + rebuilt release archive so every installable artifact in `releases/` genuinely corresponds to this release, rather than leaving some components' zips dated from whenever they last had real code changes. `guns2ammo-waiver-manager` was deliberately excluded — it's retired, and bumping a plugin that tells admins to delete it would be actively misleading.
 
 ---
 
@@ -65,14 +66,14 @@ Triggered by member-reported near-invisible text on the account dashboard and Wo
 
 Same order as `INSTALL.md`, plugins first, theme last. All artifacts are in `releases/`:
 
-1. `g2a-theme-control-1.0.0.zip`
+1. `g2a-theme-control-1.0.1.zip`
 2. `g2a-booking-engine-1.9.9.16.zip`
 3. `memberistic-membership-solutions-1.18.4.zip`
 4. `formistic-2.1.1.zip`
 5. `verifyistic-1.4.7.zip`
 6. `advanced-ffl-checkout-1.21.1.zip`
-7. `messageistic-0.8.0.zip`
-8. `g2a-pos-core-3.3.5.zip`
+7. `messageistic-0.8.1.zip`
+8. `g2a-pos-core-3.3.6.zip`
 9. `WPistic-Theme-For-G2A-Version-1.27.14.zip` (theme, last)
 
 Deactivate/reactivate each plugin once after a zip-overwrite upload — this codebase's DB migrations and cron registration historically only ran on activation, and a manual zip replace doesn't re-fire that hook. Confirm no stray `*-main` plugin folder exists in `wp-content/plugins/` before going live. `guns2ammo-waiver-manager` is retired — do not install it on a new site; if a live site still has it active, deactivate and delete per its own admin notice.

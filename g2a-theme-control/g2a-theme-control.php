@@ -2,7 +2,7 @@
 /**
  * Plugin Name: G2A Theme Control
  * Description: Dynamic template field controls for Guns2Ammo theme templates.
- * Version: 1.0.0
+ * Version: 1.0.1
  * Author: Wordpressistic
  */
 

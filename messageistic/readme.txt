@@ -32,6 +32,14 @@ Switch providers from settings without rebuilding the plugin.
 
 == Changelog ==
 
+= 0.8.1 =
+* No functional change — version bump to align with Guns 2 Ammo System Release 2.5.0.
+
+= 0.8.0 =
+* New: `waiver.signed` lifecycle trigger — hooks Memberistic's `memberistic_waiver_signed` action to send a confirmation SMS with the waiver's validity date (skipped when the signer left no phone number).
+* New: `waiver.renewal_due` lifecycle trigger — hooks Memberistic's `memberistic_waiver_renewal_due` action, carrying the tokenized re-sign link.
+* New: Firearm Workflow Pack presets for both triggers above, installed inactive with the same consent/opt-out conditions as existing pack entries.
+
 = 0.7.0 =
 *Release date: 2026-07-13*
 
