@@ -6,6 +6,14 @@ on:
   pull_request:
     branches: [ "main" ]
 
+# Cancel a still-running check for the same branch/PR as soon as a newer
+# commit shows up, instead of letting both burn Actions minutes to
+# completion — a PR that gets pushed to several times in quick succession
+# previously queued a full run per push.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 permissions:
   contents: read
 
