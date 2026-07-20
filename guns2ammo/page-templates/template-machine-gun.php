@@ -147,7 +147,7 @@ function g2a_render_mg_card( $row, $tag_index = 0 ) {
             g2a_render_mg_card( $row, $i + 1 );
         } ?>
     <?php elseif ( current_user_can( 'edit_pages' ) ) : ?>
-        <div style="grid-column:1 / -1;padding:24px;border:1px dashed #c9a84c;background:rgba(201,168,76,.08);color:#c9a84c;font-family:ui-monospace,Menlo,Consolas,monospace;font-size:13px;">
+        <div class="g2a-mg-admin-note" style="grid-column:1 / -1;padding:24px;border:1px dashed #c9a84c;background:rgba(201,168,76,.08);font-family:ui-monospace,Menlo,Consolas,monospace;font-size:13px;">
             <strong>Admin note (only you see this):</strong>
             No featured machine guns yet. Edit this page → "Machine Gun Inventory" panel → add weapons and mark up to 3 with <code>is_featured = 1</code>.
         </div>

@@ -244,8 +244,8 @@ final class G2AB_Frontend_Shortcode_Events_Calendar {
 	private function print_css() {
 		?>
 		<style id="g2ab-ecal-styles">
-		.g2ab-ecal{--bg:#1A191E;--surface:#26252C;--surface2:#26252C;--border:#2A323D;--text:#F7F7F9;--muted:#A7A6AE;--orange:#E8802F;--green:#4CAF50;font-family:'Inter',system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;color:var(--text);margin:24px 0;}
-		.g2ab-ecal--light{--bg:#FFFFFF;--surface:#FFFFFF;--surface2:#F4F6FA;--border:#E2E6EE;--text:#1F2733;--muted:#6B7686;}
+		.g2ab-ecal{--bg:#1A191E;--surface:#26252C;--surface2:#26252C;--border:#2A323D;--text:#F7F7F9;--muted:#A7A6AE;--orange:#E8802F;--green:#4CAF50;--danger:#FF6A55;font-family:'Inter',system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;color:var(--text);margin:24px 0;}
+		.g2ab-ecal--light{--bg:#FFFFFF;--surface:#FFFFFF;--surface2:#F4F6FA;--border:#E2E6EE;--text:#1F2733;--muted:#6B7686;--danger:#C62828;}
 		.g2ab-ecal *{box-sizing:border-box;}
 		.g2ab-ecal__heading{font-family:'Inter','Segoe UI',system-ui,-apple-system,sans-serif;font-size:clamp(22px,3vw,30px);letter-spacing:.04em;text-transform:uppercase;text-align:center;margin:0 0 18px;}
 		.g2ab-ecal__layout{display:grid;grid-template-columns:1fr 320px;gap:20px;align-items:start;}
@@ -275,7 +275,7 @@ final class G2AB_Frontend_Shortcode_Events_Calendar {
 		.g2ab-ecal__pill-t{display:block;font-size:10px;color:var(--muted);font-weight:700;}
 		.g2ab-ecal__pill-n{display:block;font-size:12px;color:var(--text);font-weight:600;line-height:1.2;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 		.g2ab-ecal__pill-s{display:block;font-size:9px;color:var(--green);font-weight:700;}
-		.g2ab-ecal__pill.is-out .g2ab-ecal__pill-s{color:#C62828;}
+		.g2ab-ecal__pill.is-out .g2ab-ecal__pill-s{color:var(--danger);}
 		.g2ab-ecal__moreN{font-size:10px;color:var(--orange);font-weight:700;padding-left:4px;}
 		.g2ab-ecal__empty{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:var(--muted);font-size:14px;pointer-events:none;}
 		.g2ab-ecal__side{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:18px;}
@@ -290,7 +290,7 @@ final class G2AB_Frontend_Shortcode_Events_Calendar {
 		.g2ab-ecal__up-name{font-size:14px;color:var(--text);font-weight:700;line-height:1.2;}
 		.g2ab-ecal__up-meta{font-size:11px;color:var(--muted);}
 		.g2ab-ecal__up-meta b{color:var(--green);}
-		.g2ab-ecal__up-meta b.is-out{color:#C62828;}
+		.g2ab-ecal__up-meta b.is-out{color:var(--danger);}
 		.g2ab-ecal__none{color:var(--muted);font-size:13px;}
 		@keyframes g2ab-ecal-in{from{opacity:0;transform:translateY(6px);}to{opacity:1;transform:translateY(0);}}
 		</style>

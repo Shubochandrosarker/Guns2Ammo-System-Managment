@@ -223,6 +223,9 @@ $g2a_ladies_events_shortcode = get_post_meta( $g2a_page_id, 'ladies_upcoming_eve
   .sched-grid .time { font-family: var(--font-mono); font-size: 13px; color: var(--color-fog); letter-spacing: 0.1em; }
   .sched-grid .seats { font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.18em; text-transform: uppercase; }
   .sched-grid .seats.open { color: #4ADE80; }
+  /* Light mode: #4ADE80 is ~8.7:1 on the dark-mode --color-gunmetal card
+     but only ~1.7:1 once that card flips to white (fails WCAG AA). */
+  html[data-theme="light"] .sched-grid .seats.open { color: #0F6B32; }
   .sched-grid .seats.low { color: var(--color-brass-bright); }
   .sched-grid .seats.full { color: var(--color-silver); }
 

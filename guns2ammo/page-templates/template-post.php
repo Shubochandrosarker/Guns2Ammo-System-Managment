@@ -78,6 +78,9 @@ $g2a_biz = function_exists( 'g2a_biz' ) ? g2a_biz() : array();
   .post-share button { width: 40px; height: 40px; background: var(--color-gunmetal); border: 1px solid var(--color-hairline-bright); color: var(--color-fog); cursor: pointer; display: grid; place-items: center; transition: all 180ms var(--ease-std); }
   .post-share button:hover { color: var(--color-brass-bright); border-color: var(--color-brass-dim); }
   .post-share button.copied { color: #4ADE80; border-color: rgba(74,222,128,0.4); }
+  /* Light mode: button bg is --color-gunmetal, which flips to white — the
+     "copied" checkmark's #4ADE80 drops from ~8.7:1 to ~1.7:1 there. */
+  html[data-theme="light"] .post-share button.copied { color: #0F6B32; }
 
   /* Body type */
   .post-body { font-size: 17.5px; line-height: 1.8; color: var(--color-fog); }
@@ -142,6 +145,11 @@ $g2a_biz = function_exists( 'g2a_biz' ) ? g2a_biz() : array();
   .can-col li { font-size: 14.5px; padding-left: 28px; position: relative; line-height: 1.45; }
   .can-col.do li::before { content: ""; position: absolute; left: 0; top: 0; color: #4ADE80; font-weight: 700; font-size: 18px; line-height: 1; }
   .can-col.dont li::before { content: ""; position: absolute; left: 0; top: 0; color: var(--color-ember); font-weight: 700; font-size: 18px; line-height: 1; }
+  /* Light mode: .can-col sits on --color-gunmetal (flips to white) —
+     the "CAN" column's #4ADE80 label/checkmarks drop from ~8.7:1 to
+     ~1.7:1 there. .dont's var(--color-ember) already flips correctly. */
+  html[data-theme="light"] .can-col.do .lab,
+  html[data-theme="light"] .can-col.do li::before { color: #0F6B32; }
 
   /* Tags */
   .post-tags { display: flex; flex-wrap: wrap; gap: 8px; margin: 56px 0 0; padding-top: 32px; border-top: 1px solid var(--color-hairline); }

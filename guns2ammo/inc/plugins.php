@@ -145,7 +145,7 @@ function g2a_verifyistic_skin_css() {
 	#verifyistic-popup .vfy-form-input,#verifyistic-popup select.vfy-dob-part{background:rgba(0,0,0,.25)!important;border:1px solid var(--color-hairline-bright,rgba(255,255,255,.14))!important;border-radius:0!important;color:var(--color-white,#fff)!important;font-family:var(--font-body,Barlow,sans-serif)!important;}
 	#verifyistic-popup .vfy-form-input:focus,#verifyistic-popup select.vfy-dob-part:focus{border-color:var(--color-brass,#c9a84c)!important;box-shadow:0 0 0 2px rgba(201,168,76,.25)!important;background:rgba(201,168,76,.05)!important;}
 	#verifyistic-popup select.vfy-dob-part option{color:#15141a;}
-	#verifyistic-popup .vfy-btn-submit,#verifyistic-popup .vfy-btn-yes{background:var(--color-ember,#c2491f)!important;color:#fff!important;border:0!important;border-radius:0!important;font-family:var(--font-condensed,Barlow Condensed,sans-serif)!important;font-weight:600;text-transform:uppercase;letter-spacing:.06em;}
+	#verifyistic-popup .vfy-btn-submit,#verifyistic-popup .vfy-btn-yes{background:var(--color-ember,#c2491f)!important;color:var(--color-ink,#111114)!important;border:0!important;border-radius:0!important;font-family:var(--font-condensed,Barlow Condensed,sans-serif)!important;font-weight:600;text-transform:uppercase;letter-spacing:.06em;}
 	#verifyistic-popup .vfy-btn-submit:hover,#verifyistic-popup .vfy-btn-yes:hover{filter:brightness(1.08);}
 	#verifyistic-popup .vfy-btn-no{background:transparent!important;border:1px solid var(--color-hairline-bright,rgba(255,255,255,.18))!important;color:var(--color-silver,#9a958c)!important;border-radius:0!important;text-transform:uppercase;letter-spacing:.06em;font-family:var(--font-condensed,Barlow Condensed,sans-serif)!important;}
 	#verifyistic-popup .vfy-success-title{font-family:var(--font-display,Bebas Neue,sans-serif)!important;color:var(--color-white,#fff)!important;text-transform:uppercase;}
@@ -341,7 +341,14 @@ function g2a_plugin_bridge_css() {
 	.g2ab-evt__price{color:var(--color-brass-bright)!important;}
 	.g2ab-evt__tag{background:var(--color-ember)!important;color:#fff!important;}
 	.g2ab-evt__cta{background:var(--color-ember)!important;color:#fff!important;border-radius:2px;font-family:var(--font-condensed)!important;letter-spacing:0.1em;text-transform:uppercase;}
-	.g2ab-error,.g2ab-form__error{color:var(--color-ember)!important;}';
+	.g2ab-error{color:var(--color-ember)!important;}';
+	/* .g2ab-form__error deliberately dropped from the rule above: this
+	   !important was winning over the color set in the plugin's own
+	   frontend.css (.g2ab-form__error uses var(--g2ab-text) there,
+	   chosen specifically because its translucent-red background makes
+	   var(--color-ember) text only ~2.7:1 in light mode — fails WCAG AA).
+	   .g2ab-error itself is unaffected in practice: its only text lives in
+	   a nested <p> with its own more specific color rule. */
 }
 
 /* ---------- Booking form skin: follow the site theme (incl. light/dark) ----------

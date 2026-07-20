@@ -87,6 +87,9 @@
 
 .ladies-card { padding: 32px; background: linear-gradient(135deg, rgba(214,170,124,0.10), transparent), var(--color-gunmetal); border:1px solid rgba(214,170,124,0.3); margin-top:24px; }
 .ladies-card .tag { display:inline-block; padding:4px 10px; background: rgba(214,170,124,0.15); border:1px solid rgba(214,170,124,0.4); color:#E5BC8A; font-family: var(--font-mono); font-size:10px; letter-spacing:0.24em; text-transform: uppercase; }
+/* Light mode only: #E5BC8A is ~5.3:1 on the dark-mode tinted card but
+   only ~1.5:1 once --color-gunmetal flips to white (fails WCAG AA). */
+html[data-theme="light"] .ladies-card .tag { color: #7A4E20; }
 .ladies-card h4 { font-family: var(--font-display); font-size:32px; color: var(--color-white); margin: 12px 0 8px; }
 .ladies-card p { color: var(--color-fog); font-size:14px; margin:0 0 16px; }
 

@@ -102,6 +102,10 @@
      newsletter / status-badge light-mode fixes, for consistency. */
   html[data-theme="light"] .mg-callout .t,
   html[data-theme="light"] .mg-callout .t strong { color: #0F6B32; }
+  /* .dot is a solid graphical status indicator (WCAG 1.4.11 non-text
+     contrast, 3:1 minimum), not text — same #4ADE80-on-pale-tint failure
+     as .t above (~1.5:1 in light mode). */
+  html[data-theme="light"] .mg-callout .dot { background: #0F6B32; box-shadow: 0 0 8px #0F6B32; }
 
   .mg-bullets { display: grid; grid-template-columns: 1fr 1fr; gap: 18px 32px; margin-top: 8px; }
   @media (max-width: 600px) { .mg-bullets { grid-template-columns: 1fr; } }
