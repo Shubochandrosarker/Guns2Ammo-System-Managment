@@ -1,6 +1,6 @@
 {
   "name": "g2a-rag-worker",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "private": true,
   "description": "Guns2Ammo POS RAG service: Workers AI (bge-m3) embeddings + Vectorize storage behind a bearer-auth JSON API.",
   "scripts": {

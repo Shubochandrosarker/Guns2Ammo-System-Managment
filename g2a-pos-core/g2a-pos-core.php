@@ -2,7 +2,7 @@
 /**
  * Plugin Name: G2A POS Core
  * Description: Production FFL POS — compliance (4473/NICS/Bound Book/NFA/ACE audit), 4 wholesalers, CRM, gunsmithing, layaway/SO/consignment/trade-ins, classes, range ops, loyalty + gift cards, POs with three-way match, cycle counts, multi-location transfers, shipping (UPS/FedEx 21+), messaging, KPI dashboard, hardware kit, compliance calendar, FFL routing — and an on-prem AI agent with RAG brain, tool calls, and tamper-evident audit.
- * Version: 3.3.5
+ * Version: 3.3.6
  * Author: Wordpressistic
  * Requires at least: 6.5
  * Requires PHP: 8.1

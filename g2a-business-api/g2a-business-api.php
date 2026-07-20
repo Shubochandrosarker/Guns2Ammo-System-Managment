@@ -3,7 +3,7 @@
  * Plugin Name:       G2A Business API
  * Plugin URI:        https://wordpressistic.com/g2a-business-api
  * Description:       REST API that serves the Guns2Ammo Business Control Center WebApp at app.guns2ammo.com. Aggregates analytics from WooCommerce, G2A Booking Engine, Memberistic, Waiver Manager, and search/analytics providers behind a single, permission-checked namespace.
- * Version:           0.4.2
+ * Version:           0.4.3
  * Requires at least: 6.2
  * Requires PHP:      8.0
  * Author:            Wordpressistic
