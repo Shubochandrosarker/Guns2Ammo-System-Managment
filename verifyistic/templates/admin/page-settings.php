@@ -268,7 +268,10 @@ function vfya_opt( $key, $default = '' ) {
               </div>
               <div class="vfya-field">
                 <label class="vfya-label">Yes Button Text Color</label>
-                <input type="text" class="vfya-input vfya-color-picker" name="verifyistic_btn_yes_text_color" value="<?php echo esc_attr(vfya_opt('verifyistic_btn_yes_text_color','#ffffff')); ?>">
+                <!-- Default matches the frontend fallback in
+                     class-verifyistic-frontend.php: white on the default
+                     #14b8a6 button was ~2.5:1 (fails WCAG AA). -->
+                <input type="text" class="vfya-input vfya-color-picker" name="verifyistic_btn_yes_text_color" value="<?php echo esc_attr(vfya_opt('verifyistic_btn_yes_text_color','#0f172a')); ?>">
               </div>
             </div>
 

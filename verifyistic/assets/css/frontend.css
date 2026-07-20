@@ -184,8 +184,14 @@
 .vfy-form-input {
   width: 100%;
   padding: 11px 14px;
-  background: rgba(255,255,255,.06);
-  border: 1.5px solid rgba(255,255,255,.1);
+  /* Was a translucent-white fill/border, tuned for the dark popup card.
+     Composited over the light-mode card (--color-gunmetal → #FFFFFF) both
+     resolve to plain white, so the field had literally no visible
+     boundary. --color-void/--color-steel are the theme's own "inputs /
+     borders" tokens (see .field in tokens.css) and give a real, visible
+     surface + border in both modes. */
+  background: var(--color-void);
+  border: 1.5px solid var(--color-steel);
   border-radius: 10px;
   font-family: var(--font-body);
   font-size: 14px;
@@ -214,10 +220,17 @@ select.vfy-dob-part {
   width: 100%;
   cursor: pointer;
   padding-right: 30px;
+  /* Chevron stroke is baked into the data-URI (can't reference a CSS var
+     inside it), hardcoded to the dark-mode --color-silver. Against the
+     dark-mode input fill it's ~7.3:1; against the light-mode fill it drops
+     to ~2.2:1 (fails the 3:1 UI-icon minimum) — overridden below. */
   background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23A7A6AE' stroke-width='3'><path d='M6 9l6 6 6-6'/></svg>");
   background-repeat: no-repeat;
   background-position: right 11px center;
   text-align: left;
+}
+html[data-theme="light"] select.vfy-dob-part {
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%236E6C74' stroke-width='3'><path d='M6 9l6 6 6-6'/></svg>");
 }
 select.vfy-dob-part:invalid { color: var(--color-silver); } /* shows the placeholder option dimmed */
 select.vfy-dob-part option { color: var(--color-ink); }
@@ -230,7 +243,14 @@ select.vfy-dob-part option { color: var(--color-ink); }
 
 /* ── File Upload ───────────────────────────────────────── */
 .vfy-upload-area {
-  border: 2px dashed rgba(255,255,255,.12);
+  /* Was a translucent-white dashed border, tuned for the dark popup card
+     only — indistinguishable from a light-mode (white) card. --color-steel
+     (the .field input-border token) is nearly the same luminance as the
+     popup's own --color-gunmetal card in both modes, so it doesn't read
+     as a border here either; --color-hairline-bright is the token this
+     theme already reaches for when a card-level border needs to read as
+     more than a hairline (see .card:hover, .btn). */
+  border: 2px dashed var(--color-hairline-bright);
   border-radius: 10px;
   padding: 18px;
   text-align: center;
@@ -394,7 +414,13 @@ select.vfy-dob-part option { color: var(--color-ink); }
 .vfy-error {
   background: rgba(239,68,68,.12);
   border: 1px solid rgba(239,68,68,.25);
-  color: #fca5a5;
+  /* --color-fog (not a fixed pale red) — the translucent red wash above
+     sits on the popup's card background, which flips with the theme
+     (#26252C dark / #FFFFFF light). #fca5a5 was tuned for the dark
+     composite (~7.1:1) but dropped to ~1.6:1 on the light-mode composite
+     (near-invisible pink-on-pale-pink). --color-fog already flips
+     correctly and matches how .vfy-message renders normal popup copy. */
+  color: var(--color-fog);
   border-radius: 8px;
   padding: 10px 14px;
   font-family: var(--font-body);
@@ -409,6 +435,12 @@ select.vfy-dob-part option { color: var(--color-ink); }
 .vfy-error.show { display: flex; }
 
 .vfy-error svg { width: 15px; height: 15px; stroke: #f87171; flex-shrink: 0; }
+/* Same translucent-red-wash issue as .vfy-error's text: #f87171 gives the
+   icon ~4.9:1 against the dark-mode composite but only ~2.4:1 against the
+   light-mode one (needs 3:1 for a meaningful icon). Darken for light mode
+   only, reusing the same red already used for "danger" states elsewhere
+   in this codebase (e.g. G2AB_Booking_Statuses::color NO_SHOW). */
+html[data-theme="light"] .vfy-error svg { stroke: #C62828; }
 
 /* ── Success ───────────────────────────────────────────── */
 .vfy-success-state {

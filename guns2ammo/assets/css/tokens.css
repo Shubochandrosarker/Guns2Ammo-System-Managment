@@ -75,7 +75,13 @@ html[data-theme="light"] {
   --color-surface-1: #EDEAE2;
   --color-surface-2: #E6E2D8;
   --color-elevate: #FFFFFF;
-  --color-ink: #FFFFFF;
+  /* --color-ink intentionally does NOT invert to white here. Brass/ember
+     are only darkened (not lightened) for light mode — they stay mid-tone
+     — so dark ink is still the higher-contrast pick against them (~5:1 vs
+     ~3.8:1 with white, which failed WCAG AA on brass/ember-filled
+     buttons: nav profile CTA, booking-engine selected day/slot/chip +
+     primary button, Verifyistic's "Yes I'm 21+" button). */
+  --color-ink: #111114;
   --color-page-glow-a: rgba(160, 127, 44, 0.10);
   --color-page-glow-b: rgba(201, 100, 22, 0.07);
   --color-chrome-glass: rgba(250, 249, 245, 0.92);
@@ -916,9 +922,9 @@ html[data-theme="light"] .foot-map { border-color: var(--color-hairline); }
 .woocommerce-cart table.shop_table,
 .woocommerce-checkout table.shop_table,
 .woocommerce table.shop_table {
-  background: var(--color-gunmetal);
+  background: var(--color-gunmetal) !important;
   border: 1px solid var(--color-hairline) !important;
-  color: var(--color-fog);
+  color: var(--color-fog) !important;
 }
 .woocommerce table.shop_table th,
 .woocommerce table.shop_table td { border-color: var(--color-hairline) !important; }
@@ -931,9 +937,9 @@ html[data-theme="light"] .foot-map { border-color: var(--color-hairline); }
 .woocommerce a.remove { color: var(--color-ember) !important; }
 .woocommerce a.remove:hover { background: transparent !important; color: #ff9c5a !important; }
 .woocommerce .quantity .qty {
-  background: var(--color-void);
-  border: 1px solid var(--color-steel);
-  color: var(--color-white);
+  background: var(--color-void) !important;
+  border: 1px solid var(--color-steel) !important;
+  color: var(--color-white) !important;
 }
 .woocommerce .coupon .input-text,
 .woocommerce-cart .actions .input-text {
@@ -2144,7 +2150,7 @@ html[data-theme="light"] .foot-map { border-color: var(--color-hairline); }
 	letter-spacing: 0.04em;
 	text-transform: uppercase;
 }
-.woocommerce-checkout-review-order-table .product-quantity { color: var(--color-silver); font-family: var(--font-mono); font-size: 12px; }
+.woocommerce-checkout-review-order-table .product-quantity { color: var(--color-silver) !important; font-family: var(--font-mono); font-size: 12px; }
 .woocommerce-checkout-review-order-table .product-total {
 	font-family: var(--font-display);
 	font-size: 17px;
@@ -2285,7 +2291,7 @@ html[data-theme="light"] .foot-map { border-color: var(--color-hairline); }
 	font-family: var(--font-display);
 	font-size: clamp(48px, 7vw, 88px);
 	letter-spacing: 0.02em;
-	color: var(--color-white);
+	color: var(--color-white) !important;
 	margin: 0;
 	text-transform: uppercase;
 	line-height: 0.95;
@@ -2351,7 +2357,7 @@ html[data-theme="light"] .foot-map { border-color: var(--color-hairline); }
 	font-family: var(--font-condensed);
 	font-weight: 600;
 	font-size: 15px;
-	color: var(--color-white);
+	color: var(--color-white) !important;
 	letter-spacing: 0.04em;
 	line-height: 1.2;
 }
@@ -2359,7 +2365,7 @@ html[data-theme="light"] .foot-map { border-color: var(--color-hairline); }
 	font-family: var(--font-mono);
 	font-size: 10px;
 	letter-spacing: 0.2em;
-	color: var(--color-silver);
+	color: var(--color-silver) !important;
 	text-transform: uppercase;
 	margin-top: 2px;
 }
@@ -2420,7 +2426,7 @@ html[data-theme="light"] .foot-map { border-color: var(--color-hairline); }
 }
 .g2a-account-shell .woocommerce-MyAccount-content p { color: var(--color-fog) !important; line-height: 1.65; }
 .g2a-account-shell .woocommerce-MyAccount-content a { color: var(--color-brass-bright) !important; }
-.g2a-account-shell .woocommerce-MyAccount-content strong { color: var(--color-white); }
+.g2a-account-shell .woocommerce-MyAccount-content strong { color: var(--color-white) !important; }
 
 /* Account details: password change fieldset */
 .g2a-account-shell .woocommerce-MyAccount-content fieldset {
@@ -2509,7 +2515,7 @@ html[data-theme="light"] .foot-map { border-color: var(--color-hairline); }
 .g2a-account-shell .woocommerce-Address-title { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
 .g2a-account-shell .woocommerce-Address-title h2,
 .g2a-account-shell .woocommerce-Address-title h3 { font-size: 20px !important; margin: 0 !important; }
-.g2a-account-shell .woocommerce-Address address { color: var(--color-fog); font-family: var(--font-body); font-style: normal; line-height: 1.6; }
+.g2a-account-shell .woocommerce-Address address { color: var(--color-fog) !important; font-family: var(--font-body); font-style: normal; line-height: 1.6; }
 
 /* Account responsive mobile stack */
 @media (max-width: 880px) {

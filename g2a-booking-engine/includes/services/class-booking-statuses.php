@@ -82,13 +82,22 @@ final class G2AB_Booking_Statuses {
 
 	/**
 	 * Map a status to a calendar/admin badge color (CSS hex).
+	 *
+	 * These are always painted as a solid fill with white text on top (see
+	 * .g2ab-fd-row__status in class-frontdesk-view.php, the front-desk /
+	 * staff-console roster badge). PENDING/RESERVED/CONFIRMED/PAID used to be
+	 * light/mid-tone swatches (gray-400, amber-500, blue-500, emerald-500)
+	 * that only gave white text ~2.1-3.7:1 contrast, failing WCAG AA's 4.5:1.
+	 * Darkened one step each (same hue family, still visually distinct) so
+	 * every status clears 4.5:1 with white text; the other five were already
+	 * dark enough.
 	 */
 	public static function color( $status ) {
 		$map = array(
-			self::PENDING   => '#9CA3AF', // gray
-			self::RESERVED  => '#F59E0B', // amber
-			self::CONFIRMED => '#3B82F6', // blue
-			self::PAID      => '#10B981', // green
+			self::PENDING   => '#4B5563', // slate gray (was #9CA3AF — 2.54:1 with white text)
+			self::RESERVED  => '#B45309', // amber, darkened (was #F59E0B — 2.15:1 with white text)
+			self::CONFIRMED => '#2563EB', // blue, darkened (was #3B82F6 — 3.68:1 with white text)
+			self::PAID      => '#047857', // green, darkened (was #10B981 — 2.54:1 with white text)
 			self::COMPLETED => '#0F2044', // navy
 			self::CANCELLED => '#6B7280', // dark gray
 			self::NO_SHOW   => '#C62828', // red

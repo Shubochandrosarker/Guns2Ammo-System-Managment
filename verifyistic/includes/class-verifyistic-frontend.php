@@ -133,7 +133,11 @@ class Verifyistic_Frontend {
         $font_clr     = sanitize_hex_color( get_option( 'verifyistic_font_color', '#f8fafc' ) ) ?: '#f8fafc';
         $btn_yes      = sanitize_hex_color( get_option( 'verifyistic_btn_yes_color', '#14b8a6' ) ) ?: '#14b8a6';
         $btn_no       = sanitize_hex_color( get_option( 'verifyistic_btn_no_color', '#475569' ) ) ?: '#475569';
-        $btn_yes_txt  = sanitize_hex_color( get_option( 'verifyistic_btn_yes_text_color', '#ffffff' ) ) ?: '#ffffff';
+        // Default was #ffffff, which on the default #14b8a6 teal fill is
+        // ~2.5:1 (fails WCAG AA's 4.5:1 for normal text) — the site's actual
+        // "Yes, I am 21+" button on every unverified page load. #0f172a
+        // (already this palette's popup-bg navy) gives ~7.2:1 instead.
+        $btn_yes_txt  = sanitize_hex_color( get_option( 'verifyistic_btn_yes_text_color', '#0f172a' ) ) ?: '#0f172a';
         $btn_no_txt   = sanitize_hex_color( get_option( 'verifyistic_btn_no_text_color', '#ffffff' ) ) ?: '#ffffff';
         $btn_style    = get_option( 'verifyistic_btn_style', 'rounded' );
         $popup_width  = min( 2000, max( 200, (int) get_option( 'verifyistic_popup_width', 480 ) ) );

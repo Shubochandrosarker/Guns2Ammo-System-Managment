@@ -641,16 +641,32 @@ $lane_url    = home_url( '/book-a-lane/' );
 </div>
 
 <style>
-.memberistic-acct{--ma-card:#26252C;--ma-line:rgba(255,255,255,.09);--ma-line2:rgba(255,255,255,.17);--ma-brass:#C9A84C;--ma-brass2:#E3C06A;--ma-ember:#E8802F;--ma-white:#F4F4F6;--ma-fog:#CBCAD2;--ma-silver:#A7A6AE;
+.memberistic-acct{--ma-card:var(--memberistic-surface, #26252C);--ma-line:var(--memberistic-border, rgba(255,255,255,.09));--ma-line2:var(--memberistic-border-strong, rgba(255,255,255,.17));--ma-brass:var(--memberistic-primary, #C9A84C);--ma-brass2:var(--memberistic-primary-strong, #E3C06A);--ma-ember:var(--memberistic-cta, #E8802F);--ma-white:var(--memberistic-text, #F4F4F6);--ma-fog:var(--memberistic-text-soft, #CBCAD2);--ma-silver:var(--memberistic-muted, #A7A6AE);
+	/* ^ Wired to the live --memberistic-*  theme --color-* token bridge
+	   (token-bridge.css) instead of a hardcoded dark-only snapshot, so this
+	   whole dashboard actually flips with the site's light/dark toggle
+	   instead of staying permanently dark-styled, and can never drift out
+	   of sync with the brand palette again (the literal hex values remain
+	   only as a safety fallback if the bridge stylesheet is ever missing).
+	   --ma-ok/--ma-warn/--ma-ember-text* keep their existing dark-mode
+	   values below (untouched) and only get darker light-mode pairings
+	   further down: they sit on a translucent wash over the page
+	   background (statuspill/banner) or directly on a card (photo
+	   messages, sign-out), and the plain dark-mode-tuned hex was never
+	   tested against a light background because this card never used to
+	   flip at all — verified below, several combinations were badly
+	   under 4.5:1 (as low as ~1.3:1) once it does. */
+	--ma-ok:#6FE49A;--ma-warn:#F0A565;--ma-ember-text:#E8802F;--ma-ember-text-hover:#F4A062;--ma-photo-ok:#9DE05B;
 	font-family:var(--font-body,"DM Sans",-apple-system,Segoe UI,sans-serif);}
+html[data-theme="light"] .memberistic-acct{--ma-ok:#0F6B32;--ma-warn:#8A5A1E;--ma-ember-text:#A65211;--ma-ember-text-hover:#B5540F;--ma-photo-ok:#0F6B32;}
 .memberistic-acct *{box-sizing:border-box;}
 .memberistic-acct .memberistic-acct-statusbar{margin:0 0 22px;}
 .memberistic-acct-statuspill{display:inline-flex;align-items:center;gap:8px;padding:6px 14px;border-radius:999px;
 	font-family:var(--font-mono,"Space Mono",monospace);font-size:10px;letter-spacing:.18em;}
-.memberistic-acct-statuspill.is-ok{background:rgba(74,222,128,.1);border:1px solid rgba(74,222,128,.4);color:#6FE49A!important;}
-.memberistic-acct-statuspill.is-warn{background:rgba(232,128,47,.1);border:1px solid rgba(232,128,47,.4);color:#F0A565!important;}
+.memberistic-acct-statuspill.is-ok{background:rgba(74,222,128,.1);border:1px solid rgba(74,222,128,.4);color:var(--ma-ok)!important;}
+.memberistic-acct-statuspill.is-warn{background:rgba(232,128,47,.1);border:1px solid rgba(232,128,47,.4);color:var(--ma-warn)!important;}
 .memberistic-acct-dot{width:7px;height:7px;border-radius:50%;background:currentColor;}
-.memberistic-acct-banner{background:rgba(232,128,47,.12);border:1px solid rgba(232,128,47,.4);color:#F0A565!important;
+.memberistic-acct-banner{background:rgba(232,128,47,.12);border:1px solid rgba(232,128,47,.4);color:var(--ma-warn)!important;
 	padding:12px 16px;border-radius:4px;margin-bottom:18px;font-size:14px;}
 .memberistic-acct-banner a{color:var(--ma-brass2)!important;}
 
@@ -659,7 +675,7 @@ $lane_url    = home_url( '/book-a-lane/' );
 
 .memberistic-acct-side{background:var(--ma-card)!important;border:1px solid var(--ma-line)!important;border-radius:4px;padding:22px;}
 .memberistic-acct-id{display:flex;gap:13px;align-items:center;padding-bottom:18px;border-bottom:1px solid var(--ma-line);}
-.memberistic-acct-avatar{width:48px;height:48px;border-radius:50%;flex:0 0 48px;display:grid;place-items:center;
+.memberistic-acct-id .memberistic-acct-avatar{width:48px;height:48px;border-radius:50%;flex:0 0 48px;display:grid;place-items:center;
 	background:linear-gradient(135deg,var(--ma-brass),#A8862F);color:#1A191E!important;
 	font-family:var(--font-display,"Bebas Neue",sans-serif);font-size:21px;letter-spacing:.04em;}
 .memberistic-acct-id strong{display:block;color:var(--ma-white)!important;font-size:15px;font-weight:700;}
@@ -677,8 +693,8 @@ $lane_url    = home_url( '/book-a-lane/' );
 .memberistic-acct-nav a.is-active .memberistic-acct-ic{color:var(--ma-brass2)!important;}
 .memberistic-acct-ic{font-size:13px;color:var(--ma-silver)!important;width:16px;text-align:center;}
 .memberistic-acct-navsep{height:1px;background:var(--ma-line);margin:10px 0;}
-.memberistic-acct-signout{color:var(--ma-ember)!important;}
-.memberistic-acct-signout:hover{color:#F4A062!important;}
+.memberistic-acct-signout{color:var(--ma-ember-text)!important;}
+.memberistic-acct-signout:hover{color:var(--ma-ember-text-hover)!important;}
 
 .memberistic-acct-main{min-width:0;}
 .memberistic-acct-view{display:none;}
@@ -696,6 +712,11 @@ $lane_url    = home_url( '/book-a-lane/' );
 	text-transform:uppercase;color:var(--ma-silver)!important;margin-bottom:8px;}
 .memberistic-acct-stat strong{display:block;font-family:var(--font-display,"Bebas Neue",sans-serif)!important;
 	font-size:26px;color:var(--ma-white)!important;line-height:1;letter-spacing:.02em;}
+/* Billing/Shipping address block (Shop tab) renders a bare <address> with
+   no class — it was relying purely on inheritance with no explicit color
+   of its own. Give it one explicitly instead of leaving it to whatever
+   happens to cascade down, matching every other text node in this card. */
+.memberistic-acct-stat address{display:block;color:var(--ma-fog)!important;font-size:14px;line-height:1.6;}
 
 .memberistic-acct-actions{display:grid;grid-template-columns:1fr 1fr;gap:14px;}
 @media(max-width:680px){.memberistic-acct-actions{grid-template-columns:1fr;}}
@@ -713,7 +734,7 @@ $lane_url    = home_url( '/book-a-lane/' );
 	border-radius:4px;padding:26px;margin-bottom:16px;}
 .memberistic-acct-block--center{text-align:center;}
 .memberistic-acct-block--danger{border-color:rgba(232,128,47,.3)!important;}
-.memberistic-acct-block--danger h3{color:var(--ma-ember)!important;}
+.memberistic-acct-block--danger h3{color:var(--ma-ember-text)!important;}
 .memberistic-acct-block h2,.memberistic-acct-block h3{font-family:var(--font-display,"Bebas Neue",sans-serif)!important;
 	color:var(--ma-white)!important;margin:0 0 14px;letter-spacing:.02em;font-size:28px;line-height:1;}
 .memberistic-acct-blockhd{display:flex;justify-content:space-between;align-items:center;gap:14px;margin-bottom:14px;}
@@ -731,7 +752,7 @@ $lane_url    = home_url( '/book-a-lane/' );
 .memberistic-acct-cta{display:inline-block;padding:13px 22px;border-radius:2px;text-decoration:none;cursor:pointer;
 	font-family:var(--font-condensed,"Barlow Condensed",sans-serif)!important;font-weight:600;font-size:13px;
 	letter-spacing:.1em;text-transform:uppercase;border:1px solid transparent;}
-.memberistic-acct-cta--primary{background:var(--ma-ember)!important;color:#1A191E!important;}
+.memberistic-acct-cta--primary{background:var(--ma-ember)!important;color:var(--memberistic-primary-ink, #1A191E)!important;}
 .memberistic-acct-cta--primary:hover{background:#F4933F!important;}
 .memberistic-acct-cta--ghost{background:transparent!important;border-color:var(--ma-brass)!important;color:var(--ma-brass2)!important;}
 .memberistic-acct-cta--ghost:hover{background:rgba(201,168,76,.08)!important;color:var(--ma-white)!important;}
@@ -751,10 +772,19 @@ $lane_url    = home_url( '/book-a-lane/' );
 .memberistic-acct-table tr:last-child td{border-bottom:0;}
 .memberistic-acct-pill{display:inline-block;padding:3px 9px;border-radius:2px;font-family:var(--font-mono,monospace);
 	font-size:10px;letter-spacing:.08em;text-transform:uppercase;background:rgba(255,255,255,.07);color:var(--ma-fog)!important;}
-.memberistic-acct-pill--ok{background:rgba(74,222,128,.12);color:#6FE49A!important;}
-.memberistic-acct-pill--warn{background:rgba(232,128,47,.14);color:#F0A565!important;}
+.memberistic-acct-pill--ok{background:rgba(74,222,128,.12);color:var(--ma-ok)!important;}
+.memberistic-acct-pill--warn{background:rgba(232,128,47,.14);color:var(--ma-warn)!important;}
 
 .memberistic-acct-pass{max-width:420px;margin:18px auto 0;text-align:left;border-radius:8px;padding:22px;
+	/* This "physical card" gradient is deliberately fixed-dark in BOTH
+	   color modes (like a real membership/credit card face), so it does
+	   NOT reference --ma-card. Re-pin --ma-white/--ma-brass2/--ma-silver
+	   back to their dark-mode-appropriate values in this one scope only —
+	   otherwise the __brand/__name/__meta text (which reads those same
+	   vars) would inherit the light-mode flip from .memberistic-acct and
+	   render near-black-on-near-black (~1.1:1) once the card starts
+	   following the toggle everywhere else. */
+	--ma-white:#F4F4F6;--ma-brass2:#E3C06A;--ma-silver:#A7A6AE;
 	background:linear-gradient(135deg,#2E2C25,#1C1B1F 70%);border:1px solid var(--ma-brass)!important;
 	box-shadow:0 18px 50px rgba(0,0,0,.45);}
 .memberistic-acct-pass__top{display:flex;justify-content:space-between;align-items:center;margin-bottom:18px;}
@@ -804,9 +834,9 @@ $lane_url    = home_url( '/book-a-lane/' );
 .memberistic-acct-photo-actions{display:flex;gap:8px;flex-wrap:wrap;}
 .memberistic-acct-photo-btn{background:none;border:1px solid rgba(255,255,255,.2);color:inherit;font-size:11px;letter-spacing:.06em;text-transform:uppercase;padding:4px 10px;border-radius:4px;cursor:pointer;}
 .memberistic-acct-photo-btn:hover{background:rgba(255,255,255,.06);}
-.memberistic-acct-photo-msg{font-size:12px;color:var(--ma-muted,var(--ma-silver));margin-top:6px;display:none;}
-.memberistic-acct-photo-msg.is-err{color:#E8802F;display:block;}
-.memberistic-acct-photo-msg.is-ok{color:#9DE05B;display:block;}
+.memberistic-acct-photo-msg{font-size:12px;color:var(--ma-silver);margin-top:6px;display:none;}
+.memberistic-acct-photo-msg.is-err{color:var(--ma-ember-text);display:block;}
+.memberistic-acct-photo-msg.is-ok{color:var(--ma-photo-ok);display:block;}
 @media print{ .memberistic-acct-photo-actions{display:none!important;} }
 
 /* ============================================================

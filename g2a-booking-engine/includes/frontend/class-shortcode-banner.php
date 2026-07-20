@@ -240,7 +240,7 @@ final class G2AB_Frontend_Shortcode_Banner {
 		.g2ab-banr__grid{position:absolute;inset:0;background-image:linear-gradient(rgba(74,93,58,.08) 1px,transparent 1px),linear-gradient(90deg,rgba(74,93,58,.08) 1px,transparent 1px);background-size:40px 40px;pointer-events:none;}
 		.g2ab-banr__inner{position:relative;z-index:1;display:grid;grid-template-columns:1.2fr 1fr;gap:40px;padding:40px 48px;max-width:1200px;margin:0 auto;align-items:center;}
 		@media (max-width:780px){.g2ab-banr__inner{grid-template-columns:1fr;padding:28px 22px;gap:24px;}}
-		.g2ab-banr__chip{display:inline-block;background:var(--banr-accent);color:#fff;padding:5px 12px;font-size:10px;letter-spacing:.18em;font-weight:700;font-family:'Inter','Segoe UI',system-ui,-apple-system,sans-serif;margin-bottom:14px;border-radius:3px;}
+		.g2ab-banr__chip{display:inline-block;background:var(--banr-accent);color:#111;padding:5px 12px;font-size:10px;letter-spacing:.18em;font-weight:700;font-family:'Inter','Segoe UI',system-ui,-apple-system,sans-serif;margin-bottom:14px;border-radius:3px;}
 		.g2ab-banr__title{margin:0 0 14px;font-family:'Inter','Segoe UI',system-ui,-apple-system,sans-serif;font-size:clamp(30px,5vw,50px);font-weight:700;letter-spacing:.02em;line-height:1.04;color:#fff;text-transform:uppercase;}
 		.g2ab-banr--light .g2ab-banr__title{color:#11151b;}
 		.g2ab-banr__date{display:flex;align-items:baseline;gap:14px;margin-bottom:14px;border-left:4px solid var(--banr-accent);padding-left:14px;}
@@ -249,7 +249,7 @@ final class G2AB_Frontend_Shortcode_Banner {
 		.g2ab-banr__meta{display:flex;flex-wrap:wrap;gap:18px;font-size:11px;letter-spacing:.1em;color:var(--banr-muted);font-weight:700;margin-bottom:24px;}
 		.g2ab-banr__meta span{display:inline-flex;align-items:center;gap:5px;}
 		.g2ab-banr__icon{color:var(--banr-accent);font-weight:400;}
-		.g2ab-banr__cta{display:inline-flex;align-items:center;gap:14px;background:var(--banr-accent);color:#fff !important;padding:16px 30px;text-decoration:none;font-family:'Inter','Segoe UI',system-ui,-apple-system,sans-serif;font-size:15px;letter-spacing:.14em;font-weight:700;text-transform:uppercase;border-radius:4px;transition:all .18s ease;border:2px solid var(--banr-accent);}
+		.g2ab-banr__cta{display:inline-flex;align-items:center;gap:14px;background:var(--banr-accent);color:#111 !important;padding:16px 30px;text-decoration:none;font-family:'Inter','Segoe UI',system-ui,-apple-system,sans-serif;font-size:15px;letter-spacing:.14em;font-weight:700;text-transform:uppercase;border-radius:4px;transition:all .18s ease;border:2px solid var(--banr-accent);}
 		.g2ab-banr__cta:hover{background:transparent;color:var(--banr-accent) !important;transform:translateY(-2px);box-shadow:0 10px 24px color-mix(in srgb,var(--banr-accent) 30%,transparent);}
 		.g2ab-banr__cta-arrow{font-size:20px;transition:transform .18s ease;}
 		.g2ab-banr__cta:hover .g2ab-banr__cta-arrow{transform:translateX(4px);}
@@ -268,7 +268,7 @@ final class G2AB_Frontend_Shortcode_Banner {
 		/* ── Strip ── */
 		.g2ab-banr--strip{background:linear-gradient(120deg,var(--banr-bg),#26252C);border:1px solid var(--banr-border);border-left:4px solid var(--banr-accent);}
 		.g2ab-strip__in{position:relative;z-index:1;display:flex;align-items:center;gap:18px;padding:16px 22px;max-width:1200px;margin:0 auto;flex-wrap:wrap;}
-		.g2ab-strip__tag{background:var(--banr-accent);color:#fff;font-family:'Inter','Segoe UI',system-ui,-apple-system,sans-serif;font-size:11px;font-weight:700;letter-spacing:.12em;padding:5px 12px;border-radius:3px;}
+		.g2ab-strip__tag{background:var(--banr-accent);color:#111;font-family:'Inter','Segoe UI',system-ui,-apple-system,sans-serif;font-size:11px;font-weight:700;letter-spacing:.12em;padding:5px 12px;border-radius:3px;}
 		.g2ab-strip__main{display:flex;flex-direction:column;gap:2px;margin-right:auto;}
 		.g2ab-strip__title{font-family:'Inter','Segoe UI',system-ui,-apple-system,sans-serif;font-size:20px;font-weight:700;color:#fff;letter-spacing:.02em;text-transform:uppercase;line-height:1;}
 		.g2ab-banr--light .g2ab-strip__title{color:#11151b;}
@@ -276,14 +276,14 @@ final class G2AB_Frontend_Shortcode_Banner {
 		.g2ab-strip__price{font-family:'Inter','Segoe UI',system-ui,-apple-system,sans-serif;font-size:20px;font-weight:700;color:var(--banr-accent);}
 		.g2ab-strip__seats{font-size:12px;font-weight:700;color:#4CAF50;}
 		.g2ab-strip__seats.is-out{color:#C62828;}
-		.g2ab-strip__cta{background:var(--banr-accent);color:#fff !important;text-decoration:none;font-family:'Inter','Segoe UI',system-ui,-apple-system,sans-serif;font-size:13px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;padding:11px 20px;border-radius:4px;transition:all .15s ease;}
+		.g2ab-strip__cta{background:var(--banr-accent);color:#111 !important;text-decoration:none;font-family:'Inter','Segoe UI',system-ui,-apple-system,sans-serif;font-size:13px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;padding:11px 20px;border-radius:4px;transition:all .15s ease;}
 		.g2ab-strip__cta:hover{transform:translateY(-2px);box-shadow:0 8px 20px color-mix(in srgb,var(--banr-accent) 30%,transparent);}
 		@media (max-width:640px){.g2ab-strip__main{margin-right:0;flex:1 1 100%;order:-1;}}
 
 		/* ── Ticket ── */
 		.g2ab-banr--ticket{background:transparent;overflow:visible;}
 		.g2ab-ticket{position:relative;z-index:1;display:flex;max-width:720px;margin:0 auto;background:var(--banr-surface);border:1px solid var(--banr-border);border-radius:14px;overflow:hidden;box-shadow:0 20px 50px rgba(0,0,0,.35);}
-		.g2ab-ticket__stub{flex:0 0 130px;background:linear-gradient(160deg,var(--banr-accent),color-mix(in srgb,var(--banr-accent) 60%,#000));color:#fff;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:22px 10px;text-align:center;}
+		.g2ab-ticket__stub{flex:0 0 130px;background:linear-gradient(160deg,color-mix(in srgb,var(--banr-accent) 70%,#000),color-mix(in srgb,var(--banr-accent) 40%,#000));color:#fff;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:22px 10px;text-align:center;}
 		.g2ab-ticket__d{font-family:'Inter','Segoe UI',system-ui,-apple-system,sans-serif;font-size:46px;font-weight:700;line-height:.9;}
 		.g2ab-ticket__mo{font-family:'Inter','Segoe UI',system-ui,-apple-system,sans-serif;font-size:16px;font-weight:700;letter-spacing:.2em;}
 		.g2ab-ticket__time{margin-top:8px;font-size:11px;letter-spacing:.08em;opacity:.92;}
@@ -300,7 +300,7 @@ final class G2AB_Frontend_Shortcode_Banner {
 		.g2ab-ticket__meta b{color:var(--banr-accent);font-size:16px;}
 		.g2ab-ticket__meta .is-green{color:#4CAF50;}
 		.g2ab-ticket__meta .is-out{color:#C62828;}
-		.g2ab-ticket__cta{display:inline-block;background:var(--banr-accent);color:#fff !important;text-decoration:none;font-family:'Inter','Segoe UI',system-ui,-apple-system,sans-serif;font-size:14px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;padding:12px 24px;border-radius:5px;transition:all .15s ease;}
+		.g2ab-ticket__cta{display:inline-block;background:var(--banr-accent);color:#111 !important;text-decoration:none;font-family:'Inter','Segoe UI',system-ui,-apple-system,sans-serif;font-size:14px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;padding:12px 24px;border-radius:5px;transition:all .15s ease;}
 		.g2ab-ticket__cta:hover{transform:translateY(-2px);box-shadow:0 10px 24px color-mix(in srgb,var(--banr-accent) 30%,transparent);}
 		@media (max-width:560px){.g2ab-ticket{flex-direction:column;}.g2ab-ticket__stub{flex-direction:row;gap:10px;flex:none;}.g2ab-ticket__perf{display:none;}}
 
