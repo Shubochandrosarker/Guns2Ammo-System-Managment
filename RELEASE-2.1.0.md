@@ -22,7 +22,7 @@ This is a comprehensive system release featuring plugin integration updates, sec
 | **memberistic-membership-solutions** | 1.18.3 | ✅ Current | Memberships, renewals, family linking |
 | **messageistic** | 0.8.0 | ✅ Current | SMS/communication engine (Twilio, Android gateway) |
 | **verifyistic** | 1.4.6 | ✅ Current | Age verification popup, COPPA compliance |
-| **advanced-ffl-checkout** | 1.15.1 | ✅ Current | FFL dealer search, NICS automation |
+| **advanced-ffl-checkout** | 1.21.0 | ✅ Current | FFL dealer search, NICS automation, 5-distributor drop-ship, GunBroker sync, Credova financing |
 | **formistic** | 2.1.0 | ✅ Current | Contact forms, inbox, newsletter, AI auto-reply |
 | **g2a-business-api** | (Bundled) | ✅ Current | REST API for staff dashboard |
 | **dashboard-app** | (See deployment) | ✅ Current | React SPA at app.guns2ammo.com |

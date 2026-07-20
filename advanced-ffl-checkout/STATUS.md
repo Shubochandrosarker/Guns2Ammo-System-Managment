@@ -1,6 +1,6 @@
 # Advanced FFL Checkout Solutions — Present Conditions
 
-_Last updated: 2026-07-15 · Plugin version 1.15.1 · DB schema 1.11.0_
+_Last updated: 2026-07-16 · Plugin version 1.21.0 · DB schema 1.12.0_
 
 This file is the living reference for where the plugin actually stands —
 what exists, what was just shipped, what's open, and what to pick up next
@@ -41,11 +41,22 @@ Customizer key bug (business email/phone silently always empty), an iOS
 zoom CSS fix, and atomic (not check-then-act) race guards on transfer
 creation and two status-advance paths. All of that is now in
 `ffl-checkout--solutions` too, adapted to this repo's newer multi-item
-architecture where the two conflicted (see §4 and §7). **Porting the
-v1.10.0-v1.14.0 feature work forward into guns2ammo is still open** — now
-that ffl-checkout--solutions is a strict superset of guns2ammo's real
-work, that port is a clean forward-copy rather than a delicate merge. Pick
-up in §6.
+architecture where the two conflicted (see §4 and §7). **The forward-port
+is now done, from an unexpected direction**: while a v1.15.0 backport PR
+and its guns2ammo forward-port counterpart were both open in this session,
+a separate, independently-running automated session ("Claude Fable 5")
+ran its own crossmatch across both repos, confirmed this repo's v1.14.0
+tree as a strict superset of guns2ammo's real work (the same conclusion
+above), and unified both copies to v1.15.0 directly on each repo's `main`
+— superseding this session's own two PRs, which were closed unmerged as
+redundant. A further v1.15.1 (Lipsey's credential encryption, a genuine
+security fix) landed the same way in both repos immediately after. As of
+this check, `guns2ammo-system-managment` and `ffl-checkout--solutions` are
+confirmed byte-identical again for `advanced-ffl-checkout/` at v1.15.1.
+**That other session is still actively iterating across this account's
+whole repo portfolio** (it has since moved well past this plugin — theme
+releases, waiver SMS automation, etc., in guns2ammo) — always re-diff
+before assuming this file's "last checked" state still holds.
 
 **v1.11.0 also touched a THIRD repo directly: `g2a-booking-engine`.**
 Exhibit 09 originally called that plugin's tables/classes directly from
@@ -82,6 +93,10 @@ Both repos develop on branch `claude/ffl-checkout-audit-9kdjub` (guns2ammo)
 
 | Version | What shipped | Status |
 |---|---|---|
+| 1.21.0 | Distributors as toggleable add-ons: new "🧩 Add-ons" admin page lets a store independently enable/disable each of the five distributor drop-ship clients (Lipsey's, Sports South, RSR, Bill Hicks & Co., Chattanooga) instead of all five always loading. A disabled distributor's class is never instantiated by the bootstrap (no hooks/AJAX actions register, its tab drops off the 📦 Distributors page); settings/catalog/order history are preserved, not deleted. Enabled-by-default for every slug so upgrading is a no-op until a store explicitly turns one off. A review pass caught and fixed two gaps: RSR's self-scheduled recurring cron was left orphaned when RSR was disabled (now cleared from both wp-cron and Action Scheduler), and a malformed (non-array) AJAX payload would have silently disabled all five distributors at once (now rejected with a 400). 104 → 111 tests | This repo this round |
+| 1.20.0 | Credova firearms financing (`G2A_Gateway_Credova`) — a real WC_Payment_Gateway against Credova's lending API, confirmed against Credova's own open-source Ruby SDK, closing the financing gap from the same competitor sweep as v1.18.0/v1.19.0. Redirect-based (creates a real application, sends the customer to Credova's hosted flow, holds the order until a webhook or the new "Check Credova financing status" order action/daily cron confirms a real outcome) since the exact approval signal was never independently confirmed. Sezzle deliberately not built — contradictory evidence on whether Sezzle's own policy permits firearms merchants. A code-review pass fixed an unauthenticated-by-default webhook (now hard-refuses with no shared secret configured, matching ID Verification's own precedent) and a check-then-act race on status resolution (now an atomic claim). 97 → 104 tests | This repo this round |
+| 1.19.0 | Chattanooga Shooting Supplies (`G2A_Chattanooga`), a fifth distributor client — the next-clearest gap from the same competitor sweep that led to v1.18.0. Real REST client (api.chattanoogashooting.com/rest/v5), cross-verified against four independent real production codebases including a real 81,195-row sample product feed confirming the exact CSV header row. Catalog sync + explicit-click order submission, hard-blocked up front if Chattanooga doesn't have the transfer's dealer FFL on file yet (a real, confirmed precondition endpoint unique to this distributor). No FFL-required column exists anywhere in the real feed — `is_firearm` honestly defaults to false, filterable. 92 → 97 tests | This repo this round |
+| 1.18.0 | GunBroker.com marketplace sync (`G2A_Gunbroker`) — the clearest gap found in a fresh competitor sweep against AmmoReady, Orchid, and the WooCommerce rival "FFL Cockpit," all of which sync to GunBroker. Real, confirmed REST client (auth, listing create/update/end, category browse, order pull); imported GunBroker sales flow through the existing `Checkout::create_transfer_on_payment()` pipeline unchanged. Also fixed a long-standing `DB::SCHEMA_VERSION` staleness bug (stuck at 1.11.0 since v1.11.0) that had silently skipped creating every table added since on any in-place-upgraded site. 76 → 86 tests | This repo this round |
 | 1.7.6 | Cross-repo parity fix — 3 files had silently drifted despite matching version headers (email-OTP 2FA, themed emails, ICS invites, an open-redirect fix) | Merged: ffl-checkout--solutions#4 |
 | 1.8.0 | On-screen signature capture for the Form 4473 worksheet (buyer + dealer), append-only `signatures` table, GDPR eraser coverage extended | Merged: guns2ammo#59, ffl-checkout--solutions#5 |
 | 1.9.0 | FFL Compliance Verification Hub — Phase A (certified-copy tracking, manual eZ Check log, ATF-sync validity check, manager review queue) | Open (draft): guns2ammo#60, ffl-checkout--solutions#6 |
@@ -91,6 +106,10 @@ Both repos develop on branch `claude/ffl-checkout-audit-9kdjub` (guns2ammo)
 | 1.12.0 | Checkout now creates one `transfers` row per FFL unit in an order (not just the first line item) — fixes the known undercount in the A&D ledger, the Form 3310.4 watcher, and rate-shopping/label-buying for multi-firearm carts; `G2A_Status_Bridge` and the Ops Tools LTV lookup updated to match. Verification Hub Phase B: certified-copy expiration reminders (60/30/7/0 days), a WP dashboard widget, CSV/PDF audit export, and a new 📅 Regulatory Watch page (real Federal Register API sweep, alert-only) | ffl-checkout--solutions only this round — see §1 |
 | 1.13.0 | Remaining gaps from the original 15-gap audit: PHPUnit test suite (Brain Monkey mocks, GitHub Actions), vendored dependency-free canvas charts on the FFL Dashboard + Portal analytics pages + fixed the hardcoded `coming_soon` phone-calls stub, persistent dealer portal login (`ffl_dealer` role + `[ffl_dealer_portal]` shortcode, alongside the unchanged magic-link flow), buyer-side fraud/straw-purchase rules-based risk scoring (🚩 Fraud Review queue), and a real Lipsey's distributor drop-ship client (📦 Distributor page) | ffl-checkout--solutions only this round — see §1 |
 | 1.14.0 | Backported real, independent fixes found in guns2ammo (still at plugin 1.9.4 there) during a cross-repo reconciliation check: checkout-time Verifyistic age-verification enforcement, dealer-detail REST endpoint rate-limit + a public `notes`-column leak fix, federal-holiday-aware NICS/multi-sale business-day math, a theme Customizer key bug (business email/phone always empty), an iOS zoom CSS fix, and atomic (DB-enforced, not check-then-act) race guards on multi-item transfer creation + two status-advance paths | ffl-checkout--solutions only this round — see §1 |
+| 1.17.1 | Hardening pass on the four v1.17.0 distributor clients (no real distributor accounts exist yet to smoke-test against live credentials, so an 8-angle code review stood in): Bill Hicks blank-`marp`-column and UPC-quantity-fallback pricing bugs, a filename-overwrite bug on order resubmission, `ftp_nlist()` false-vs-empty-array conflation in both Bill Hicks's and RSR's response checkers, RSR's O(N×M) response re-download, a real daily cron for RSR response-checking, amber-vs-green admin status colors distinguishing "submitted" from "confirmed," plus dead-code removal (Sports South's unused `$note` param, Lipsey's unreachable `encrypt_secret()` shim) and a legacy-admin-URL redirect. 73 → 76 tests | This repo this round |
+| 1.17.0 | Three more real distributor drop-ship clients (Sports South, RSR Group, Bill Hicks & Co.) behind a new filterable `G2A_Distributor_Registry`, plus a shared `G2A_Distributor_Support` helper (crypto, catalog upsert, order bookkeeping) that Lipsey's was refactored onto too. Single "📦 Distributor (Lipsey's)" admin page replaced by a tabbed "📦 Distributors" page. Davidson's evaluated and deliberately not built — no confirmed catalog schema or order API. 51 → 73 tests | This repo this round |
+| 1.16.0 | Regulatory Watch search terms are now filterable (`wpistic_ffl_regulatory_watch_terms`) instead of a hardcoded constant, the curated default broadened from 3 to 7 terms, and the admin page now shows the currently active list. New test coverage verifies the filter actually drives the query loop, not just the accessor. 47 → 51 tests | This repo this round |
+| 1.15.2 | Test coverage: a FakeWpdb test double so `$wpdb`-gated logic is testable without a live DB; new coverage for `G2A_Fraud_Score::score_transfer()` (zero tests previously despite the weights/thresholds STATUS.md §6 flags as untuned) and the v1.15.1 Lipsey's credential encryption (round-trip + tamper-rejection). 39 → 47 tests. No functional change | This repo this round |
 | 1.15.1 | Security: Lipsey's dealer credentials encrypted at rest (AES-256-GCM keyed from AUTH_KEY); legacy plaintext re-encrypted transparently on first read | Both repos |
 | 1.15.0 | Cross-repo unification (crossmatch): verified file-by-file that 1.14.0 was already a strict functional superset of the guns2ammo copy (1.9.4), ported the one remaining cosmetic monorepo difference (standard 🖨️ printer emoji on the scorecard Print button), and wrote the identical unified tree to BOTH repos — parity restored, no schema change | Both repos, byte-identical this round |
 
@@ -158,7 +177,10 @@ this session for the full reasoning and Phases B/C.
   the dealer verification directory. Paired with a new standalone 📅
   Regulatory Watch page — a nightly Federal Register API sweep for ATF
   documents matching FFL-licensee-verification terms, alert-only, never
-  changes the policy-mode setting automatically.
+  changes the policy-mode setting automatically. **As of v1.16.0**, the
+  search terms are filterable (`wpistic_ffl_regulatory_watch_terms`) rather
+  than hardcoded, the default list broadened from 3 to 7 terms, and the
+  admin page displays the currently active list.
 - **Acquisition & Disposition (bound book) ledger** (v1.10.0, new):
   serial-level `ad_ledger` table auto-populated on receipt/disposition,
   "Needs Serial Number" queue, ATF-format CSV export. Models the
@@ -185,19 +207,132 @@ this session for the full reasoning and Phases B/C.
   label is always an explicit admin click.
 
 ### Distributor drop-ship
-- **New (v1.13.0)**: `G2A_Lipseys` (Advanced FFL → 📦 Distributor) — a real
-  client against Lipsey's documented dealer API (api.lipseys.com),
-  confirmed against the public reference client
-  (github.com/Lipseys/LipseysApiIntegrationPhp) rather than guessed:
-  `POST integration/authentication/login`, a custom `Token` auth header
-  (not `Authorization: Bearer`), `GET integration/items/CatalogFeed`,
-  `POST integration/order/DropShipFirearm`. Catalog sync is free/automatic
-  on click; drop-ship order submission (real wholesale $) is always an
-  explicit admin click scoped to one transfer's own dealer FFL, same
-  pattern as EasyPost's "Buy Label." **Ships un-smoke-tested** — no
-  approved Lipsey's dealer account was available in-session; verify
-  Login/CatalogFeed/DropShipFirearm against a live account before trusting
-  it with a real order.
+- **As of v1.21.0**, each distributor is independently toggleable (Advanced
+  FFL → 🧩 Add-ons) via `G2A_Distributor_Registry::is_enabled()`/
+  `set_enabled()`, backed by a single `wpistic_ffl_distributor_addons`
+  option. Disabling one stops the bootstrap from ever instantiating its
+  class — no hooks, no `wp_ajax_*` actions, no admin-menu registration —
+  and its tab disappears from the 📦 Distributors page below, while its
+  settings/credentials/catalog/order history stay in place for whenever
+  it's turned back on. Enabled-by-default for every known slug, so an
+  already-running site sees zero functional change on upgrade until it
+  explicitly disables something. Disabling RSR (the only distributor that
+  self-schedules a recurring cron from its own constructor) also clears
+  that cron from both wp-cron and Action Scheduler, closing a gap this
+  round's own review pass caught.
+- **New (v1.13.0)**: `G2A_Lipseys` — a real client against Lipsey's
+  documented dealer API (api.lipseys.com), confirmed against the public
+  reference client (github.com/Lipseys/LipseysApiIntegrationPhp) rather
+  than guessed: `POST integration/authentication/login`, a custom `Token`
+  auth header (not `Authorization: Bearer`), `GET integration/items/
+  CatalogFeed`, `POST integration/order/DropShipFirearm`.
+- **As of v1.17.0**, three more real distributor clients (Advanced FFL →
+  📦 Distributors, now a single tabbed page instead of a Lipsey's-only
+  page), all behind the new filterable `G2A_Distributor_Registry`
+  (`wpistic_ffl_distributor_providers`) and a shared `G2A_Distributor_
+  Support` helper (AES-256-GCM credential encryption, catalog-cache
+  upsert, order bookkeeping) that `G2A_Lipseys` was also refactored onto:
+  - **`G2A_Sports_South`** — a legacy SOAP-ish ASMX HTTP service
+    (webservices.theshootingwarehouse.com), confirmed against two
+    independent open-source clients: `DailyItemUpdate` for catalog,
+    `AddHeader → AddDetail → Submit` (with `DeleteOpenOrder` rollback) for
+    orders.
+  - **`G2A_Rsr`** — RSR has no REST/SOAP API; catalog and orders are both
+    real, confirmed FTPS file transfers, verified against the actual
+    source of the open-source `rsr_group` gem (not marketing copy). Order
+    confirmation is asynchronous (RSR deposits ECONF/EERR files
+    separately) — a "Check Responses" admin action polls for them, and (as
+    of v1.17.1) so does a real daily cron, since matching against a stored
+    `po_number` or `distributor_order_ref` isn't instant.
+  - **`G2A_Bill_Hicks`** — also FTP-based, confirmed by triangulating
+    three independent open-source implementations, but never officially
+    published by Bill Hicks itself. Order acknowledgements are listed for
+    a human to read rather than auto-classified, since the exact
+    accept/reject file convention wasn't independently confirmed (unlike
+    RSR's ECONF/EERR, which was).
+  - **Davidson's was evaluated and deliberately not built.** No public
+    catalog field layout exists anywhere, and the most technically
+    specific source found states plainly Davidson's has no automated
+    order-submission path at all ("you will have to login to Davidson's
+    site and manually fulfill any order you receive") — same category as
+    ATF's eZ Check: a real, well-known distributor with nothing honestly
+    buildable from public documentation. Revisit only after direct
+    outreach to Davidson's for real developer/API access.
+  - **`G2A_Chattanooga`** (new, v1.19.0) — a fifth distributor, closing the
+    next-clearest gap from the same competitor sweep that led to v1.18.0's
+    GunBroker work. Real REST/JSON API (api.chattanoogashooting.com/rest/v5),
+    cross-verified against four independent real production codebases
+    (a commercial coreFORCE POS module, a real FFL-hub PHP client, a Go
+    client, a JS sync script) — including the exact product-feed CSV
+    header row, confirmed against a real 81,195-row sample export, not
+    guessed. Auth is a real but non-standard `Authorization: Basic
+    {SID}:{md5(token)}` (a literal string concat, not base64). Uniquely
+    among the five distributors, order submission checks a real, confirmed
+    "is this FFL on file with Chattanooga yet" endpoint first and hard-
+    blocks a doomed order before it's sent — but only on a definitive
+    "not on file" answer; a failure of the check itself doesn't block,
+    since the orders endpoint remains the real arbiter either way. There is
+    no FFL-required/firearm-classification column anywhere in the real
+    sample feed — unlike Bill Hicks/GunBroker, there's no vendor signal to
+    even guess from, so `is_firearm` honestly defaults to false and needs a
+    store-supplied filter (e.g. matching the feed's own `Category` column).
+
+  Catalog sync is free/automatic on click for every distributor above;
+  order submission (real wholesale $) is always an explicit admin click
+  scoped to one transfer's own dealer FFL, same pattern as EasyPost's "Buy
+  Label." **All five distributor clients ship un-smoke-tested** — no
+  approved dealer account was available for any of them in-session;
+  verify each against a live account before trusting it with a real order.
+  **v1.17.1** substituted a rigorous 8-angle code review for that
+  unavailable live test and fixed everything it found: a Bill Hicks
+  blank-MAP-price pricing bug, a UPC-quantity-join fallback gap, an
+  order-resubmission filename collision, `ftp_nlist()` error-vs-empty
+  conflation in both FTP-based clients' response checkers, RSR's O(N×M)
+  response re-download, and admin-panel status colors that read "submitted
+  via FTP" as "confirmed by the distributor." **v1.19.0's own review pass**
+  on the new Chattanooga client caught and fixed a CSV-parsing bug that
+  silently dropped any row with a quoted, legally embedded newline; a
+  price/quantity cast that truncated at the first non-numeric character
+  (so `"$1,250.00"` read as `1.0`); a missing `wp_unslash()` on the API
+  token field; and a "FFL not on file" block that previously left no audit
+  trail. None of this changes the live-account-verification requirement
+  above.
+
+### Marketplace sync
+- **New (v1.18.0)**: `G2A_Gunbroker` (Advanced FFL → 🎯 GunBroker) — a real
+  client against GunBroker.com's documented REST API (api.gunbroker.com),
+  confirmed against two independent real production PHP integrations found
+  on GitHub (`coreware`, `gunbroker-bridge`), the clearest gap found in a
+  fresh competitor sweep (AmmoReady, Orchid, and the WooCommerce rival
+  "FFL Cockpit" all sync to GunBroker). Two directions, unlike the
+  distributor clients' catalog-in/order-out shape:
+  - **Listing sync (push)**: flag a WC product "List on GunBroker" + set a
+    Category ID, sync creates/updates a real listing (`POST`/`PUT Items`);
+    "End Listing" removes it (`DELETE Items/{itemID}`). A "Browse
+    Categories" action surfaces GunBroker's real category tree for
+    reference rather than hardcoding a guessed taxonomy. Free to run any
+    time, same as distributor catalog sync.
+  - **Order pull**: an hourly cron (+ a manual "Check for New Orders"
+    action) pulls sales via `GET OrdersSold`, matches the buyer's FFL
+    license against this plugin's own ATF-synced `dealers` table
+    (`is_active = 1` required, same rule `Checkout` itself enforces), and
+    creates a real WC order that flows through the exact same
+    `Checkout::create_transfer_on_payment()` pipeline a normal storefront
+    sale uses — so the transfer, A&D ledger, and 4473 worksheet all work
+    unchanged. Concurrent sweeps (the cron + a manual click) are made
+    mutually exclusive by an `INSERT IGNORE` claim against
+    `gunbroker_orders`' own UNIQUE key, not a PHP-side check-then-act read.
+    A sale is already paid for on GunBroker's side — importing it never
+    spends money or places an order. No dealer match lands the order in a
+    "needs dealer" queue for one-click manual staff assignment.
+  - **Honesty notes**: DevKey approval terms, rate limits, and the full
+    category taxonomy are not published anywhere GunBroker's own docs
+    (`api.gunbroker.com/User/Help`) don't cover — a store has to request
+    API access directly. The exact JSON field names an order's buyer/FFL
+    data comes back under were never independently confirmed; the importer
+    tries several plausible key spellings defensively. **Ships
+    un-smoke-tested against a live account**, same posture as every
+    distributor client — see §6.
 
 ### Payments
 - **NMI gateway adapter** (v1.11.0, new): Collect.js client-side
@@ -208,6 +343,36 @@ this session for the full reasoning and Phases B/C.
   the transaction API URL are both admin-configurable per-reseller.
   Compliance audit flags Stripe/PayPal/Square if one of them is the
   active gateway.
+- **Credova financing gateway** (v1.20.0, new): `G2A_Gateway_Credova` —
+  real firearms lease-to-own/financing via Credova's lending API
+  (lending-api.credova.com/v2), confirmed against Credova's own
+  open-source Ruby SDK (github.com/ammoready/credova). Unlike NMI's
+  synchronous card-charge flow, this is redirect-based and async: creates
+  a real financing application (confirmed fields — `storeCode`,
+  `firstName`/`lastName`, `mobilePhone`, `email`, `referenceNumber`,
+  `redirectUrl`, `products`; no `amount`/`cartTotal` field exists, the
+  financed amount is derived from line items), sends the customer to
+  Credova's own hosted flow, and holds the order on-hold until a real
+  outcome is confirmed — never marks an order paid at checkout time,
+  since the create-application response's field names, the application
+  status enum, and the webhook payload shape were never independently
+  confirmed (the real SDK is create-only; it never documents its own
+  response/webhook shape). Resolution: a webhook (hard-requires a
+  configured shared secret — refuses with HTTP 503 if blank, same
+  posture `G2A_Id_Verification`'s webhook already uses, after a
+  code-review pass caught the initial version silently trusting an
+  unauthenticated claim when left blank) or a "Check Credova financing
+  status" order action plus a daily automated sweep, both polling
+  Credova's one confirmed status-check endpoint. An unrecognized status
+  is never guessed either way — left on-hold with a note for staff
+  review; approved/declined status-word lists are filterable.
+  **Sezzle was evaluated and deliberately NOT built this round**:
+  Sezzle's own merchant-marketing guidelines list firearms as a
+  prohibited co-branding category, while several currently-live Sezzle
+  merchant pages (Sig Sauer, CMMG, Palmetto State Armory, Sportsman's)
+  show real firearms retailers using it — a genuine contradiction that
+  needs direct confirmation with Sezzle's approvals team before
+  building, same "don't guess" posture that led to rejecting Davidson's.
 
 ### Dealer network & portal
 - ATF dealer database: real monthly sync, chunked/resumable, ~80k dealers.
@@ -309,13 +474,25 @@ this session for the full reasoning and Phases B/C.
 
 ### Testing
 - **As of v1.13.0**, a PHPUnit suite exists (`tests/`, `composer.json`,
-  `phpunit.xml.dist`, a GitHub Actions workflow across PHP 8.1-8.3) — 38
-  tests using Brain Monkey to mock WordPress functions, since there's no
-  live WP/WooCommerce/MySQL environment available in this session or in
-  CI. Covers pure-logic methods only (WC-status mapping, multi-item
-  quantity expansion, CSV formula-injection guards, the verification-
-  reminder threshold picker, NICS business-day math) — no integration or
-  DB-backed test coverage yet.
+  `phpunit.xml.dist`, a GitHub Actions workflow across PHP 8.1-8.3) using
+  Brain Monkey to mock WordPress functions, since there's no live
+  WP/WooCommerce/MySQL environment available in this session or in CI.
+  Originally covered pure-logic methods only (WC-status mapping,
+  multi-item quantity expansion, CSV formula-injection guards, the
+  verification-reminder threshold picker, NICS business-day math).
+- **As of v1.15.2**: a `FakeWpdb` test double (`tests/Unit/Support/
+  FakeWpdb.php`) matches a query by a static substring from its source
+  rather than parsing SQL, letting tests exercise `$wpdb`-gated logic
+  deterministically without a live DB. First use: `G2A_Fraud_Score::
+  score_transfer()` (previously zero coverage despite §6 flagging its
+  weights/thresholds as untuned starting defaults) and the v1.15.1
+  Lipsey's credential encryption (legacy-plaintext passthrough, transparent
+  re-encryption, round-trip decryption, tamper-rejection). 39 → 47 tests.
+  Still no test exercises a real DB round-trip, a real WC checkout flow,
+  or an admin AJAX handler end-to-end — that class of coverage still needs
+  a live WP test harness (see §6 item 4), which `FakeWpdb` doesn't replace,
+  just narrows the gap for logic that's shaped like a DB round-trip but is
+  really deterministic business logic.
 
 ---
 
@@ -348,36 +525,50 @@ this session for the full reasoning and Phases B/C.
 The original 15-gap audit is now closed at least at an infra/client
 level (see §5) — this list is what's left, roughly in priority order:
 
-1. **Port v1.10.0 through v1.14.0 forward into `guns2ammo-complete-custom-
-   business-system`** (repo `Shubochandrosarker/guns2ammo-system-managment`
-   — added to this session; the "complete-custom-business-system" name in
-   this doc is a nickname, not the literal repo name). **In progress /
-   next up.** v1.14.0 (above) already backported guns2ammo's own
-   independent fixes into ffl-checkout--solutions, which is now a strict
-   superset of guns2ammo's real work — the remaining step is a clean
-   forward-copy of the new features (not a delicate merge, since nothing
-   would be lost). Also port the g2a-booking-engine module + the
-   sibling-repo addon PRs from §1 into that ecosystem's copies, if mirrored
-   anywhere. Re-confirm with `diff -rq` when done.
-2. **Smoke-test the two un-tested-in-session live API clients before
-   trusting either with real money/orders**: NMI (Collect.js callback,
-   transact.php parsing, a refund) and, new this round, Lipsey's
-   (`Login` → `CatalogFeed` → `DropShipFirearm`, ideally with a cheap
-   test SKU first). Both were built to the real, stable, documented
-   contract but neither has run against a live account in this
-   environment.
+1. ~~Port v1.10.0 through v1.14.0 forward into guns2ammo~~ **Done — v1.15.0/
+   v1.15.1, closed by an independent session's own crossmatch (see §1).**
+   Both repos confirmed byte-identical for `advanced-ffl-checkout/` as of
+   this check. The g2a-booking-engine module + sibling-repo addon ports
+   from §1 were also picked up by that same external effort (guns2ammo's
+   own commit history now references a "Release 2.1.0 — Complete Plugin
+   Crossmatch & System Integration" spanning multiple plugins) — not
+   independently re-verified here since it's outside this repo's `diff -rq`
+   scope, but no longer this repo's open item.
+2. **Smoke-test the un-tested-in-session live clients before trusting any
+   with real money/orders**: NMI (Collect.js callback, transact.php
+   parsing, a refund), Lipsey's (`Login` → `CatalogFeed` →
+   `DropShipFirearm`), and, new as of v1.17.0, Sports South (`AddHeader`
+   → `AddDetail` → `Submit`), RSR Group (FTPS upload + ECONF/EERR
+   polling), and Bill Hicks & Co. (FTP order file drop). All five were
+   built to a real, confirmed contract, but none has run against a live
+   account in this environment — use a cheap test SKU first on whichever
+   is smoke-tested first. **New as of v1.18.0**: GunBroker (`Users/
+   AccessToken` → `POST Items` listing create → `GET OrdersSold` pull) —
+   also un-smoke-tested; a DevKey needs to be requested from GunBroker
+   directly before this can run against anything real (see §4). **New as
+   of v1.19.0**: Chattanooga (`Basic {SID}:{md5(token)}` auth → `GET
+   items/product-feed` catalog sync → `GET federal-firearms-licenses/
+   {ffl}` precondition check → `POST orders` submission) — also
+   un-smoke-tested; needs an approved Chattanooga dealer account (SID +
+   Token) before this can run against anything real. **New as of
+   v1.20.0**: Credova (`POST token` auth → `POST applications` create →
+   redirect → webhook/`GET applications/{id}/status`) — also
+   un-smoke-tested; needs an approved Credova retailer account
+   (credova.com/retailer) before this can run against anything real.
 3. **Stand up the actual `wordpressistic.com` license server**, or point
    `License::API_BASE` at wherever it really lives. The v1.11.0 client is
    real and correct but has nothing to talk to yet — `activate()` will
    honestly fail with a connection error until this exists. Once it does,
    gate Verification Hub Phase C behind `License::can()` as planned.
-4. **Expand test coverage past pure-logic units.** v1.13.0's PHPUnit suite
-   (38 tests) deliberately covers only what's testable without a live
-   WP/WooCommerce/MySQL environment — no test exercises an actual DB
-   round-trip, a real WC checkout flow, or an admin AJAX handler. If a
-   WP test harness (wp-env, wp-browser, WP_UnitTestCase) becomes available
-   in a future session, that's the next real jump in coverage, not more
-   Brain Monkey unit tests.
+4. **Expand test coverage past pure-logic units.** As of v1.15.2 (47 tests),
+   a `FakeWpdb` test double closed the gap for pure business logic that
+   happens to read/write through `$wpdb` (fraud scoring, credential
+   encryption) — but it's a stand-in with canned responses, not a real
+   database, so it still can't catch a genuine schema mismatch, a real
+   race condition, or an actual WC checkout flow / admin AJAX handler
+   end-to-end. If a WP test harness (wp-env, wp-browser, WP_UnitTestCase)
+   becomes available in a future session, that's the next real jump in
+   coverage, not more Brain Monkey/FakeWpdb unit tests.
 5. **Formistic addon was evaluated, not built.** Research concluded the
    integration point belongs on this plugin's side (calling
    `formistic_capture_contact()` / `do_action( 'formistic_capture', ... )`
@@ -388,12 +579,19 @@ level (see §5) — this list is what's left, roughly in priority order:
 6. **Check PR status first** — guns2ammo#60 and ffl-checkout--solutions#6
    (Verification Hub v1.9.0) were open drafts as of the v1.9.0 update.
    Confirm merged before starting new schema changes on top.
-7. **v1.12.0's regulatory-watch search terms are a starting curation, not
-   exhaustive** (`G2A_Regulatory_Watch::TERMS`) — revisit if ATF proposes a
-   rule using different phrasing than "eZ Check"/"licensee verification."
-   The Federal Register API's `conditions[term]` is a full-text search, so
-   a too-broad term risks noise and a too-narrow one risks silence; there's
-   no feedback loop yet to tell which failure mode is happening.
+7. ~~v1.12.0's regulatory-watch search terms are a starting curation, not
+   exhaustive~~ **Partially addressed — v1.16.0.** `G2A_Regulatory_Watch::
+   TERMS` (still a starting curation, now 7 terms instead of 3) is filterable
+   via `wpistic_ffl_regulatory_watch_terms` (`G2A_Regulatory_Watch::
+   active_terms()`), and the admin page now shows the active list, so a
+   store can react to noise or a suspected gap without a code change.
+   **Still open**: there's no feedback loop that tells a store *which*
+   failure mode (noise vs. silence) it's actually experiencing — that would
+   need either a "matches per term" breakdown on the admin page or an
+   opt-in false-positive/false-negative report, neither built yet. The
+   Federal Register API's `conditions[term]` is a full-text search, so this
+   remains a judgment call per store, not something the plugin can infer
+   on its own.
 8. **v1.13.0's fraud-score weights/thresholds are starting defaults, not
    tuned against real data** (`wpistic_ffl_fraud_score_weights` and the
    two threshold filters) — revisit once a store has enough real order
@@ -485,6 +683,33 @@ level (see §5) — this list is what's left, roughly in priority order:
   account was available in-session to run an actual login or order
   through it. Verify against a real account before trusting it with a
   real order, same posture as the NMI gateway.
+- **Sports South, RSR, and Bill Hicks & Co. clients (v1.17.0) all ship
+  un-smoke-tested too**, and at three different confidence levels — don't
+  treat them as equally solid. Sports South's contract is confirmed by
+  two independent open-source clients agreeing on host/auth/method names.
+  RSR's is confirmed against the actual quoted source of a real
+  open-source gem (the strongest of the three). Bill Hicks & Co.'s is
+  triangulated across three unrelated codebases that don't fully agree on
+  current filenames, and was never officially published by Bill Hicks
+  itself — treat its exact filenames as the least reliable detail in this
+  round and confirm them with a live account before syncing or ordering.
+- **RSR order confirmation is asynchronous by the real protocol, not a
+  shortcut.** Uploading an order file only means the file was accepted by
+  FTP — RSR confirms or rejects it later via a separate ECONF/EERR file.
+  Don't change `distributor_orders.status` to "confirmed" anywhere except
+  through `G2A_Rsr::check_responses()` actually finding a matching file.
+- **Bill Hicks & Co.'s response files are listed, not auto-classified,
+  on purpose.** Their accept/reject file-naming convention was never
+  independently confirmed in this session (unlike RSR's ECONF/EERR) — if
+  a future session confirms it, `G2A_Bill_Hicks::check_responses()` is
+  the place to add real classification, not before.
+- **Davidson's is not built, and that's a considered decision, not an
+  oversight.** No public catalog field layout exists anywhere for it, and
+  a credible integrator source states plainly it has no automated
+  order-submission path — building a client for it now would mean
+  guessing a contract the way this plugin explicitly refuses to for ATF's
+  eZ Check or the NICS API. Only revisit after getting real credentials
+  and/or documentation directly from Davidson's.
 - **Dealer self-service login (v1.13.0) is additive, not a replacement.**
   The single-use magic-link `Portal` flow is unchanged and stays the
   default for every dealer who isn't explicitly invited to the

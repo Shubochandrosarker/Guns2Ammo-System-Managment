@@ -80,6 +80,22 @@ if ( ! class_exists( 'WC_Order' ) ) {
 	}
 }
 
+// Minimal WC_Payment_Gateway stand-in -- PHP resolves an `extends` clause
+// at class-DECLARATION time (when the file is require_once'd), not at
+// instantiation time, so G2A_Gateway_Nmi/G2A_Gateway_Credova's own files
+// would fatal on load without this even for tests that only exercise
+// their static, instance-independent helper methods and never construct
+// the gateway itself.
+if ( ! class_exists( 'WC_Payment_Gateway' ) ) {
+	class WC_Payment_Gateway {
+		public function init_form_fields(): void {}
+		public function init_settings(): void {}
+		public function get_option( $key, $default = '' ) {
+			return $default;
+		}
+	}
+}
+
 // Plugin classes referenced by type-hint even when the test doesn't
 // exercise the code paths that use them (e.g. Checkout references DB,
 // Compliance, Mailer, G2A_Scheduler inside methods this suite doesn't call).

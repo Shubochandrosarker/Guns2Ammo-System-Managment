@@ -29,12 +29,35 @@ class G2A_Regulatory_Watch {
 	const AGENCY_SLUG = 'bureau-of-alcohol-tobacco-firearms-and-explosives';
 	const CRON_HOOK   = 'wpistic_ffl_regulatory_watch_check';
 
-	/** Curated search terms — kept narrow so this stays signal, not noise. */
+	/**
+	 * Curated search terms — kept deliberately narrow so this stays signal,
+	 * not noise (see `wpistic_ffl_regulatory_watch_terms` below and
+	 * STATUS.md §6/§7: a too-broad term risks noise, a too-narrow one risks
+	 * silence, and there's no feedback loop yet to tell which is happening
+	 * for a given store). Grounded in the withdrawn "Licensee eZ Check
+	 * Verification for Transfers" rule's own language plus the plausible
+	 * phrasings a re-proposed or related rule would use.
+	 */
 	const TERMS = [
 		'firearms licensee verification',
 		'eZ Check',
 		'FFL transfer verification',
+		'electronic verification of licensee',
+		'transferee license verification',
+		'certified copy of license requirement',
+		'FFL license validity verification',
 	];
+
+	/**
+	 * The effective term list for a given run — `self::TERMS` unless a
+	 * store overrides it. Filterable so a store can narrow (less noise),
+	 * widen (less risk of silence), or replace the defaults entirely
+	 * without a code change, same pattern as every other tunable list in
+	 * this plugin (fraud-score weights, state-rules seed, etc.).
+	 */
+	public static function active_terms(): array {
+		return (array) apply_filters( 'wpistic_ffl_regulatory_watch_terms', self::TERMS );
+	}
 
 	public function __construct() {
 		add_action( 'admin_menu', [ $this, 'register_admin_page' ], 46 );
@@ -55,8 +78,8 @@ class G2A_Regulatory_Watch {
 	 * old matches again on every run.
 	 */
 	public static function run_check(): void {
-		foreach ( self::TERMS as $term ) {
-			self::query_term( $term );
+		foreach ( self::active_terms() as $term ) {
+			self::query_term( (string) $term );
 		}
 		update_option( 'wpistic_ffl_regwatch_last_run', current_time( 'mysql' ), false );
 	}
@@ -219,6 +242,11 @@ class G2A_Regulatory_Watch {
 					&nbsp;·&nbsp;
 					<button type="button" class="button" id="wpistic-ffl-regwatch-run"><?php esc_html_e( 'Check Now', 'advanced-ffl-checkout' ); ?></button>
 					<span id="wpistic-ffl-regwatch-msg" style="font-weight:600;"></span>
+				</p>
+				<p style="margin-bottom:0;">
+					<strong><?php esc_html_e( 'Active search terms:', 'advanced-ffl-checkout' ); ?></strong>
+					<?php echo esc_html( implode( ' · ', self::active_terms() ) ); ?>
+					<br><span class="description"><?php esc_html_e( 'Too much noise or worried a real rule change might slip through unworded? Add or remove terms with the wpistic_ffl_regulatory_watch_terms filter — no code change to this plugin required.', 'advanced-ffl-checkout' ); ?></span>
 				</p>
 			</div>
 

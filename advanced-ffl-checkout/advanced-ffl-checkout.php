@@ -3,7 +3,7 @@
  * Plugin Name:       Advanced FFL Checkout Solutions — G2A Edition
  * Plugin URI:        https://wordpressistic.com/products/advanced-ffl-checkout
  * Description:       Federal Firearms License (FFL) dealer management, WooCommerce checkout integration, transfer tracking and one-click dealer confirmation portal — customized for the Guns2Ammo system (HPOS-safe order meta, brass/graphite branding, customer "My FFL Transfers" tab, NICS 3-day automation, SMS via Verifyistic, WC order ↔ transfer status bridge).
- * Version:           1.15.1
+ * Version:           1.21.0
  * Requires at least: 6.4
  * Requires PHP:      8.1
  * Author:            Wordpressistic
@@ -29,7 +29,7 @@ if ( version_compare( PHP_VERSION, '8.1', '<' ) ) {
 }
 
 // ── Constants ─────────────────────────────────────────────────────────────────
-define( 'WPISTIC_FFL_VERSION',   '1.15.1' );
+define( 'WPISTIC_FFL_VERSION',   '1.21.0' );
 define( 'WPISTIC_FFL_FILE',      __FILE__ );
 define( 'WPISTIC_FFL_PATH',      plugin_dir_path( __FILE__ ) );
 define( 'WPISTIC_FFL_URL',       plugin_dir_url( __FILE__ ) );
@@ -160,6 +160,7 @@ register_deactivation_hook( __FILE__, function (): void {
 		'wpistic_ffl_webhook_retry',
 		'wpistic_ffl_license_revalidate',
 		'wpistic_ffl_regulatory_watch_check',
+		'wpistic_ffl_credova_check_status_sweep',
 	];
 	foreach ( $hooks as $hook ) {
 		wp_clear_scheduled_hook( $hook );
@@ -394,7 +395,32 @@ add_action( 'plugins_loaded', function (): void {
 	// v1.13.0 — gap #11: Lipsey's distributor drop-ship integration
 	// (real dealer API client -- catalog sync + explicit-click order
 	// submission only, never automatic).
-	new \WpisticFFL\G2A_Lipseys();
+	//
+	// v1.17.0 added Sports South, RSR, and Bill Hicks & Co. (v1.19.0 added
+	// Chattanooga) behind the same "explicit click to place a real
+	// wholesale order, catalog sync is free/automatic" rule -- see each
+	// class's own docblock for exactly what wire protocol/contract was
+	// confirmed vs. inferred.
+	//
+	// v1.21.0 — each is now independently toggleable (🧩 Add-ons): a store
+	// that only uses one or two of these turns the rest off, so a
+	// disabled distributor's class is never instantiated here at all --
+	// no hooks, no wp_ajax_* actions register for it. Enabled by default
+	// for every known slug, so this is a no-op change for an
+	// already-running site until it explicitly disables one.
+	foreach ( \WpisticFFL\G2A_Distributor_Registry::known_distributors() as $slug => $meta ) {
+		if ( \WpisticFFL\G2A_Distributor_Registry::is_enabled( $slug ) && class_exists( $meta['class'] ) ) {
+			new $meta['class']();
+		}
+	}
+
+	new \WpisticFFL\G2A_Distributors_Admin();
+	new \WpisticFFL\G2A_Addons_Admin();
+
+	// v1.18.0 — GunBroker.com marketplace sync: pushes flagged WC products
+	// as real listings and pulls sold orders back in, reusing the existing
+	// Checkout transfer-creation pipeline (see class docblock).
+	new \WpisticFFL\G2A_Gunbroker();
 
 }, 20 );
 
@@ -403,7 +429,26 @@ add_action( 'plugins_loaded', function (): void {
 // instantiates it itself once per request, same as every other gateway.
 add_filter( 'woocommerce_payment_gateways', function ( array $methods ): array {
 	$methods[] = '\WpisticFFL\G2A_Gateway_Nmi';
+	// v1.20.0 — Credova firearms financing (real lending-api.credova.com
+	// client, confirmed against Credova's own open-source Ruby SDK).
+	$methods[] = '\WpisticFFL\G2A_Gateway_Credova';
 	return $methods;
+} );
+
+// Credova's webhook route and daily "Check Status" sweep cron are both
+// wired from a dedicated instance here, not from the gateway class's own
+// constructor -- WooCommerce only instantiates the classes above when its
+// payment-gateways subsystem actually loads, which a request hitting
+// nothing but the REST route (or a bare cron tick) can't be relied on to
+// guarantee. See G2A_Gateway_Credova::register_routes()/cron_check_pending().
+add_action( 'rest_api_init', function (): void {
+	( new \WpisticFFL\G2A_Gateway_Credova() )->register_routes();
+} );
+add_action( 'init', function (): void {
+	add_action( \WpisticFFL\G2A_Gateway_Credova::CRON_HOOK, [ '\WpisticFFL\G2A_Gateway_Credova', 'cron_check_pending' ] );
+	if ( ( new \WpisticFFL\G2A_Gateway_Credova() )->is_available() ) {
+		\WpisticFFL\G2A_Scheduler::recurring( DAY_IN_SECONDS, \WpisticFFL\G2A_Gateway_Credova::CRON_HOOK );
+	}
 } );
 
 // ── v1.1.3 — Default options bootstrap ────────────────────────────────────────
