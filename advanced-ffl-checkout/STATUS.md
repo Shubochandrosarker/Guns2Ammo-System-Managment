@@ -1,6 +1,6 @@
 # Advanced FFL Checkout Solutions — Present Conditions
 
-_Last updated: 2026-07-16 · Plugin version 1.21.0 · DB schema 1.12.0_
+_Last updated: 2026-07-20 · Plugin version 1.21.1 (1.21.0 crossmatched into the monorepo, then a sitewide color-contrast patch) · DB schema 1.12.0 (unchanged)_
 
 This file is the living reference for where the plugin actually stands —
 what exists, what was just shipped, what's open, and what to pick up next

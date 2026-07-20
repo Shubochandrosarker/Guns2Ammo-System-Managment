@@ -11,7 +11,7 @@ performance — all from one branded dashboard.
 
 | | |
 |---|---|
-| **Stable version** | `2.1.0` |
+| **Stable version** | `2.1.1` |
 | **Requires WordPress** | `6.2` or higher |
 | **Tested up to** | `6.9` |
 | **Requires PHP** | `7.4` or higher |
