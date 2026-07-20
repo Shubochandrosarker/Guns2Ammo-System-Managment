@@ -145,22 +145,26 @@ function g2ab_current_user_can( $cap ) {
 }
 
 /**
- * Get the IP of the current request, respecting common proxy headers.
+ * Get the client IP safely.
+ *
+ * Forwarded headers are honored only when the immediate peer is a trusted
+ * proxy. This prevents direct-origin spoofing while still splitting real
+ * visitors behind Cloudflare into separate rate-limit buckets.
  *
  * @return string
  */
 function g2ab_get_client_ip() {
-	$candidates = array(
-		'HTTP_CF_CONNECTING_IP',
-		'HTTP_X_FORWARDED_FOR',
-		'HTTP_X_REAL_IP',
-		'REMOTE_ADDR',
-	);
+	$remote = isset( $_SERVER['REMOTE_ADDR'] ) ? sanitize_text_field( wp_unslash( $_SERVER['REMOTE_ADDR'] ) ) : '';
+	if ( ! filter_var( $remote, FILTER_VALIDATE_IP ) ) {
+		return '0.0.0.0';
+	}
 
-	foreach ( $candidates as $key ) {
-		if ( ! empty( $_SERVER[ $key ] ) ) {
+	if ( g2ab_remote_is_trusted_proxy( $remote ) ) {
+		foreach ( array( 'HTTP_CF_CONNECTING_IP', 'HTTP_X_REAL_IP', 'HTTP_X_FORWARDED_FOR' ) as $key ) {
+			if ( empty( $_SERVER[ $key ] ) ) {
+				continue;
+			}
 			$ip = sanitize_text_field( wp_unslash( $_SERVER[ $key ] ) );
-			// X-Forwarded-For can be a comma-separated list. Take the first.
 			if ( false !== strpos( $ip, ',' ) ) {
 				$ip = trim( explode( ',', $ip )[0] );
 			}
@@ -170,7 +174,67 @@ function g2ab_get_client_ip() {
 		}
 	}
 
-	return '';
+	return $remote;
+}
+
+function g2ab_remote_is_trusted_proxy( $remote ) {
+	$list = array();
+	if ( defined( 'G2AB_TRUSTED_PROXIES' ) && is_string( G2AB_TRUSTED_PROXIES ) ) {
+		$list = array_merge( $list, array_filter( array_map( 'trim', explode( ',', G2AB_TRUSTED_PROXIES ) ) ) );
+	}
+	$opt = (string) get_option( 'g2ab_trusted_proxies', '' );
+	if ( '' !== $opt ) {
+		$list = array_merge( $list, array_filter( array_map( 'trim', explode( ',', $opt ) ) ) );
+	}
+	$list = array_merge( $list, g2ab_default_trusted_proxy_ranges() );
+	$list = (array) apply_filters( 'g2ab_trusted_proxies', array_unique( $list ) );
+
+	foreach ( $list as $range ) {
+		if ( g2ab_ip_in_cidr( $remote, (string) $range ) ) {
+			return true;
+		}
+	}
+	return false;
+}
+
+function g2ab_default_trusted_proxy_ranges() {
+	return array(
+		'173.245.48.0/20', '103.21.244.0/22', '103.22.200.0/22', '103.31.4.0/22',
+		'141.101.64.0/18', '108.162.192.0/18', '190.93.240.0/20', '188.114.96.0/20',
+		'197.234.240.0/22', '198.41.128.0/17', '162.158.0.0/15', '104.16.0.0/13',
+		'104.24.0.0/14', '172.64.0.0/13', '131.0.72.0/22',
+		'2400:cb00::/32', '2606:4700::/32', '2803:f800::/32', '2405:b500::/32',
+		'2405:8100::/32', '2a06:98c0::/29', '2c0f:f248::/32',
+	);
+}
+
+function g2ab_ip_in_cidr( $ip, $range ) {
+	if ( '' === $ip || '' === $range ) {
+		return false;
+	}
+	if ( '*' === $range ) {
+		return true;
+	}
+	if ( false === strpos( $range, '/' ) ) {
+		return $ip === $range;
+	}
+	list( $subnet, $bits ) = explode( '/', $range, 2 );
+	$ip_bin     = @inet_pton( $ip );
+	$subnet_bin = @inet_pton( $subnet );
+	if ( false === $ip_bin || false === $subnet_bin || strlen( $ip_bin ) !== strlen( $subnet_bin ) ) {
+		return false;
+	}
+	$bits  = max( 0, min( strlen( $ip_bin ) * 8, (int) $bits ) );
+	$bytes = intdiv( $bits, 8 );
+	$rem   = $bits % 8;
+	if ( $bytes && substr( $ip_bin, 0, $bytes ) !== substr( $subnet_bin, 0, $bytes ) ) {
+		return false;
+	}
+	if ( 0 === $rem ) {
+		return true;
+	}
+	$mask = ( 0xff << ( 8 - $rem ) ) & 0xff;
+	return ( ord( $ip_bin[ $bytes ] ) & $mask ) === ( ord( $subnet_bin[ $bytes ] ) & $mask );
 }
 
 /**
@@ -198,6 +262,216 @@ function g2ab_webhook_event_is_new( $gateway, $event_id ) {
 	}
 	set_transient( $key, 1, DAY_IN_SECONDS );
 	return true;
+}
+
+function g2ab_webhook_event_claim( $gateway, $event_id, $event_type = '', $payload = '' ) {
+	global $wpdb;
+	$gateway    = sanitize_key( (string) $gateway );
+	$event_id   = sanitize_text_field( (string) $event_id );
+	$event_type = sanitize_text_field( (string) $event_type );
+	if ( '' === $gateway || '' === $event_id ) {
+		return 'process';
+	}
+
+	$table = $wpdb->prefix . 'g2ab_webhook_events';
+	if ( ! g2ab_table_exists( $table ) ) {
+		return g2ab_webhook_event_was_processed_legacy( $gateway, $event_id ) ? 'duplicate' : 'process';
+	}
+
+	$lock_name = 'g2ab_wh_' . md5( $gateway . '|' . $event_id );
+	if ( ! g2ab_mysql_lock( $lock_name, 3 ) ) {
+		return new WP_Error( 'g2ab_webhook_locked', __( 'Webhook event is already being processed.', 'g2a-booking' ), array( 'status' => 503 ) );
+	}
+
+	try {
+		$now = current_time( 'mysql' );
+		$row = $wpdb->get_row(
+			$wpdb->prepare( "SELECT id, status, attempts, updated_at FROM {$table} WHERE gateway = %s AND event_id = %s LIMIT 1", $gateway, $event_id ),
+			ARRAY_A
+		);
+		if ( $row && 'processed' === (string) $row['status'] ) {
+			return 'duplicate';
+		}
+		if ( $row && 'processing' === (string) $row['status'] && ! empty( $row['updated_at'] ) && strtotime( (string) $row['updated_at'] ) > ( time() - 120 ) ) {
+			return new WP_Error( 'g2ab_webhook_processing', __( 'Webhook event is still processing.', 'g2a-booking' ), array( 'status' => 503 ) );
+		}
+
+		$data = array(
+			'event_type'   => $event_type,
+			'status'       => 'processing',
+			'attempts'     => $row ? ( (int) $row['attempts'] + 1 ) : 1,
+			'payload_hash' => is_string( $payload ) && '' !== $payload ? hash( 'sha256', $payload ) : null,
+			'last_error'   => '',
+			'received_at'  => $now,
+			'updated_at'   => $now,
+		);
+
+		if ( $row ) {
+			$wpdb->update(
+				$table,
+				$data,
+				array( 'id' => (int) $row['id'] ),
+				array( '%s', '%s', '%d', '%s', '%s', '%s', '%s' ),
+				array( '%d' )
+			);
+		} else {
+			$data['gateway']    = $gateway;
+			$data['event_id']   = $event_id;
+			$data['created_at'] = $now;
+			$wpdb->insert(
+				$table,
+				$data,
+				array( '%s', '%s', '%d', '%s', '%s', '%s', '%s', '%s', '%s', '%s' )
+			);
+		}
+	} finally {
+		g2ab_mysql_unlock( $lock_name );
+	}
+
+	return 'process';
+}
+
+function g2ab_webhook_event_mark_processed( $gateway, $event_id ) {
+	global $wpdb;
+	$gateway  = sanitize_key( (string) $gateway );
+	$event_id = sanitize_text_field( (string) $event_id );
+	if ( '' === $gateway || '' === $event_id ) {
+		return;
+	}
+	$table = $wpdb->prefix . 'g2ab_webhook_events';
+	if ( ! g2ab_table_exists( $table ) ) {
+		set_transient( 'g2ab_wh_' . md5( $gateway . '|' . $event_id ), 1, DAY_IN_SECONDS );
+		return;
+	}
+	$now = current_time( 'mysql' );
+	$wpdb->update(
+		$table,
+		array(
+			'status'       => 'processed',
+			'processed_at' => $now,
+			'last_error'   => '',
+			'updated_at'   => $now,
+		),
+		array(
+			'gateway'  => $gateway,
+			'event_id' => $event_id,
+		),
+		array( '%s', '%s', '%s', '%s' ),
+		array( '%s', '%s' )
+	);
+}
+
+function g2ab_webhook_event_mark_failed( $gateway, $event_id, $message ) {
+	global $wpdb;
+	$gateway  = sanitize_key( (string) $gateway );
+	$event_id = sanitize_text_field( (string) $event_id );
+	if ( '' === $gateway || '' === $event_id ) {
+		return;
+	}
+	$table = $wpdb->prefix . 'g2ab_webhook_events';
+	if ( ! g2ab_table_exists( $table ) ) {
+		return;
+	}
+	$wpdb->update(
+		$table,
+		array(
+			'status'     => 'failed',
+			'last_error' => substr( sanitize_textarea_field( (string) $message ), 0, 1000 ),
+			'updated_at' => current_time( 'mysql' ),
+		),
+		array(
+			'gateway'  => $gateway,
+			'event_id' => $event_id,
+		),
+		array( '%s', '%s', '%s' ),
+		array( '%s', '%s' )
+	);
+}
+
+function g2ab_webhook_event_was_processed_legacy( $gateway, $event_id ) {
+	return (bool) get_transient( 'g2ab_wh_' . md5( sanitize_key( (string) $gateway ) . '|' . sanitize_text_field( (string) $event_id ) ) );
+}
+
+function g2ab_table_exists( $table ) {
+	global $wpdb;
+	static $cache = array();
+	$table = (string) $table;
+	if ( isset( $cache[ $table ] ) ) {
+		return $cache[ $table ];
+	}
+	$cache[ $table ] = (bool) $wpdb->get_var( $wpdb->prepare( 'SHOW TABLES LIKE %s', $table ) );
+	return $cache[ $table ];
+}
+
+function g2ab_mysql_lock( $key, $timeout = 3 ) {
+	global $wpdb;
+	if ( ! is_object( $wpdb ) || ! method_exists( $wpdb, 'get_var' ) ) {
+		return true;
+	}
+	return 1 === (int) $wpdb->get_var( $wpdb->prepare( 'SELECT GET_LOCK(%s, %d)', (string) $key, max( 0, (int) $timeout ) ) );
+}
+
+function g2ab_mysql_unlock( $key ) {
+	global $wpdb;
+	if ( ! is_object( $wpdb ) || ! method_exists( $wpdb, 'get_var' ) ) {
+		return;
+	}
+	$wpdb->get_var( $wpdb->prepare( 'SELECT RELEASE_LOCK(%s)', (string) $key ) );
+}
+
+function g2ab_queue_booking_paid_side_effects( $booking_id, $gateway, $previous_status, $payload = array() ) {
+	$booking_id = absint( $booking_id );
+	if ( ! $booking_id ) {
+		return false;
+	}
+	$gateway = sanitize_key( (string) $gateway );
+	$args    = array(
+		$booking_id,
+		$gateway,
+		sanitize_key( (string) $previous_status ),
+		array(
+			'session_id'     => isset( $payload['id'] ) ? sanitize_text_field( (string) $payload['id'] ) : '',
+			'payment_intent' => isset( $payload['payment_intent'] ) ? sanitize_text_field( (string) $payload['payment_intent'] ) : '',
+			'event_source'   => 'webhook',
+		),
+	);
+
+	if ( function_exists( 'as_enqueue_async_action' ) ) {
+		as_enqueue_async_action( 'g2ab_run_booking_paid_side_effects', $args, 'g2a-booking' );
+		return true;
+	}
+
+	if ( ! wp_next_scheduled( 'g2ab_run_booking_paid_side_effects', $args ) ) {
+		return (bool) wp_schedule_single_event( time() + 1, 'g2ab_run_booking_paid_side_effects', $args );
+	}
+
+	return true;
+}
+
+function g2ab_run_booking_paid_side_effects( $booking_id, $gateway = 'stripe', $previous_status = '', $context = array() ) {
+	global $wpdb;
+	$booking_id = absint( $booking_id );
+	if ( ! $booking_id ) {
+		return;
+	}
+	$gateway = sanitize_key( (string) $gateway );
+	$token   = md5( $gateway . '|' . $booking_id . '|' . (string) ( $context['payment_intent'] ?? '' ) . '|' . (string) ( $context['session_id'] ?? '' ) );
+	$key     = 'g2ab_paid_hooks_' . $token;
+
+	if ( get_transient( $key ) ) {
+		return;
+	}
+
+	$booking = $wpdb->get_row( $wpdb->prepare( "SELECT * FROM {$wpdb->prefix}g2ab_bookings WHERE id = %d LIMIT 1", $booking_id ) );
+	if ( ! $booking ) {
+		return;
+	}
+
+	do_action( 'g2ab_payment_succeeded', $booking_id, $gateway, $context );
+	do_action( 'g2ab_booking_paid', $booking, $context );
+	do_action( 'g2ab_booking_status_changed', $booking_id, 'paid', $previous_status );
+
+	set_transient( $key, 1, 30 * DAY_IN_SECONDS );
 }
 
 /**

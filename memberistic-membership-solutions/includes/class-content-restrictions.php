@@ -36,7 +36,7 @@ final class Content_Restrictions {
 		add_filter( 'rest_prepare_post', array( self::class, 'filter_rest_response' ), 10, 2 );
 		add_filter( 'rest_prepare_page', array( self::class, 'filter_rest_response' ), 10, 2 );
 		add_action( 'memberistic_membership_created', array( self::class, 'sync_roles_for_membership' ) );
-		add_action( 'memberistic_membership_activated', array( self::class, 'sync_roles_for_membership' ) );
+		add_action( 'memberistic_membership_activated', array( self::class, 'sync_roles_for_membership' ), 30 );
 		// On expiry, strip the member roles + active-plan meta so an expired member
 		// no longer reads as active to content restriction or the booking engine.
 		add_action( 'memberistic_membership_expired', array( self::class, 'clear_roles_for_membership' ) );

@@ -27,10 +27,13 @@ final class G2AB_Plugin
 		add_action('init', array($this, 'ensure_cron_scheduled'), 15);
 		add_action('rest_api_init', array($this, 'register_rest_routes'));
 		add_action('admin_init', array($this, 'maybe_redirect_after_activation'));
+		add_action('template_redirect', array($this, 'send_sensitive_page_cache_headers'), 0);
+		add_action('admin_notices', array($this, 'render_webhook_health_notice'));
 		add_filter('plugin_action_links_' . G2AB_BASENAME, array($this, 'plugin_action_links'));
 		add_filter('cron_schedules', array($this, 'register_cron_intervals'));
 
 		add_action('g2ab_cleanup_expired_reservations', array($this, 'run_booking_expiry_cron'));
+		add_action('g2ab_run_booking_paid_side_effects', 'g2ab_run_booking_paid_side_effects', 10, 4);
 
 		// Lightweight nonce refresh over admin-ajax. A logged-in member whose page
 		// was served from cache carries a stale wp_rest nonce; WP core then rejects
@@ -180,6 +183,55 @@ final class G2AB_Plugin
 			}
 		}
 		do_action('g2ab_register_rest_routes');
+	}
+
+	public function send_sensitive_page_cache_headers()
+	{
+		if (isset($_GET['g2ab_paid']) || isset($_GET['g2ab_cancel']) || isset($_GET['g2ab_pay']) || isset($_GET['g2ab_token'])) {
+			nocache_headers();
+			return;
+		}
+		if (! is_singular()) {
+			return;
+		}
+		$post = get_post();
+		if (! $post instanceof WP_Post) {
+			return;
+		}
+		foreach (array('g2a_lane_booking', 'g2a_booking_form', 'g2a_event_booking', 'g2ab_reschedule', 'g2ab_cancel_booking', 'g2ab_frontdesk', 'g2ab_staff_console', 'g2ab_range_console', 'g2ab_self_checkin') as $shortcode) {
+			if (has_shortcode((string) $post->post_content, $shortcode)) {
+				nocache_headers();
+				return;
+			}
+		}
+	}
+
+	public function render_webhook_health_notice()
+	{
+		if (! current_user_can('manage_options')) {
+			return;
+		}
+		if (1 !== (int) get_option('g2ab_stripe_enabled', 0)) {
+			return;
+		}
+		$last_verified = get_option('g2ab_stripe_webhook_last_verified_at', '');
+		$last_failed   = get_option('g2ab_stripe_webhook_last_failed_at', '');
+		$last_processed= get_option('g2ab_stripe_webhook_last_processed_at', '');
+		$warnings      = array();
+		if ('' === (string) $last_verified || strtotime((string) $last_verified) < (time() - DAY_IN_SECONDS)) {
+			$warnings[] = __('Stripe booking webhook has not verified a signed event in the last 24 hours.', 'g2a-booking');
+		}
+		if ($last_failed && (!$last_processed || strtotime((string) $last_failed) > strtotime((string) $last_processed))) {
+			$warnings[] = __('The most recent Stripe booking webhook attempt failed.', 'g2a-booking');
+		}
+		if (!$warnings) {
+			return;
+		}
+		printf(
+			'<div class="notice notice-warning"><p><strong>%1$s</strong> %2$s</p></div>',
+			esc_html__('G2A Booking webhook health:', 'g2a-booking'),
+			esc_html(implode(' ', $warnings))
+		);
 	}
 
 	/**

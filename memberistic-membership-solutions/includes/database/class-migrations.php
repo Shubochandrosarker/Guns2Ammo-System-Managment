@@ -57,12 +57,35 @@ final class Migrations {
 			'1.7.0' => array( self::class, 'migrate_1_7_0' ),
 			'1.8.0' => array( self::class, 'migrate_1_8_0' ),
 			'1.9.0' => array( self::class, 'migrate_1_9_0' ),
+			'1.10.0' => array( self::class, 'migrate_1_10_0' ),
 		);
 	}
 
 	/**
 	 * 1.9.0 — Kiosk station attribution on waiver signatures.
 	 */
+	public static function migrate_1_10_0() {
+		global $wpdb;
+
+		$table = $wpdb->prefix . 'memberistic_memberships';
+
+		self::add_column_if_missing(
+			$table,
+			'stripe_checkout_session_id',
+			'VARCHAR(191) NULL AFTER stripe_subscription_id'
+		);
+
+		self::add_column_if_missing(
+			$table,
+			'stripe_checkout_expires_at',
+			'DATETIME NULL AFTER stripe_checkout_session_id'
+		);
+
+		self::add_index_if_missing( $table, 'stripe_checkout_session_id', 'stripe_checkout_session_id' );
+
+		return true;
+	}
+
 	public static function migrate_1_9_0() {
 		global $wpdb;
 

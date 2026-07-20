@@ -34,7 +34,7 @@ class Verifyistic_Ajax {
 
         // Refuse mints to IPs already blocked for hammering verification.
         if ( ! Verifyistic_Security::check_rate_limit( $ip ) ) {
-            wp_send_json_error( array( 'message' => __( 'Too many attempts. Please wait a few minutes and try again.', 'verifyistic' ) ), 429 );
+            $this->send_rate_limit_error();
             return;
         }
 
@@ -45,7 +45,7 @@ class Verifyistic_Ajax {
         // counter.
         $mint_key = 'vfy_mint_' . md5( $ip );
         if ( ! Verifyistic_Security::atomic_check_and_increment( $mint_key, 30, 15 * MINUTE_IN_SECONDS ) ) {
-            wp_send_json_error( array( 'message' => __( 'Too many attempts. Please wait a few minutes and try again.', 'verifyistic' ) ), 429 );
+            $this->send_rate_limit_error();
             return;
         }
 
@@ -66,7 +66,7 @@ class Verifyistic_Ajax {
 
         // 1. Rate limit (per IP) — blunts automated age-guessing.
         if ( ! Verifyistic_Security::check_rate_limit( $ip ) ) {
-            wp_send_json_error( array( 'message' => __( 'Too many attempts. Please wait a few minutes and try again.', 'verifyistic' ) ) );
+            $this->send_rate_limit_error();
             return;
         }
         // 2. Honeypot — real users never fill this hidden field.
@@ -150,6 +150,11 @@ class Verifyistic_Ajax {
         // Verification fully passed — now burn the token's jti so it can't
         // be replayed by a bot. Failed attempts (above) intentionally do
         // NOT burn, so honest users can retry after a typo.
+        $success_key = 'vfy_success_' . md5( $ip );
+        if ( ! Verifyistic_Security::atomic_check_and_increment( $success_key, (int) apply_filters( 'verifyistic_success_rate_limit', 20 ), 15 * MINUTE_IN_SECONDS ) ) {
+            $this->send_rate_limit_error();
+            return;
+        }
         Verifyistic_Security::burn_form_token( $token_jti );
 
         // Save to DB
@@ -187,6 +192,14 @@ class Verifyistic_Ajax {
         // value can't drive an open redirect.
         $safe = $redirect ? wp_validate_redirect( $redirect, '' ) : '';
         wp_send_json_success( array( 'redirect' => esc_url( $safe ) ) );
+    }
+
+    private function send_rate_limit_error() {
+        if ( ! headers_sent() ) {
+            status_header( 429 );
+            header( 'Retry-After: 900' );
+        }
+        wp_send_json_error( array( 'message' => __( 'Too many attempts. Please wait a few minutes and try again.', 'verifyistic' ) ), 429 );
     }
 
     // ─── DOB Verification ────────────────────────────────────────────────────

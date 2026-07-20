@@ -63,6 +63,7 @@ final class Plugin {
 			'includes/integrations/class-corestore-bridge.php',
 			'includes/integrations/class-ffl-checkout-bridge.php',
 			'includes/payments/class-stripe-service.php',
+			'includes/cli/class-stripe-recovery-command.php',
 			'includes/admin/class-admin-menu.php',
 			'includes/admin/class-dashboard-page.php',
 			'includes/admin/class-members-page.php',
@@ -105,6 +106,7 @@ final class Plugin {
 	private function register_hooks() {
 		add_action( 'init', array( $this, 'load_textdomain' ) );
 		add_action( 'init', array( Payments\Stripe_Service::class, 'maybe_handle_public_checkout_request' ) );
+		CLI\Stripe_Recovery_Command::register();
 		add_action( 'init', array( Payments\Stripe_Service::class, 'maybe_handle_billing_portal_request' ) );
 		// Propagate WordPress-side cancellations to Stripe so the
 		// subscription actually stops billing — previously a cancel on the
@@ -114,6 +116,7 @@ final class Plugin {
 		// wp-admin until Stripe confirms billing has stopped.
 		add_action( Payments\Stripe_Service::CANCEL_RETRY_HOOK, array( Payments\Stripe_Service::class, 'run_cancel_retry' ), 10, 2 );
 		add_action( 'admin_notices', array( Payments\Stripe_Service::class, 'render_cancel_failure_notice' ) );
+		add_action( 'admin_notices', array( Payments\Stripe_Service::class, 'render_webhook_health_notice' ) );
 		add_action( 'admin_menu', array( Admin\Admin_Menu::class, 'register' ) );
 		add_action( 'admin_init', array( Installer::class, 'maybe_upgrade' ) );
 		add_action( 'admin_init', array( Admin\Settings_Page::class, 'register_settings' ) );
@@ -180,6 +183,7 @@ final class Plugin {
 		add_action( 'admin_post_memberistic_save_integrations', array( Admin\Admin_Menu::class, 'save_integrations' ) );
 		add_action( 'admin_post_memberistic_corestore_test', array( Admin\Admin_Menu::class, 'corestore_test' ) );
 		add_action( 'admin_post_memberistic_corestore_sync', array( Admin\Admin_Menu::class, 'corestore_sync' ) );
+		add_action( 'template_redirect', array( $this, 'send_sensitive_page_cache_headers' ), 0 );
 		// Register Verification before `init` fires so its priority-5 init
 		// hook actually lands in the queue before WP processes priority 5.
 		Utilities\Verification::register();
@@ -206,6 +210,49 @@ final class Plugin {
 		( new REST\Records_Controller() )->register_routes();
 		( new REST\Saved_Views_Controller() )->register_routes();
 		( new REST\Settings_Controller() )->register_routes();
+	}
+
+	public function send_sensitive_page_cache_headers() {
+		if ( is_admin() || wp_doing_ajax() || ! is_singular() ) {
+			return;
+		}
+		$post = get_post();
+		if ( ! $post instanceof \WP_Post ) {
+			return;
+		}
+		$shortcodes = array(
+			'memberistic_plans',
+			'memberistic_checkout',
+			'memberistic_account',
+			'memberistic_renewal',
+			'memberistic_thank_you',
+			'memberistic_payment_failed',
+			'memberistic_people',
+			'memberistic_payment_history',
+			'memberistic_booking_history',
+			'memberistic_staff_dashboard',
+		);
+		foreach ( $shortcodes as $shortcode ) {
+			if ( has_shortcode( (string) $post->post_content, $shortcode ) ) {
+				nocache_headers();
+				return;
+			}
+		}
+		$page_keys = array(
+			'plans_page_id',
+			'checkout_page_id',
+			'account_page_id',
+			'renewal_page_id',
+			'thank_you_page_id',
+			'failed_payment_page_id',
+			'staff_dashboard_page_id',
+		);
+		foreach ( $page_keys as $key ) {
+			if ( absint( memberistic_get_setting( $key, 0 ) ) === (int) $post->ID ) {
+				nocache_headers();
+				return;
+			}
+		}
 	}
 
 	/**

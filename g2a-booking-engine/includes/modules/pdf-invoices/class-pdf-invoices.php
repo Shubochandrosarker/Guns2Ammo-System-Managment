@@ -54,6 +54,9 @@ final class G2AB_Module_PDF_Invoices {
 	 * `g2ab_payment_succeeded` listener — gateway hooks pass the booking id.
 	 */
 	public function on_payment_succeeded( $booking_id, $gateway = '', $payload = null ) {
+		if ( is_array( $payload ) && ! empty( $payload['event_source'] ) && 'webhook' === $payload['event_source'] ) {
+			return;
+		}
 		$booking = $this->resolve_booking( $booking_id );
 		if ( $booking ) {
 			$this->safe_generate( $booking );

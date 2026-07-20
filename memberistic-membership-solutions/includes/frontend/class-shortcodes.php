@@ -219,10 +219,16 @@ final class Shortcodes {
 	}
 
 	public static function thank_you() {
+		nocache_headers();
+		$membership_id = isset( $_GET['membership_id'] ) ? absint( $_GET['membership_id'] ) : 0; // phpcs:ignore WordPress.Security.NonceVerification.Recommended
+		$session_id    = isset( $_GET['session_id'] ) ? sanitize_text_field( wp_unslash( $_GET['session_id'] ) ) : ''; // phpcs:ignore WordPress.Security.NonceVerification.Recommended
+		$result        = Stripe_Service::confirm_checkout_return( $membership_id, $session_id );
+		$type          = 'active' === (string) ( $result['state'] ?? '' ) ? 'success' : ( 'failed' === (string) ( $result['state'] ?? '' ) ? 'failed' : 'pending' );
+
 		return self::result_page(
-			'success',
-			__( 'Membership Checkout Received', 'memberistic' ),
-			__( 'Thank you. Your membership checkout was received. Once payment is confirmed, your membership record will be activated automatically.', 'memberistic' )
+			$type,
+			isset( $result['title'] ) ? (string) $result['title'] : __( 'Membership Checkout Received', 'memberistic' ),
+			isset( $result['message'] ) ? (string) $result['message'] : __( 'We are checking your Stripe payment status.', 'memberistic' )
 		);
 	}
 

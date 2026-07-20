@@ -57,6 +57,8 @@ CREATE TABLE {$prefix}memberistic_memberships (
   billing_amount DECIMAL(10,2) NULL,
   stripe_customer_id VARCHAR(191) NULL,
   stripe_subscription_id VARCHAR(191) NULL,
+  stripe_checkout_session_id VARCHAR(191) NULL,
+  stripe_checkout_expires_at DATETIME NULL,
   woo_customer_id BIGINT UNSIGNED NULL,
   woo_subscription_id BIGINT UNSIGNED NULL,
   pos_customer_id VARCHAR(191) NULL,
@@ -68,6 +70,7 @@ CREATE TABLE {$prefix}memberistic_memberships (
   UNIQUE KEY membership_uuid (membership_uuid),
   KEY primary_user_id (primary_user_id),
   KEY plan_id (plan_id),
+  KEY stripe_checkout_session_id (stripe_checkout_session_id),
   KEY status (status)
 ) {$charset_collate};
 CREATE TABLE {$prefix}memberistic_people (

@@ -4,7 +4,7 @@ Tags: booking, reservation, scheduling, appointments, shooting range, firearms, 
 Requires at least: 6.2
 Tested up to: 6.5
 Requires PHP: 8.0
-Stable tag: 1.9.9.13
+Stable tag: 1.9.9.15
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -206,6 +206,15 @@ Yes. REST API at `/wp-json/g2a-booking/v1/` covers bookings, forms, calendar, fr
 7. Migration wizard — dry-run preview before live import.
 
 == Changelog ==
+
+= 1.9.9.15 =
+* Hotfix: Stripe webhook signature lookup now accepts WordPress-normalized headers and standard Stripe headers, with symmetric timestamp tolerance.
+* Hotfix: verified foreign/unhandled webhook events are acknowledged instead of returning generic 422 failures; retryable failures still return 5xx.
+* Hotfix: webhook event state is durable and marked processed only after business logic succeeds.
+* Hotfix: Stripe/Fortis paid-booking side effects are deferred and idempotent; canonical `g2ab_booking_paid` fires for newly paid gateway bookings.
+* Hotfix: Stripe payment ledgers now preserve Checkout Session and PaymentIntent identifiers so refunds and reconciliation can match correctly.
+* Hotfix: stale booking holds perform a final gateway check before expiring an online-payment booking.
+* New: WP-CLI `g2ab stripe-audit` and `g2ab stripe-reconcile` dry-run-first recovery commands.
 
 = 1.9.9.13 =
 * Security: the Verifyistic module no longer accepts the legacy literal "1" cookie as a verified customer — only a server-minted verification token (>=16 chars) resolved against the Verifyistic log counts. The forged/legacy cookie could previously auto-satisfy the liability waiver on public bookings.

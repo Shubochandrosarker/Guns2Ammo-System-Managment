@@ -37,6 +37,21 @@ final class G2AB_Gateway_Stripe {
 		return (string) get_option( 'g2ab_stripe_webhook_secret', '' );
 	}
 
+	private function header_value( $headers, $name ) {
+		$target = strtolower( str_replace( '-', '_', (string) $name ) );
+		foreach ( (array) $headers as $key => $value ) {
+			$normalized = strtolower( str_replace( '-', '_', (string) $key ) );
+			if ( $normalized !== $target ) {
+				continue;
+			}
+			if ( is_array( $value ) ) {
+				$value = reset( $value );
+			}
+			return sanitize_text_field( (string) $value );
+		}
+		return '';
+	}
+
 	/**
 	 * Create a Stripe Checkout Session. Returns a URL the customer redirects to.
 	 *
@@ -179,12 +194,9 @@ final class G2AB_Gateway_Stripe {
 		$secret = $this->webhook_secret();
 		if ( empty( $secret ) ) return new WP_Error( 'no_webhook_secret', 'Webhook secret not configured.', array( 'status' => 400 ) );
 
-		$sig_header = '';
-		foreach ( $headers as $k => $v ) {
-			if ( 'stripe-signature' === strtolower( $k ) ) {
-				$sig_header = is_array( $v ) ? $v[0] : $v;
-				break;
-			}
+		$sig_header = $this->header_value( $headers, 'stripe-signature' );
+		if ( '' === $sig_header && ! empty( $_SERVER['HTTP_STRIPE_SIGNATURE'] ) ) {
+			$sig_header = sanitize_text_field( wp_unslash( $_SERVER['HTTP_STRIPE_SIGNATURE'] ) );
 		}
 		if ( empty( $sig_header ) ) return new WP_Error( 'no_signature', 'Missing Stripe-Signature header.', array( 'status' => 400 ) );
 
@@ -200,8 +212,9 @@ final class G2AB_Gateway_Stripe {
 		if ( empty( $timestamp ) || empty( $v1 ) ) return new WP_Error( 'bad_signature', 'Malformed signature header.', array( 'status' => 400 ) );
 
 		// Tolerance: 5 minutes, past only — future-dated stamps are suspicious.
-		$delta = time() - (int) $timestamp;
-		if ( $delta < -10 || $delta > 300 ) return new WP_Error( 'signature_expired', 'Signature timestamp outside tolerance.', array( 'status' => 400 ) );
+		$tolerance = (int) apply_filters( 'g2ab_stripe_webhook_tolerance', 300 );
+		$tolerance = max( 60, min( DAY_IN_SECONDS, $tolerance ) );
+		if ( abs( time() - (int) $timestamp ) > $tolerance ) return new WP_Error( 'signature_expired', 'Signature timestamp outside tolerance.', array( 'status' => 400 ) );
 
 		$signed_payload = $timestamp . '.' . $body;
 		$expected = hash_hmac( 'sha256', $signed_payload, $secret );
@@ -224,22 +237,46 @@ final class G2AB_Gateway_Stripe {
 		$event_id = (string) ( $event['id'] ?? '' );
 		$obj      = $event['data']['object'] ?? array();
 
-		// Idempotency: Stripe retries any non-2xx response. Skip duplicates.
-		if ( $event_id && function_exists( 'g2ab_webhook_event_is_new' ) && ! g2ab_webhook_event_is_new( 'stripe', $event_id ) ) {
-			return array( 'handled' => true, 'type' => $type, 'reason' => 'duplicate_event', 'event_id' => $event_id );
+		if ( $event_id && function_exists( 'g2ab_webhook_event_claim' ) ) {
+			$claim = g2ab_webhook_event_claim( 'stripe', $event_id, $type, wp_json_encode( $event ) );
+			if ( is_wp_error( $claim ) ) {
+				return $claim;
+			}
+			if ( 'duplicate' === $claim ) {
+				return array( 'handled' => true, 'type' => $type, 'reason' => 'duplicate_event', 'event_id' => $event_id );
+			}
 		}
 
+		$result = null;
 		if ( 'checkout.session.completed' === $type && 'paid' === ( $obj['payment_status'] ?? '' ) ) {
-			return $this->mark_booking_paid( $obj );
+			$result = $this->mark_booking_paid( $obj );
+		} elseif ( 'charge.refunded' === $type ) {
+			$result = $this->mark_booking_refunded( $obj );
+		} elseif ( 'payment_intent.succeeded' === $type ) {
+			$result = array( 'handled' => true, 'type' => $type, 'reason' => 'acknowledged_payment_intent' );
+		} else {
+			$result = array( 'handled' => true, 'type' => $type, 'reason' => 'verified_event_ignored' );
 		}
-		if ( 'charge.refunded' === $type ) {
-			return $this->mark_booking_refunded( $obj );
+
+		if ( is_wp_error( $result ) ) {
+			if ( $event_id && function_exists( 'g2ab_webhook_event_mark_failed' ) ) {
+				g2ab_webhook_event_mark_failed( 'stripe', $event_id, $result->get_error_message() );
+			}
+			return $result;
 		}
-		if ( 'payment_intent.succeeded' === $type ) {
-			// Alternative path if not using Checkout Sessions.
-			return array( 'handled' => true, 'type' => $type );
+
+		if ( ! empty( $result['retryable'] ) ) {
+			if ( $event_id && function_exists( 'g2ab_webhook_event_mark_failed' ) ) {
+				g2ab_webhook_event_mark_failed( 'stripe', $event_id, wp_json_encode( $result ) );
+			}
+			return $result;
 		}
-		return array( 'handled' => false, 'type' => $type );
+
+		if ( $event_id && function_exists( 'g2ab_webhook_event_mark_processed' ) ) {
+			g2ab_webhook_event_mark_processed( 'stripe', $event_id );
+		}
+
+		return $result;
 	}
 
 	/**
@@ -283,35 +320,56 @@ final class G2AB_Gateway_Stripe {
 		// Capture previous status so listeners get correct context.
 		$previous_status = (string) $booking->status;
 
-		$wpdb->update( $bt, array(
+		$session_id         = isset( $session['id'] ) ? sanitize_text_field( (string) $session['id'] ) : '';
+		$payment_intent_id  = isset( $session['payment_intent'] ) ? sanitize_text_field( (string) $session['payment_intent'] ) : '';
+		$ledger_txn_id      = '' !== $payment_intent_id ? $payment_intent_id : $session_id;
+		$payment_metadata   = wp_json_encode( array(
+			'checkout_session_id' => $session_id,
+			'payment_intent_id'   => $payment_intent_id,
+		) );
+
+		$updated = $wpdb->update( $bt, array(
 			'status' => 'paid',
 			'paid_amount' => $amount,
+			'gateway_intent_id' => $payment_intent_id,
 			'updated_at' => current_time( 'mysql' ),
-		), array( 'id' => $booking->id ), array( '%s', '%f', '%s' ), array( '%d' ) );
+		), array( 'id' => $booking->id ), array( '%s', '%f', '%s', '%s' ), array( '%d' ) );
+		if ( false === $updated ) {
+			return array( 'handled' => false, 'retryable' => true, 'reason' => 'booking_update_failed' );
+		}
 
 		// Update or insert payment row.
 		$pt = $wpdb->prefix . 'g2ab_payments';
-		$existing = $wpdb->get_var( $wpdb->prepare( "SELECT id FROM {$pt} WHERE transaction_id = %s LIMIT 1", $session['id'] ) );
+		$existing = $wpdb->get_var( $wpdb->prepare(
+			"SELECT id FROM {$pt} WHERE gateway = 'stripe' AND ( transaction_id = %s OR transaction_id = %s OR metadata LIKE %s OR gateway_response LIKE %s ) LIMIT 1",
+			$session_id,
+			$ledger_txn_id,
+			'%' . $wpdb->esc_like( $session_id ) . '%',
+			'%' . $wpdb->esc_like( $session_id ) . '%'
+		) );
 		if ( $existing ) {
 			$wpdb->update( $pt, array(
+				'transaction_id' => $ledger_txn_id,
 				'status' => 'succeeded',
 				'amount' => $amount,
 				'gateway_response' => wp_json_encode( $session ),
+				'metadata' => $payment_metadata,
 				'processed_at' => current_time( 'mysql' ),
-			), array( 'id' => $existing ), array( '%s', '%f', '%s', '%s' ), array( '%d' ) );
+			), array( 'id' => $existing ), array( '%s', '%s', '%f', '%s', '%s', '%s' ), array( '%d' ) );
 		} else {
 			g2ab_insert_or_update_payment( $pt, array(
 				'booking_id' => $booking->id,
 				'gateway' => 'stripe',
-				'transaction_id' => $session['id'],
+				'transaction_id' => $ledger_txn_id,
 				'amount' => $amount,
 				'currency' => $currency,
 				'status' => 'succeeded',
 				'payment_method' => 'card',
 				'gateway_response' => wp_json_encode( $session ),
+				'metadata' => $payment_metadata,
 				'processed_at' => current_time( 'mysql' ),
 				'created_at' => current_time( 'mysql' ),
-			), array( '%d', '%s', '%s', '%f', '%s', '%s', '%s', '%s', '%s', '%s' ) );
+			), array( '%d', '%s', '%s', '%f', '%s', '%s', '%s', '%s', '%s', '%s', '%s' ) );
 		}
 
 		// Audit log.
@@ -320,12 +378,17 @@ final class G2AB_Gateway_Stripe {
 			'event_type' => 'payment_succeeded',
 			'severity' => 'info',
 			'message' => sprintf( 'Stripe payment succeeded: $%s', number_format( $amount, 2 ) ),
-			'context' => wp_json_encode( array( 'session_id' => $session['id'] ) ),
+			'context' => wp_json_encode( array( 'session_id' => $session_id, 'payment_intent_id' => $payment_intent_id ) ),
 			'created_at' => current_time( 'mysql' ),
 		) );
 
-		do_action( 'g2ab_payment_succeeded', $booking->id, 'stripe', $session );
-		do_action( 'g2ab_booking_status_changed', $booking->id, 'paid', $previous_status );
+		if ( function_exists( 'g2ab_queue_booking_paid_side_effects' ) ) {
+			g2ab_queue_booking_paid_side_effects( $booking->id, 'stripe', $previous_status, $session );
+		} else {
+			do_action( 'g2ab_payment_succeeded', $booking->id, 'stripe', $session );
+			do_action( 'g2ab_booking_paid', $booking, array( 'gateway' => 'stripe', 'session_id' => $session_id, 'payment_intent' => $payment_intent_id ) );
+			do_action( 'g2ab_booking_status_changed', $booking->id, 'paid', $previous_status );
+		}
 
 		return array( 'handled' => true, 'booking_id' => $booking->id, 'status' => 'paid' );
 	}
@@ -333,12 +396,17 @@ final class G2AB_Gateway_Stripe {
 	private function mark_booking_refunded( $charge ) {
 		global $wpdb;
 		$pi_id = $charge['payment_intent'] ?? '';
-		if ( ! $pi_id ) return array( 'handled' => false );
+		if ( ! $pi_id ) return array( 'handled' => false, 'reason' => 'no_payment_intent' );
 
 		// Find related booking via payment row.
 		$pt = $wpdb->prefix . 'g2ab_payments';
-		$payment = $wpdb->get_row( $wpdb->prepare( "SELECT * FROM {$pt} WHERE transaction_id LIKE %s LIMIT 1", '%' . $wpdb->esc_like( $pi_id ) . '%' ) );
-		if ( ! $payment ) return array( 'handled' => false );
+		$payment = $wpdb->get_row( $wpdb->prepare(
+			"SELECT * FROM {$pt} WHERE gateway = 'stripe' AND ( transaction_id = %s OR metadata LIKE %s OR gateway_response LIKE %s ) LIMIT 1",
+			$pi_id,
+			'%' . $wpdb->esc_like( $pi_id ) . '%',
+			'%' . $wpdb->esc_like( $pi_id ) . '%'
+		) );
+		if ( ! $payment ) return array( 'handled' => false, 'reason' => 'payment_not_found', 'payment_intent' => $pi_id );
 
 		$refund_amount = ( $charge['amount_refunded'] ?? 0 ) / 100.0;
 
@@ -352,7 +420,7 @@ final class G2AB_Gateway_Stripe {
 			'updated_at' => current_time( 'mysql' ),
 		), array( 'id' => $payment->booking_id ), array( '%s', '%s' ), array( '%d' ) );
 
-		do_action( 'g2ab_payment_refunded', $payment->booking_id, $refund_amount );
+		do_action( 'g2ab_payment_refunded', $payment->booking_id, $refund_amount, 'stripe', $charge );
 		return array( 'handled' => true, 'booking_id' => $payment->booking_id, 'status' => 'refunded' );
 	}
 }

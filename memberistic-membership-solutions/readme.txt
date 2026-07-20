@@ -4,7 +4,7 @@ Tags: membership, operations, staff dashboard, stripe, woocommerce, rest api
 Requires at least: 6.0
 Requires PHP: 8.0
 Tested up to: 6.7
-Stable tag: 1.18.2
+Stable tag: 1.18.3
 License: GPLv2 or later
 
 A modern membership operations engine for service businesses. Co-developed by WordPressistic and launch partner Guns 2 Ammo (https://guns2ammo.com).
@@ -73,6 +73,16 @@ See CHANGELOG.md for the full history.
 Note: the plugin's version numbering was reset after 1.46.1 back to a 1.9.9.x line. Entries below are in release order (newest first), so 1.46.1 and the earlier "legacy line" 1.10.0 release predate the 1.9.9.2–1.12.0 entries above them.
 
 Note: entries for 1.14.0–1.18.0 (the native waiver e-signature engine, kiosk mode, dashboard Waivers page, and SMS automations) are not yet documented here — see CHANGELOG.md and the merged PR history in the meantime.
+
+= 1.18.3 =
+* Hotfix: Stripe webhooks now hold the idempotency lock through processing and mark events processed only after successful handling.
+* Hotfix: pending checkout retries reuse or reconcile the saved Stripe Checkout Session instead of creating a second subscription.
+* Hotfix: checkout completion validates Stripe mode, session metadata, plan, billing cycle, amount, currency, email, payment status, and subscription status before activation.
+* Hotfix: the thank-you page now confirms Stripe status server-side and shows active, processing, failed, or manual-review states honestly.
+* Hotfix: renewal webhooks support current nested Stripe invoice subscription references, and inconclusive Stripe API checks no longer downgrade active members.
+* Hotfix: role synchronization now runs after account provisioning.
+* New: pending memberships store `stripe_checkout_session_id` and `stripe_checkout_expires_at`.
+* New: WP-CLI `memberistic stripe-audit` and `memberistic stripe-reconcile` dry-run-first recovery commands.
 
 = 1.18.2 =
 * Fix: the plugin bootstrap is now idempotent, so if a second/stray copy of the plugin folder is ever active on the same site (e.g. a "memberistic-membership-solutions-main" GitHub-zip leftover alongside the real folder), it becomes fully inert instead of emitting PHP warnings that break `header()`/redirect calls on check-in, checkout, and waiver-signing/printing pages. Staff now get a clear admin notice naming both plugin paths instead of visitor-facing PHP warnings.

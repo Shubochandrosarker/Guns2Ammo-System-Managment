@@ -21,6 +21,7 @@ final class G2AB_Installer {
 		'availability_rules' => 13,
 		'payments'           => 14,
 		'logs'               => 10,
+		'webhook_events'     => 12,
 		'migration_runs'     => 17,
 		'booking_activity'   => 8,
 		'checkins'           => 8,
@@ -91,7 +92,7 @@ final class G2AB_Installer {
 
 	public function reset_all_data() {
 		global $wpdb;
-		$drop_order = array( 'migration_runs', 'logs', 'payments', 'availability_rules', 'form_fields', 'forms', 'booking_types', 'resources', 'bookings' );
+		$drop_order = array( 'migration_runs', 'webhook_events', 'logs', 'payments', 'availability_rules', 'form_fields', 'forms', 'booking_types', 'resources', 'bookings' );
 		foreach ( $drop_order as $name ) {
 			$full = $this->full_table_name( $name );
 			$wpdb->query( "DROP TABLE IF EXISTS {$full}" );
@@ -160,7 +161,20 @@ final class G2AB_Installer {
 		$this->migrate_to_1_4_0( $current );
 		$this->migrate_to_1_5_0( $current );
 		$this->migrate_to_1_5_1( $current );
+		$this->migrate_to_1_5_3( $current );
 		do_action( 'g2ab_run_migrations', $current, G2AB_DB_VERSION );
+	}
+
+	/**
+	 * v1.5.3 - durable webhook event state for idempotent Stripe/Fortis retries.
+	 *
+	 * dbDelta creates wp_g2ab_webhook_events from get_schemas().
+	 */
+	private function migrate_to_1_5_3( $current ) {
+		if ( version_compare( $current, '1.5.3', '>=' ) ) {
+			return;
+		}
+		// no-op (table added by dbDelta)
 	}
 
 	/**
@@ -479,6 +493,26 @@ PRIMARY KEY  (id),
 KEY idx_booking (booking_id),
 KEY idx_event (event_type),
 KEY idx_created (created_at)
+) {$collate};";
+
+		$schemas['webhook_events'] = "CREATE TABLE {$prefix}g2ab_webhook_events (
+id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+gateway VARCHAR(50) NOT NULL,
+event_id VARCHAR(191) NOT NULL,
+event_type VARCHAR(191) NOT NULL DEFAULT '',
+status VARCHAR(20) NOT NULL DEFAULT 'received',
+attempts INT UNSIGNED NOT NULL DEFAULT 0,
+payload_hash CHAR(64) DEFAULT NULL,
+last_error TEXT NULL,
+received_at DATETIME NOT NULL,
+processed_at DATETIME DEFAULT NULL,
+created_at DATETIME NOT NULL,
+updated_at DATETIME NOT NULL,
+PRIMARY KEY  (id),
+UNIQUE KEY uniq_gateway_event (gateway, event_id),
+KEY idx_status (status),
+KEY idx_gateway_type (gateway, event_type),
+KEY idx_processed (processed_at)
 ) {$collate};";
 
 		$schemas['migration_runs'] = "CREATE TABLE {$prefix}g2ab_migration_runs (

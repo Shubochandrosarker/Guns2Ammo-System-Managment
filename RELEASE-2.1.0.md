@@ -17,11 +17,11 @@ This is a comprehensive system release featuring plugin integration updates, sec
 | Component | Version | Status | Notes |
 |-----------|---------|--------|-------|
 | **WPistic Theme for G2A** | 1.27.13 | ✅ Current | Theme with design tokens, SEO/AEO, business info |
-| **g2a-booking-engine** | 1.9.9.14 | ✅ Current | Lane bookings, events, payments, waivers |
-| **g2a-pos-core** | 3.3.0 | ✅ Current | Point-of-sale, ATF compliance, audit trails |
-| **memberistic-membership-solutions** | 1.18.0 | ✅ Current | Memberships, renewals, family linking |
+| **g2a-booking-engine** | 1.9.9.15 | ✅ Current | Lane bookings, events, payments, waivers |
+| **g2a-pos-core** | 3.3.5 | ✅ Current | Point-of-sale, ATF compliance, audit trails |
+| **memberistic-membership-solutions** | 1.18.3 | ✅ Current | Memberships, renewals, family linking |
 | **messageistic** | 0.8.0 | ✅ Current | SMS/communication engine (Twilio, Android gateway) |
-| **verifyistic** | 1.4.4 | ✅ Current | Age verification popup, COPPA compliance |
+| **verifyistic** | 1.4.6 | ✅ Current | Age verification popup, COPPA compliance |
 | **advanced-ffl-checkout** | 1.15.1 | ✅ Current | FFL dealer search, NICS automation |
 | **formistic** | 2.1.0 | ✅ Current | Contact forms, inbox, newsletter, AI auto-reply |
 | **g2a-business-api** | (Bundled) | ✅ Current | REST API for staff dashboard |

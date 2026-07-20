@@ -3,7 +3,7 @@ Contributors: wordpressistic
 Tags: age verification, age gate, age check, firearms, alcohol, adult, cannabis, popup, COPPA
 Requires at least: 5.8
 Tested up to: 6.7
-Stable tag: 1.4.5
+Stable tag: 1.4.6
 Requires PHP: 7.4
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
@@ -101,6 +101,12 @@ No. All verification is handled locally. The webhook integration is optional and
 8. Frontend popup — ID & Face upload mode
 
 == Changelog ==
+
+= 1.4.6 =
+* Hotfix: client IP resolution now trusts Cloudflare/forwarded headers only when the origin request came from a trusted proxy, with IPv4 and IPv6 CIDR support.
+* Hotfix: token minting, failed verification attempts, and successful verifications use separate limiter buckets.
+* Hotfix: real rate limits return HTTP 429 with `Retry-After`; lock timeouts no longer create false shared-user 429 responses.
+* Hotfix: frontend token refresh uses short session storage caching and forces a fresh token only after failed/stale submissions.
 
 = 1.4.5 =
 * Uninstall is now non-destructive by default: the age-verification log
