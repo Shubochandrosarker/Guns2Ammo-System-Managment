@@ -114,9 +114,22 @@ $g2a_biz = function_exists( 'g2a_biz' ) ? g2a_biz() : array();
   .callout.warn { background: rgba(232,128,47,0.06); border-color: rgba(232,128,47,0.4); border-left-width: 3px; }
   .callout.warn .h { color: var(--color-ember); }
   .callout.warn::before { content: "!"; color: var(--color-ember); font-family: var(--font-display); font-size: 28px; }
+  /* Light mode only: this callout's 6% ember tint over --color-void is
+     close enough to plain white that --color-ember's light value only
+     reaches ~3.35:1 (fails WCAG AA), even though --color-ember passes
+     fine everywhere else it's used. Borrow --color-ember-dim's light
+     value instead of touching the shared --color-ember token (dark mode
+     already passes and is left alone). */
+  html[data-theme="light"] .callout.warn .h,
+  html[data-theme="light"] .callout.warn::before { color: var(--color-ember-dim); }
   .callout.fact { background: rgba(96,165,250,0.05); border-color: rgba(96,165,250,0.3); border-left-width: 3px; }
   .callout.fact .h { color: #60A5FA; }
   .callout.fact::before { content: ""; color: #60A5FA; font-size: 24px; }
+  /* #60A5FA (an ungrouped one-off, no --color-info token exists) only
+     hits ~2.2:1 in light mode against this same faint tint over
+     --color-void — fails badly. Matches the .badge.info fix below. */
+  html[data-theme="light"] .callout.fact .h,
+  html[data-theme="light"] .callout.fact::before { color: #1D4ED8; }
 
   /* CAN / CANNOT table */
   .can-table { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin: 28px 0; }

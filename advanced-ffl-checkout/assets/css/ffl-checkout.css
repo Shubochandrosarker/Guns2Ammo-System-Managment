@@ -374,15 +374,27 @@
 	text-decoration: underline !important;
 }
 
-/* InfoWindow */
+/* InfoWindow — rendered inside Google's *native* google.maps.InfoWindow
+   bubble (see ffl-checkout.js: `new google.maps.InfoWindow()`, no custom
+   OverlayView/theming), which paints its own white/near-white chrome that
+   this stylesheet cannot repaint. The --wf-text/--wf-text-muted tokens
+   below were tuned for this widget's dark --wf-surface card and, on that
+   actual white InfoWindow background, landed at ~1.1:1 / ~1.6:1 (the
+   dealer name + address were effectively invisible on the map popup).
+   Uses dark, non-token colors here specifically because this fragment
+   renders outside the widget's own dark surface. */
 .wpistic-ffl-iw { font-family: var(--wf-font); max-width: 240px; padding: 6px 4px; }
-.wpistic-ffl-iw__name { font-weight: 700; color: var(--wf-text); margin: 0 0 4px; font-size: 14px; }
-.wpistic-ffl-iw__addr { color: var(--wf-text-muted); font-size: 12px; margin: 0 0 8px; line-height: 1.45; }
+.wpistic-ffl-iw__name { font-weight: 700; color: var(--wf-ink-soft); margin: 0 0 4px; font-size: 14px; }
+.wpistic-ffl-iw__addr { color: #4B5563; font-size: 12px; margin: 0 0 8px; line-height: 1.45; }
 .wpistic-ffl-iw__select {
 	display: inline-block;
 	padding: 6px 14px;
 	background: var(--wf-primary);
-	color: #fff !important;
+	/* Was #fff !important — ~2.0:1 on the brass fill (fails WCAG AA);
+	   --wf-ink is this widget's existing "text on brass fill" token and
+	   is unaffected by the InfoWindow's own background since it's paired
+	   with its own opaque fill. */
+	color: var(--wf-ink) !important;
 	font-size: 12px;
 	font-weight: 600;
 	border-radius: 6px;

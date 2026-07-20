@@ -432,18 +432,21 @@ get_header();
                   if (ok) {
                     btn.textContent = '✓ Subscribed';
                     btn.classList.remove('btn-ember');
-                    status.style.color = '#9DE05B';
+                    status.classList.remove('is-error');
+                    status.classList.add('is-ok');
                     status.textContent = msg || 'Subscribed.';
                     input.value = '';
                   } else {
                     btn.disabled = false; btn.innerHTML = original;
-                    status.style.color = '#E8802F';
+                    status.classList.remove('is-ok');
+                    status.classList.add('is-error');
                     status.textContent = msg || 'Something went wrong.';
                   }
                 })
                 .catch(function () {
                   btn.disabled = false; btn.innerHTML = original;
-                  status.style.color = '#E8802F';
+                  status.classList.remove('is-ok');
+                  status.classList.add('is-error');
                   status.textContent = 'Network error. Please try again.';
                 });
             });
