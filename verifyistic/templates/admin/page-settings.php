@@ -228,18 +228,26 @@ function vfya_opt( $key, $default = '' ) {
             <div class="vfya-field-row">
               <div class="vfya-field">
                 <label class="vfya-label">Popup Background Color</label>
-                <input type="text" class="vfya-input vfya-color-picker" name="verifyistic_popup_bg_color" value="<?php echo esc_attr(vfya_opt('verifyistic_popup_bg_color','#0f172a')); ?>">
+                <!-- Snapshot of the theme's dark-mode --color-gunmetal (the
+                     frontend default is the live var(), which follows the
+                     site's light/dark toggle; this hex is only what gets
+                     saved if the form is submitted without touching this
+                     field — see class-verifyistic-frontend.php). -->
+                <input type="text" class="vfya-input vfya-color-picker" name="verifyistic_popup_bg_color" value="<?php echo esc_attr(vfya_opt('verifyistic_popup_bg_color','#26252C')); ?>">
               </div>
               <div class="vfya-field">
                 <label class="vfya-label">Popup Font / Text Color</label>
-                <input type="text" class="vfya-input vfya-color-picker" name="verifyistic_font_color" value="<?php echo esc_attr(vfya_opt('verifyistic_font_color','#f8fafc')); ?>">
+                <input type="text" class="vfya-input vfya-color-picker" name="verifyistic_font_color" value="<?php echo esc_attr(vfya_opt('verifyistic_font_color','#F7F7F9')); ?>">
               </div>
             </div>
 
             <div class="vfya-field-row">
               <div class="vfya-field">
                 <label class="vfya-label">Accent / Input Focus Color</label>
-                <input type="text" class="vfya-input vfya-color-picker" name="verifyistic_accent_color" value="<?php echo esc_attr(vfya_opt('verifyistic_accent_color','#14b8a6')); ?>">
+                <!-- brass-bright, not brass: this color is also used as
+                     actual text (age badge, upload prompt) and plain brass
+                     only cleared ~3.5-3.8:1 in light mode (fails WCAG AA). -->
+                <input type="text" class="vfya-input vfya-color-picker" name="verifyistic_accent_color" value="<?php echo esc_attr(vfya_opt('verifyistic_accent_color','#DCB45F')); ?>">
               </div>
               <div class="vfya-field">
                 <label class="vfya-label">Overlay Color</label>
@@ -264,14 +272,15 @@ function vfya_opt( $key, $default = '' ) {
             <div class="vfya-field-row">
               <div class="vfya-field">
                 <label class="vfya-label">Yes Button Color</label>
-                <input type="text" class="vfya-input vfya-color-picker" name="verifyistic_btn_yes_color" value="<?php echo esc_attr(vfya_opt('verifyistic_btn_yes_color','#14b8a6')); ?>">
+                <input type="text" class="vfya-input vfya-color-picker" name="verifyistic_btn_yes_color" value="<?php echo esc_attr(vfya_opt('verifyistic_btn_yes_color','#C9A84C')); ?>">
               </div>
               <div class="vfya-field">
                 <label class="vfya-label">Yes Button Text Color</label>
-                <!-- Default matches the frontend fallback in
-                     class-verifyistic-frontend.php: white on the default
-                     #14b8a6 button was ~2.5:1 (fails WCAG AA). -->
-                <input type="text" class="vfya-input vfya-color-picker" name="verifyistic_btn_yes_text_color" value="<?php echo esc_attr(vfya_opt('verifyistic_btn_yes_text_color','#0f172a')); ?>">
+                <!-- Dark ink, not white: matches the frontend fallback in
+                     class-verifyistic-frontend.php (var(--color-ink)) —
+                     white on the brass/teal button fill was only ~2.5:1
+                     (fails WCAG AA's 4.5:1). -->
+                <input type="text" class="vfya-input vfya-color-picker" name="verifyistic_btn_yes_text_color" value="<?php echo esc_attr(vfya_opt('verifyistic_btn_yes_text_color','#111114')); ?>">
               </div>
             </div>
 

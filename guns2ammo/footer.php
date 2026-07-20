@@ -47,7 +47,7 @@ $founded   = (int) $biz['founded_year'];
 		      aria-label="Newsletter signup">
 			<input type="email" name="email" placeholder="your@email.com" required aria-label="Email">
 			<button type="submit">JOIN <svg class="btn-arrow" width="15" height="12" viewBox="0 0 20 16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M1 8h17M12 2l6 6-6 6"/></svg></button>
-			<span class="g2a-newsletter-status" role="status" aria-live="polite" style="display:block; margin-top:8px; font-size:13px; color: var(--color-fog);"></span>
+			<span class="g2a-newsletter-status" role="status" aria-live="polite" style="display:block; margin-top:8px; font-size:13px;"></span>
 		</form>
 		<script>
 		(function(){
@@ -75,20 +75,23 @@ $founded   = (int) $biz['founded_year'];
 		        var msg = j && (j.message || (j.data && j.data.message));
 		        if (ok) {
 		          btn.textContent = 'JOINED';
-		          status.style.color = '#9DE05B';
+		          status.classList.remove('is-error');
+		          status.classList.add('is-ok');
 		          status.textContent = msg || 'Subscribed.';
 		          f.querySelector('input[type=email]').value = '';
 		        } else {
 		          btn.disabled = false;
 		          btn.innerHTML = original;
-		          status.style.color = '#E8802F';
+		          status.classList.remove('is-ok');
+		          status.classList.add('is-error');
 		          status.textContent = msg || 'Something went wrong. Please try again.';
 		        }
 		      })
 		      .catch(function () {
 		        btn.disabled = false;
 		        btn.innerHTML = original;
-		        status.style.color = '#E8802F';
+		        status.classList.remove('is-ok');
+		        status.classList.add('is-error');
 		        status.textContent = 'Network error. Please try again.';
 		      });
 		  });

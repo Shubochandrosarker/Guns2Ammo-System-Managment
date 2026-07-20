@@ -10,6 +10,14 @@
 	padding: 28px;
 }
 .wpistic-formistic-form-title {
+	/* Explicit dark text: this form's card is a hardcoded white background
+	   (see .wpistic-formistic-form above), but the title/label/input text
+	   below had no color of its own, so it inherited whatever the host
+	   page set — on Guns 2 Ammo's site-wide dark mode (the theme's
+	   default), body text is a light gray/white (~1.4:1 on this white
+	   card, effectively invisible). Pinning dark text here makes the
+	   card self-consistent regardless of the page/theme it's embedded in. */
+	color: #1a1c29;
 	margin: 0 0 18px;
 	font-size: 22px;
 	line-height: 1.2;
@@ -25,6 +33,7 @@
 }
 .wpistic-formistic-field > span {
 	display: block;
+	color: #33364a; /* same inherited-text-on-white-card issue as the form title */
 	font-size: 13px;
 	font-weight: 600;
 	margin-bottom: 5px;
@@ -32,6 +41,7 @@
 .wpistic-formistic-field input,
 .wpistic-formistic-field textarea {
 	width: 100%;
+	color: #1a1c29; /* what the visitor types must stay readable on the white field */
 	border: 1px solid #d4d6e2;
 	border-radius: 8px;
 	padding: 11px 12px;

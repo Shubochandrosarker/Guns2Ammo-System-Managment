@@ -593,6 +593,18 @@ html[data-theme="light"] .g2a-mode .ico-moon { display: none; }
 .g2a-foot .grid ul a::after { content:""; position:absolute; left:0; bottom:-2px; width:100%; height:1px; background: var(--color-brass); transform: scaleX(0); transform-origin: left; transition: transform 250ms var(--ease-out); }
 .g2a-foot .grid ul a:hover::after { transform: scaleX(1); }
 
+/* Newsletter signup status (footer.php inline JS toggles these classes on
+   #g2a-...-status instead of setting style.color directly). The old JS set
+   a raw '#9DE05B'/'#E8802F' every time: fine against the dark footer
+   (--color-foot ≈ #151419, ~11.6:1 / ~6.6:1) but on the light-mode footer
+   (--color-foot ≈ #ECE9E1) those same fixed hexes dropped to ~1.3:1 and
+   ~2.3:1 — the "Subscribed." / error message was effectively invisible in
+   light mode, sitewide (footer.php loads on every page). */
+.g2a-newsletter-status { color: var(--color-fog); }
+.g2a-newsletter-status.is-ok { color: var(--color-active); }
+html[data-theme="light"] .g2a-newsletter-status.is-ok { color: #0F6B32; }
+.g2a-newsletter-status.is-error { color: var(--color-ember-dim); }
+
 /* FOOTER MAP — compact Google embed with an animated brass pin */
 .foot-map { position: relative; width: 100%; height: 180px; border: 1px solid var(--color-hairline-bright); border-radius: 2px; overflow: hidden; background: var(--color-gunmetal); }
 .foot-map iframe { width: 100%; height: 100%; border: 0; display: block; filter: saturate(0.85) contrast(1.02); }
@@ -1189,6 +1201,14 @@ html[data-theme="light"] .foot-map { border-color: var(--color-hairline); }
 .badge.popular  { background: var(--color-brass); color: #111; padding: 6px 14px; font-weight: 700; }
 .badge::before { content:""; width:6px; height:6px; border-radius:50%; background: currentColor; opacity:0.9; }
 .badge.popular::before, .badge.no-dot::before { display:none; }
+/* .active/.expired/.info text was tuned only against a dark card: the
+   translucent tint behind it composites to a near-white wash in light
+   mode, and #4ADE80/#FF6A55/#60A5FA all drop to ~1.5-2.3:1 there (fails
+   WCAG AA). .pending is unaffected since --color-brass-bright already
+   flips. Darkened, same hue family, still passes ~6-7:1 on the dark tint. */
+html[data-theme="light"] .badge.active  { color: #0F6B32; }
+html[data-theme="light"] .badge.expired { color: #C62828; }
+html[data-theme="light"] .badge.info    { color: #1D4ED8; }
 
 /* ============ MONTHLY/ANNUAL TOGGLE ============ */
 .bill-toggle { display:inline-flex; padding:4px; background: var(--color-gunmetal); border:1px solid var(--color-hairline-bright); border-radius: 999px; gap:0; position:relative; }
