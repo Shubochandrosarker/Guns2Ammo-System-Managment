@@ -2,6 +2,8 @@
 
 Installable archives for the Guns 2 Ammo WordPress build (Phase 1 + Phase 2 hardening included).
 
+**Current system release: [2.5.0](RELEASE-2.5.0.md)** (July 20, 2026) — Stripe webhook/membership-activation incident fix, a six-plugin crossmatch reconciliation against each plugin's dedicated repo and the live site, and a sitewide dark/light color-contrast fix. See that doc for the full writeup; this file stays current with whatever `releases/` actually contains.
+
 ## Download
 
 All zips are at the repo root and can be uploaded directly via **WP Admin → Plugins / Appearance → Themes → Upload**.
@@ -15,7 +17,7 @@ All zips are at the repo root and can be uploaded directly via **WP Admin → Pl
 | Verifyistic (age verification) plugin | `verifyistic.zip` (current archive `verifyistic-1.4.7.zip`) | **1.4.7** ✅ (Cloudflare-aware rate limiting) |
 | Advanced FFL Checkout (G2A Edition) plugin | `advanced-ffl-checkout.zip` (current archive `advanced-ffl-checkout-1.21.1.zip`) | **1.21.1** ✅ (NICS automation, dealer portal, 5-distributor drop-ship, GunBroker sync, Credova financing) |
 | Messageistic (SMS / local gateway) plugin | `messageistic.zip` (current archive `messageistic-0.8.0.zip`) | **0.8.0** ✅ (provider failover, multi-location) |
-| G2A POS Core plugin | `g2a-pos-core.zip` (current archive `g2a-pos-core-3.3.0.zip`) | **3.3.0** ✅ (dual-account hardening, integrity checks, PHP 8.1+) |
+| G2A POS Core plugin | `g2a-pos-core.zip` (current archive `g2a-pos-core-3.3.5.zip`) | **3.3.5** ✅ (dual-account hardening, integrity checks, PHP 8.1+) |
 | Formistic (contact forms, inbox, newsletter, AI auto-reply) plugin | `formistic.zip` (current archive `formistic-2.1.1.zip`) | **2.1.1** ✅ (unified inbox, smart tagging, GDPR) |
 
 > **Formistic is the site's sole contact-form/inbox/newsletter solution.** The
@@ -29,18 +31,18 @@ All zips are at the repo root and can be uploaded directly via **WP Admin → Pl
 >
 > `releases/` keeps only the two most-recent versions of each artifact (current + previous) for easy rollback; older archives are pruned.
 
-## Install order (fresh site) — Release 2.1.0
+## Install order (fresh site) — Release 2.5.0
 
 Plugins first, theme last, so the theme activation can see the plugins.
 
 1. **G2A Theme Control** (v1.0.0) — meta-box plugin used by the theme. Upload, activate.
 2. **G2A Booking Engine** (v1.9.9.16) — bookings + payments + reminders. Upload, activate. Confirm DB schema v1.5.2. Visit `Booking Engine → Resources` and `Booking Types` for seed data. In the Stripe dashboard, add webhook endpoint `https://YOUR-SITE/wp-json/g2a-booking/v1/webhooks/stripe` listening to exactly `checkout.session.completed` + `charge.refunded`, and paste its `whsec_…` into **Settings → Payments → Stripe → Webhook secret**.
 3. **Memberistic Membership Solutions** (v1.18.4) — plans, member portal, family linking, content restriction. Upload, activate. Visit `Memberistic → Settings → Pages` to wire the linked pages. See `docs/MEMBERS_AND_USERS_EXPLAINED.md` for member/user relationships. **Membership activation is a SEPARATE Stripe webhook from the Booking Engine's** — in the Stripe dashboard, also add `https://YOUR-SITE/wp-json/memberistic/v1/webhooks/stripe` listening to `checkout.session.completed`, `invoice.payment_succeeded`, `invoice.payment_failed`, `customer.subscription.deleted`, and paste its own (different) `whsec_…` into **Memberistic → Settings → Webhook secret**. Skipping this step means paid members are charged but never activated — see `docs/INCIDENT-AUDIT-2026-07-19-STRIPE-SIGNUP.md`.
-4. **Formistic** (v2.1.0) — contact forms, form builder, inbox, newsletter, spam protection, and AI auto-reply. Upload, activate. Visit `Formistic → Addons` to enable Newsletter/Auto-Responder/AI Automation, then `Formistic → Settings → AI & Automation → Seed Guns 2 Ammo defaults` (see `docs/FORMISTIC_G2A_SETUP.md`).
+4. **Formistic** (v2.1.1) — contact forms, form builder, inbox, newsletter, spam protection, and AI auto-reply. Upload, activate. Visit `Formistic → Addons` to enable Newsletter/Auto-Responder/AI Automation, then `Formistic → Settings → AI & Automation → Seed Guns 2 Ammo defaults` (see `docs/FORMISTIC_G2A_SETUP.md`).
 5. **Verifyistic** (v1.4.7) — age verification popup + multi-webhook delivery, COPPA compliance. Upload, activate. Then `Verifyistic → Settings` (see `docs/VERIFYISTIC_SETUP_G2A.md`). Replaces Ottertext — see `docs/OTTERTEXT_REMOVAL.md`. If the origin is reachable directly (not exclusively through Cloudflare), define `VERIFYISTIC_TRUSTED_PROXIES` in `wp-config.php` to match your actual edge network so rate limits key on real visitor IPs.
 6. **Advanced FFL Checkout (G2A Edition)** (v1.21.1) — FFL dealer search at checkout, transfer lifecycle, dealer confirmation portal, customer "My FFL Transfers" tab, NICS 3-business-day automation (holiday-aware), WC↔transfer status bridge, SMS via Messageistic, 5 toggleable distributor drop-ship integrations (Lipsey's, Sports South, RSR Group, Bill Hicks & Co., Chattanooga), GunBroker.com marketplace listing sync, and a Credova financing payment gateway. Upload `advanced-ffl-checkout.zip`, activate. Watch `Advanced FFL → Dashboard` for the auto-started ZIP centroid + ATF dealer sync, and `Advanced FFL → Add-ons` to enable individual distributors. Mark firearm products **FFL Transfer Required** in their general product data. Optional: define `WPISTIC_FFL_TOKEN_SECRET` in `wp-config.php` for the strongest portal token security. Optional: define `wpistic_ffl_trusted_proxies` filter for accurate IPs behind Cloudflare/LB.
 7. **Messageistic** (v0.8.0) — SMS engine with provider failover (Twilio / local Android gateway / Jasmin). Upload, activate. Pick the provider under `Messageistic → Settings`, then enable the **SMS Notifications (Messageistic)** module in `Memberistic → Integrations` to turn on membership + booking texts.
-8. **G2A POS Core** (v3.3.0) — full FFL POS with dual-account support and integrity checking (requires PHP 8.1+; composer vendors ship inside the zip). Upload, activate, then enable the **POS Bridge** module in `Memberistic → Integrations` so the counter sees live membership status.
+8. **G2A POS Core** (v3.3.5) — full FFL POS with dual-account support and integrity checking (requires PHP 8.1+; composer vendors ship inside the zip). Upload, activate, then enable the **POS Bridge** module in `Memberistic → Integrations` so the counter sees live membership status.
 9. **WPistic Theme (guns2ammo)** (v1.27.14) — upload as theme, activate. The theme ships system-aware light/dark mode (header toggle) and skins the booking widget automatically.
 
 ## Upgrade in place (existing site)
