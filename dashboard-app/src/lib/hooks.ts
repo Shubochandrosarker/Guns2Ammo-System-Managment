@@ -19,8 +19,15 @@ export function useAsync<T>(fn: () => Promise<T>, deps: unknown[] = []): AsyncSt
 
   useEffect(() => {
     let cancelled = false
-    setLoading(true)
-    setError(null)
+    // Deferred so the first state write lands outside the effect body rather
+    // than triggering a synchronous cascading render
+    // (react-hooks/set-state-in-effect). `cancelled` is still checked so a
+    // fast unmount can't set state on a gone component.
+    queueMicrotask(() => {
+      if (cancelled) return
+      setLoading(true)
+      setError(null)
+    })
     fn()
       .then(res => {
         if (!cancelled) setData(res)

@@ -47,8 +47,22 @@ cmd_deploy() {
     if compgen -G "dist/**/*.map" > /dev/null || compgen -G "dist/assets/*.map" > /dev/null; then
         echo "FATAL: source maps present in dist/ — aborting." >&2; exit 1
     fi
-    if grep -RqiE "g2a\\.mocks|USE_MOCKS *= *(1|true)" dist/assets/*.js 2>/dev/null; then
-        echo "FATAL: mock markers found in production bundle — aborting." >&2; exit 1
+    # Prove the dev fixtures were tree-shaken out, via a tripwire token that
+    # exists ONLY in src/mocks/data.ts (written as a globalThis assignment there
+    # so it survives minification whenever that module is reachable).
+    #
+    # The previous check was /g2a\.mocks|USE_MOCKS *= *(1|true)/, which matched
+    # env.ts's own "VITE_G2A_USE_MOCKS=1 is ignored in production builds"
+    # warning string. That string is in every production bundle, so this step
+    # aborted EVERY deploy while mocks were in fact correctly absent.
+    #
+    # Catches: any static import of the fixtures reaching the bundle — the way
+    # this realistically regresses. The existing dynamic import in api.ts sits
+    # behind a literal import.meta.env.DEV guard and a hard useMocks=false, so
+    # Rollup eliminates that path outright; it cannot leak and so does not trip
+    # this. Verified in both directions before shipping.
+    if grep -RqF "G2A_MOCK_FIXTURES_PRESENT_DO_NOT_SHIP" dist/assets/*.js 2>/dev/null; then
+        echo "FATAL: dev mock fixtures are present in the production bundle — aborting." >&2; exit 1
     fi
     printf '{"release":"%s","builtAt":"%s"}\n' "${release_id}" "$(date -u +%FT%TZ)" > dist/healthz.json
 

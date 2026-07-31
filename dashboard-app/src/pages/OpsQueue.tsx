@@ -24,7 +24,7 @@ export function OpsQueue() {
   }, [])
 
   useEffect(() => {
-    void refresh()
+    queueMicrotask(refresh)
   }, [refresh])
 
   async function complete(id: string) {

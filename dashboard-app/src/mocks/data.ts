@@ -1,5 +1,28 @@
 // Bundled sample data. Everything is USD cents to match the on-wire shape.
 // Realistic-looking numbers so demo screenshots don't look empty.
+//
+// DEV ONLY. api.ts imports this behind a literal `import.meta.env.DEV` guard so
+// Rollup drops the whole module from production builds, and env.ts forces
+// useMocks=false in prod regardless of the flag.
+
+/**
+ * Tripwire for deploy/deploy.sh.
+ *
+ * The deploy script greps the built bundle for this exact token to prove the
+ * fixtures were tree-shaken out of production. It must appear nowhere else in
+ * the codebase — that uniqueness is the whole point. The previous check looked
+ * for /USE_MOCKS *= *(1|true)/, which matched env.ts's own "mocks are ignored
+ * in production" warning string, so it aborted every deploy while mocks were
+ * in fact correctly absent.
+ *
+ * Written as a global assignment rather than an exported const on purpose: an
+ * unused export is tree-shaken even when this module IS bundled, which made the
+ * tripwire silently un-trippable. A write to globalThis is an observable side
+ * effect, so Rollup keeps it whenever the module is reachable — and drops it
+ * with the whole module when it is not. Verified in both directions.
+ */
+;(globalThis as unknown as Record<string, unknown>).__G2A_MOCK_FIXTURES__ =
+  'G2A_MOCK_FIXTURES_PRESENT_DO_NOT_SHIP'
 
 import type {
   AIInsight,
