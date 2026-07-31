@@ -40,6 +40,21 @@ if (!function_exists('sanitize_key')) {
         return strtolower(preg_replace('/[^a-z0-9_\-]/i', '', (string) $k));
     }
 }
+if (!function_exists('sanitize_file_name')) {
+    // Mirrors core's behaviour closely enough for filename assertions:
+    // strip the characters core strips, collapse whitespace/dashes to '-',
+    // then trim leading/trailing dots, dashes and underscores.
+    function sanitize_file_name($name): string
+    {
+        $name = str_replace(
+            ['?', '[', ']', '/', '\\', '=', '<', '>', ':', ';', ',', "'", '"', '&', '$', '#', '*', '(', ')', '|', '~', '`', '!', '{', '}', '%', '+', chr(0)],
+            '',
+            (string) $name
+        );
+        $name = preg_replace('/[\s\-]+/', '-', $name);
+        return trim($name, '.-_');
+    }
+}
 if (!function_exists('sanitize_textarea_field')) {
     function sanitize_textarea_field($str): string
     {

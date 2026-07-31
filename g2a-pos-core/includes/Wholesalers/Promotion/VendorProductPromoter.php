@@ -7,7 +7,7 @@ use G2A\POS\Database\WholesalerCategoryRepository;
 use G2A\POS\Database\WholesalerProductRepository;
 use G2A\POS\Database\WholesalerRepository;
 use G2A\POS\Support\Logger;
-use G2A\POS\Wholesalers\Media\LipseysImageUrls;
+use G2A\POS\Wholesalers\Media\VendorImageUrls;
 use G2A\POS\Wholesalers\Media\VendorImageMirror;
 
 /**
@@ -119,7 +119,7 @@ final class VendorProductPromoter {
 		}
 
 		// Image (best-effort).
-		$image = self::mirrorImage( (string) ( $wholesaler['provider_code'] ?? '' ), (string) ( $vendor['image_filename'] ?? '' ), $productId, $vendorSku );
+		$image = self::mirrorImage( (string) ( $wholesaler['provider_code'] ?? '' ), (string) ( $vendor['image_filename'] ?? '' ), $productId, $vendorSku, (string) ( $vendor['name'] ?? '' ) );
 
 		// MAP rule (best-effort).
 		$mapRuleId = null;
@@ -178,14 +178,14 @@ final class VendorProductPromoter {
 		return $cost;
 	}
 
-	private static function mirrorImage( string $providerCode, string $imageFilename, int $productId, string $vendorSku ): ?array {
+	private static function mirrorImage( string $providerCode, string $imageFilename, int $productId, string $vendorSku, string $name = '' ): ?array {
 		if ( $imageFilename === '' ) {
 			return null;
 		}
-		$url = match ( $providerCode ) {
-			'lipseys' => LipseysImageUrls::cdnUrl( $imageFilename ),
-			default => null,
-		};
+		// Every provider with an image host resolves here, not just Lipsey's
+		// — a promoted RSR/Sports South/Davidsons product used to land in
+		// WooCommerce with no picture at all.
+		$url = VendorImageUrls::cdnUrl( $providerCode, $imageFilename );
 		if ( ! $url ) {
 			return null;
 		}
@@ -194,8 +194,10 @@ final class VendorProductPromoter {
 				$url,
 				array(
 					'vendor_sku'    => $vendorSku,
+					'provider_code' => $providerCode,
 					'wc_product_id' => $productId,
 					'set_featured'  => true,
+					'alt'           => $name,
 				)
 			);
 		} catch ( \Throwable $e ) {

@@ -7,7 +7,7 @@ use G2A\POS\Database\ExternalRefRepository;
 use G2A\POS\Inventory\Distributors\Adapter;
 use G2A\POS\Inventory\Distributors\AdapterRegistry;
 use G2A\POS\Support\Logger;
-use G2A\POS\Wholesalers\Media\LipseysImageUrls;
+use G2A\POS\Wholesalers\Media\VendorImageUrls;
 use G2A\POS\Wholesalers\Media\VendorImageMirror;
 
 /**
@@ -228,9 +228,11 @@ final class Importer {
 	/**
 	 * Mirrors a distributor's product image into the media library and sets
 	 * it as the featured image, when the adapter surfaced one and the
-	 * product doesn't already have one. Only Lipsey's CDN mapping exists
-	 * today; other distributors are silently skipped until their own
-	 * image URL builder is added. Never throws — a mirror failure (bad
+	 * product doesn't already have one. Resolution is delegated to
+	 * VendorImageUrls, so every distributor with an image host (or a feed
+	 * carrying absolute URLs) is covered — this used to hard-bail on
+	 * anything that wasn't Lipsey's, which silently dropped the imagery for
+	 * three of the four wholesalers. Never throws — a mirror failure (bad
 	 * filename, CDN timeout) must not fail the whole row import.
 	 */
 	private function mirror_image_if_available( int $product_id, array $norm, ?string $vendor_sku ): void {
@@ -243,11 +245,8 @@ final class Importer {
 			return;
 		}
 
-		if ( ( $norm['source'] ?? null ) !== 'lipseys' ) {
-			return;
-		}
-
-		$cdn_url = LipseysImageUrls::cdnUrl( (string) $image_filename );
+		$source  = (string) ( $norm['source'] ?? '' );
+		$cdn_url = VendorImageUrls::cdnUrl( $source, (string) $image_filename );
 		if ( ! $cdn_url ) {
 			return;
 		}
@@ -258,7 +257,9 @@ final class Importer {
 				array(
 					'wc_product_id' => $product_id,
 					'vendor_sku'    => $vendor_sku,
+					'provider_code' => $source,
 					'set_featured'  => true,
+					'alt'           => (string) ( $norm['name'] ?? '' ),
 				)
 			);
 		} catch ( \Throwable $e ) {

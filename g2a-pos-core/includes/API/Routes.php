@@ -1105,6 +1105,31 @@ final class Routes {
 		);
 		register_rest_route(
 			'g2a-pos/v1',
+			// SKU-in-the-body twin of the route above, and what the admin UI
+			// calls. Percent-encoding a vendor SKU into a path segment is not
+			// survivable for the SKUs vendors actually ship: Apache/nginx
+			// decode %2F back to '/' before WP ever sees the path, so any SKU
+			// containing a slash 404'd with "No route was found matching the
+			// URL and request method" no matter how the client encoded it.
+			'/wholesalers/(?P<wholesaler_id>\d+)/mirror-image',
+			array(
+				'methods'             => 'POST',
+				'callback'            => array( WholesalerController::class, 'mirror_image' ),
+				'permission_callback' => static fn() => current_user_can( 'g2a_pos_manage_wholesalers' ) || current_user_can( 'g2a_pos_manage_inventory' ),
+			)
+		);
+		register_rest_route(
+			'g2a-pos/v1',
+			// Bulk: mirror a whole vendor catalog's imagery in batches.
+			'/wholesalers/(?P<wholesaler_id>\d+)/mirror-images',
+			array(
+				'methods'             => 'POST',
+				'callback'            => array( WholesalerController::class, 'mirror_images' ),
+				'permission_callback' => static fn() => current_user_can( 'g2a_pos_manage_wholesalers' ) || current_user_can( 'g2a_pos_manage_inventory' ),
+			)
+		);
+		register_rest_route(
+			'g2a-pos/v1',
 			// Same vendor-sku character-set issue as mirror-image above.
 			'/wholesalers/(?P<wholesaler_id>\d+)/products/(?P<vendor_sku>[^/]+)/promote',
 			array(

@@ -35,7 +35,7 @@ if ( ! isset( $wp_version ) || version_compare( (string) $wp_version, '6.5', '<'
 	return;
 }
 
-define( 'G2A_POS_CORE_VERSION', '3.3.5' );
+define( 'G2A_POS_CORE_VERSION', '3.3.6' );
 define( 'G2A_POS_CORE_FILE', __FILE__ );
 define( 'G2A_POS_CORE_PATH', plugin_dir_path( __FILE__ ) );
 define( 'G2A_POS_CORE_URL', plugin_dir_url( __FILE__ ) );

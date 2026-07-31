@@ -25,6 +25,28 @@ interface VendorProduct {
 }
 
 const PAGE_SIZE = 50;
+/** Rows per bulk-mirror request. Each row is an HTTP fetch + a sideload, so
+ *  keep the batch small enough to stay inside a stock PHP max_execution_time. */
+const BULK_BATCH = 25;
+
+interface BulkFailure { vendor_sku: string; url?: string; error?: string; message?: string; }
+interface BulkStats { processed: number; imported: number; reused: number; skipped: number; failed: number; }
+interface BulkResponse {
+  ok?: boolean;
+  stats?: BulkStats;
+  failures?: BulkFailure[];
+  next_offset?: number;
+  total?: number;
+  remaining?: number;
+  done?: boolean;
+}
+interface BulkState {
+  running: boolean;
+  totals: BulkStats;
+  total: number | null;
+  failures: BulkFailure[];
+  error?: string;
+}
 
 export default function VendorCatalog() {
   const [wholesalers, setWholesalers] = useState<Wholesaler[]>([]);
@@ -34,6 +56,7 @@ export default function VendorCatalog() {
   const [page, setPage] = useState(1);
   const [filter, setFilter] = useState({ q: '', category: '', item_type: '', in_stock: false, dropship_only: false });
   const [mirror, setMirror] = useState<Record<string, { busy?: boolean; ok?: boolean; msg?: string }>>({});
+  const [bulk, setBulk] = useState<BulkState | null>(null);
 
   const loadWholesalers = async () => {
     const r = await get<{ ok: boolean; wholesalers: Wholesaler[] }>('/wholesalers');
@@ -73,19 +96,66 @@ export default function VendorCatalog() {
   const mirrorImage = async (row: VendorProduct) => {
     setMirror((s) => ({ ...s, [row.vendor_sku]: { busy: true } }));
     try {
-      const r = await post<{ ok?: boolean; reused?: boolean; attachment_id?: number; error?: string }>(
-        `/wholesalers/${wholesalerId}/products/${encodeURIComponent(row.vendor_sku)}/mirror-image`,
-        { set_featured: !!row.wc_product_id, wc_product_id: row.wc_product_id || 0 }
+      // The SKU travels in the body, not the path. Vendor SKUs routinely
+      // contain '/', '#' and spaces, and a slash inside a path segment is
+      // decoded by the web server before WP matches routes — those rows came
+      // back as "No route was found matching the URL and request method"
+      // however carefully the client encoded them.
+      const r = await post<{ ok?: boolean; reused?: boolean; attachment_id?: number; error?: string; message?: string }>(
+        `/wholesalers/${wholesalerId}/mirror-image`,
+        { vendor_sku: row.vendor_sku, set_featured: !!row.wc_product_id, wc_product_id: row.wc_product_id || 0 }
       );
       setMirror((s) => ({
         ...s,
         [row.vendor_sku]: {
           ok: !!r.ok,
-          msg: r.ok ? (r.reused ? `Reused #${r.attachment_id}` : `Imported #${r.attachment_id}`) : (r.error || 'Failed'),
+          msg: r.ok
+            ? r.reused
+              ? `Reused #${r.attachment_id}`
+              : `Imported #${r.attachment_id}`
+            : r.message || r.error || 'Failed',
         },
       }));
     } catch (e) {
       setMirror((s) => ({ ...s, [row.vendor_sku]: { ok: false, msg: errorMessage(e, 'failed') } }));
+    }
+  };
+
+  /** Walk the whole vendor catalog, mirroring every row that has an image. */
+  const mirrorAll = async () => {
+    if (!wholesalerId || bulk?.running) return;
+    const totals = { processed: 0, imported: 0, reused: 0, skipped: 0, failed: 0 };
+    setBulk({ running: true, totals, total: null, failures: [] });
+    let offset = 0;
+    try {
+      for (;;) {
+        const r = await post<BulkResponse>(`/wholesalers/${wholesalerId}/mirror-images`, {
+          limit: BULK_BATCH,
+          offset,
+          set_featured: true,
+        });
+        (Object.keys(totals) as (keyof typeof totals)[]).forEach((k) => {
+          totals[k] += r.stats?.[k] || 0;
+        });
+        offset = r.next_offset ?? offset + BULK_BATCH;
+        setBulk({
+          running: true,
+          totals: { ...totals },
+          total: r.total ?? null,
+          failures: (r.failures || []).slice(0, 10),
+        });
+        if (r.done || !r.stats || r.stats.processed === 0) break;
+      }
+      setBulk((s) => (s ? { ...s, running: false } : s));
+      await loadProducts();
+    } catch (e) {
+      setBulk((s) => ({
+        running: false,
+        totals: s?.totals ?? totals,
+        total: s?.total ?? null,
+        failures: s?.failures ?? [],
+        error: errorMessage(e, 'Bulk mirroring failed'),
+      }));
     }
   };
 
@@ -175,11 +245,37 @@ export default function VendorCatalog() {
           <label className="flex items-center gap-2 text-xs">
             <input type="checkbox" checked={filter.dropship_only} onChange={(e) => setFilter({ ...filter, dropship_only: e.target.checked })} /> Drop-ship only
           </label>
-          <div className="md:col-span-6 flex justify-end">
+          <div className="md:col-span-6 flex flex-wrap items-center justify-end gap-2">
+            <button className="btn-secondary" disabled={!wholesalerId || !!bulk?.running} onClick={mirrorAll}>
+              {bulk?.running ? 'Mirroring catalog…' : 'Mirror all images'}
+            </button>
             <button className="btn-primary" onClick={() => { setPage(1); loadProducts(); }}>Apply filters</button>
           </div>
         </div>
       </div>
+
+      {bulk && (
+        <div className="card mb-4 p-4 text-sm">
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
+            <strong>{bulk.running ? 'Mirroring vendor catalog images…' : 'Catalog image mirroring finished'}</strong>
+            <span>{bulk.totals.processed}{bulk.total !== null ? ` / ${bulk.total}` : ''} rows</span>
+            <span className="text-emerald-600">{bulk.totals.imported} imported</span>
+            <span className="text-zinc-500">{bulk.totals.reused} reused</span>
+            <span className="text-zinc-500">{bulk.totals.skipped} no image</span>
+            {bulk.totals.failed > 0 && <span className="text-rose-600">{bulk.totals.failed} failed</span>}
+          </div>
+          {bulk.error && <p className="mt-2 text-rose-600">{bulk.error}</p>}
+          {bulk.failures.length > 0 && (
+            <ul className="mt-2 space-y-0.5 text-xs text-rose-600">
+              {bulk.failures.map((f) => (
+                <li key={f.vendor_sku}>
+                  <code>{f.vendor_sku}</code> — {f.message || f.error}
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      )}
 
       <DataTable rows={items} columns={cols} loading={loading} rowKey={(r) => r.id} empty="No products. Upload a vendor catalog CSV via Inventory → Import CSV." />
 
