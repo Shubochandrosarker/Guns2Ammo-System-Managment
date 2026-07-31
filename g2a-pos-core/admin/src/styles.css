@@ -57,6 +57,12 @@
   .btn-secondary {
     @apply btn border border-zinc-300 bg-white text-zinc-800 hover:bg-zinc-100 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100 dark:hover:bg-zinc-800;
   }
+  /* Destructive confirmations — voiding a tender, cancelling a layaway. These
+     were window.confirm() dialogs with no visual weight, so a void looked
+     exactly like any other prompt. */
+  .btn-danger {
+    @apply btn bg-rose-600 text-white hover:bg-rose-700 focus:ring-rose-500;
+  }
   .badge {
     @apply inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium;
   }

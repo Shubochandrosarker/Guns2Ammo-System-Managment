@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { applyTheme, currentTheme, toggleTheme } from './theme';
 import Sidebar, { NAV, type NavKey } from './components/Sidebar';
 import Topbar from './components/Topbar';
+import { DialogsProvider } from './components/Dialogs';
 import Dashboard from './views/Dashboard';
 import Kpis from './views/Kpis';
 import Orders from './views/Orders';
@@ -145,6 +146,7 @@ export default function App() {
   const View = VIEWS[view] ?? NotAvailableView;
 
   return (
+    <DialogsProvider>
     <div className="flex h-full min-h-screen w-full bg-zinc-50 text-zinc-900 dark:bg-zinc-950 dark:text-zinc-100">
       <Sidebar current={view} onSelect={setView} open={sidebarOpen} />
       <div className="flex min-w-0 flex-1 flex-col">
@@ -165,5 +167,6 @@ export default function App() {
         <AgentOmnibar />
       </ErrorBoundary>
     </div>
+    </DialogsProvider>
   );
 }

@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react';
 import { get, post } from '../api';
 import PageHeader from '../components/PageHeader';
 import DataTable, { type Column } from '../components/DataTable';
+import { useDialogs } from '../components/Dialogs';
+import { useAction, ActionFeedback } from '../components/useAction';
 
 interface Consignment {
   id: number;
@@ -31,6 +33,8 @@ interface ConsignmentForm {
 }
 
 export default function Consignments() {
+  const dialogs = useDialogs();
+  const { run, busy, error, notice } = useAction();
   const [rows, setRows] = useState<Consignment[]>([]);
   const [loading, setLoading] = useState(true);
   const [showNew, setShowNew] = useState(false);
@@ -53,17 +57,38 @@ export default function Consignments() {
     await refresh();
   };
 
-  const sell = async (id: number) => {
-    const p = parseFloat(prompt('Sold price?') || '0');
-    if (!p) return;
-    await post(`/consignments/${id}/sell`, { sold_price: p });
-    await refresh();
+  const sell = async (row: Consignment) => {
+    const values = await dialogs.prompt({
+      title: `Mark ${row.consignment_number} sold`,
+      body: `${row.consignor_name} · asking $${Number(row.asking_price).toFixed(2)}. Commission and payout are computed server-side from the sold price.`,
+      confirmLabel: 'Mark sold',
+      fields: [
+        { name: 'sold_price', label: 'Sold price', type: 'number', required: true, min: 0.01, step: 0.01 },
+      ],
+    });
+    if (!values) return;
+    await run(async () => {
+      await post(`/consignments/${row.id}/sell`, values);
+      await refresh();
+    }, 'Marked sold.');
   };
 
-  const payout = async (id: number) => {
-    const ref = prompt('Payout reference (check #, ACH ID, …)?') ?? '';
-    await post(`/consignments/${id}/payout`, { reference: ref });
-    await refresh();
+  // The reference was previously optional and silently defaulted to an empty
+  // string, so a payout could be recorded with no way to trace it afterwards.
+  const payout = async (row: Consignment) => {
+    const values = await dialogs.prompt({
+      title: `Record payout for ${row.consignment_number}`,
+      body: `Paying ${row.consignor_name}.`,
+      confirmLabel: 'Record payout',
+      fields: [
+        { name: 'reference', label: 'Payout reference', required: true, placeholder: 'Check #, ACH ID, …' },
+      ],
+    });
+    if (!values) return;
+    await run(async () => {
+      await post(`/consignments/${row.id}/payout`, values);
+      await refresh();
+    }, 'Payout recorded.');
   };
 
   const cols: Column<Consignment>[] = [
@@ -77,8 +102,8 @@ export default function Consignments() {
     { key: 'status', label: 'Status', render: (r) => <span className="badge-zinc">{r.status}</span> },
     { key: 'actions', label: '', render: (r) => (
       <div className="flex gap-2 justify-end">
-        {r.status === 'received' && <button className="btn-sm" onClick={() => sell(r.id)}>Sell</button>}
-        {r.status === 'sold' && <button className="btn-sm" onClick={() => payout(r.id)}>Payout</button>}
+        {r.status === 'received' && <button className="btn-sm" disabled={busy} onClick={() => sell(r)}>Sell</button>}
+        {r.status === 'sold' && <button className="btn-sm" disabled={busy} onClick={() => payout(r)}>Payout</button>}
       </div>
     ) },
   ];
@@ -90,6 +115,8 @@ export default function Consignments() {
         subtitle="Customer-owned firearms accepted for sale. Auto-computes commission + payout when sold."
         actions={<button className="btn-primary" onClick={() => setShowNew((s) => !s)}>{showNew ? 'Close' : '+ New'}</button>}
       />
+
+      <ActionFeedback error={error} notice={notice} />
 
       {showNew && (
         <div className="card p-4 mb-4 grid grid-cols-1 sm:grid-cols-2 gap-3">
