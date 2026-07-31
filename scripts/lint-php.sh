@@ -31,10 +31,10 @@ trap 'rm -f "$LIST" "$LOG"' EXIT
 
 if [ "${1:-}" = "--staged" ]; then
   # Only files staged for commit, still present on disk (skip deletions).
-  git diff --cached --name-only --diff-filter=ACMR -z -- '*.php' > "$LIST"
+  git -C "$ROOT" diff --cached --name-only --diff-filter=ACMR -z -- '*.php' > "$LIST"
 else
-  find . -name '*.php' \
-    -not -path './.git/*' \
+  find "$ROOT" -name '*.php' \
+    -not -path "$ROOT/.git/*" \
     -not -path '*/vendor/*' \
     -not -path '*/node_modules/*' \
     -print0 > "$LIST"
