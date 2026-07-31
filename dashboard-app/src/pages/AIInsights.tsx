@@ -30,7 +30,7 @@ export function AIInsights() {
   }, [])
 
   useEffect(() => {
-    void refresh()
+    queueMicrotask(refresh)
   }, [refresh])
 
   async function approve(id: string) {

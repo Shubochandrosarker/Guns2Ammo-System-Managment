@@ -189,8 +189,14 @@ function RoutingCard({ models }: { models: ModelConnection[] }) {
   const [busy, setBusy] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
 
+  // Seeds the editable copy from the fetched routing exactly once. Deferred so
+  // the write happens outside the effect body (react-hooks/set-state-in-effect);
+  // the `!routing` guard still makes it a one-shot.
   useEffect(() => {
-    if (q.data && !routing) setRouting(q.data.routing)
+    if (q.data && !routing) {
+      const next = q.data.routing
+      queueMicrotask(() => setRouting(next))
+    }
   }, [q.data, routing])
 
   if (q.loading || !q.data) {

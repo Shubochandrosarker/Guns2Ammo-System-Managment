@@ -59,12 +59,12 @@ export function BridGistic() {
   // Deep-linked query from the topbar `?q=...` runs on mount.
   useEffect(() => {
     const q = params.get('q')
-    if (q) void submitQuery(q)
+    if (q) queueMicrotask(() => submitQuery(q))
   }, [params, submitQuery])
 
   // Load the pending queue on mount + whenever we approve/reject.
   useEffect(() => {
-    void refreshPending()
+    queueMicrotask(refreshPending)
   }, [refreshPending])
 
   function submit(e: FormEvent) {

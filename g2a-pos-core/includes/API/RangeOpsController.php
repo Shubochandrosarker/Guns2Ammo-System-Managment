@@ -4,6 +4,7 @@ namespace G2A\POS\API;
 
 use G2A\POS\Database\AmmoRentalRepository;
 use G2A\POS\Database\BrassBuybackRepository;
+use G2A\POS\Database\FirearmRentalRepository;
 use G2A\POS\Database\RsoAssignmentRepository;
 use WP_REST_Request;
 
@@ -65,6 +66,48 @@ final class RangeOpsController {
 			isset( $body['pos_order_id'] ) ? (int) $body['pos_order_id'] : null
 		);
 		return array( 'ok' => $ok );
+	}
+
+	// Firearm rental ---------------------------------------------------
+	public static function firearm_open( WP_REST_Request $request ) {
+		$repo = new FirearmRentalRepository();
+
+		// Roll any past-due rentals over before listing, so the outstanding
+		// view is honest the moment it's opened rather than waiting for a cron.
+		$repo->mark_overdue();
+
+		return array( 'items' => $repo->list_open() );
+	}
+
+	public static function firearm_recent( WP_REST_Request $request ) {
+		$limit = (int) ( $request->get_param( 'limit' ) ?: 100 );
+		return array( 'items' => ( new FirearmRentalRepository() )->recent( $limit ) );
+	}
+
+	public static function firearm_issue( WP_REST_Request $request ) {
+		$body = $request->get_json_params() ?: array();
+
+		// The repository owns validation (including the ID and waiver checks)
+		// so the same rules apply to any other caller, not just this route.
+		$result = ( new FirearmRentalRepository() )->issue( $body );
+
+		if ( is_wp_error( $result ) ) {
+			return $result;
+		}
+
+		return array( 'id' => $result );
+	}
+
+	public static function firearm_return( WP_REST_Request $request ) {
+		$id     = (int) $request['id'];
+		$body   = $request->get_json_params() ?: array();
+		$result = ( new FirearmRentalRepository() )->return_firearm( $id, $body );
+
+		if ( is_wp_error( $result ) ) {
+			return $result;
+		}
+
+		return array( 'ok' => true );
 	}
 
 	// Brass buyback ----------------------------------------------------

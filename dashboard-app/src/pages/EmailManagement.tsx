@@ -37,7 +37,7 @@ export function EmailManagement() {
   }, [])
 
   useEffect(() => {
-    void refresh()
+    queueMicrotask(refresh)
   }, [refresh])
 
   async function send(id: string) {

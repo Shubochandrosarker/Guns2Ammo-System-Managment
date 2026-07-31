@@ -26,6 +26,18 @@ if (!defined('HOUR_IN_SECONDS')) {
 if (!defined('DAY_IN_SECONDS')) {
     define('DAY_IN_SECONDS', 86400);
 }
+// wpdb output formats. Defined here rather than inline in a single test so any
+// repository calling get_row()/get_results() with ARRAY_A works regardless of
+// which tests happen to load first.
+if (!defined('OBJECT')) {
+    define('OBJECT', 'OBJECT');
+}
+if (!defined('ARRAY_A')) {
+    define('ARRAY_A', 'ARRAY_A');
+}
+if (!defined('ARRAY_N')) {
+    define('ARRAY_N', 'ARRAY_N');
+}
 
 require __DIR__ . '/wp-stubs.php';
 

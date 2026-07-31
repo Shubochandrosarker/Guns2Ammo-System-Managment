@@ -35,7 +35,7 @@ export function Tasks() {
   }, [status])
 
   useEffect(() => {
-    void refresh()
+    queueMicrotask(refresh)
   }, [refresh])
 
   async function act(taskId: string, kind: 'resolve' | 'dismiss') {

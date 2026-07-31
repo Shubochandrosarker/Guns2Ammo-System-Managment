@@ -146,6 +146,40 @@ final class WholesalerProductRepository extends Repository {
 		return $wpdb->get_results( $wpdb->prepare( $sql, $args ), ARRAY_A ) ?: array();
 	}
 
+	/**
+	 * Catalog rows that carry an image reference, ordered stably by id so a
+	 * paged bulk-mirror walk can't skip or repeat rows between batches.
+	 *
+	 * @param bool $linkedOnly Only rows already promoted to a WC product.
+	 * @return list<array<string,mixed>>
+	 */
+	public function withImages( int $wholesalerId, int $limit = 50, int $offset = 0, bool $linkedOnly = false ): array {
+		global $wpdb;
+		$t      = $this->table( 'g2a_wholesaler_products' );
+		$limit  = max( 1, min( 500, $limit ) );
+		$offset = max( 0, $offset );
+		$linked = $linkedOnly ? ' AND wc_product_id IS NOT NULL AND wc_product_id > 0' : '';
+
+		$sql = "SELECT * FROM {$t}
+			WHERE wholesaler_id=%d AND image_filename IS NOT NULL AND image_filename <> ''{$linked}
+			ORDER BY id ASC LIMIT %d OFFSET %d";
+
+		return $wpdb->get_results( $wpdb->prepare( $sql, $wholesalerId, $limit, $offset ), ARRAY_A ) ?: array();
+	}
+
+	public function countWithImages( int $wholesalerId, bool $linkedOnly = false ): int {
+		global $wpdb;
+		$t      = $this->table( 'g2a_wholesaler_products' );
+		$linked = $linkedOnly ? ' AND wc_product_id IS NOT NULL AND wc_product_id > 0' : '';
+
+		return (int) $wpdb->get_var(
+			$wpdb->prepare(
+				"SELECT COUNT(*) FROM {$t} WHERE wholesaler_id=%d AND image_filename IS NOT NULL AND image_filename <> ''{$linked}",
+				$wholesalerId
+			)
+		);
+	}
+
 	public function countByWholesaler( int $wholesalerId ): int {
 		global $wpdb;
 		$t = $this->table( 'g2a_wholesaler_products' );

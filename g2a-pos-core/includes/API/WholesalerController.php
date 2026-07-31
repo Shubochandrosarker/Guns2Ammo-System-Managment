@@ -7,9 +7,8 @@ use G2A\POS\Database\WholesalerProductRepository;
 use G2A\POS\Database\WholesalerCategoryRepository;
 use G2A\POS\Database\WholesalerOrderRepository;
 use G2A\POS\Support\Logger;
-use G2A\POS\Wholesalers\Lipseys\LipseysProvider;
-use G2A\POS\Wholesalers\Media\LipseysImageUrls;
 use G2A\POS\Wholesalers\Media\VendorImageMirror;
+use G2A\POS\Wholesalers\Media\VendorImageUrls;
 use G2A\POS\Wholesalers\Promotion\VendorProductPromoter;
 use G2A\POS\Wholesalers\Routing\MultiVendorRouter;
 use G2A\POS\Wholesalers\WholesalerRegistry;
@@ -418,8 +417,20 @@ final class WholesalerController {
 	 */
 	public static function mirror_image( WP_REST_Request $req ) {
 		$wholesalerId = (int) $req->get_param( 'wholesaler_id' );
-		$sku          = (string) $req->get_param( 'vendor_sku' );
+		$body         = $req->get_json_params() ?: $req->get_params();
+
+		// The SKU may arrive either as a path segment (legacy route) or in
+		// the request body (the route the admin UI uses). Body first: real
+		// vendor SKUs contain '/', '#' and spaces, and a '/' inside a path
+		// segment is decoded by the web server *before* WP matches routes,
+		// so those SKUs could never match the path route at all — they came
+		// back as a bare "No route was found matching the URL and request
+		// method." with nothing in any log to explain it.
+		$sku = (string) ( $body['vendor_sku'] ?? '' );
 		if ( $sku === '' ) {
+			$sku = (string) $req->get_param( 'vendor_sku' );
+		}
+		if ( trim( $sku ) === '' ) {
 			return new WP_Error( 'no_sku', 'vendor_sku is required', array( 'status' => 400 ) );
 		}
 
@@ -435,12 +446,15 @@ final class WholesalerController {
 			return new WP_Error( 'not_found', 'Vendor product not found', array( 'status' => 404 ) );
 		}
 
-		$url = self::cdnUrlFor( (string) $w['provider_code'], (string) ( $product['image_filename'] ?? '' ) );
+		$providerCode = (string) $w['provider_code'];
+		$url          = self::cdnUrlFor( $providerCode, (string) ( $product['image_filename'] ?? '' ) );
 		if ( ! $url ) {
-			return new WP_Error( 'no_image', 'Vendor product has no image filename, or provider has no CDN mapping', array( 'status' => 422 ) );
+			$detail = trim( (string) ( $product['image_filename'] ?? '' ) ) === ''
+				? 'This catalog row has no image in the vendor feed.'
+				: sprintf( 'No image host is configured for provider "%s" — set one via the g2a_pos_vendor_image_cdn_bases option.', $providerCode );
+			return new WP_Error( 'no_image', $detail, array( 'status' => 422 ) );
 		}
 
-		$body        = $req->get_json_params() ?: $req->get_params();
 		$wcProductId = isset( $body['wc_product_id'] ) ? (int) $body['wc_product_id'] : (int) ( $product['wc_product_id'] ?? 0 );
 		$setFeatured = ! empty( $body['set_featured'] );
 
@@ -449,8 +463,10 @@ final class WholesalerController {
 				$url,
 				array(
 					'vendor_sku'    => $sku,
+					'provider_code' => $providerCode,
 					'wc_product_id' => $wcProductId,
 					'set_featured'  => $setFeatured,
+					'alt'           => (string) ( $product['name'] ?? '' ),
 				)
 			);
 		} catch ( \Throwable $e ) {
@@ -465,8 +481,120 @@ final class WholesalerController {
 			return new WP_Error( 'mirror_failed', 'Image mirroring failed: ' . $e->getMessage(), array( 'status' => 500 ) );
 		}
 		$result['source_url'] = $url;
+		$result['vendor_sku'] = $sku;
 
 		return new WP_REST_Response( $result, ! empty( $result['ok'] ) ? 200 : 422 );
+	}
+
+	/**
+	 * Mirror every catalog image for a wholesaler, one batch at a time.
+	 *
+	 * Mirroring row-by-row from the catalog table was the only way to get
+	 * vendor imagery in, which is unusable for a 50k-row feed. This walks the
+	 * rows that actually carry an image reference and side-loads each one,
+	 * returning a cursor so the caller can keep going until `remaining` hits
+	 * zero. Individual failures never abort the batch — they're counted and
+	 * sampled into `failures` so one bad CDN filename doesn't cost every
+	 * other image in the batch.
+	 */
+	public static function mirror_images( WP_REST_Request $req ) {
+		$wholesalerId = (int) $req->get_param( 'wholesaler_id' );
+		$body         = $req->get_json_params() ?: $req->get_params();
+
+		$repoW = new WholesalerRepository();
+		$w     = $repoW->find( $wholesalerId );
+		if ( ! $w ) {
+			return new WP_Error( 'not_found', 'Wholesaler not found', array( 'status' => 404 ) );
+		}
+		$providerCode = (string) $w['provider_code'];
+
+		$limit       = max( 1, min( 200, (int) ( $body['limit'] ?? 50 ) ) );
+		$offset      = max( 0, (int) ( $body['offset'] ?? 0 ) );
+		$setFeatured = array_key_exists( 'set_featured', $body ) ? ! empty( $body['set_featured'] ) : true;
+		$linkedOnly  = ! empty( $body['linked_only'] );
+
+		$repoP = new WholesalerProductRepository();
+		$rows  = $repoP->withImages( $wholesalerId, $limit, $offset, $linkedOnly );
+		$total = $repoP->countWithImages( $wholesalerId, $linkedOnly );
+
+		$stats = array(
+			'processed' => 0,
+			'imported'  => 0,
+			'reused'    => 0,
+			'skipped'   => 0,
+			'failed'    => 0,
+		);
+		$failures = array();
+
+		foreach ( $rows as $row ) {
+			++$stats['processed'];
+			$url = self::cdnUrlFor( $providerCode, (string) ( $row['image_filename'] ?? '' ) );
+			if ( ! $url ) {
+				++$stats['skipped'];
+				continue;
+			}
+			$wcProductId = (int) ( $row['wc_product_id'] ?? 0 );
+			try {
+				$result = VendorImageMirror::mirror(
+					$url,
+					array(
+						'vendor_sku'    => (string) $row['vendor_sku'],
+						'provider_code' => $providerCode,
+						'wc_product_id' => $wcProductId,
+						'set_featured'  => $setFeatured && $wcProductId > 0,
+						'alt'           => (string) ( $row['name'] ?? '' ),
+					)
+				);
+			} catch ( \Throwable $e ) {
+				Logger::exception(
+					'Vendor image bulk mirror failed',
+					$e,
+					array(
+						'wholesaler_id' => $wholesalerId,
+						'vendor_sku'    => $row['vendor_sku'] ?? null,
+					)
+				);
+				$result = array(
+					'ok'      => false,
+					'error'   => 'exception',
+					'message' => $e->getMessage(),
+				);
+			}
+
+			if ( ! empty( $result['ok'] ) ) {
+				if ( ! empty( $result['reused'] ) ) {
+					++$stats['reused'];
+				} else {
+					++$stats['imported'];
+				}
+				continue;
+			}
+
+			++$stats['failed'];
+			if ( count( $failures ) < 20 ) {
+				$failures[] = array(
+					'vendor_sku' => (string) $row['vendor_sku'],
+					'url'        => $url,
+					'error'      => (string) ( $result['error'] ?? 'unknown' ),
+					'message'    => (string) ( $result['message'] ?? $result['detail'] ?? '' ),
+				);
+			}
+		}
+
+		$nextOffset = $offset + count( $rows );
+
+		return new WP_REST_Response(
+			array(
+				'ok'          => true,
+				'stats'       => $stats,
+				'failures'    => $failures,
+				'offset'      => $offset,
+				'next_offset' => $nextOffset,
+				'total'       => $total,
+				'remaining'   => max( 0, $total - $nextOffset ),
+				'done'        => count( $rows ) < $limit || $nextOffset >= $total,
+			)
+		);
 	}
 
 	public static function promote( WP_REST_Request $req ) {
@@ -510,9 +638,6 @@ final class WholesalerController {
 	}
 
 	private static function cdnUrlFor( string $providerCode, string $imageFilename ): ?string {
-		return match ( $providerCode ) {
-			LipseysProvider::CODE => LipseysImageUrls::cdnUrl( $imageFilename ),
-			default => null,
-		};
+		return VendorImageUrls::cdnUrl( $providerCode, $imageFilename );
 	}
 }
