@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { get, post, errorMessage } from '../api';
 import PageHeader from '../components/PageHeader';
+import { useDialogs } from '../components/Dialogs';
 
 interface TenderLine {
   id: number;
@@ -50,6 +51,7 @@ export default function SplitTender() {
   const [error, setError] = useState<string | null>(null);
   const [form, setForm] = useState<TenderForm>({ tender_method: 'cash' });
   const [busy, setBusy] = useState(false);
+  const dialogs = useDialogs();
 
   const load = async (id?: number) => {
     const useId = id ?? parseInt(orderId, 10);
@@ -69,7 +71,7 @@ export default function SplitTender() {
   useEffect(() => {
     // Allow ?order=42 in the URL hash to deep-link.
     const m = window.location.hash.match(/order=(\d+)/);
-    if (m) { queueMicrotask(() => setOrderId(m[1])); setTimeout(() => load(parseInt(m[1], 10)), 0); }
+    if (m) { const id = m[1]; queueMicrotask(() => { setOrderId(id); void load(parseInt(id, 10)); }); }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -85,7 +87,17 @@ export default function SplitTender() {
     setError(null);
     try {
       const r = await post<{ change_due: number; balance?: { owed?: number } }>(`/orders/${balance.order_id}/tenders`, payload);
-      if (r.change_due > 0) alert(`Change due: $${r.change_due.toFixed(2)}`);
+      // Kept as an acknowledge-me dialog, not a passive notice: the cashier
+      // has to see this before handing money back. Now in-app rather than a
+      // browser alert(), so it matches the rest of the UI and is styleable.
+      if (r.change_due > 0) {
+        await dialogs.confirm({
+          title: `Change due: $${r.change_due.toFixed(2)}`,
+          body: 'Hand this back to the customer.',
+          confirmLabel: 'Done',
+          cancelLabel: 'Close',
+        });
+      }
       await load(balance.order_id);
       setForm({ tender_method: 'cash', amount: r.balance?.owed?.toFixed(2) ?? '' });
     } catch (e) {
@@ -93,18 +105,75 @@ export default function SplitTender() {
     } finally { setBusy(false); }
   };
 
-  const voidLine = async (id: number) => {
-    if (!confirm('Void this tender line?')) return;
-    const reason = prompt('Reason?') ?? '';
-    await post(`/tenders/${id}/void`, { reason });
-    await load(balance?.order_id);
+  // Voids and refunds move money, so both now confirm in-app with a typed,
+  // validated form and surface failures. Previously each was a window.prompt()
+  // whose result went straight to the API, and a rejected request did nothing
+  // visible at all.
+  const voidLine = async (line: TenderLine) => {
+    const values = await dialogs.prompt({
+      title: 'Void this tender line?',
+      body: `${line.tender_method} · $${Number(line.amount).toFixed(2)}. This cannot be undone.`,
+      danger: true,
+      confirmLabel: 'Void tender',
+      fields: [
+        { name: 'reason', label: 'Reason', type: 'textarea', required: true, placeholder: 'Why is this being voided?' },
+      ],
+    });
+    if (!values) return;
+
+    setBusy(true);
+    setError('');
+    try {
+      await post(`/tenders/${line.id}/void`, { reason: values.reason });
+      await load(balance?.order_id);
+    } catch (e) {
+      setError(errorMessage(e, 'Void failed'));
+    } finally {
+      setBusy(false);
+    }
   };
 
-  const refundLine = async (id: number) => {
-    const amt = parseFloat(prompt('Refund amount?') || '0');
-    if (!amt) return;
-    await post(`/tenders/${id}/refund`, { amount: amt });
-    await load(balance?.order_id);
+  const refundLine = async (line: TenderLine) => {
+    // Cap at what is actually still refundable so an over-refund is rejected
+    // before it reaches the API rather than after.
+    const alreadyRefunded = Number(line.refunded_amount) || 0;
+    const refundable = Math.max(0, (Number(line.amount) || 0) - alreadyRefunded);
+
+    if (refundable <= 0) {
+      setError('This tender line has already been fully refunded.');
+      return;
+    }
+
+    const values = await dialogs.prompt({
+      title: 'Refund tender line',
+      body: `${line.tender_method} · $${refundable.toFixed(2)} available to refund.`,
+      confirmLabel: 'Refund',
+      fields: [
+        {
+          name: 'amount',
+          label: 'Refund amount',
+          type: 'number',
+          required: true,
+          min: 0.01,
+          max: refundable,
+          step: 0.01,
+          value: refundable.toFixed(2),
+          help: `Maximum $${refundable.toFixed(2)}.`,
+        },
+      ],
+    });
+    if (!values) return;
+
+    setBusy(true);
+    setError('');
+    try {
+      await post(`/tenders/${line.id}/refund`, { amount: values.amount });
+      await load(balance?.order_id);
+    } catch (e) {
+      setError(errorMessage(e, 'Refund failed'));
+    } finally {
+      setBusy(false);
+    }
   };
 
   const def = METHODS.find((m) => m.key === form.tender_method);
@@ -206,12 +275,14 @@ export default function SplitTender() {
                   <td className="text-right">
                     {t.status === 'captured' && (
                       <div className="flex gap-1 justify-end">
-                        <button className="btn-sm" onClick={() => refundLine(t.id)}>Refund</button>
-                        <button className="btn-sm" onClick={() => voidLine(t.id)}>Void</button>
+                        <button className="btn-sm" disabled={busy} onClick={() => refundLine(t)}>Refund</button>
+                        <button className="btn-sm" disabled={busy} onClick={() => voidLine(t)}>Void</button>
                       </div>
                     )}
-                    {(t.status === 'captured' || t.status === 'partially_refunded') && t.status !== 'captured' && (
-                      <button className="btn-sm" onClick={() => refundLine(t.id)}>Refund more</button>
+                    {/* Was written as `(captured || partially_refunded) && !captured`,
+                        which is just `partially_refunded` with extra steps. */}
+                    {t.status === 'partially_refunded' && (
+                      <button className="btn-sm" disabled={busy} onClick={() => refundLine(t)}>Refund more</button>
                     )}
                   </td>
                 </tr>

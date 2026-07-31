@@ -1,7 +1,9 @@
 import { useEffect, useState } from 'react';
-import { get, post, errorMessage } from '../api';
+import { get, post } from '../api';
 import PageHeader from '../components/PageHeader';
 import DataTable, { type Column } from '../components/DataTable';
+import { useDialogs } from '../components/Dialogs';
+import { useAction, ActionFeedback } from '../components/useAction';
 
 interface Intake {
   id: number;
@@ -38,6 +40,8 @@ interface IntakeForm {
 const CONDITIONS = ['A — like new', 'B — excellent', 'C — good', 'D — fair', 'E — poor'];
 
 export default function UsedFirearms() {
+  const dialogs = useDialogs();
+  const { run, busy, error, notice, setNotice } = useAction();
   const [rows, setRows] = useState<Intake[]>([]);
   const [loading, setLoading] = useState(true);
   const [showNew, setShowNew] = useState(false);
@@ -65,28 +69,58 @@ export default function UsedFirearms() {
     if (res?.identity?.decision) {
       const d = res.identity.decision;
       const score = res.identity.score?.toFixed?.(3);
-      alert(`Intake #${res.intake.intake_number} created — identity decision: ${d} (score ${score})`);
+      setNotice(`Intake #${res.intake.intake_number} created — identity decision: ${d} (score ${score}).`);
     }
     setForm({ firearm_type: 'handgun' });
     setShowNew(false);
     await refresh();
   };
 
-  const payout = async (id: number) => {
-    const amount = parseFloat(prompt('Payout amount?') || '0');
-    if (!amount) return;
-    const method = prompt('Payout method (cash / check / store_credit)?', 'cash') || 'cash';
-    const reference = method === 'check' ? (prompt('Check number?') ?? '') : '';
-    try {
-      await post(`/used-firearms/${id}/payout`, { payout_amount: amount, payout_method: method, payout_reference: reference });
+  // The payout method was free text typed into a prompt, so "Cash" or a typo
+  // reached the API as a payout_method the server had never heard of. It is a
+  // select now, and the reference field is only asked for when it applies.
+  const payout = async (row: Intake) => {
+    const values = await dialogs.prompt({
+      title: `Pay out ${row.intake_number}`,
+      confirmLabel: 'Record payout',
+      fields: [
+        { name: 'payout_amount', label: 'Amount', type: 'number', required: true, min: 0.01, step: 0.01 },
+        { name: 'payout_method', label: 'Method', type: 'select', options: [
+          { value: 'cash', label: 'Cash' },
+          { value: 'check', label: 'Check' },
+          { value: 'store_credit', label: 'Store credit' },
+        ] },
+        { name: 'payout_reference', label: 'Reference', placeholder: 'Check number, if paying by check' },
+      ],
+    });
+    if (!values) return;
+
+    await run(async () => {
+      await post(`/used-firearms/${row.id}/payout`, values);
       await refresh();
-    } catch (e) { alert(errorMessage(e, 'Payout failed')); }
+    }, 'Payout recorded.');
   };
 
-  const listForSale = async (id: number) => {
-    const wc = prompt('Linked Woo product ID (optional, blank to just flip status):');
-    await post(`/used-firearms/${id}/list`, wc ? { wc_product_id: parseInt(wc) } : {});
-    await refresh();
+  const listForSale = async (row: Intake) => {
+    const values = await dialogs.prompt({
+      title: `List ${row.intake_number} for sale`,
+      body: 'Leave the product ID blank to just flip the status.',
+      confirmLabel: 'List',
+      fields: [
+        { name: 'wc_product_id', label: 'Linked Woo product ID', type: 'number', min: 1, step: 1 },
+      ],
+    });
+    if (!values) return;
+
+    // Previously parseInt() on prompt text, so anything non-numeric became NaN
+    // and was sent as null. An empty answer legitimately means "no link".
+    const productId = values.wc_product_id;
+    const body = typeof productId === 'number' ? { wc_product_id: productId } : {};
+
+    await run(async () => {
+      await post(`/used-firearms/${row.id}/list`, body);
+      await refresh();
+    }, 'Listed for sale.');
   };
 
   const cols: Column<Intake>[] = [
@@ -104,8 +138,8 @@ export default function UsedFirearms() {
     { key: 'status', label: 'Status', render: (r) => <span className={STATUS_BADGE[r.status] || 'badge-zinc'}>{r.status}</span> },
     { key: 'actions', label: '', render: (r) => (
       <div className="flex gap-1 justify-end">
-        {r.status === 'received' && <button className="btn-sm" onClick={() => payout(r.id)}>Pay out</button>}
-        {(r.status === 'paid' || r.status === 'appraised') && <button className="btn-sm" onClick={() => listForSale(r.id)}>List</button>}
+        {r.status === 'received' && <button className="btn-sm" disabled={busy} onClick={() => payout(r)}>Pay out</button>}
+        {(r.status === 'paid' || r.status === 'appraised') && <button className="btn-sm" disabled={busy} onClick={() => listForSale(r)}>List</button>}
       </div>
     ) },
   ];
@@ -117,6 +151,8 @@ export default function UsedFirearms() {
         subtitle="Customer brings in a used gun; the shop buys it outright. Distinct from consignment (we hold for them) and trade-in (immediate store credit toward another purchase). On receipt, the gun is auto-resolved to a canonical item identity in the Identity Graph — so used and new stock of the same make/model share one catalog truth."
         actions={<button className="btn-primary" onClick={() => setShowNew((s) => !s)}>{showNew ? 'Close' : '+ New intake'}</button>}
       />
+
+      <ActionFeedback error={error} notice={notice} />
 
       {showNew && (
         <div className="card p-4 mb-4 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
