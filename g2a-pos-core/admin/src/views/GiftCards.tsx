@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { get, post, errorMessage } from '../api';
 import PageHeader from '../components/PageHeader';
 import DataTable, { type Column } from '../components/DataTable';
+import { useAction, ActionFeedback } from '../components/useAction';
 
 interface Card {
   id: number;
@@ -16,6 +17,7 @@ interface Card {
 }
 
 export default function GiftCards() {
+  const { error, notice, setNotice, setError } = useAction();
   const [rows, setRows] = useState<Card[]>([]);
   const [loading, setLoading] = useState(true);
   const [amount, setAmount] = useState('25');
@@ -35,7 +37,9 @@ export default function GiftCards() {
     const a = parseFloat(amount);
     if (!a) return;
     const res = await post<{ code?: string }>('/gift-cards/issue', { amount: a });
-    if (res?.code) alert('Issued code: ' + res.code);
+    // The cleartext code is shown exactly once — it is stored hashed — so it
+    // stays on screen as a notice rather than vanishing with a dismissed alert.
+    if (res?.code) setNotice(`Issued code: ${res.code} — record it now, it cannot be shown again.`);
     await refresh();
   };
 
@@ -43,15 +47,15 @@ export default function GiftCards() {
     if (!lookup) return;
     try {
       const res = await get<{ balance_cents: number; status: string }>('/gift-cards/balance', { code: lookup });
-      alert(`Balance: $${(res.balance_cents / 100).toFixed(2)} (${res.status})`);
-    } catch (e) { alert(errorMessage(e, 'not found')); }
+      setNotice(`Balance: $${(res.balance_cents / 100).toFixed(2)} (${res.status})`);
+    } catch (e) { setError(errorMessage(e, 'Gift card not found')); }
   };
 
   const redeem = async () => {
     if (!lookup || !redeemAmount) return;
     const cents = Math.round(parseFloat(redeemAmount) * 100);
     const res = await post<{ applied_cents: number; balance_cents: number }>('/gift-cards/redeem', { code: lookup, amount_cents: cents });
-    alert(`Applied $${(res.applied_cents/100).toFixed(2)}. New balance: $${(res.balance_cents/100).toFixed(2)}`);
+    setNotice(`Applied $${(res.applied_cents/100).toFixed(2)}. New balance: $${(res.balance_cents/100).toFixed(2)}.`);
     await refresh();
   };
 
@@ -68,6 +72,8 @@ export default function GiftCards() {
   return (
     <div>
       <PageHeader title="Gift Cards" subtitle="Issue, look up balance, and redeem. Codes stored as SHA-256 hash; only the issuance receipt shows cleartext." />
+
+      <ActionFeedback error={error} notice={notice} />
       <div className="grid gap-4 md:grid-cols-2 mb-4">
         <div className="card p-4 flex items-end gap-2">
           <div className="flex-1">

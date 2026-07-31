@@ -98,7 +98,9 @@ export default function AgentOmnibar() {
         : '✗ Denied' }]);
       setMessages((m) => m.map((msg) => msg.pending ? { ...msg, pending: msg.pending.filter((p) => p.id !== pendingId) } : msg));
     } catch (e) {
-      alert('Decision failed: ' + errorMessage(e, '?'));
+      // Reported in the transcript alongside the approve/deny lines, so the
+      // outcome sits with the action it belongs to instead of in an alert().
+      setMessages((m) => [...m, { role: 'system', content: `✗ Decision failed — ${errorMessage(e)}` }]);
     }
   };
 

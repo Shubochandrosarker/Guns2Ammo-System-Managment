@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react';
 import { get, post } from '../api';
 import PageHeader from '../components/PageHeader';
 import DataTable, { type Column } from '../components/DataTable';
+import { useDialogs } from '../components/Dialogs';
+import { useAction, ActionFeedback } from '../components/useAction';
 
 interface Count {
   id: number;
@@ -26,6 +28,8 @@ interface CountDetail extends Count {
 }
 
 export default function CycleCounts() {
+  const dialogs = useDialogs();
+  const { run, error, notice } = useAction();
   const [rows, setRows] = useState<Count[]>([]);
   const [loading, setLoading] = useState(true);
   const [open, setOpen] = useState<CountDetail | null>(null);
@@ -40,8 +44,15 @@ export default function CycleCounts() {
   useEffect(() => { queueMicrotask(refresh); }, []);
 
   const create = async () => {
-    const scope = prompt('Scope value (e.g. category name, location)?') ?? '';
-    if (!scope) return;
+    const values = await dialogs.prompt({
+      title: 'Start a cycle count',
+      confirmLabel: 'Start count',
+      fields: [
+        { name: 'scope', label: 'Scope value', required: true, placeholder: 'e.g. category name, location' },
+      ],
+    });
+    if (!values) return;
+    const scope = String(values.scope);
     const r = await post<{ count: CountDetail }>('/cycle-counts', {
       scope_type: 'category',
       scope_value: scope,
@@ -58,10 +69,22 @@ export default function CycleCounts() {
 
   const record = async (item_id: number) => {
     if (!open) return;
-    const c = parseFloat(prompt('Counted quantity?') || '0');
-    await post(`/cycle-counts/${open.id}/record`, { item_id, counted_qty: c });
-    await openOne(open.id);
-    await refresh();
+    // A blind count of zero is meaningful, so this must accept 0 while still
+    // rejecting a cancel — which the old parseFloat(x || '0') could not tell
+    // apart, recording 0 either way.
+    const values = await dialogs.prompt({
+      title: 'Record counted quantity',
+      confirmLabel: 'Record',
+      fields: [
+        { name: 'counted_qty', label: 'Counted quantity', type: 'number', required: true, min: 0, step: 1 },
+      ],
+    });
+    if (!values) return;
+    await run(async () => {
+      await post(`/cycle-counts/${open.id}/record`, { item_id, counted_qty: values.counted_qty });
+      await openOne(open.id);
+      await refresh();
+    }, 'Count recorded.');
   };
 
   const close = async () => {
@@ -85,6 +108,8 @@ export default function CycleCounts() {
     <div>
       <PageHeader title="Cycle Counts" subtitle="Blind count workflow with variance reporting. Out-of-tolerance lines auto-flagged."
         actions={<button className="btn-primary" onClick={create}>+ Open new count</button>} />
+
+      <ActionFeedback error={error} notice={notice} />
       <DataTable<Count> rows={rows} columns={cols} loading={loading} rowKey={(r) => r.id} empty="No counts." />
 
       {open && (

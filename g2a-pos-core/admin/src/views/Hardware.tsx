@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { get, post } from '../api';
 import PageHeader from '../components/PageHeader';
 import DataTable, { type Column } from '../components/DataTable';
+import { useAction, ActionFeedback } from '../components/useAction';
 
 interface Profile {
   id: number;
@@ -29,6 +30,7 @@ interface ProfileForm {
 }
 
 export default function Hardware() {
+  const { error, notice, setNotice } = useAction();
   const [rows, setRows] = useState<Profile[]>([]);
   const [form, setForm] = useState<ProfileForm>({
     location_id: 1,
@@ -53,7 +55,7 @@ export default function Hardware() {
 
   const kickDrawer = async () => {
     const r = await post<{ bytes_base64: string }>('/hardware/drawer/kick', {});
-    alert(`Generated ${r.bytes_base64.length} byte kick code (POST to your printer at the configured endpoint).`);
+    setNotice(`Generated ${r.bytes_base64.length} byte kick code — POST it to your printer at the configured endpoint.`);
   };
 
   const cols: Column<Profile>[] = [
@@ -71,6 +73,8 @@ export default function Hardware() {
     <div>
       <PageHeader title="Hardware Profiles" subtitle="Per-register: ESC/POS printer, cash drawer kick, scanner profile, customer display, signature pad, ID scanner."
         actions={<button className="btn" onClick={kickDrawer}>Test drawer kick</button>} />
+
+      <ActionFeedback error={error} notice={notice} />
       <div className="card p-4 mb-4 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
         <input className="input" placeholder="Register code (e.g. COUNTER-1)" value={form.register_code ?? ''} onChange={(e) => setForm({...form, register_code: e.target.value})} />
         <input className="input" type="number" placeholder="Location ID" value={form.location_id} onChange={(e) => setForm({...form, location_id: parseInt(e.target.value)})} />

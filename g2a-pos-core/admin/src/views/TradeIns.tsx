@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { get, post } from '../api';
 import PageHeader from '../components/PageHeader';
 import DataTable, { type Column } from '../components/DataTable';
+import { useAction, ActionFeedback } from '../components/useAction';
 
 interface TradeIn {
   id: number;
@@ -30,6 +31,7 @@ interface TradeInForm {
 }
 
 export default function TradeIns() {
+  const { error, notice, setNotice } = useAction();
   const [rows, setRows] = useState<TradeIn[]>([]);
   const [loading, setLoading] = useState(true);
   const [form, setForm] = useState<TradeInForm>({});
@@ -46,7 +48,7 @@ export default function TradeIns() {
   const create = async () => {
     if (!form.customer_name || !form.serial_number || !form.manufacturer) return;
     const res = await post<{ credit_amount?: string }>('/tradeins', form);
-    if (res?.credit_amount) alert(`Credit issued: $${parseFloat(res.credit_amount).toFixed(2)}`);
+    if (res?.credit_amount) setNotice(`Credit issued: $${parseFloat(res.credit_amount).toFixed(2)}.`);
     setForm({});
     await refresh();
   };
@@ -65,6 +67,8 @@ export default function TradeIns() {
   return (
     <div>
       <PageHeader title="Trade-Ins" subtitle="Customer firearm trade-in. Auto-issues store credit (single ledger that survives refunds), writes acquisition entry to bound book." />
+
+      <ActionFeedback error={error} notice={notice} />
       <div className="card p-4 mb-4 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
         <input className="input" placeholder="Customer *" value={form.customer_name ?? ''} onChange={(e) => setForm({...form, customer_name: e.target.value})} />
         <input className="input" type="number" placeholder="Customer ID" value={form.customer_id ?? ''} onChange={(e) => setForm({...form, customer_id: parseInt(e.target.value)})} />

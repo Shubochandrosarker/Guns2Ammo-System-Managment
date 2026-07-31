@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react';
 import { get, post } from '../api';
 import PageHeader from '../components/PageHeader';
 import DataTable, { type Column } from '../components/DataTable';
+import { useDialogs } from '../components/Dialogs';
+import { useAction, ActionFeedback } from '../components/useAction';
 
 interface MaintTicket {
   id: number; ticket_number: string; lane_code: string; ticket_type: string;
@@ -36,6 +38,8 @@ const SEVERITY_BADGE: Record<string, string> = {
 };
 
 export default function RangeSafety() {
+  const dialogs = useDialogs();
+  const { run, error, notice, setNotice } = useAction();
   const [tab, setTab] = useState<'maintenance' | 'incidents'>('maintenance');
   const [tickets, setTickets] = useState<MaintTicket[]>([]);
   const [incidents, setIncidents] = useState<Incident[]>([]);
@@ -61,10 +65,19 @@ export default function RangeSafety() {
   };
   const startTicket = async (id: number) => { await post(`/range/maintenance/${id}/start`, {}); await refresh(); };
   const closeTicket = async (id: number) => {
-    const labor = parseInt(prompt('Labor minutes?') || '0') || 0;
-    const cost = parseFloat(prompt('Cost $?') || '0') || 0;
-    await post(`/range/maintenance/${id}/close`, { labor_minutes: labor, cost_amount: cost });
-    await refresh();
+    const values = await dialogs.prompt({
+      title: 'Close maintenance ticket',
+      confirmLabel: 'Close ticket',
+      fields: [
+        { name: 'labor_minutes', label: 'Labor minutes', type: 'number', min: 0, step: 1, value: '0' },
+        { name: 'cost_amount', label: 'Cost $', type: 'number', min: 0, step: 0.01, value: '0' },
+      ],
+    });
+    if (!values) return;
+    await run(async () => {
+      await post(`/range/maintenance/${id}/close`, values);
+      await refresh();
+    }, 'Ticket closed.');
   };
 
   const addIncCustomer = () => setIncCustomers((c) => [...c, { customer_name: '', role: 'involved' }]);
@@ -76,11 +89,11 @@ export default function RangeSafety() {
     if (!incForm.description) return;
     const body = { ...incForm, customers: incCustomers };
     const res = await post<{ incident?: { customer_flag_applied?: number } }>('/range/incidents', body);
-    if (res?.incident?.customer_flag_applied) {
-      alert('Incident logged. Customer flag(s) applied to CRM profile per severity ladder.');
-    } else {
-      alert('Incident logged.');
-    }
+    setNotice(
+      res?.incident?.customer_flag_applied
+        ? 'Incident logged. Customer flag(s) applied to the CRM profile per the severity ladder.'
+        : 'Incident logged.',
+    );
     setIncForm({ severity: 'warning', incident_type: 'safety_violation' });
     setIncCustomers([]);
     await refresh();
@@ -121,6 +134,8 @@ export default function RangeSafety() {
         title="Range Safety"
         subtitle="Lane maintenance tickets (cleaning / repair / inspection / scheduled / equipment failure) + range-incident reports with severity ladder info → warning → serious → eject → banned. Eject auto-applies do_not_sell to the customer CRM profile; banned additionally sets denied_buyer + reason."
       />
+
+      <ActionFeedback error={error} notice={notice} />
 
       <div className="mb-4 flex gap-2">
         <button className={tab === 'maintenance' ? 'btn-primary' : 'btn'} onClick={() => setTab('maintenance')}>Lane maintenance</button>

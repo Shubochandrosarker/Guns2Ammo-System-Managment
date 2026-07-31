@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { errorMessage, get, post } from '../api';
 import PageHeader from '../components/PageHeader';
 import DataTable, { type Column } from '../components/DataTable';
+import { useDialogs } from '../components/Dialogs';
 
 interface NicsRow {
   id: number;
@@ -25,6 +26,7 @@ const STATUS_BADGE: Record<string, string> = {
 };
 
 export default function NicsQueue() {
+  const dialogs = useDialogs();
   const [rows, setRows] = useState<NicsRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [status, setStatus] = useState('');
@@ -50,7 +52,22 @@ export default function NicsQueue() {
   }, [status]);
 
   const recordResponse = async (id: number, response_status: 'proceed' | 'denied' | 'delayed') => {
-    const ntn = response_status !== 'denied' ? prompt('NTN (transaction number) — optional, leave blank to skip:') ?? undefined : undefined;
+    let ntn: string | undefined;
+    if (response_status !== 'denied') {
+      // Cancelling now aborts the whole action. Previously a dismissed prompt
+      // was indistinguishable from "no NTN" and the response was recorded
+      // anyway, leaving the check with no transaction number against it.
+      const values = await dialogs.prompt({
+        title: `Record NICS ${response_status}`,
+        body: 'The NTN is optional — leave it blank to skip.',
+        confirmLabel: 'Record response',
+        fields: [
+          { name: 'ntn', label: 'NTN (transaction number)', placeholder: 'Optional' },
+        ],
+      });
+      if (!values) return;
+      ntn = String(values.ntn).trim() || undefined;
+    }
     setRecordingId(id);
     try {
       await post(`/atf/nics/${id}/response`, { response_status, ntn: ntn || undefined });
