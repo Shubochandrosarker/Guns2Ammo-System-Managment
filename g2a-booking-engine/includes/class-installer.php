@@ -19,7 +19,7 @@ final class G2AB_Installer {
 		'forms'              => 9,
 		'form_fields'        => 12,
 		'availability_rules' => 13,
-		'payments'           => 14,
+		'payments'           => 23,
 		'logs'               => 10,
 		'webhook_events'     => 12,
 		'migration_runs'     => 17,
@@ -162,7 +162,21 @@ final class G2AB_Installer {
 		$this->migrate_to_1_5_0( $current );
 		$this->migrate_to_1_5_1( $current );
 		$this->migrate_to_1_5_3( $current );
+		$this->migrate_to_1_5_4( $current );
 		do_action( 'g2ab_run_migrations', $current, G2AB_DB_VERSION );
+	}
+
+	/**
+	 * v1.5.4 - indexed payment-attempt fields for Stripe idempotency and refunds.
+	 *
+	 * dbDelta adds the columns. Existing rows remain readable through legacy
+	 * transaction_id/metadata lookups until they are touched by reconciliation.
+	 */
+	private function migrate_to_1_5_4( $current ) {
+		if ( version_compare( $current, '1.5.4', '>=' ) ) {
+			return;
+		}
+		// no-op (columns added by dbDelta)
 	}
 
 	/**
@@ -460,19 +474,31 @@ id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
 booking_id BIGINT UNSIGNED NOT NULL,
 gateway VARCHAR(50) NOT NULL DEFAULT 'pay_in_store',
 transaction_id VARCHAR(255) DEFAULT NULL,
+checkout_session_id VARCHAR(255) DEFAULT NULL,
+payment_intent_id VARCHAR(255) DEFAULT NULL,
+idempotency_key_hash CHAR(64) DEFAULT NULL,
+attempt_number SMALLINT UNSIGNED NOT NULL DEFAULT 1,
 amount DECIMAL(10,2) NOT NULL DEFAULT 0.00,
+amount_minor BIGINT UNSIGNED DEFAULT NULL,
+due_now_minor BIGINT UNSIGNED DEFAULT NULL,
 currency CHAR(3) NOT NULL DEFAULT 'USD',
 status VARCHAR(20) NOT NULL DEFAULT 'pending',
 payment_method VARCHAR(50) DEFAULT NULL,
 refund_amount DECIMAL(10,2) NOT NULL DEFAULT 0.00,
+refunded_amount_minor BIGINT UNSIGNED NOT NULL DEFAULT 0,
 gateway_response LONGTEXT,
 metadata LONGTEXT,
 external_ref VARCHAR(64) DEFAULT NULL,
+checkout_expires_at DATETIME DEFAULT NULL,
 processed_at DATETIME DEFAULT NULL,
 created_at DATETIME NOT NULL,
+updated_at DATETIME DEFAULT NULL,
 PRIMARY KEY  (id),
 KEY idx_booking (booking_id),
 KEY idx_transaction (transaction_id),
+KEY idx_checkout_session (checkout_session_id),
+KEY idx_payment_intent (payment_intent_id),
+KEY idx_idempotency_key_hash (idempotency_key_hash),
 KEY idx_status (status),
 KEY idx_extref (external_ref),
 UNIQUE KEY uniq_gateway_txn (gateway, transaction_id(191))

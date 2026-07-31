@@ -32,9 +32,10 @@
 	}
 
 	function checkBookingStatus(uuid) {
-		var url = window.G2AB_DATA.rest_url + 'bookings/' + encodeURIComponent(uuid) + '/status';
 		var sessionId = qs('session_id');
 		var confirmToken = qs('g2ab_token');
+		var url = window.G2AB_DATA.rest_url + 'bookings/' + encodeURIComponent(uuid) + '/status';
+		if (confirmToken) url += '?confirm_token=' + encodeURIComponent(confirmToken);
 		return fetch(url, { headers: { 'X-WP-Nonce': window.G2AB_DATA.nonce || '' } })
 			.then(function (r) { return r.json(); })
 			.then(function (json) {

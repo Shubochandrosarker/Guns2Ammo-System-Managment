@@ -24,6 +24,7 @@ final class G2AB_Module_Email_Automation {
 
 		// Booking lifecycle hooks (fired from class-bookings-controller.php).
 		add_action( 'g2ab_booking_created',   array( $this, 'on_created' ),   10, 2 );
+		add_action( 'g2ab_payment_checkout_ready', array( $this, 'on_checkout_ready' ), 10, 2 );
 		add_action( 'g2ab_booking_confirmed', array( $this, 'on_confirmed' ), 10, 2 );
 		add_action( 'g2ab_booking_paid',      array( $this, 'on_paid' ),      10, 2 );
 		add_action( 'g2ab_booking_cancelled', array( $this, 'on_cancelled' ), 10, 2 );
@@ -40,10 +41,28 @@ final class G2AB_Module_Email_Automation {
 	public function engine() { return $this->engine; }
 
 	public function on_created( $booking, $context = array() ) {
-		if ( ! $this->is_event_enabled( 'booking_created' ) ) return;
 		$booking = $this->resolve_booking( $booking );
 		if ( ! $booking ) return;
+
+		$payment_mode = sanitize_key( (string) ( $booking->payment_mode ?? '' ) );
+		$status       = sanitize_key( (string) ( $booking->status ?? '' ) );
+
+		if ( in_array( $payment_mode, array( 'full', 'deposit' ), true ) && in_array( $status, array( 'pending', 'reserved' ), true ) ) {
+			return;
+		}
+		if ( 'in_store' === $payment_mode && 'reserved' === $status && $this->is_event_enabled( 'pay_in_store_reservation' ) ) {
+			$this->engine->send_event( 'pay_in_store_reservation', $booking, $context );
+			return;
+		}
+		if ( ! $this->is_event_enabled( 'booking_created' ) ) return;
 		$this->engine->send_event( 'booking_created', $booking, $context );
+	}
+
+	public function on_checkout_ready( $booking, $context = array() ) {
+		if ( ! $this->is_event_enabled( 'payment_required' ) ) return;
+		$booking = $this->resolve_booking( $booking );
+		if ( ! $booking ) return;
+		$this->engine->send_event( 'payment_required', $booking, $context );
 	}
 
 	public function on_confirmed( $booking, $context = array() ) {
@@ -117,7 +136,7 @@ final class G2AB_Module_Email_Automation {
 	private function is_event_enabled( $event ) {
 		$opts = get_option( 'g2ab_email_events', array() );
 		// Default-on for all critical events; default-off for noisy ones.
-		$default_on = array( 'booking_created', 'booking_confirmed', 'booking_paid', 'booking_cancelled' );
+		$default_on = array( 'booking_created', 'payment_required', 'pay_in_store_reservation', 'booking_confirmed', 'booking_paid', 'booking_cancelled' );
 		if ( ! isset( $opts[ $event ] ) ) return in_array( $event, $default_on, true );
 		return ! empty( $opts[ $event ] );
 	}

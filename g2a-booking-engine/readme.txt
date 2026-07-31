@@ -4,7 +4,7 @@ Tags: booking, reservation, scheduling, appointments, shooting range, firearms, 
 Requires at least: 6.2
 Tested up to: 6.5
 Requires PHP: 8.0
-Stable tag: 1.9.9.16
+Stable tag: 1.9.9.19
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -206,6 +206,30 @@ Yes. REST API at `/wp-json/g2a-booking/v1/` covers bookings, forms, calendar, fr
 7. Migration wizard — dry-run preview before live import.
 
 == Changelog ==
+
+= 1.9.9.19 =
+* Fixed event-seat capacity with a canonical capacity service, live hold expiry rules, and atomic occurrence locking.
+* Fixed featured event banner countdown by moving initialization into a deferred DOM-ready asset.
+* Added live availability refresh for event banners and pre-submit refresh for the event booking widget.
+* Upgraded event landing pages with high-contrast premium hero styling, animated detail cards, and clearer event information.
+* Added admin and WP-CLI event-capacity diagnostics with a safe stale-hold repair action.
+
+= 1.9.9.18 =
+* Added canonical operational booking visibility so normal booking dashboards, counts, reminders, and exports exclude unpaid online checkout holds.
+* Added a restricted Checkout Attempts admin screen for Stripe session attempts, saved URLs, expiries, and failed/open payment records.
+* Moved payment-required email dispatch to a post-Stripe-checkout-ready hook after the Stripe URL and expiry are persisted.
+* Added token-gated resume-payment REST recovery for still-open Stripe Checkout Sessions.
+* Hardened email merge tags from canonical booking/payment records and prevented payment-required sends with empty payment CTAs.
+
+= 1.9.9.17 =
+* Security: Stripe Checkout creation now persists a payment attempt before the API call and sends a stable Stripe Idempotency-Key per attempt.
+* Security: payment confirmation and webhooks now share strict Stripe session-to-booking validation for session ID, booking metadata, amount, currency, mode, status, environment, and attempt binding.
+* Security: new booking confirmation tokens are stored as hashes, not raw tokens; public status and confirmation endpoints require a token, ownership, or staff capability for sensitive data.
+* Fix: payment completion updates the payment ledger and booking status inside one transaction, with paid side effects queued only after commit.
+* Fix: Stripe partial refunds now stay partial until cumulative refunded amount reaches the paid amount.
+* Fix: standard bookings lock the concrete resource row and event bookings lock the occurrence row before recalculating capacity.
+* Change: guest WordPress account provisioning is delayed until a committed free/pay-in-store reservation or a verified online payment.
+* Change: paid event seats no longer silently fall back to pay-in-store unless the admin explicitly enables `g2ab_allow_event_pay_in_store_fallback`.
 
 = 1.9.9.16 =
 * Fix: events-calendar widget's "sold out" indicator was hardcoded to a light-mode-safe red regardless of the widget's own theme="dark"|"light" attribute (default dark), failing contrast (~2.7-3.1:1) in its default dark state. Now uses a per-variant color.

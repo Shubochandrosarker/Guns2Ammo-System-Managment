@@ -35,6 +35,7 @@ final class Scheduler {
 	const HOOK_WAIVER_FOLLOWUP   = 'memberistic_daily_waiver_followup';
 	const HOOK_PRUNE_LOGS        = 'memberistic_daily_prune_logs';
 	const HOOK_BACKFILL_RENEWALS = 'memberistic_daily_backfill_renewals';
+	const HOOK_PRUNE_RATE_LIMITS = 'memberistic_hourly_prune_rate_limits';
 
 	public static function register() {
 		add_action( self::HOOK_RENEWAL_REMINDERS, array( self::class, 'run_renewal_reminders' ) );
@@ -42,6 +43,7 @@ final class Scheduler {
 		add_action( self::HOOK_WAIVER_FOLLOWUP, array( self::class, 'run_waiver_followup' ) );
 		add_action( self::HOOK_PRUNE_LOGS, array( self::class, 'run_prune_logs' ) );
 		add_action( self::HOOK_BACKFILL_RENEWALS, array( self::class, 'run_backfill_renewals' ) );
+		add_action( self::HOOK_PRUNE_RATE_LIMITS, array( self::class, 'run_prune_rate_limits' ) );
 
 		self::ensure_scheduled();
 	}
@@ -62,6 +64,10 @@ final class Scheduler {
 				wp_schedule_event( $start ?: time() + DAY_IN_SECONDS, 'daily', $hook );
 			}
 		}
+
+		if ( ! wp_next_scheduled( self::HOOK_PRUNE_RATE_LIMITS ) ) {
+			wp_schedule_event( time() + HOUR_IN_SECONDS, 'hourly', self::HOOK_PRUNE_RATE_LIMITS );
+		}
 	}
 
 	/**
@@ -72,6 +78,10 @@ final class Scheduler {
 	public static function run_prune_logs() {
 		$days = (int) apply_filters( 'memberistic_email_log_retention_days', 90 );
 		Email_Logs_Repository::prune_older_than( $days );
+	}
+
+	public static function run_prune_rate_limits() {
+		Stripe_Service::prune_expired_rate_limits();
 	}
 
 	/**
@@ -92,6 +102,7 @@ final class Scheduler {
 				self::HOOK_WAIVER_FOLLOWUP,
 				self::HOOK_PRUNE_LOGS,
 				self::HOOK_BACKFILL_RENEWALS,
+				self::HOOK_PRUNE_RATE_LIMITS,
 			) as $hook
 		) {
 			$timestamp = wp_next_scheduled( $hook );

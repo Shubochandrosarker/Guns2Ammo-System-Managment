@@ -54,10 +54,12 @@ final class G2AB_Admin_Bookings_List {
 
 	private function tabs() {
 		return array(
-			'all'   => __( 'All', 'g2a-booking' ),
-			'lane'  => __( 'Lanes', 'g2a-booking' ),
-			'event' => __( 'Events', 'g2a-booking' ),
-			'class' => __( 'Classes', 'g2a-booking' ),
+			'all'       => __( 'Operational', 'g2a-booking' ),
+			'lane'      => __( 'Lanes', 'g2a-booking' ),
+			'event'     => __( 'Events', 'g2a-booking' ),
+			'class'     => __( 'Classes', 'g2a-booking' ),
+			'pay_store' => __( 'Pay at Store', 'g2a-booking' ),
+			'completed' => __( 'Completed', 'g2a-booking' ),
 		);
 	}
 
@@ -100,7 +102,7 @@ final class G2AB_Admin_Bookings_List {
 				<div>
 					<div class="g2ab-bk__eyebrow"><?php esc_html_e( 'RANGE ROSTER', 'g2a-booking' ); ?></div>
 					<h1 class="g2ab-bk__title"><?php esc_html_e( 'Bookings', 'g2a-booking' ); ?></h1>
-					<p class="g2ab-bk__sub"><?php esc_html_e( 'Every reservation across lanes, events and classes — in one place.', 'g2a-booking' ); ?></p>
+					<p class="g2ab-bk__sub"><?php esc_html_e( 'Confirmed and pay-at-store reservations requiring operational attention.', 'g2a-booking' ); ?></p>
 				</div>
 				<div class="g2ab-bk__head-actions">
 					<a class="g2ab-bk__btn g2ab-bk__btn--ghost" href="<?php echo esc_url( wp_nonce_url( add_query_arg( array( 'action' => 'g2ab_export_bookings_csv', 'tab' => $tab, 'status' => $status, 's' => $search ), admin_url( 'admin-post.php' ) ), 'g2ab_export_bookings_csv' ) ); ?>">
@@ -131,8 +133,8 @@ final class G2AB_Admin_Bookings_List {
 					<input type="search" name="s" value="<?php echo esc_attr( $search ); ?>" placeholder="<?php esc_attr_e( 'Search bookings by name, email, phone…', 'g2a-booking' ); ?>" />
 				</div>
 				<select name="status" class="g2ab-bk__select" onchange="this.form.submit()">
-					<option value=""><?php esc_html_e( 'All statuses', 'g2a-booking' ); ?></option>
-					<?php foreach ( array( 'pending', 'reserved', 'confirmed', 'paid', 'completed', 'cancelled', 'no_show', 'refunded', 'expired' ) as $st ) : ?>
+					<option value=""><?php esc_html_e( 'Operational statuses', 'g2a-booking' ); ?></option>
+					<?php foreach ( array( 'reserved', 'confirmed', 'paid', 'completed' ) as $st ) : ?>
 						<option value="<?php echo esc_attr( $st ); ?>" <?php selected( $status, $st ); ?>><?php echo esc_html( ucwords( str_replace( '_', ' ', $st ) ) ); ?></option>
 					<?php endforeach; ?>
 				</select>
@@ -142,8 +144,8 @@ final class G2AB_Admin_Bookings_List {
 			<?php if ( empty( $rows ) ) : ?>
 				<div class="g2ab-bk__empty">
 					<div class="g2ab-bk__empty-icon">◎</div>
-					<h2><?php esc_html_e( 'No bookings in this view yet.', 'g2a-booking' ); ?></h2>
-					<p><?php esc_html_e( 'Reservations will appear here as shooters book lanes, events and classes.', 'g2a-booking' ); ?></p>
+					<h2><?php esc_html_e( 'No operational bookings in this view yet.', 'g2a-booking' ); ?></h2>
+					<p><?php esc_html_e( 'Pending online checkout holds are tracked under Checkout Attempts until payment is verified.', 'g2a-booking' ); ?></p>
 				</div>
 			<?php else : ?>
 				<div class="g2ab-bk__table-wrap">
@@ -189,7 +191,7 @@ final class G2AB_Admin_Bookings_List {
 										</span>
 									</td>
 									<td class="g2ab-bk__c-status">
-										<span class="g2ab-bk__badge g2ab-bk__st-<?php echo esc_attr( $r['status'] ); ?>"><?php echo esc_html( ucwords( str_replace( '_', ' ', $r['status'] ) ) ); ?></span>
+										<span class="g2ab-bk__badge g2ab-bk__st-<?php echo esc_attr( $r['status'] ); ?>"><?php echo esc_html( class_exists( 'G2AB_Booking_Visibility' ) ? G2AB_Booking_Visibility::status_label( $r ) : ucwords( str_replace( '_', ' ', $r['status'] ) ) ); ?></span>
 									</td>
 									<td class="g2ab-bk__c-amt">$<?php echo esc_html( number_format( (float) $r['total_amount'], 2 ) ); ?></td>
 									<td class="g2ab-bk__c-act"><a class="g2ab-bk__view" href="<?php echo esc_url( $detail_url ); ?>" onclick="event.stopPropagation()">→</a></td>
@@ -281,7 +283,7 @@ final class G2AB_Admin_Bookings_List {
 							<h1 class="g2ab-bk__dname"><?php echo esc_html( $b->customer_name ? $b->customer_name : __( 'Guest', 'g2a-booking' ) ); ?></h1>
 							<div class="g2ab-bk__dmeta">
 								<span class="g2ab-bk__chip g2ab-bk__chip--light" style="--c:<?php echo esc_attr( $kmeta['color'] ); ?>;"><?php echo esc_html( $kmeta['icon'] . ' ' . $kmeta['label'] ); ?></span>
-								<span class="g2ab-bk__badge g2ab-bk__st-<?php echo esc_attr( $b->status ); ?>"><?php echo esc_html( ucwords( str_replace( '_', ' ', $b->status ) ) ); ?></span>
+								<span class="g2ab-bk__badge g2ab-bk__st-<?php echo esc_attr( $b->status ); ?>"><?php echo esc_html( class_exists( 'G2AB_Booking_Visibility' ) ? G2AB_Booking_Visibility::status_label( $b ) : ucwords( str_replace( '_', ' ', $b->status ) ) ); ?></span>
 								<code class="g2ab-bk__uuid"><?php echo esc_html( $b->uuid ); ?></code>
 							</div>
 						</div>
@@ -449,6 +451,13 @@ final class G2AB_Admin_Bookings_List {
 			$where .= " AND b.event_id IS NOT NULL AND (e.category IS NULL OR e.category <> 'ccw-class') ";
 		} elseif ( 'class' === $tab ) {
 			$where .= " AND b.event_id IS NOT NULL AND e.category = 'ccw-class' ";
+		} elseif ( 'pay_store' === $tab ) {
+			$where .= " AND b.status = 'reserved' AND b.payment_mode = 'in_store' ";
+		} elseif ( 'completed' === $tab ) {
+			$where .= " AND b.status = 'completed' ";
+		}
+		if ( class_exists( 'G2AB_Booking_Visibility' ) ) {
+			$where .= ' AND ' . G2AB_Booking_Visibility::operational_sql( 'b' ) . ' ';
 		}
 		if ( $status ) {
 			$where  .= ' AND b.status = %s ';

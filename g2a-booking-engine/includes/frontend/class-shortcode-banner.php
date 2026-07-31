@@ -24,6 +24,7 @@ final class G2AB_Frontend_Shortcode_Banner {
 
 	private static $instance = null;
 	private $printed = false;
+	private $script_configured = false;
 
 	public static function instance() {
 		if ( null === self::$instance ) {
@@ -107,6 +108,7 @@ final class G2AB_Frontend_Shortcode_Banner {
 
 		$style = sanitize_key( $atts['style'] );
 		ob_start();
+		$this->enqueue_assets();
 		$this->print_styles();
 		switch ( $style ) {
 			case 'strip':
@@ -126,7 +128,7 @@ final class G2AB_Frontend_Shortcode_Banner {
 	private function render_spotlight( $v ) {
 		$e = $v['event'];
 		?>
-		<section class="g2ab-banr g2ab-banr--spotlight g2ab-banr--<?php echo esc_attr( $v['theme'] ); ?>" style="--banr-accent:<?php echo esc_attr( $v['accent'] ); ?>;">
+		<section class="g2ab-banr g2ab-banr--spotlight g2ab-banr--<?php echo esc_attr( $v['theme'] ); ?>" style="--banr-accent:<?php echo esc_attr( $v['accent'] ); ?>;" data-g2ab-event-id="<?php echo (int) $e->id; ?>" data-g2ab-occurrence-id="<?php echo (int) $v['occ']->id; ?>">
 			<div class="g2ab-banr__grid"></div>
 			<div class="g2ab-banr__glow"></div>
 			<div class="g2ab-banr__inner">
@@ -148,8 +150,8 @@ final class G2AB_Frontend_Shortcode_Banner {
 				</div>
 				<div class="g2ab-banr__right">
 					<?php if ( $v['countdown'] ) : ?>
-						<div class="g2ab-banr__count" data-g2ab-countdown="<?php echo esc_attr( $v['ts'] ); ?>">
-							<div class="g2ab-banr__count-label"><?php esc_html_e( 'STARTS IN', 'g2a-booking' ); ?></div>
+						<div class="g2ab-banr__count" data-g2ab-countdown="<?php echo esc_attr( $v['ts'] ); ?>" data-g2ab-countdown-ms="<?php echo esc_attr( $v['ts'] * 1000 ); ?>">
+							<div class="g2ab-banr__count-label" data-g2ab-countdown-label><?php esc_html_e( 'STARTS IN', 'g2a-booking' ); ?></div>
 							<div class="g2ab-banr__count-grid">
 								<div class="g2ab-banr__count-cell"><span data-d>00</span><small>D</small></div>
 								<div class="g2ab-banr__count-cell"><span data-h>00</span><small>H</small></div>
@@ -159,8 +161,8 @@ final class G2AB_Frontend_Shortcode_Banner {
 						</div>
 					<?php endif; ?>
 					<div class="g2ab-banr__seats">
-						<div class="g2ab-banr__seats-row"><span><?php echo (int) $v['booked']; ?> / <?php echo (int) $v['cap']; ?> RESERVED</span><span class="g2ab-banr__seats-left"><?php echo (int) $v['left']; ?> SEATS LEFT</span></div>
-						<div class="g2ab-banr__seats-bar"><div class="g2ab-banr__seats-fill" style="width:<?php echo (int) $v['pct']; ?>%;"></div></div>
+						<div class="g2ab-banr__seats-row"><span><span data-g2ab-seats-reserved><?php echo (int) $v['booked']; ?></span> / <span data-g2ab-seats-total><?php echo (int) $v['cap']; ?></span> RESERVED</span><span class="g2ab-banr__seats-left"><span data-g2ab-seats-left><?php echo (int) $v['left']; ?></span> SEATS LEFT</span></div>
+						<div class="g2ab-banr__seats-bar"><div class="g2ab-banr__seats-fill" data-g2ab-seats-fill style="width:<?php echo (int) $v['pct']; ?>%;"></div></div>
 					</div>
 				</div>
 			</div>
@@ -171,7 +173,7 @@ final class G2AB_Frontend_Shortcode_Banner {
 	private function render_strip( $v ) {
 		$e = $v['event'];
 		?>
-		<section class="g2ab-banr g2ab-banr--strip g2ab-banr--<?php echo esc_attr( $v['theme'] ); ?>" style="--banr-accent:<?php echo esc_attr( $v['accent'] ); ?>;">
+		<section class="g2ab-banr g2ab-banr--strip g2ab-banr--<?php echo esc_attr( $v['theme'] ); ?>" style="--banr-accent:<?php echo esc_attr( $v['accent'] ); ?>;" data-g2ab-event-id="<?php echo (int) $e->id; ?>" data-g2ab-occurrence-id="<?php echo (int) $v['occ']->id; ?>">
 			<div class="g2ab-banr__glow"></div>
 			<div class="g2ab-strip__in">
 				<span class="g2ab-strip__tag"><?php echo esc_html( strtoupper( $v['cat'] ) ); ?></span>
@@ -180,7 +182,7 @@ final class G2AB_Frontend_Shortcode_Banner {
 					<span class="g2ab-strip__when"><?php echo esc_html( $v['dow'] . ', ' . $v['day'] . ' · ' . $v['time'] ); ?></span>
 				</div>
 				<span class="g2ab-strip__price"><?php echo $v['is_free'] ? esc_html__( 'FREE', 'g2a-booking' ) : '$' . esc_html( number_format( $v['price'], 2 ) ); ?></span>
-				<span class="g2ab-strip__seats <?php echo $v['left'] > 0 ? '' : 'is-out'; ?>"><?php echo $v['left'] > 0 ? ( (int) $v['left'] . ' ' . esc_html__( 'left', 'g2a-booking' ) ) : esc_html__( 'Sold out', 'g2a-booking' ); ?></span>
+				<span class="g2ab-strip__seats <?php echo $v['left'] > 0 ? '' : 'is-out'; ?>" data-g2ab-seats-left-text><span data-g2ab-seats-left><?php echo (int) $v['left']; ?></span> <?php esc_html_e( 'left', 'g2a-booking' ); ?></span>
 				<a class="g2ab-strip__cta" href="<?php echo esc_url( $v['url'] ); ?>"><?php echo esc_html( $v['cta'] ); ?> →</a>
 			</div>
 		</section>
@@ -190,7 +192,7 @@ final class G2AB_Frontend_Shortcode_Banner {
 	private function render_ticket( $v ) {
 		$e = $v['event'];
 		?>
-		<section class="g2ab-banr g2ab-banr--ticket g2ab-banr--<?php echo esc_attr( $v['theme'] ); ?>" style="--banr-accent:<?php echo esc_attr( $v['accent'] ); ?>;">
+		<section class="g2ab-banr g2ab-banr--ticket g2ab-banr--<?php echo esc_attr( $v['theme'] ); ?>" style="--banr-accent:<?php echo esc_attr( $v['accent'] ); ?>;" data-g2ab-event-id="<?php echo (int) $e->id; ?>" data-g2ab-occurrence-id="<?php echo (int) $v['occ']->id; ?>">
 			<div class="g2ab-ticket">
 				<div class="g2ab-ticket__stub">
 					<span class="g2ab-ticket__d"><?php echo esc_html( $v['d_num'] ); ?></span>
@@ -204,7 +206,7 @@ final class G2AB_Frontend_Shortcode_Banner {
 					<?php if ( $e->summary ) : ?><p class="g2ab-ticket__sum"><?php echo esc_html( $e->summary ); ?></p><?php endif; ?>
 					<div class="g2ab-ticket__meta">
 						<span><b><?php echo $v['is_free'] ? esc_html__( 'FREE', 'g2a-booking' ) : '$' . esc_html( number_format( $v['price'], 2 ) ); ?></b></span>
-						<span class="<?php echo $v['left'] > 0 ? 'is-green' : 'is-out'; ?>"><?php echo $v['left'] > 0 ? ( (int) $v['left'] . ' ' . esc_html__( 'seats left', 'g2a-booking' ) ) : esc_html__( 'Sold out', 'g2a-booking' ); ?></span>
+						<span class="<?php echo $v['left'] > 0 ? 'is-green' : 'is-out'; ?>" data-g2ab-seats-left-text><span data-g2ab-seats-left><?php echo (int) $v['left']; ?></span> <?php esc_html_e( 'seats left', 'g2a-booking' ); ?></span>
 						<?php if ( $e->location ) : ?><span>⌖ <?php echo esc_html( $e->location ); ?></span><?php endif; ?>
 					</div>
 					<a class="g2ab-ticket__cta" href="<?php echo esc_url( $v['url'] ); ?>"><?php echo esc_html( $v['cta'] ); ?> →</a>
@@ -216,6 +218,22 @@ final class G2AB_Frontend_Shortcode_Banner {
 
 	private function book_url( $event ) {
 		return home_url( '/event/' . $event->slug . '/' );
+	}
+
+	private function enqueue_assets() {
+		wp_enqueue_script( 'g2ab-event-banner', G2AB_URL . 'assets/js/event-banner.js', array(), G2AB_VERSION, true );
+		if ( function_exists( 'wp_script_add_data' ) ) {
+			wp_script_add_data( 'g2ab-event-banner', 'defer', true );
+		}
+		if ( ! $this->script_configured ) {
+			$this->script_configured = true;
+			wp_localize_script( 'g2ab-event-banner', 'G2ABEventBannerConfig', array(
+				'restUrl'      => esc_url_raw( rest_url( G2AB_REST_NAMESPACE . '/' ) ),
+				'startedLabel' => __( 'EVENT STARTED', 'g2a-booking' ),
+				'soldOutLabel' => __( 'Sold out', 'g2a-booking' ),
+				'leftLabel'    => __( 'left', 'g2a-booking' ),
+			) );
+		}
 	}
 
 	/* ───────────────────────── Styles + countdown JS ───────────────────────── */
@@ -307,24 +325,6 @@ final class G2AB_Frontend_Shortcode_Banner {
 		.g2ab-banr--empty{padding:30px;background:#26252C;color:#A7A6AE;text-align:center;border-left:3px solid #E8802F;border-radius:10px;}
 		@media (prefers-reduced-motion: reduce){.g2ab-banr,.g2ab-banr__glow{animation:none;}}
 		</style>
-		<script id="g2ab-banr-js">
-		(function(){
-			document.querySelectorAll('[data-g2ab-countdown]').forEach(function(el){
-				if (el.dataset.cdBooted) return; el.dataset.cdBooted='1';
-				var ts = parseInt(el.getAttribute('data-g2ab-countdown'), 10) * 1000;
-				function tick(){
-					var d = ts - Date.now(); if(d < 0) d = 0;
-					var pad = function(n){return n<10?'0'+n:''+n;};
-					var dd=el.querySelector('[data-d]'),hh=el.querySelector('[data-h]'),mm=el.querySelector('[data-m]'),ss=el.querySelector('[data-s]');
-					if(dd) dd.textContent=pad(Math.floor(d/86400000));
-					if(hh) hh.textContent=pad(Math.floor((d%86400000)/3600000));
-					if(mm) mm.textContent=pad(Math.floor((d%3600000)/60000));
-					if(ss) ss.textContent=pad(Math.floor((d%60000)/1000));
-				}
-				tick(); setInterval(tick, 1000);
-			});
-		})();
-		</script>
 		<?php
 	}
 }
