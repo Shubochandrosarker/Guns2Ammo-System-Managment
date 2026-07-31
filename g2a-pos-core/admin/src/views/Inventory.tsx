@@ -53,8 +53,10 @@ export default function Inventory() {
     setLoading(true);
     setErr('');
     try {
-      const r = await get<{ results: Product[] }>('/products/search', { q });
-      setRows(r.results || []);
+      // ProductController::search returns { items: [...] }. Reading `results`
+      // here meant inventory search always came back empty.
+      const r = await get<{ items: Product[] }>('/products/search', { q });
+      setRows(r.items || []);
     } catch (e) { setErr(errorMessage(e)); }
     finally { setLoading(false); }
   };

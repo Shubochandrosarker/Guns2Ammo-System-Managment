@@ -222,7 +222,9 @@ final class Routes {
 			array(
 				'methods'             => 'POST',
 				'callback'            => array( PaymentController::class, 'collect' ),
-				'permission_callback' => static fn() => current_user_can( 'g2a_pos_manage_register' ) || current_user_can( 'g2a_pos_process_firearm_sale' ),
+				// g2a_pos_take_payment added in 3.4.0 — see Roles::CAPS. Purely
+				// additive; the two original capabilities still grant access.
+				'permission_callback' => static fn() => current_user_can( 'g2a_pos_manage_register' ) || current_user_can( 'g2a_pos_process_firearm_sale' ) || current_user_can( 'g2a_pos_take_payment' ),
 			)
 		);
 		register_rest_route(
@@ -271,7 +273,9 @@ final class Routes {
 			array(
 				'methods'             => 'POST',
 				'callback'            => array( TenderController::class, 'add' ),
-				'permission_callback' => static fn() => current_user_can( 'g2a_pos_manage_register' ) || current_user_can( 'g2a_pos_process_firearm_sale' ),
+				// g2a_pos_take_payment added in 3.4.0 — see Roles::CAPS. Voids
+				// and refunds below deliberately stay manager-only.
+				'permission_callback' => static fn() => current_user_can( 'g2a_pos_manage_register' ) || current_user_can( 'g2a_pos_process_firearm_sale' ) || current_user_can( 'g2a_pos_take_payment' ),
 			)
 		);
 		register_rest_route(
@@ -1334,6 +1338,17 @@ final class Routes {
 			)
 		);
 
+		// The list handler existed but was never routed, so the Distributors
+		// screen 404'd on load in both front-ends while POST/PUT worked.
+		register_rest_route(
+			'g2a-pos/v1',
+			'/inventory/distributors',
+			array(
+				'methods'             => 'GET',
+				'callback'            => array( InventoryImportController::class, 'distributors' ),
+				'permission_callback' => static fn() => current_user_can( 'g2a_pos_access' ),
+			)
+		);
 		register_rest_route(
 			'g2a-pos/v1',
 			'/inventory/distributors',

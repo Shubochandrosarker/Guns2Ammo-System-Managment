@@ -26,5 +26,18 @@ export default defineConfig({
     // auth implementation (auth plan risk R6 / decision D7).
     sourcemap: false,
     target: 'es2020',
+    rollupOptions: {
+      output: {
+        // Pages are already route-split, but everything they share landed in
+        // one ~595KB entry chunk that changes on every application edit —
+        // so each deploy re-downloaded React and Recharts too. Splitting the
+        // two big third-party trees out lets them stay in cache across
+        // deploys, which is what actually matters on shop wifi.
+        manualChunks: {
+          react: ['react', 'react-dom', 'react-router-dom'],
+          charts: ['recharts'],
+        },
+      },
+    },
   },
 })

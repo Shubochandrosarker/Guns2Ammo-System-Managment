@@ -20,8 +20,10 @@ export default function Registers() {
   useEffect(() => {
     (async () => {
       try {
-        const r = await get<{ sessions: Session[] }>('/register/open-list');
-        setRows(r.sessions || []);
+        // RegisterController::open_list returns { items: [...] }. Reading
+        // `sessions` here produced an empty list on every load, silently.
+        const r = await get<{ items: Session[] }>('/register/open-list');
+        setRows(r.items || []);
       } finally { setLoading(false); }
     })();
   }, []);

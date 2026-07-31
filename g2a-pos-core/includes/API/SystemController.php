@@ -41,9 +41,17 @@ final class SystemController {
 			);
 		}
 
+		// plugin_version is the code that is running; db_version is the schema
+		// the migrator last finished. They are normally equal — when they are
+		// not, the plugin files were updated but the migration has not run yet,
+		// and a client that shows only one of them reports a half-truth.
+		$db_version = (string) get_option( 'g2a_pos_core_db_version' );
+
 		return array(
 			'ok'                   => ! in_array( false, $checks, true ),
-			'db_version'           => get_option( 'g2a_pos_core_db_version' ),
+			'plugin_version'       => G2A_POS_CORE_VERSION,
+			'db_version'           => $db_version,
+			'migration_pending'    => $db_version !== G2A_POS_CORE_VERSION,
 			'tables'               => $checks,
 			'wholesaler_integrity' => array(
 				'ok'     => empty( $integrity_issues ),

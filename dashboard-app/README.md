@@ -74,15 +74,57 @@ UI divides by 100 when rendering.
 
 ### Auth against a live WordPress
 
-Sign-in expects a **WordPress application password** (created from a WP user's
-profile → Application Passwords screen). The frontend stores
-`base64(email:appPassword)` in `localStorage` and sends it as
-`Authorization: Basic …` on every request. The plugin validates the
-credential and requires the user to hold the `g2a_dashboard` capability.
+**This section previously described Basic auth with an application password
+kept in `localStorage`. That is not what the app does, and it is the opposite
+of what it does.** The implemented contract (see the header of
+`src/lib/api.ts`) is:
 
-The regular WP account password is deliberately NOT accepted — application
-passwords are individually revocable without disturbing the operator's main
-login.
+- The session credential is an **HttpOnly cookie** the server sets on
+  `POST /auth/session/login`. JavaScript never reads, writes or stores it —
+  every request simply carries it via `credentials: 'include'`.
+- A per-session **CSRF token** comes back in the login/session JSON and is
+  held **in module memory only** — never `localStorage`, never
+  `sessionStorage`. Every non-GET request sends it as `X-G2A-CSRF`.
+- `401` anywhere clears client auth state and routes to `/login`. A `403`
+  with code `g2aba_csrf_failed` re-hydrates the token once via
+  `GET /auth/session` and retries the request exactly once.
+
+The cookie being same-origin is why nginx proxies `/wp-json/g2a/v1/` rather
+than the app calling `guns2ammo.com` directly — a cross-origin request would
+not carry it.
+
+## Testing
+
+```bash
+npm test
+```
+
+`scripts/run-tests.mjs` bundles every `src/**/*.test.ts` with esbuild (already
+a Vite dependency — no test framework is installed) and runs it. It exits
+non-zero if it finds no test files, so an empty suite cannot masquerade as a
+pass.
+
+Current coverage is the envelope transport in `src/lib/api.ts`: a `200` that
+carries `success:false`, a `200` that is not an envelope at all, structured
+errors recovered from non-2xx bodies, and content-list pagination. That last
+one caught a live bug — `Number(null)` is `0`, so a missing `X-WP-Total`
+header was being read as "0 results" instead of falling back to the item
+count.
+
+## Deploying
+
+```bash
+./deploy/deploy.sh deploy      # ten steps, atomic release, auto-rollback
+./deploy/deploy.sh rollback    # instant, to the previous release
+```
+
+Preflight runs before anything is built: lockfile present, API base set and
+of a valid shape. After the build it refuses to ship source maps, refuses a
+bundle containing the dev fixtures (via a tripwire token that exists only in
+`src/mocks/data.ts`), and requires the API base to actually appear in the
+bundle. After the atomic switch it checks `/healthz` for the new release id
+and then probes the API through the nginx proxy — a `404` there means every
+screen would be empty even though the files are being served.
 
 ## Build order (matches the plan)
 

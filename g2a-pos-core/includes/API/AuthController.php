@@ -3,6 +3,7 @@
 namespace G2A\POS\API;
 
 use G2A\POS\Auth\JWT;
+use G2A\POS\Permissions\Roles;
 use WP_REST_Request;
 
 final class AuthController {
@@ -65,14 +66,28 @@ final class AuthController {
 	private static function issue_response( int $user_id ): array {
 		$user = get_userdata( $user_id );
 
+		// Report the running plugin version and the caller's actual
+		// capabilities. A cross-origin client cannot read either off the page
+		// the way the wp-admin SPA can, and it must not infer permission from
+		// role names — roles are editable per site, whereas capabilities are
+		// what the REST routes actually check.
+		$caps = array();
+		foreach ( Roles::all_caps() as $cap ) {
+			if ( user_can( $user_id, $cap ) ) {
+				$caps[] = $cap;
+			}
+		}
+
 		return array(
-			'token'      => JWT::issue_token( $user_id, self::TOKEN_TTL ),
-			'user_id'    => $user_id,
-			'expires_in' => self::TOKEN_TTL,
-			'user'       => array(
-				'id'    => $user_id,
-				'name'  => $user ? $user->display_name : '',
-				'roles' => $user ? array_values( (array) $user->roles ) : array(),
+			'token'          => JWT::issue_token( $user_id, self::TOKEN_TTL ),
+			'user_id'        => $user_id,
+			'expires_in'     => self::TOKEN_TTL,
+			'plugin_version' => G2A_POS_CORE_VERSION,
+			'user'           => array(
+				'id'           => $user_id,
+				'name'         => $user ? $user->display_name : '',
+				'roles'        => $user ? array_values( (array) $user->roles ) : array(),
+				'capabilities' => $caps,
 			),
 		);
 	}
