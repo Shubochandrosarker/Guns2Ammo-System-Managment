@@ -449,6 +449,17 @@ window.addEventListener('load', function () {
 			$status_label = $labels[ $row->status ] ?? $row->status;
 		}
 		$balance = max( 0, round( (float) $row->total_amount - (float) $row->paid_amount, 2 ) );
+
+		// Surface the advisory membership hint so the desk knows to check ID and
+		// apply the member rate before taking payment. Set when a logged-out
+		// booking's email matched an active membership — we can't trust a typed
+		// address enough to discount automatically, but staff can verify it.
+		$meta         = ! empty( $row->metadata ) ? json_decode( (string) $row->metadata, true ) : array();
+		$hint         = ( is_array( $meta ) && ! empty( $meta['membership_hint'] ) && is_array( $meta['membership_hint'] ) )
+			? $meta['membership_hint']
+			: array();
+		$needs_rate   = ! empty( $hint['needs_desk_rate'] );
+
 		return array(
 			'id'                => (int) $row->id,
 			'uuid'              => $row->uuid,
@@ -480,6 +491,8 @@ window.addEventListener('load', function () {
 			'checkin_note'      => $row->checkin_note ?? '',
 			'notes'             => $row->notes,
 			'source'            => $row->source,
+			'member_rate_check' => $needs_rate,
+			'member_hint_label' => (string) ( $hint['label'] ?? '' ),
 		);
 	}
 }

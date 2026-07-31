@@ -22,6 +22,7 @@ final class Booking_Engine {
 		add_filter( 'memberistic_booking_discount', array( self::class, 'booking_discount' ), 10, 3 );
 		add_action( 'memberistic_booking_recorded', array( self::class, 'record_booking_activity' ), 10, 3 );
 		add_filter( 'g2ab_user_is_member', array( self::class, 'g2ab_user_is_member' ), 10, 4 );
+		add_filter( 'g2ab_advisory_membership_hint', array( self::class, 'g2ab_advisory_membership_hint' ), 10, 2 );
 		add_filter( 'g2ab_booking_pricing', array( self::class, 'g2ab_booking_pricing' ), 10, 5 );
 		add_filter( 'g2ab_booking_display_pricing', array( self::class, 'g2ab_booking_pricing' ), 10, 4 );
 		add_action( 'g2ab_booking_created', array( self::class, 'g2ab_booking_created' ), 10, 2 );
@@ -65,6 +66,33 @@ final class Booking_Engine {
 		return (bool) $allowed;
 	}
 
+	/**
+	 * Tell the booking engine that a typed email MAY belong to an active
+	 * member, without granting anything.
+	 *
+	 * Audit C27 correctly stopped email-only matching from setting prices. But
+	 * the booking engine still needs to know a member might be on the other end,
+	 * so it can route them to the front desk instead of charging the walk-in
+	 * rate to a card. The hint carries no price and no access — only a flag and
+	 * a plan name for staff.
+	 *
+	 * @param array  $hint           Default hint.
+	 * @param string $customer_email Email typed into the booking form.
+	 * @return array
+	 */
+	public static function g2ab_advisory_membership_hint( $hint, $customer_email ) {
+		$membership = self::get_active_membership_for_email( $customer_email );
+
+		if ( ! $membership ) {
+			return $hint;
+		}
+
+		return array(
+			'matched' => true,
+			'label'   => self::plan_name( $membership ),
+		);
+	}
+
 	public static function g2ab_booking_pricing( $pricing, $booking_type, $party_size, $user_id, $customer_email = '' ) {
 		// Audit C27: same fix as above — discount only applies to
 		// the LOGGED-IN member, not anyone who types a member's
@@ -76,6 +104,26 @@ final class Booking_Engine {
 		}
 
 		$subtotal = isset( $pricing['subtotal'] ) ? (float) $pricing['subtotal'] : ( (float) $booking_type->base_price * max( 1, (int) $party_size ) );
+
+		// A plan may INCLUDE a booking type outright (e.g. a Guest Pass bought
+		// annually at the counter that covers lane time). That is not the same
+		// as a 100% discount rule: it is an entitlement of the plan, so it
+		// applies even when no percentage rule was configured for this type.
+		if ( self::booking_type_is_included( $membership, $booking_type ) ) {
+			$pricing['discount_amount']         = $subtotal;
+			$pricing['total']                   = 0.0;
+			$pricing['member_discount_percent'] = 100.0;
+			$pricing['membership_level_id']     = (int) ( $membership['plan_id'] ?? 0 );
+			$pricing['membership_source']       = 'memberistic';
+			$pricing['discount_label']          = sprintf(
+				/* translators: %s: plan name */
+				__( 'Included with your %s membership', 'memberistic' ),
+				self::plan_name( $membership )
+			);
+
+			return $pricing;
+		}
+
 		$percent  = self::discount_percent_for_booking_type( $membership, $booking_type );
 
 		if ( $subtotal <= 0 || $percent <= 0 ) {
@@ -245,6 +293,56 @@ final class Booking_Engine {
 			),
 			ARRAY_A
 		) ?: array();
+	}
+
+	/**
+	 * Human-readable plan name for a membership row.
+	 */
+	private static function plan_name( $membership ) {
+		$plan = Plans_Repository::get( (int) ( $membership['plan_id'] ?? 0 ) );
+
+		return ( is_array( $plan ) && ! empty( $plan['name'] ) )
+			? (string) $plan['name']
+			: __( 'member', 'memberistic' );
+	}
+
+	/**
+	 * True when the plan INCLUDES this booking type outright.
+	 *
+	 * Configured on the plan as `settings.included_booking_types`, either a list
+	 * of booking type ids or the string 'all'. This is what a Guest Pass or an
+	 * unlimited-range plan needs: the member already paid for lane time (often
+	 * in store, at a custom price), so the booking must resolve to $0 rather
+	 * than relying on someone remembering to add a 100% discount rule for every
+	 * booking type.
+	 */
+	private static function booking_type_is_included( $membership, $booking_type ) {
+		$plan_id = isset( $membership['plan_id'] ) ? (int) $membership['plan_id'] : 0;
+
+		if ( ! $plan_id ) {
+			return false;
+		}
+
+		$plan     = Plans_Repository::get( $plan_id );
+		$settings = ( is_array( $plan ) && ! empty( $plan['settings'] ) ) ? json_decode( (string) $plan['settings'], true ) : array();
+
+		if ( ! is_array( $settings ) || empty( $settings['included_booking_types'] ) ) {
+			return false;
+		}
+
+		$included = $settings['included_booking_types'];
+
+		if ( 'all' === $included ) {
+			return true;
+		}
+
+		if ( ! is_array( $included ) ) {
+			return false;
+		}
+
+		$booking_type_id = isset( $booking_type->id ) ? (int) $booking_type->id : 0;
+
+		return $booking_type_id > 0 && in_array( $booking_type_id, array_map( 'absint', $included ), true );
 	}
 
 	private static function discount_percent_for_booking_type( $membership, $booking_type ) {

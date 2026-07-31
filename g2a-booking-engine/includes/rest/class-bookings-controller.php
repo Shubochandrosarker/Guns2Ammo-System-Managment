@@ -469,15 +469,36 @@ final class G2AB_REST_Bookings_Controller {
 		if ( empty( $booking_type->members_only ) ) {
 			return true;
 		}
-		$user_id = get_current_user_id();
+		$user_id = $this->authenticated_user_id();
 		$allowed = $this->is_active_member( $user_id );
 		return (bool) apply_filters( 'g2ab_user_is_member', $allowed, $user_id, $booking_type, $customer_email );
 	}
 
 	private function is_member_for_discount( $booking_type, $customer_email = '' ) {
-		$user_id   = get_current_user_id();
+		$user_id   = $this->authenticated_user_id();
 		$is_member = $this->is_active_member( $user_id );
 		return (bool) apply_filters( 'g2ab_user_is_member', $is_member, $user_id, $booking_type, $customer_email );
+	}
+
+	/**
+	 * Advisory-only membership lookup for a typed email.
+	 *
+	 * Returns a hint that the person booking MAY hold a membership, so the
+	 * front desk can apply the member rate after checking ID at check-in. This
+	 * deliberately does NOT change the price or grant access — it can't, safely,
+	 * because a typed address proves nothing (audit C27). It exists so a
+	 * logged-out member is never silently charged the walk-in rate by card.
+	 *
+	 * @return array{matched:bool,label:string}
+	 */
+	private function advisory_membership_hint( $customer_email ) {
+		$hint = array( 'matched' => false, 'label' => '' );
+
+		if ( ! is_email( $customer_email ) ) {
+			return $hint;
+		}
+
+		return (array) apply_filters( 'g2ab_advisory_membership_hint', $hint, $customer_email );
 	}
 
 	private function payment_modes_for_type( $booking_type ) {
@@ -532,8 +553,34 @@ final class G2AB_REST_Bookings_Controller {
 		return $fallback ?: null;
 	}
 
-	private function prefer_stripe_for_public_payment( $gateway, $gateway_id, $booking_type ) {
+	/**
+	 * Optionally force a public (walk-in) booking onto Stripe.
+	 *
+	 * This used to be unconditional, which is why EVERY public lane booking
+	 * minted a Stripe Checkout Session up front — including for members and for
+	 * customers who never intended to pay online — leaving a long tail of
+	 * abandoned `open` attempts. Prepay is now opt-in per site via
+	 * `g2ab_require_public_prepay` (default off: reserve now, pay at the range),
+	 * and is always skipped when the booking still needs a front-desk rate
+	 * decision.
+	 */
+	/**
+	 * Whether a public (walk-in) booking must be paid by card before the lane is
+	 * held. Off by default: reserve now, settle at the front desk.
+	 */
+	private function public_prepay_required( $booking_type ) {
+		return (bool) apply_filters(
+			'g2ab_require_public_prepay',
+			1 === (int) get_option( 'g2ab_require_public_prepay', 0 ),
+			$booking_type
+		);
+	}
+
+	private function prefer_stripe_for_public_payment( $gateway, $gateway_id, $booking_type, $needs_desk_rate = false ) {
 		if ( $gateway_id || ! class_exists( 'G2AB_Gateway_Manager' ) || ! empty( $booking_type->members_only ) ) {
+			return $gateway;
+		}
+		if ( $needs_desk_rate || ! $this->public_prepay_required( $booking_type ) ) {
 			return $gateway;
 		}
 		$mgr    = G2AB_Gateway_Manager::instance();
@@ -564,6 +611,22 @@ final class G2AB_REST_Bookings_Controller {
 	 * (account takeover via email-guessing). For new users we create the account but
 	 * do NOT log them in here; password is delivered via wp_new_user_notification.
 	 */
+	/**
+	 * Resolve the user record a booking should be ATTRIBUTED to.
+	 *
+	 * Attribution is deliberately separate from entitlement. This may match an
+	 * existing account by the typed email so the booking lands on the right
+	 * customer record, front-desk history, and CRM — but the returned id must
+	 * NEVER be used to grant member pricing or members-only access on its own.
+	 * Use authenticated_user_id() for that. See the class docblock on
+	 * calculate_pricing() for why the two are kept apart (audit C27).
+	 *
+	 * No account is created here: since 1.9.9.17 provisioning is deferred until
+	 * the reservation is actually committed (free / pay-in-store) or an online
+	 * payment is verified, so an abandoned checkout never leaves a stray user.
+	 *
+	 * @return int User id, or 0 when the customer has no account yet.
+	 */
 	private function ensure_customer_user( $customer_name, $customer_email, $customer_phone ) {
 		$current_user_id = get_current_user_id();
 		if ( $current_user_id ) {
@@ -571,55 +634,27 @@ final class G2AB_REST_Bookings_Controller {
 			return (int) $current_user_id;
 		}
 
-		return 0;
-
 		$existing = get_user_by( 'email', $customer_email );
 		if ( $existing instanceof WP_User ) {
-			// Do NOT auto-login. Attach the booking to the existing user only.
-			update_user_meta( $existing->ID, 'billing_phone', $customer_phone );
+			// Attribution only. Do NOT auto-login, and do NOT treat this as proof
+			// the visitor IS this person — they merely typed the address.
 			update_user_meta( $existing->ID, 'g2ab_last_booking_contact_phone', $customer_phone );
 			return (int) $existing->ID;
 		}
 
-		$name_parts = $this->split_customer_name( $customer_name );
-		$base_login = sanitize_user( current( explode( '@', $customer_email ) ), true );
-		if ( '' === $base_login ) {
-			$base_login = 'g2a_customer';
-		}
+		return 0;
+	}
 
-		$user_login = $base_login;
-		$suffix     = 1;
-		while ( username_exists( $user_login ) ) {
-			$user_login = $base_login . $suffix;
-			$suffix++;
-		}
-
-		$password = wp_generate_password( 20, true, true );
-		$user_id  = wp_insert_user( array(
-			'user_login'   => $user_login,
-			'user_pass'    => $password,
-			'user_email'   => $customer_email,
-			'display_name' => $customer_name,
-			'first_name'   => $name_parts['first_name'],
-			'last_name'    => $name_parts['last_name'],
-			'role'         => 'subscriber',
-		) );
-
-		if ( is_wp_error( $user_id ) ) {
-			return $user_id;
-		}
-
-		update_user_meta( $user_id, 'billing_first_name', $name_parts['first_name'] );
-		update_user_meta( $user_id, 'billing_last_name', $name_parts['last_name'] );
-		update_user_meta( $user_id, 'billing_email', $customer_email );
-		update_user_meta( $user_id, 'billing_phone', $customer_phone );
-		update_user_meta( $user_id, 'g2ab_customer_created_from_booking', current_time( 'mysql' ) );
-
-		// Email the password-set link. No session is established — the customer
-		// must set their own password if they want to log in.
-		wp_new_user_notification( $user_id, null, 'user' );
-
-		return (int) $user_id;
+	/**
+	 * The user id that may be trusted for ENTITLEMENT decisions — member
+	 * pricing, members-only access. Only a real authenticated session counts.
+	 *
+	 * Audit C27: matching on a typed email let anyone who knew a member's
+	 * address book at member rates. Logged-out members are handled instead by
+	 * the pay-at-range path, where staff verify membership at check-in.
+	 */
+	private function authenticated_user_id() {
+		return (int) get_current_user_id();
 	}
 
 	public function create_booking( WP_REST_Request $request ) {
@@ -765,10 +800,20 @@ final class G2AB_REST_Bookings_Controller {
 		}
 		$user_id = (int) $user_id;
 
-		$pricing         = $this->calculate_pricing( $booking_type, $party_size, $user_id, $customer_email );
+		// Entitlement (member pricing / members-only) is resolved from the
+		// AUTHENTICATED session only — never from $user_id, which may have been
+		// matched from a typed email for attribution. See ensure_customer_user().
+		$pricing         = $this->calculate_pricing( $booking_type, $party_size, $this->authenticated_user_id(), $customer_email );
 		$subtotal        = (float) $pricing['subtotal'];
 		$discount_amount = (float) $pricing['discount_amount'];
 		$total           = (float) $pricing['total'];
+
+		// A logged-out member typing their own address gets no automatic
+		// discount (it can't be trusted), but we must not silently charge them
+		// the walk-in rate by card either. Flag it and let the front desk settle
+		// the correct rate at check-in.
+		$membership_hint = $this->advisory_membership_hint( $customer_email );
+		$needs_desk_rate = empty( $pricing['membership_source'] ) && ! empty( $membership_hint['matched'] );
 
 		// ─── Gateway selection ──────────────────────────────────────────────
 		$gateway = null;
@@ -783,11 +828,30 @@ final class G2AB_REST_Bookings_Controller {
 			if ( ! $gateway ) {
 				$gateway = $mgr->pick_for_type( $booking_type );
 			}
-			$gateway = $this->prefer_stripe_for_public_payment( $gateway, $gateway_id, $booking_type );
+			$gateway = $this->prefer_stripe_for_public_payment( $gateway, $gateway_id, $booking_type, $needs_desk_rate );
 		}
 		$gateway_used_id = ( $gateway && method_exists( $gateway, 'id' ) ) ? $gateway->id() : 'pay_in_store';
 
 		$modes = $this->payment_modes_for_type( $booking_type );
+
+		// Walk-in lane types are frequently configured card-only, which is what
+		// forced every public booking through Stripe: with no `in_store` mode
+		// there was no other branch to fall into, so an abandoned form left an
+		// `open` checkout attempt behind. Unless the site explicitly requires
+		// prepay, a public booking may always settle at the front desk. The same
+		// applies when the email matched a membership we couldn't verify — that
+		// customer must reach the desk rather than be charged the walk-in rate.
+		$allow_desk_settlement = empty( $booking_type->members_only )
+			&& empty( $gateway_id )
+			&& ( $needs_desk_rate || ! $this->public_prepay_required( $booking_type ) );
+
+		if ( $allow_desk_settlement ) {
+			if ( ! in_array( 'in_store', $modes, true ) ) {
+				$modes[] = 'in_store';
+			}
+			$gateway_used_id = 'pay_in_store';
+		}
+
 		if ( $total <= 0 || ( in_array( 'free', $modes, true ) && $total <= 0 ) ) {
 			$payment_mode    = 'free';
 			$due_now         = 0.0;
@@ -915,6 +979,14 @@ final class G2AB_REST_Bookings_Controller {
 					'source'   => $pricing['membership_source'],
 					'level_id' => $pricing['membership_level_id'],
 					'percent'  => $pricing['member_discount_percent'],
+				),
+				// Advisory only — a typed email matched an active membership but
+				// the visitor wasn't logged in, so no discount was applied. The
+				// front desk verifies ID and settles the member rate at check-in.
+				'membership_hint' => array(
+					'matched'          => ! empty( $membership_hint['matched'] ),
+					'label'            => (string) ( $membership_hint['label'] ?? '' ),
+					'needs_desk_rate'  => (bool) $needs_desk_rate,
 				),
 			) ),
 			'waiver_signed'    => $waiver_ok ? 1 : 0,

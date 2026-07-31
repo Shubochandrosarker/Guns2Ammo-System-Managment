@@ -41,16 +41,19 @@ final class G2AB_Booking_Expiry_Cron
 		$cutoff = gmdate('Y-m-d H:i:s', current_time('timestamp') - $hold_minutes * MINUTE_IN_SECONDS); // phpcs:ignore WordPress.DateTime.CurrentTimeTimestamp.Requested
 		$now    = current_time('mysql');
 
+		// Note: no `start_at >= now` filter. Restricting expiry to future slots
+		// left every abandoned hold whose slot had since passed stuck in
+		// `pending` forever, silently inflating the Checkout Attempts screen and
+		// the pending-revenue figures. A hold is stale once the window lapses,
+		// whether or not its slot is still ahead of us.
 		$stale = $wpdb->get_results($wpdb->prepare(
 			"SELECT id, uuid, status, payment_mode, start_at FROM {$bookings_table}
 			 WHERE status IN ('pending','reserved')
 			 AND payment_mode IN ('full','deposit')
 			 AND paid_amount <= 0
 			 AND created_at <= %s
-			 AND start_at >= %s
 			 LIMIT 200",
-			$cutoff,
-			$now
+			$cutoff
 		));
 
 		if (empty($stale)) {

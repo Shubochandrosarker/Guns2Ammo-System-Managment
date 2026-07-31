@@ -117,6 +117,7 @@ final class Plugin {
 		add_action( Payments\Stripe_Service::CANCEL_RETRY_HOOK, array( Payments\Stripe_Service::class, 'run_cancel_retry' ), 10, 2 );
 		add_action( 'admin_notices', array( Payments\Stripe_Service::class, 'render_cancel_failure_notice' ) );
 		add_action( 'admin_notices', array( Payments\Stripe_Service::class, 'render_webhook_health_notice' ) );
+		add_action( 'admin_init', array( Payments\Stripe_Service::class, 'handle_webhook_notice_dismissal' ) );
 		add_action( 'admin_menu', array( Admin\Admin_Menu::class, 'register' ) );
 		add_action( 'admin_init', array( Installer::class, 'maybe_upgrade' ) );
 		add_action( 'admin_init', array( Admin\Settings_Page::class, 'register_settings' ) );

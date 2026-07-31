@@ -4,7 +4,7 @@ Tags: membership, operations, staff dashboard, stripe, woocommerce, rest api
 Requires at least: 6.0
 Requires PHP: 8.0
 Tested up to: 6.7
-Stable tag: 1.18.5
+Stable tag: 1.18.6
 License: GPLv2 or later
 
 A modern membership operations engine for service businesses. Co-developed by WordPressistic and launch partner Guns 2 Ammo (https://guns2ammo.com).
@@ -73,6 +73,13 @@ See CHANGELOG.md for the full history.
 Note: the plugin's version numbering was reset after 1.46.1 back to a 1.9.9.x line. Entries below are in release order (newest first), so 1.46.1 and the earlier "legacy line" 1.10.0 release predate the 1.9.9.2–1.12.0 entries above them.
 
 Note: entries for 1.14.0–1.18.0 (the native waiver e-signature engine, kiosk mode, dashboard Waivers page, and SMS automations) are not yet documented here — see CHANGELOG.md and the merged PR history in the meantime.
+
+= 1.18.6 =
+* Admin menu now always reads "Memberistic" instead of the customer-facing brand label, so shortening the brand for emails no longer renames the whole admin menu.
+* Customer-facing branding (emails, waivers, PDFs, member portal) now prefers the Business name setting over the shorthand brand label, so customers see the full business name rather than an abbreviation.
+* The Stripe webhook health notice is now dismissible and only appears on the WordPress dashboard and Memberistic screens — it previously rendered on every admin page, including other plugins' dashboards, with no way to dismiss it. It also links straight to the payments screen, and returns automatically if the underlying problem changes.
+* New: plans can mark booking types as included outright (`settings.included_booking_types`), so a Guest Pass bought at the counter resolves lane bookings to $0 without needing a 100% discount rule per booking type.
+* New: `g2ab_advisory_membership_hint` tells the booking engine a typed email may belong to a member — without granting a discount — so the front desk can verify ID and apply the member rate.
 
 = 1.18.5 =
 * Hotfix: checkout advisory lock names are now hashed and capped at MySQL's 64-character limit, preventing false "Checkout is busy" failures before Stripe is contacted.
