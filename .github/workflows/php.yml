@@ -1,5 +1,14 @@
 name: PHP Composer
 
+# Runner selection is a repository variable, not a code change:
+#   RUNNER_LABEL unset  -> GitHub-hosted (ubuntu-latest), metered minutes
+#   RUNNER_LABEL = g2a  -> the self-hosted runner on server.wpistic.cloud
+# See docs/SELF-HOSTED-RUNNER.md.
+#
+# ubuntu-latest stays the default deliberately: naming a self-hosted label
+# directly would make every job queue indefinitely whenever the runner is
+# offline, which is harder to spot than a red check.
+
 on:
   push:
     branches: [ "main" ]
@@ -38,7 +47,7 @@ permissions:
 jobs:
   lint:
     name: PHP syntax lint (all plugins)
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.RUNNER_LABEL || 'ubuntu-latest' }}
     timeout-minutes: 10
     steps:
     - uses: actions/checkout@v4
@@ -58,7 +67,7 @@ jobs:
 
   composer:
     name: Validate composer projects
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.RUNNER_LABEL || 'ubuntu-latest' }}
     timeout-minutes: 10
     strategy:
       fail-fast: false
