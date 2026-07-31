@@ -28,7 +28,9 @@ final class G2AB_Booking_Expiry_Cron
 	{
 		global $wpdb;
 
-		$hold_minutes = (int) get_option('g2ab_reservation_hold_minutes', 15);
+		$hold_minutes = class_exists('G2AB_Event_Capacity_Service')
+			? G2AB_Event_Capacity_Service::hold_minutes()
+			: (int) apply_filters('g2ab_event_hold_minutes', get_option('g2ab_reservation_hold_minutes', 15));
 		if ($hold_minutes < 1) {
 			return 0;
 		}

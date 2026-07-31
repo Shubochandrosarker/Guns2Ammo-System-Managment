@@ -205,8 +205,8 @@ final class G2AB_Seo {
 		// page-title hero can never bleed through and muddy the text.
 		if ( 'light' === $theme ) {
 			$bg = '#F6F7FA'; $surface = '#FFFFFF'; $surface2 = '#F0F3F8'; $border = '#E3E8F0';
-			$text = '#161B22'; $muted = '#5B6678'; $heroBg = 'linear-gradient(180deg,#FFFFFF 0%,#F1F4F9 100%)';
-			$heroText = '#13181F'; $heroSub = '#4A5568'; $statBg = '#FFFFFF'; $green = '#1F9E54';
+			$text = '#161B22'; $muted = '#5B6678'; $heroBg = 'linear-gradient(145deg,#090B0F 0%,#171B22 62%,#0E1117 100%)';
+			$heroText = '#FFFFFF'; $heroSub = '#D6DEE8'; $statBg = '#15191F'; $green = '#1F9E54';
 		} else {
 			$bg = '#0B0D11'; $surface = '#15191F'; $surface2 = '#1C2229'; $border = '#2A323D';
 			$text = '#EDEFF2'; $muted = '#9AA4B2'; $heroBg = 'linear-gradient(160deg,#0B0D11 0%,#161B22 60%,#0B0D11 100%)';
@@ -218,7 +218,7 @@ final class G2AB_Seo {
 		.g2ab-elp *{box-sizing:border-box;}
 		.g2ab-elp__hero{position:relative;background:<?php echo $has_img ? "url('" . esc_url( $ev->image_url ) . "') center/cover" : $heroBg; // phpcs:ignore ?>;padding:0;border-bottom:3px solid var(--accent);overflow:hidden;}
 		.g2ab-elp__hero-scrim{position:relative;<?php if ( $has_img ) : ?>background:linear-gradient(180deg,rgba(8,10,14,.62),rgba(8,10,14,.82));<?php endif; ?>padding:74px 20px 64px;text-align:center;}
-		<?php if ( $has_img ) : ?>.g2ab-elp__hero .g2ab-elp__title{color:#fff;}.g2ab-elp__hero .g2ab-elp__summary{color:#E6EAF0;}.g2ab-elp__hero .g2ab-elp__stat{background:rgba(255,255,255,.12);border-color:rgba(255,255,255,.22);}.g2ab-elp__hero .g2ab-elp__stat-k{color:#D7DEE8;}.g2ab-elp__hero .g2ab-elp__stat-v{color:#fff;}.g2ab-elp__hero .g2ab-elp__flag{color:#E6EAF0;border-color:rgba(255,255,255,.3);}<?php endif; ?>
+		.g2ab-elp__hero .g2ab-elp__title{color:#fff;}.g2ab-elp__hero .g2ab-elp__summary{color:#E6EAF0;}.g2ab-elp__hero .g2ab-elp__stat{background:rgba(21,25,31,.94);border-color:rgba(255,255,255,.18);box-shadow:0 18px 44px rgba(0,0,0,.26);}.g2ab-elp__hero .g2ab-elp__stat-k{color:#C9D2DE;}.g2ab-elp__hero .g2ab-elp__stat-v{color:#fff;}.g2ab-elp__hero .g2ab-elp__flag{background:rgba(21,25,31,.82);color:#E6EAF0;border-color:rgba(255,255,255,.24);}
 		.g2ab-elp__hero-inner{position:relative;max-width:900px;margin:0 auto;}
 		.g2ab-elp__eyebrow{display:inline-flex;align-items:center;gap:8px;color:var(--accent);font-family:'Inter','Segoe UI',system-ui,-apple-system,sans-serif;font-size:13px;font-weight:700;letter-spacing:.26em;text-transform:uppercase;margin-bottom:14px;opacity:0;animation:g2ab-elp-up .6s ease .05s forwards;}
 		.g2ab-elp__eyebrow::before,.g2ab-elp__eyebrow::after{content:"";width:26px;height:2px;background:var(--accent);opacity:.7;}
@@ -242,6 +242,19 @@ final class G2AB_Seo {
 		.g2ab-elp__body h2::before{content:"";width:26px;height:3px;background:var(--accent);border-radius:2px;}
 		.g2ab-elp__desc{color:var(--muted);font-size:15.5px;line-height:1.78;}
 		.g2ab-elp__desc p{margin:0 0 14px;}
+		.g2ab-elp__detail-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;margin:24px 0 26px;}
+		@media (max-width:620px){.g2ab-elp__detail-grid{grid-template-columns:1fr;}}
+		.g2ab-elp__card{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:18px 18px 17px;box-shadow:0 14px 36px rgba(20,28,46,.08);animation:g2ab-elp-card .65s cubic-bezier(.16,.8,.3,1) both;transition:transform .18s ease,border-color .18s ease,box-shadow .18s ease;}
+		.g2ab-elp__card:nth-child(2){animation-delay:.05s}.g2ab-elp__card:nth-child(3){animation-delay:.1s}.g2ab-elp__card:nth-child(4){animation-delay:.15s}
+		.g2ab-elp__card:hover{transform:translateY(-3px);border-color:color-mix(in srgb,var(--accent) 48%,var(--border));box-shadow:0 18px 44px rgba(20,28,46,.12);}
+		.g2ab-elp__card-k{display:block;color:var(--accent);font-size:11px;font-weight:800;letter-spacing:.14em;text-transform:uppercase;margin-bottom:7px;}
+		.g2ab-elp__card-v{display:block;color:var(--text);font-size:18px;font-weight:800;line-height:1.22;}
+		.g2ab-elp__card p{margin:8px 0 0;color:var(--muted);font-size:13.5px;line-height:1.55;}
+		.g2ab-elp__notice{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin:0 0 26px;}
+		@media (max-width:760px){.g2ab-elp__notice{grid-template-columns:1fr;}}
+		.g2ab-elp__notice span{display:flex;align-items:center;gap:9px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:12px 14px;color:var(--text);font-size:13px;font-weight:700;}
+		.g2ab-elp__notice b{color:var(--accent);font-size:16px;}
+		@keyframes g2ab-elp-card{from{opacity:0;transform:translateY(14px);}to{opacity:1;transform:translateY(0);}}
 		.g2ab-elp__dates{margin-top:26px;}
 		.g2ab-elp__date-pill{display:inline-flex;align-items:baseline;gap:8px;background:var(--surface);border:1px solid var(--border);border-left:3px solid var(--accent);border-radius:8px;padding:8px 14px;margin:0 8px 8px 0;font-size:13px;color:var(--text);}
 		.g2ab-elp__date-pill b{font-family:'Inter','Segoe UI',system-ui,-apple-system,sans-serif;}
@@ -284,6 +297,33 @@ final class G2AB_Seo {
 						<h2><?php esc_html_e( 'About this event', 'g2a-booking' ); ?></h2>
 						<div class="g2ab-elp__desc"><?php echo wp_kses_post( wpautop( $ev->description ) ); ?></div>
 					<?php endif; ?>
+					<div class="g2ab-elp__detail-grid">
+						<article class="g2ab-elp__card">
+							<span class="g2ab-elp__card-k"><?php esc_html_e( 'Training format', 'g2a-booking' ); ?></span>
+							<span class="g2ab-elp__card-v"><?php echo esc_html( $cat ); ?></span>
+							<p><?php esc_html_e( 'Instructor-led session with clear safety expectations, practical guidance, and time for questions before you reserve.', 'g2a-booking' ); ?></p>
+						</article>
+						<article class="g2ab-elp__card">
+							<span class="g2ab-elp__card-k"><?php esc_html_e( 'Session length', 'g2a-booking' ); ?></span>
+							<span class="g2ab-elp__card-v"><?php echo (int) $ev->duration_min; ?> <?php esc_html_e( 'minutes', 'g2a-booking' ); ?></span>
+							<p><?php esc_html_e( 'Plan to arrive early enough for check-in, waiver review, and any range safety briefing.', 'g2a-booking' ); ?></p>
+						</article>
+						<article class="g2ab-elp__card">
+							<span class="g2ab-elp__card-k"><?php esc_html_e( 'Reservation cost', 'g2a-booking' ); ?></span>
+							<span class="g2ab-elp__card-v"><?php echo $is_free ? esc_html__( 'Free seat', 'g2a-booking' ) : '$' . esc_html( number_format( (float) $ev->price, 2 ) ) . ' / ' . esc_html__( 'seat', 'g2a-booking' ); ?></span>
+							<p><?php esc_html_e( 'Secure your spot online when checkout is enabled, or reserve for in-store handling when available.', 'g2a-booking' ); ?></p>
+						</article>
+						<article class="g2ab-elp__card">
+							<span class="g2ab-elp__card-k"><?php esc_html_e( 'Availability', 'g2a-booking' ); ?></span>
+							<span class="g2ab-elp__card-v"><?php echo $next ? esc_html( (int) $next->seats_left . ' ' . __( 'seats left', 'g2a-booking' ) ) : esc_html__( 'Dates coming soon', 'g2a-booking' ); ?></span>
+							<p><?php esc_html_e( 'Seat counts update live before checkout so the reservation form reflects current capacity.', 'g2a-booking' ); ?></p>
+						</article>
+					</div>
+					<div class="g2ab-elp__notice">
+						<span><b>1</b><?php esc_html_e( 'Choose a date and seat count.', 'g2a-booking' ); ?></span>
+						<span><b>2</b><?php echo (int) $ev->requires_waiver ? esc_html__( 'Accept the required waiver.', 'g2a-booking' ) : esc_html__( 'Enter your attendee details.', 'g2a-booking' ); ?></span>
+						<span><b>3</b><?php esc_html_e( 'Receive booking confirmation by email.', 'g2a-booking' ); ?></span>
+					</div>
 					<?php
 					$upcoming = G2AB_Events::get_occurrences( $ev->id, array( 'upcoming_only' => true, 'limit' => 8 ) );
 					if ( count( $upcoming ) > 1 ) : ?>

@@ -106,6 +106,7 @@ final class G2AB_Frontend_Shortcode_Event_Booking {
 				'submitting' => __( 'Reserving…', 'g2a-booking' ),
 				'failed'     => __( 'Could not complete your reservation. Please try again.', 'g2a-booking' ),
 				'waiver_req' => __( 'Please accept the waiver to continue.', 'g2a-booking' ),
+				'not_enough_seats' => __( 'Not enough seats left for this date. Please reduce the number of seats or pick another date.', 'g2a-booking' ),
 			),
 		);
 
@@ -326,15 +327,53 @@ final class G2AB_Frontend_Shortcode_Event_Booking {
 			}
 			function showStage(name){ $$('.g2ab-evb__stage').forEach(function(s){ s.classList.toggle('is-active', s.getAttribute('data-evb-stage')===name); }); }
 
+			function fetchOccurrences(){
+				if (!state.eventId) return Promise.resolve(null);
+				return fetch(cfg.rest_url + 'events/' + state.eventId + '/occurrences?_=' + Date.now(), { headers: headers(cfg.nonce), credentials:'same-origin', cache:'no-store' })
+					.then(function(r){ return r.json(); })
+					.then(function(j){ return j && j.success ? j.data : null; });
+			}
+
+			function applyOccurrenceUpdate(o){
+				if (!o) return null;
+				state.occ = o;
+				var f = fmtDate(o.start_at);
+				var btn = root.querySelector('[data-evb-occurrence-id="'+o.id+'"]');
+				if (btn) {
+					btn.disabled = !!o.sold_out;
+					var seat = btn.querySelector('.g2ab-evb__date-seats');
+					if (seat) {
+						seat.classList.toggle('is-out', !!o.sold_out);
+						seat.classList.toggle('is-low', !o.sold_out && o.seats_left <= 3);
+						seat.textContent = o.sold_out ? cfg.i18n.sold_out : (o.seats_left + ' ' + cfg.i18n.left);
+					}
+					var price = btn.querySelector('.g2ab-evb__date-price');
+					if (price) price.textContent = o.price_label;
+				}
+				goDetails(o, f);
+				document.dispatchEvent(new CustomEvent('g2ab:content-ready', { detail: { root: document } }));
+				return o;
+			}
+
+			function refreshSelectedOccurrence(){
+				if (!state.eventId || !state.occ) return Promise.resolve(state.occ);
+				var selectedId = parseInt(state.occ.id, 10);
+				return fetchOccurrences().then(function(data){
+					var occs = data && data.occurrences ? data.occurrences : [];
+					for (var i = 0; i < occs.length; i++) {
+						if (parseInt(occs[i].id, 10) === selectedId) return applyOccurrenceUpdate(occs[i]);
+					}
+					throw new Error(cfg.i18n.pick_date);
+				});
+			}
+
 			function loadOccurrences(){
 				var box = $('[data-evb-dates]'); var hint = $('[data-evb-hint]');
 				if (!state.eventId) { box.innerHTML=''; if (hint){ hint.textContent = cfg.i18n.pick_event; } return; }
 				if (hint) hint.textContent = cfg.i18n.loading;
 				box.innerHTML = '';
-				fetch(cfg.rest_url + 'events/' + state.eventId + '/occurrences', { headers: headers(cfg.nonce), credentials:'same-origin' })
-					.then(function(r){ return r.json(); })
-					.then(function(j){
-						var data = j && j.success ? j.data : null;
+				fetchOccurrences()
+					.then(function(data){
 						if (!data) { if (hint) hint.textContent = cfg.i18n.no_dates; return; }
 						state.requiresWaiver = !!(data.event && data.event.requires_waiver);
 						var occs = data.occurrences || [];
@@ -344,6 +383,7 @@ final class G2AB_Frontend_Shortcode_Event_Booking {
 							var f = fmtDate(o.start_at);
 							var btn = document.createElement('button');
 							btn.type = 'button'; btn.className = 'g2ab-evb__date'; btn.disabled = !!o.sold_out;
+							btn.setAttribute('data-evb-occurrence-id', o.id);
 							var seatCls = o.sold_out ? 'is-out' : (o.seats_left <= 3 ? 'is-low' : '');
 							var seatTxt = o.sold_out ? cfg.i18n.sold_out : (o.seats_left + ' ' + cfg.i18n.left);
 							btn.innerHTML = '<span class="g2ab-evb__date-day">'+f.day+'</span>'
@@ -394,13 +434,18 @@ final class G2AB_Frontend_Shortcode_Event_Booking {
 				}
 				if (err) err.hidden = true;
 				if (btn) btn.disabled = true; if (lbl) lbl.textContent = cfg.i18n.submitting;
-				var payload = JSON.stringify({ occurrence_id: state.occ.id, seats: seats, fields: fields });
 				function post(nonce){
+					var payload = JSON.stringify({ occurrence_id: state.occ.id, seats: seats, fields: fields });
 					return fetch(cfg.rest_url + 'events/book', { method:'POST', headers: headers(nonce), credentials:'same-origin', body: payload })
 						.then(function(r){ return r.json().then(function(j){ return {ok:r.ok,status:r.status,body:j}; }, function(){ return {ok:r.ok,status:r.status,body:null}; }); });
 				}
 				function isStale(res){ return res && res.status===403 && res.body && (res.body.code==='g2ab_invalid_nonce' || res.body.code==='rest_cookie_invalid_nonce'); }
-				post(cfg.nonce).then(function(res){
+				refreshSelectedOccurrence().then(function(fresh){
+					if (!fresh || fresh.sold_out || seats > parseInt(fresh.seats_left, 10)) {
+						throw new Error(cfg.i18n.not_enough_seats);
+					}
+					return post(cfg.nonce);
+				}).then(function(res){
 					if (!isStale(res)) return res;
 					var base = cfg.ajax_url || (location.origin + '/wp-admin/admin-ajax.php');
 					return fetch(base + (base.indexOf('?')===-1?'?':'&') + 'action=g2ab_refresh_nonce', { headers:{Accept:'application/json'}, credentials:'same-origin' })
@@ -415,6 +460,9 @@ final class G2AB_Frontend_Shortcode_Event_Booking {
 					if (u) u.textContent = d.uuid || '';
 					showStage('done');
 				}).catch(function(ex){
+					if (ex && ex.message === cfg.i18n.not_enough_seats) {
+						refreshSelectedOccurrence().catch(function(){});
+					}
 					if (err){ err.textContent = ex.message || cfg.i18n.failed; err.hidden=false; }
 					if (btn) btn.disabled = false; if (lbl) lbl.textContent = origLbl;
 				});

@@ -22,7 +22,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 final class G2AB_Events {
 
-	/** Booking statuses that still occupy a seat. */
+	/** Deprecated: use G2AB_Event_Capacity_Service for authoritative capacity. */
 	const ACTIVE_STATUSES = array( 'pending', 'reserved', 'confirmed', 'paid', 'completed' );
 
 	public static function table() {
@@ -168,11 +168,21 @@ final class G2AB_Events {
 		if ( ! $event ) {
 			$event = self::get_event( $occurrence->event_id );
 		}
-		$total = (int) $occurrence->capacity;
-		if ( $total <= 0 && $event ) {
-			$total = (int) $event->capacity;
+		if ( class_exists( 'G2AB_Event_Capacity_Service' ) ) {
+			$diag = G2AB_Event_Capacity_Service::diagnostics( (int) $occurrence->id );
+		} else {
+			$diag = null;
 		}
-		$booked = self::booked_seats( (int) $occurrence->id );
+		if ( is_array( $diag ) ) {
+			$total  = (int) $diag['capacity'];
+			$booked = (int) $diag['reserved'];
+		} else {
+			$total = (int) $occurrence->capacity;
+			if ( $total <= 0 && $event ) {
+				$total = (int) $event->capacity;
+			}
+			$booked = self::booked_seats( (int) $occurrence->id );
+		}
 
 		$occurrence->seats_total  = $total;
 		$occurrence->seats_booked = $booked;
@@ -191,6 +201,9 @@ final class G2AB_Events {
 	 * non-cancelled bookings).
 	 */
 	public static function booked_seats( $occurrence_id ) {
+		if ( class_exists( 'G2AB_Event_Capacity_Service' ) ) {
+			return G2AB_Event_Capacity_Service::get_reserved_seats( (int) $occurrence_id );
+		}
 		global $wpdb;
 		$bookings = $wpdb->prefix . 'g2ab_bookings';
 		$in       = "'" . implode( "','", array_map( 'esc_sql', self::ACTIVE_STATUSES ) ) . "'";

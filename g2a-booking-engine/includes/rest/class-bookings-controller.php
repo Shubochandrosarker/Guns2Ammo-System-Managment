@@ -60,6 +60,11 @@ final class G2AB_REST_Bookings_Controller {
 			'callback' => array( $this, 'confirm_payment' ),
 			'permission_callback' => '__return_true',
 		) );
+		register_rest_route( G2AB_REST_NAMESPACE, '/bookings/(?P<uuid>[a-f0-9-]{36})/resume-payment', array(
+			'methods' => WP_REST_Server::READABLE,
+			'callback' => array( $this, 'resume_payment' ),
+			'permission_callback' => '__return_true',
+		) );
 		// Tiny, explicitly-uncached endpoint so the frontend can fetch a FRESH
 		// wp_rest nonce when the one baked into a (possibly cached) page has gone
 		// stale. Prevents a stale-nonce 403 from looking like "cookies won't let me
@@ -103,6 +108,15 @@ final class G2AB_REST_Bookings_Controller {
 		) );
 	}
 
+	private function send_no_store_headers() {
+		nocache_headers();
+		if ( ! headers_sent() ) {
+			header( 'Cache-Control: no-store, no-cache, must-revalidate, max-age=0', false );
+			header( 'Pragma: no-cache', false );
+			header( 'Expires: 0', false );
+		}
+	}
+
 	public function permission_create_booking( WP_REST_Request $request ) {
 		// Nonce is required for everyone. Guests get one via the rendered shortcode.
 		$nonce = $request->get_header( 'X-WP-Nonce' );
@@ -115,27 +129,23 @@ final class G2AB_REST_Bookings_Controller {
 			return true;
 		}
 
-		// Soft, deliberately generous rate-limit. A single public IP is routinely
-		// shared by an entire range's Wi-Fi (NAT) or a mobile carrier (CGNAT), so
-		// the cap must tolerate many legitimate people booking from one address. A
-		// completed booking clears the counter (see create_booking()), so only
-		// repeated *unsuccessful* hammering accumulates toward the limit.
-		$key  = $this->rate_limit_key( (int) $request->get_param( 'resource_id' ) );
-		$hits = (int) get_transient( $key );
-
-		if ( $hits >= 30 ) {
-			return new WP_Error( 'g2ab_rate_limited', __( 'Too many booking attempts. Try again in a few minutes.', 'g2a-booking' ), array( 'status' => 429 ) );
+		$resource_key = (int) $request->get_param( 'resource_id' );
+		if ( ! $resource_key && (int) $request->get_param( 'occurrence_id' ) ) {
+			$resource_key = 'event-' . (int) $request->get_param( 'occurrence_id' );
+		}
+		$attempt = function_exists( 'g2ab_rate_limit_check' )
+			? g2ab_rate_limit_check( 'booking_attempt', array( $this->rate_limit_identity(), $resource_key ), 30, 10 * MINUTE_IN_SECONDS )
+			: array( 'limited' => false, 'retry_after' => 600 );
+		if ( ! empty( $attempt['limited'] ) ) {
+			return new WP_Error( 'g2ab_rate_limited', __( 'Too many booking attempts. Try again in a few minutes.', 'g2a-booking' ), array( 'status' => 429, 'retry_after' => (int) $attempt['retry_after'] ) );
 		}
 
-		// Successful guest bookings are ALSO capped per IP (this counter is never
-		// cleared). Each guest booking can create a subscriber account + email, so
-		// without this a script that completes bookings would bypass the attempt
-		// limit above and mass-create accounts for arbitrary addresses.
-		if ( (int) get_transient( $this->success_rate_limit_key() ) >= 5 ) {
-			return new WP_Error( 'g2ab_rate_limited', __( 'Too many bookings from this network. Please try again later or call us.', 'g2a-booking' ), array( 'status' => 429 ) );
+		$success = function_exists( 'g2ab_rate_limit_check' )
+			? g2ab_rate_limit_check( 'booking_success_probe', array( $this->rate_limit_identity() ), 100, HOUR_IN_SECONDS )
+			: array( 'limited' => false, 'retry_after' => HOUR_IN_SECONDS );
+		if ( ! empty( $success['limited'] ) ) {
+			return new WP_Error( 'g2ab_rate_limited', __( 'Too many bookings from this network. Please try again later or call us.', 'g2a-booking' ), array( 'status' => 429, 'retry_after' => (int) $success['retry_after'] ) );
 		}
-
-		set_transient( $key, $hits + 1, 10 * MINUTE_IN_SECONDS );
 		return true;
 	}
 
@@ -145,8 +155,7 @@ final class G2AB_REST_Bookings_Controller {
 	 * on a successful booking).
 	 */
 	private function rate_limit_key( $resource_id ) {
-		$ip = function_exists( 'g2ab_get_client_ip' ) ? g2ab_get_client_ip() : (string) ( $_SERVER['REMOTE_ADDR'] ?? '' );
-		return 'g2ab_rl_' . md5( $ip . '|' . (int) $resource_id );
+		return 'g2ab_rl_' . md5( $this->rate_limit_identity() . '|' . (string) $resource_id );
 	}
 
 	/**
@@ -155,16 +164,21 @@ final class G2AB_REST_Bookings_Controller {
 	 * cleared, capping how many accounts/bookings one IP can create per hour.
 	 */
 	private function success_rate_limit_key() {
-		$ip = function_exists( 'g2ab_get_client_ip' ) ? g2ab_get_client_ip() : (string) ( $_SERVER['REMOTE_ADDR'] ?? '' );
-		return 'g2ab_rls_' . md5( $ip );
+		return 'g2ab_rls_' . md5( $this->rate_limit_identity() );
 	}
 
 	/**
 	 * Count a successful guest booking toward the per-IP hourly success cap.
 	 */
 	private function bump_success_rate_limit() {
-		$key = $this->success_rate_limit_key();
-		set_transient( $key, (int) get_transient( $key ) + 1, HOUR_IN_SECONDS );
+		if ( function_exists( 'g2ab_rate_limit_check' ) ) {
+			g2ab_rate_limit_check( 'booking_success', array( $this->rate_limit_identity() ), 5, HOUR_IN_SECONDS );
+		}
+	}
+
+	private function rate_limit_identity() {
+		$ip = function_exists( 'g2ab_get_client_ip' ) ? g2ab_get_client_ip() : (string) ( $_SERVER['REMOTE_ADDR'] ?? '' );
+		return hash( 'sha256', (string) $ip );
 	}
 
 	public function list_payment_methods() {
@@ -220,6 +234,7 @@ final class G2AB_REST_Bookings_Controller {
 
 	public function get_availability( WP_REST_Request $request ) {
 		global $wpdb;
+		$this->send_no_store_headers();
 		$resource_id     = (int) $request->get_param( 'resource_id' );
 		$date            = $request->get_param( 'date' );
 		$duration        = max( 15, min( 480, (int) $request->get_param( 'duration' ) ) );
@@ -556,6 +571,8 @@ final class G2AB_REST_Bookings_Controller {
 			return (int) $current_user_id;
 		}
 
+		return 0;
+
 		$existing = get_user_by( 'email', $customer_email );
 		if ( $existing instanceof WP_User ) {
 			// Do NOT auto-login. Attach the booking to the existing user only.
@@ -759,6 +776,9 @@ final class G2AB_REST_Bookings_Controller {
 			$mgr = G2AB_Gateway_Manager::instance();
 			if ( $gateway_id ) {
 				$gateway = $mgr->get( $gateway_id );
+				if ( ! $gateway || ( method_exists( $gateway, 'is_available' ) && ! $gateway->is_available() ) ) {
+					return new WP_Error( 'g2ab_gateway_unavailable', __( 'Selected payment gateway is not available.', 'g2a-booking' ), array( 'status' => 503 ) );
+				}
 			}
 			if ( ! $gateway ) {
 				$gateway = $mgr->pick_for_type( $booking_type );
@@ -825,7 +845,21 @@ final class G2AB_REST_Bookings_Controller {
 		// Buffers are honored on both sides via DATE_SUB / DATE_ADD on the
 		// existing bookings' booking_type buffer columns.
 		$bt_table_for_lock = $wpdb->prefix . 'g2ab_booking_types';
-		$wpdb->query( 'START TRANSACTION' );
+		if ( false === $wpdb->query( 'START TRANSACTION' ) ) {
+			return new WP_Error( 'g2ab_transaction_failed', __( 'Could not start booking transaction.', 'g2a-booking' ), array( 'status' => 500 ) );
+		}
+		$resource = $wpdb->get_row( $wpdb->prepare( "SELECT * FROM {$res_table} WHERE id = %d AND is_active = 1 FOR UPDATE", $resource_id ) );
+		if ( ! $resource ) {
+			$wpdb->query( 'ROLLBACK' );
+			return new WP_Error( 'g2ab_invalid_resource', __( 'Invalid resource.', 'g2a-booking' ), array( 'status' => 400 ) );
+		}
+		$booking_type = $wpdb->get_row( $wpdb->prepare( "SELECT * FROM {$bt_table} WHERE id = %d AND is_active = 1 FOR UPDATE", $booking_type_id ) );
+		if ( ! $booking_type ) {
+			$wpdb->query( 'ROLLBACK' );
+			return new WP_Error( 'g2ab_invalid_type', __( 'Invalid booking type.', 'g2a-booking' ), array( 'status' => 400 ) );
+		}
+		$capacity      = max( 1, (int) $resource->capacity );
+		$capacity_mode = $this->normalize_capacity_mode( $booking_type->capacity_mode ?? '' );
 
 		if ( 'party_size' === $capacity_mode ) {
 			$load_select = 'COALESCE(SUM(b.party_size), 0)';
@@ -876,7 +910,7 @@ final class G2AB_REST_Bookings_Controller {
 				'discount_amount' => $discount_amount,
 				'due_now'         => $due_now,
 				'discount_label'  => $pricing['discount_label'],
-				'confirm_token'   => $confirm_token,
+				'confirm_token_hash' => function_exists( 'g2ab_hash_public_token' ) ? g2ab_hash_public_token( $confirm_token ) : hash( 'sha256', $confirm_token ),
 				'membership'      => array(
 					'source'   => $pricing['membership_source'],
 					'level_id' => $pricing['membership_level_id'],
@@ -909,13 +943,18 @@ final class G2AB_REST_Bookings_Controller {
 			return new WP_Error( 'g2ab_insert_failed', __( 'Could not save booking.', 'g2a-booking' ), array( 'status' => 500 ) );
 		}
 		$booking_id = (int) $wpdb->insert_id;
-		$wpdb->query( 'COMMIT' );
+		if ( false === $wpdb->query( 'COMMIT' ) ) {
+			$wpdb->query( 'ROLLBACK' );
+			return new WP_Error( 'g2ab_commit_failed', __( 'Could not commit booking.', 'g2a-booking' ), array( 'status' => 500 ) );
+		}
 
 		// A completed booking proves this visitor isn't a scripted bot — release
 		// their rate-limit budget so a returning legitimate guest (or the next
 		// person on the same shared/NAT IP) isn't penalised by earlier attempts.
 		if ( ! is_user_logged_in() ) {
-			delete_transient( $this->rate_limit_key( $resource_id ) );
+			if ( function_exists( 'g2ab_rate_limit_clear' ) ) {
+				g2ab_rate_limit_clear( 'booking_attempt', array( $this->rate_limit_identity(), $resource_id ) );
+			}
 			$this->bump_success_rate_limit();
 		}
 
@@ -971,7 +1010,9 @@ final class G2AB_REST_Bookings_Controller {
 
 		if ( $due_now > 0 && $gateway && method_exists( $gateway, 'create_intent' ) ) {
 			$booking_row = $wpdb->get_row( $wpdb->prepare( "SELECT * FROM {$bookings_table} WHERE id = %d", $booking_id ) );
-			$intent      = $gateway->create_intent( $booking_row, $due_now );
+			$intent      = ( 'stripe' === $gateway_used_id )
+				? $gateway->create_intent( $booking_row, $due_now, array( 'confirm_token' => $confirm_token ) )
+				: $gateway->create_intent( $booking_row, $due_now );
 
 			if ( is_wp_error( $intent ) ) {
 				$wpdb->insert( $wpdb->prefix . 'g2ab_logs', array(
@@ -994,8 +1035,14 @@ final class G2AB_REST_Bookings_Controller {
 			}
 		} elseif ( $total <= 0 ) {
 			$response['message'] = __( 'Booking confirmed (no payment required).', 'g2a-booking' );
+			if ( function_exists( 'g2ab_provision_booking_customer_account' ) ) {
+				g2ab_provision_booking_customer_account( $booking_id );
+			}
 		} else {
 			$response['message'] = __( 'Reservation received. Pay at the front desk on arrival.', 'g2a-booking' );
+			if ( function_exists( 'g2ab_provision_booking_customer_account' ) ) {
+				g2ab_provision_booking_customer_account( $booking_id );
+			}
 		}
 
 		// Only send the basic fallback email when the email-automation addon is
@@ -1057,7 +1104,7 @@ final class G2AB_REST_Bookings_Controller {
 			'payment_required' => (float) ( $metadata['due_now'] ?? 0 ) > 0,
 			'redirect_url'     => '',
 			'message'          => __( 'This booking was already received — showing your existing reservation.', 'g2a-booking' ),
-			'confirm_token'    => (string) ( $metadata['confirm_token'] ?? '' ),
+			'confirm_token'    => '',
 			'idempotent_replay'=> true,
 		);
 
@@ -1070,25 +1117,49 @@ final class G2AB_REST_Bookings_Controller {
 		if ( ! preg_match( '/^[a-f0-9-]{36}$/', $uuid ) ) {
 			return new WP_Error( 'g2ab_bad_uuid', 'Bad UUID.', array( 'status' => 400 ) );
 		}
+		$limit = function_exists( 'g2ab_rate_limit_check' )
+			? g2ab_rate_limit_check( 'booking_status', array( $this->rate_limit_identity(), $uuid ), 30, 5 * MINUTE_IN_SECONDS )
+			: array( 'limited' => false, 'retry_after' => 300 );
+		if ( ! empty( $limit['limited'] ) ) {
+			return new WP_Error( 'g2ab_rate_limited', __( 'Too many status requests. Please wait and try again.', 'g2a-booking' ), array( 'status' => 429, 'retry_after' => (int) $limit['retry_after'] ) );
+		}
 		$bt  = $wpdb->prefix . 'g2ab_bookings';
 		$rt  = $wpdb->prefix . 'g2ab_resources';
 		$row = $wpdb->get_row( $wpdb->prepare(
-			"SELECT b.uuid, b.status, b.start_at, b.total_amount, b.paid_amount, b.currency, r.name AS resource_name FROM {$bt} b LEFT JOIN {$rt} r ON r.id = b.resource_id WHERE b.uuid = %s LIMIT 1",
+			"SELECT b.id, b.uuid, b.status, b.start_at, b.total_amount, b.paid_amount, b.currency, b.user_id, b.metadata, r.name AS resource_name FROM {$bt} b LEFT JOIN {$rt} r ON r.id = b.resource_id WHERE b.uuid = %s LIMIT 1",
 			$uuid
 		) );
 		if ( ! $row ) {
 			return new WP_Error( 'g2ab_not_found', 'Booking not found.', array( 'status' => 404 ) );
 		}
+		nocache_headers();
+		$meta          = json_decode( (string) $row->metadata, true );
+		$meta          = is_array( $meta ) ? $meta : array();
+		$confirm_token = sanitize_text_field( (string) $request->get_param( 'confirm_token' ) );
+		$owns_booking  = is_user_logged_in() && (int) $row->user_id > 0 && get_current_user_id() === (int) $row->user_id;
+		$staff         = current_user_can( 'manage_g2ab_bookings' );
+		$token_ok      = function_exists( 'g2ab_verify_public_token' ) && g2ab_verify_public_token( $confirm_token, $meta );
+		if ( ! $staff && ! $owns_booking && ! $token_ok ) {
+			return rest_ensure_response( array( 'success' => true, 'data' => array( 'uuid' => $row->uuid, 'status' => $row->status ) ) );
+		}
+		unset( $row->id, $row->user_id, $row->metadata );
 		return rest_ensure_response( array( 'success' => true, 'data' => $row ) );
 	}
 
 	public function confirm_payment( WP_REST_Request $request ) {
 		global $wpdb;
+		nocache_headers();
 		$uuid          = sanitize_text_field( $request['uuid'] ?? '' );
 		$session_id    = sanitize_text_field( (string) $request->get_param( 'session_id' ) );
 		$confirm_token = sanitize_text_field( (string) $request->get_param( 'confirm_token' ) );
 		if ( ! preg_match( '/^[a-f0-9-]{36}$/', $uuid ) ) {
 			return new WP_Error( 'g2ab_bad_uuid', 'Bad UUID.', array( 'status' => 400 ) );
+		}
+		$limit = function_exists( 'g2ab_rate_limit_check' )
+			? g2ab_rate_limit_check( 'confirm_payment', array( $this->rate_limit_identity(), $uuid ), 12, 5 * MINUTE_IN_SECONDS )
+			: array( 'limited' => false, 'retry_after' => 300 );
+		if ( ! empty( $limit['limited'] ) ) {
+			return new WP_Error( 'g2ab_rate_limited', __( 'Too many confirmation attempts. Please wait and try again.', 'g2a-booking' ), array( 'status' => 429, 'retry_after' => (int) $limit['retry_after'] ) );
 		}
 
 		$bt      = $wpdb->prefix . 'g2ab_bookings';
@@ -1104,11 +1175,10 @@ final class G2AB_REST_Bookings_Controller {
 		// the gateway round-trip which already verifies the session
 		// against the upstream provider.
 		$meta          = json_decode( (string) $booking->metadata, true );
-		$stored_token  = isset( $meta['confirm_token'] ) ? (string) $meta['confirm_token'] : '';
-		$has_stored    = '' !== $stored_token;
-		$token_matches = $has_stored && hash_equals( $stored_token, $confirm_token );
+		$has_stored    = ! empty( $meta['confirm_token_hash'] ) || ! empty( $meta['confirm_token'] );
+		$token_matches = function_exists( 'g2ab_verify_public_token' ) && g2ab_verify_public_token( $confirm_token, is_array( $meta ) ? $meta : array() );
 
-		if ( in_array( $booking->status, array( 'paid', 'confirmed', 'completed' ), true ) ) {
+		if ( in_array( $booking->status, array( 'paid', 'confirmed', 'completed' ), true ) && ( ! $has_stored || $token_matches ) ) {
 			return rest_ensure_response( array( 'success' => true, 'data' => array( 'status' => $booking->status, 'verified' => true ) ) );
 		}
 
@@ -1124,13 +1194,74 @@ final class G2AB_REST_Bookings_Controller {
 		if ( $gateway_id && class_exists( 'G2AB_Gateway_Manager' ) ) {
 			$gw = G2AB_Gateway_Manager::instance()->get( $gateway_id );
 			if ( $gw && method_exists( $gw, 'confirm_payment' ) && $session_id ) {
-				$result = $gw->confirm_payment( $session_id );
+				$result = $gw->confirm_payment( $session_id, array( 'booking_id' => (int) $booking->id, 'uuid' => (string) $booking->uuid, 'confirm_token_valid' => $token_matches ) );
 				if ( is_array( $result ) && ! empty( $result['handled'] ) ) {
 					return rest_ensure_response( array( 'success' => true, 'data' => array( 'status' => 'paid', 'verified' => true ) ) );
 				}
 			}
 		}
 		return rest_ensure_response( array( 'success' => true, 'data' => array( 'status' => $booking->status, 'verified' => false ) ) );
+	}
+
+	public function resume_payment( WP_REST_Request $request ) {
+		global $wpdb;
+		nocache_headers();
+		$uuid          = sanitize_text_field( $request['uuid'] ?? '' );
+		$confirm_token = sanitize_text_field( (string) $request->get_param( 'confirm_token' ) );
+		if ( ! preg_match( '/^[a-f0-9-]{36}$/', $uuid ) ) {
+			return new WP_Error( 'g2ab_bad_uuid', 'Bad UUID.', array( 'status' => 400 ) );
+		}
+		$limit = function_exists( 'g2ab_rate_limit_check' )
+			? g2ab_rate_limit_check( 'resume_payment', array( $this->rate_limit_identity(), $uuid ), 12, 5 * MINUTE_IN_SECONDS )
+			: array( 'limited' => false, 'retry_after' => 300 );
+		if ( ! empty( $limit['limited'] ) ) {
+			return new WP_Error( 'g2ab_rate_limited', __( 'Too many payment link requests. Please wait and try again.', 'g2a-booking' ), array( 'status' => 429, 'retry_after' => (int) $limit['retry_after'] ) );
+		}
+
+		$bt      = $wpdb->prefix . 'g2ab_bookings';
+		$pt      = $wpdb->prefix . 'g2ab_payments';
+		$booking = $wpdb->get_row( $wpdb->prepare( "SELECT * FROM {$bt} WHERE uuid = %s LIMIT 1", $uuid ) );
+		if ( ! $booking ) {
+			return new WP_Error( 'g2ab_not_found', 'Booking not found.', array( 'status' => 404 ) );
+		}
+
+		$meta          = json_decode( (string) $booking->metadata, true );
+		$meta          = is_array( $meta ) ? $meta : array();
+		$token_matches = function_exists( 'g2ab_verify_public_token' ) && g2ab_verify_public_token( $confirm_token, $meta );
+		if ( ! current_user_can( 'manage_g2ab_bookings' ) && ! $token_matches ) {
+			return new WP_Error( 'g2ab_invalid_confirm_token', __( 'Invalid confirmation token.', 'g2a-booking' ), array( 'status' => 403 ) );
+		}
+
+		if ( in_array( (string) $booking->status, array( 'paid', 'confirmed', 'completed' ), true ) ) {
+			return rest_ensure_response( array( 'success' => true, 'data' => array( 'status' => $booking->status, 'payment_required' => false ) ) );
+		}
+
+		$payment = $wpdb->get_row( $wpdb->prepare(
+			"SELECT * FROM {$pt}
+			 WHERE booking_id = %d AND gateway = 'stripe' AND status IN ('creating','pending','open','failed')
+			 ORDER BY id DESC LIMIT 1",
+			(int) $booking->id
+		) );
+		if ( ! $payment ) {
+			return new WP_Error( 'g2ab_no_checkout_attempt', __( 'No checkout attempt is available for this booking.', 'g2a-booking' ), array( 'status' => 404 ) );
+		}
+		$response = json_decode( (string) $payment->gateway_response, true );
+		$url      = is_array( $response ) ? esc_url_raw( (string) ( $response['url'] ?? '' ) ) : '';
+		$expires  = ! empty( $payment->checkout_expires_at ) ? strtotime( (string) $payment->checkout_expires_at ) : 0;
+		if ( ! $url || ( $expires && $expires <= time() + 60 ) ) {
+			return new WP_Error( 'g2ab_checkout_expired', __( 'The payment link has expired. Please contact staff for a fresh checkout link.', 'g2a-booking' ), array( 'status' => 410 ) );
+		}
+
+		return rest_ensure_response( array(
+			'success' => true,
+			'data'    => array(
+				'status'              => (string) $booking->status,
+				'payment_required'    => true,
+				'redirect_url'        => $url,
+				'checkout_session_id' => ! empty( $payment->checkout_session_id ) ? (string) $payment->checkout_session_id : (string) $payment->transaction_id,
+				'checkout_expires_at' => ! empty( $payment->checkout_expires_at ) ? (string) $payment->checkout_expires_at : '',
+			),
+		) );
 	}
 
 	private function send_confirmation_email( $to, $name, $resource, $start_at, $uuid ) {
@@ -1154,6 +1285,7 @@ final class G2AB_REST_Bookings_Controller {
 	 * ──────────────────────────────────────────────────────────────── */
 
 	public function list_events( WP_REST_Request $request ) {
+		$this->send_no_store_headers();
 		if ( ! class_exists( 'G2AB_Events' ) ) {
 			return rest_ensure_response( array( 'success' => true, 'data' => array() ) );
 		}
@@ -1187,6 +1319,7 @@ final class G2AB_REST_Bookings_Controller {
 	}
 
 	public function list_event_occurrences( WP_REST_Request $request ) {
+		$this->send_no_store_headers();
 		if ( ! class_exists( 'G2AB_Events' ) ) {
 			return new WP_Error( 'g2ab_no_events', __( 'Events are not available.', 'g2a-booking' ), array( 'status' => 400 ) );
 		}
@@ -1200,16 +1333,22 @@ final class G2AB_REST_Bookings_Controller {
 		$out       = array();
 		foreach ( $occs as $o ) {
 			$price = G2AB_Events::price_for( $event, $o, $is_member );
+			$diag  = class_exists( 'G2AB_Event_Capacity_Service' ) ? G2AB_Event_Capacity_Service::diagnostics( (int) $o->id ) : null;
+			$reserved = is_array( $diag ) ? (int) $diag['reserved'] : (int) $o->seats_booked;
+			$capacity = is_array( $diag ) ? (int) $diag['capacity'] : (int) $o->seats_total;
+			$left     = is_array( $diag ) ? (int) $diag['seats_left'] : (int) $o->seats_left;
 			$out[] = array(
 				'id'         => (int) $o->id,
 				'start_at'   => $o->start_at,
 				'end_at'     => $o->end_at,
-				'seats_left' => (int) $o->seats_left,
-				'seats_total'=> (int) $o->seats_total,
-				'sold_out'   => (int) $o->seats_left <= 0,
+				'seats_left' => $left,
+				'seats_total'=> $capacity,
+				'seats_reserved' => $reserved,
+				'sold_out'   => $left <= 0,
 				'price'      => (float) $price,
 				'is_free'    => (int) $event->is_free === 1 || (float) $price <= 0,
 				'price_label'=> ( (int) $event->is_free === 1 || (float) $price <= 0 ) ? __( 'Free', 'g2a-booking' ) : '$' . number_format( (float) $price, 2 ),
+				'calculated_at' => is_array( $diag ) ? $diag['calculated_at'] : current_time( 'mysql' ),
 			);
 		}
 		return rest_ensure_response( array(
@@ -1248,6 +1387,7 @@ final class G2AB_REST_Bookings_Controller {
 			if ( $ok( $g ) ) {
 				return $g;
 			}
+			return new WP_Error( 'g2ab_gateway_unavailable', __( 'Selected payment gateway is not available for online event payment.', 'g2a-booking' ), array( 'status' => 503 ) );
 		}
 		foreach ( array( 'stripe', 'paypal' ) as $pref ) {
 			$g = $mgr->get( $pref );
@@ -1265,6 +1405,7 @@ final class G2AB_REST_Bookings_Controller {
 
 	public function create_event_booking( WP_REST_Request $request ) {
 		global $wpdb;
+		$this->send_no_store_headers();
 		if ( ! class_exists( 'G2AB_Events' ) ) {
 			return new WP_Error( 'g2ab_no_events', __( 'Events are not available.', 'g2a-booking' ), array( 'status' => 400 ) );
 		}
@@ -1283,7 +1424,7 @@ final class G2AB_REST_Bookings_Controller {
 		if ( ! $event || 'publish' !== $event->status ) {
 			return new WP_Error( 'g2ab_bad_event', __( 'This event is not available.', 'g2a-booking' ), array( 'status' => 400 ) );
 		}
-		if ( strtotime( $occ->start_at ) < ( time() - 60 ) ) {
+		if ( G2AB_Events::timestamp( $occ->start_at ) < ( time() - 60 ) ) {
 			return new WP_Error( 'g2ab_event_past', __( 'That date has already started.', 'g2a-booking' ), array( 'status' => 400 ) );
 		}
 
@@ -1337,6 +1478,12 @@ final class G2AB_REST_Bookings_Controller {
 		// available card gateway). Only when none is configured do we fall back
 		// to reserve-and-pay-at-the-desk.
 		$gateway         = ( $total > 0 ) ? $this->pick_online_gateway_for_event( $bt, $gateway_id ) : null;
+		if ( is_wp_error( $gateway ) ) {
+			return $gateway;
+		}
+		if ( $total > 0 && ! $gateway && 1 !== (int) get_option( 'g2ab_allow_event_pay_in_store_fallback', 0 ) ) {
+			return new WP_Error( 'g2ab_no_online_gateway', __( 'Online payment is currently unavailable for this event.', 'g2a-booking' ), array( 'status' => 503 ) );
+		}
 		$gateway_used_id = ( $gateway && method_exists( $gateway, 'id' ) ) ? $gateway->id() : 'pay_in_store';
 
 		if ( $total <= 0 ) {
@@ -1363,6 +1510,11 @@ final class G2AB_REST_Bookings_Controller {
 		$now_mysql     = current_time( 'mysql' );
 		$uuid          = wp_generate_uuid4();
 		$confirm_token = wp_generate_password( 32, false );
+		$hold_minutes  = class_exists( 'G2AB_Event_Capacity_Service' ) ? G2AB_Event_Capacity_Service::hold_minutes() : (int) apply_filters( 'g2ab_event_hold_minutes', get_option( 'g2ab_reservation_hold_minutes', 15 ) );
+		$hold_expires_at = '';
+		if ( in_array( $initial_status, array( 'pending', 'reserved' ), true ) && in_array( $payment_mode, array( 'full', 'deposit' ), true ) ) {
+			$hold_expires_at = wp_date( 'Y-m-d H:i:s', current_time( 'timestamp' ) + ( max( 1, $hold_minutes ) * MINUTE_IN_SECONDS ), wp_timezone() );
+		}
 
 		// See create_booking() for why this exists: a retry/double-submit of
 		// the same seat request must not create a second reservation (and, for
@@ -1375,19 +1527,7 @@ final class G2AB_REST_Bookings_Controller {
 		) ) );
 
 		// ─── Race-safe seat reservation ─────────────────────────────────────
-		$in = "'" . implode( "','", array_map( 'esc_sql', G2AB_Events::ACTIVE_STATUSES ) ) . "'";
-		$wpdb->query( 'START TRANSACTION' );
-		$current_load = (int) $wpdb->get_var( $wpdb->prepare(
-			"SELECT COALESCE(SUM(party_size),0) FROM {$bookings_table}
-			  WHERE event_occurrence_id = %d AND status IN ({$in}) FOR UPDATE",
-			$occurrence_id
-		) );
-		if ( $current_load + $seats > $capacity_total ) {
-			$wpdb->query( 'ROLLBACK' );
-			return new WP_Error( 'g2ab_event_full', __( 'Not enough seats left for this date. Please reduce the number of seats or pick another date.', 'g2a-booking' ), array( 'status' => 409 ) );
-		}
-
-		$inserted = $wpdb->insert( $bookings_table, array(
+		$booking_data = array(
 			'uuid'                => $uuid,
 			'booking_type_id'     => (int) $bt->id,
 			'resource_id'         => null,
@@ -1409,10 +1549,11 @@ final class G2AB_REST_Bookings_Controller {
 			'metadata'            => wp_json_encode( array(
 				'gateway'       => $gateway_used_id,
 				'due_now'       => $due_now,
-				'confirm_token' => $confirm_token,
+				'confirm_token_hash' => function_exists( 'g2ab_hash_public_token' ) ? g2ab_hash_public_token( $confirm_token ) : hash( 'sha256', $confirm_token ),
 				'event_title'   => $event->title,
 				'seats'         => $seats,
 				'unit_price'    => $unit_price,
+				'hold_expires_at' => $hold_expires_at,
 			) ),
 			'waiver_signed'       => $waiver_ok ? 1 : 0,
 			'source'              => 'web',
@@ -1422,27 +1563,26 @@ final class G2AB_REST_Bookings_Controller {
 			'created_at'          => $now_mysql,
 			'updated_at'          => $now_mysql,
 			'idempotency_key'     => $idempotency_key,
-		), array( '%s','%d','%s','%s','%d','%s','%s','%s','%s','%s','%d','%d','%s','%s','%f','%f','%s','%s','%s','%d','%s','%d','%d','%d','%s','%s','%s' ) );
+		);
+		$booking_formats = array( '%s','%d','%s','%s','%d','%s','%s','%s','%s','%s','%d','%d','%s','%s','%f','%f','%s','%s','%s','%d','%s','%d','%d','%d','%s','%s','%s' );
 
-		if ( false === $inserted ) {
-			if ( false !== stripos( (string) $wpdb->last_error, 'idempotency_key' ) ) {
-				$wpdb->query( 'ROLLBACK' );
-				$existing_id = (int) $wpdb->get_var( $wpdb->prepare(
-					"SELECT id FROM {$bookings_table} WHERE idempotency_key = %s LIMIT 1",
-					$idempotency_key
-				) );
-				if ( $existing_id > 0 ) {
-					return $this->idempotent_replay_response( $existing_id );
-				}
-			}
-			$wpdb->query( 'ROLLBACK' );
-			return new WP_Error( 'g2ab_insert_failed', __( 'Could not save your reservation.', 'g2a-booking' ), array( 'status' => 500 ) );
+		if ( ! class_exists( 'G2AB_Event_Capacity_Service' ) ) {
+			return new WP_Error( 'g2ab_capacity_service_missing', __( 'Event availability service is unavailable.', 'g2a-booking' ), array( 'status' => 500 ) );
 		}
-		$booking_id = (int) $wpdb->insert_id;
-		$wpdb->query( 'COMMIT' );
+
+		$reservation = G2AB_Event_Capacity_Service::reserve_seats_atomically( $occurrence_id, $seats, $booking_data, $booking_formats );
+		if ( is_wp_error( $reservation ) ) {
+			return $reservation;
+		}
+		if ( ! empty( $reservation['idempotent_replay_id'] ) ) {
+			return $this->idempotent_replay_response( (int) $reservation['idempotent_replay_id'] );
+		}
+		$booking_id = (int) $reservation['booking_id'];
 
 		if ( ! is_user_logged_in() ) {
-			delete_transient( $this->rate_limit_key( 'event-' . $occurrence_id ) );
+			if ( function_exists( 'g2ab_rate_limit_clear' ) ) {
+				g2ab_rate_limit_clear( 'booking_attempt', array( $this->rate_limit_identity(), 'event-' . $occurrence_id ) );
+			}
 			$this->bump_success_rate_limit();
 		}
 
@@ -1487,7 +1627,9 @@ final class G2AB_REST_Bookings_Controller {
 
 		if ( $due_now > 0 && $gateway && method_exists( $gateway, 'create_intent' ) ) {
 			$booking_row = $wpdb->get_row( $wpdb->prepare( "SELECT * FROM {$bookings_table} WHERE id = %d", $booking_id ) );
-			$intent      = $gateway->create_intent( $booking_row, $due_now );
+			$intent      = ( 'stripe' === $gateway_used_id )
+				? $gateway->create_intent( $booking_row, $due_now, array( 'confirm_token' => $confirm_token ) )
+				: $gateway->create_intent( $booking_row, $due_now );
 			if ( is_wp_error( $intent ) ) {
 				$response['message'] = sprintf( __( 'Reservation saved, but payment setup failed: %s. Staff will contact you.', 'g2a-booking' ), $intent->get_error_message() );
 			} elseif ( is_array( $intent ) ) {
@@ -1496,8 +1638,14 @@ final class G2AB_REST_Bookings_Controller {
 			}
 		} elseif ( $total <= 0 ) {
 			$response['message'] = __( 'Seat reserved — no payment required. See you there!', 'g2a-booking' );
+			if ( function_exists( 'g2ab_provision_booking_customer_account' ) ) {
+				g2ab_provision_booking_customer_account( $booking_id );
+			}
 		} else {
 			$response['message'] = __( 'Seat reserved. Pay at the front desk on arrival.', 'g2a-booking' );
+			if ( function_exists( 'g2ab_provision_booking_customer_account' ) ) {
+				g2ab_provision_booking_customer_account( $booking_id );
+			}
 		}
 
 		$email_automation_active = class_exists( 'G2AB_Addon_Manager' )

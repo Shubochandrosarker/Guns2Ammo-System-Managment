@@ -276,8 +276,9 @@ final class G2AB_REST_Calendar_Controller {
 			return new WP_Error( 'g2ab_not_found', __( 'Booking not found.', 'g2a-booking' ), array( 'status' => 404 ) );
 		}
 		$meta         = json_decode( (string) $booking->metadata, true );
-		$stored       = isset( $meta['confirm_token'] ) ? (string) $meta['confirm_token'] : '';
-		if ( '' === $stored || '' === $token || ! hash_equals( $stored, $token ) ) {
+		$meta         = is_array( $meta ) ? $meta : array();
+		$token_ok     = function_exists( 'g2ab_verify_public_token' ) && g2ab_verify_public_token( $token, $meta );
+		if ( ! $token_ok ) {
 			return new WP_Error( 'g2ab_invalid_confirm_token', __( 'Invalid confirmation token.', 'g2a-booking' ), array( 'status' => 403 ) );
 		}
 		if ( G2AB_Booking_Statuses::is_terminal( $booking->status ) ) {

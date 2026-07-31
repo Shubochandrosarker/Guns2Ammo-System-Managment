@@ -39,10 +39,18 @@ class G2AB_Email_Engine {
 		if ( empty( $tpl ) || empty( $tpl['enabled'] ) ) return false;
 
 		$tags = $this->build_tags( $booking, $context );
+		if ( 'payment_required' === $event && empty( $tags['pay_url'] ) ) {
+			do_action( 'g2ab_email_precondition_failed', $event, $booking, 'missing_pay_url' );
+			return false;
+		}
 		$subject = $this->merge( $tpl['subject'], $tags );
+		$body_template = $tpl['body_html'];
+		if ( empty( $tags['pay_url'] ) && false !== strpos( (string) $body_template, '{pay_url}' ) ) {
+			$body_template = $this->strip_missing_pay_url_cta( (string) $body_template );
+		}
 		// Customer-sourced values are escaped before substitution into the HTML
 		// body so stored markup in a booking can't inject HTML into inboxes.
-		$body    = $this->merge( $tpl['body_html'], $this->escape_customer_tags( $tags ) );
+		$body    = $this->merge( $body_template, $this->escape_customer_tags( $tags ) );
 		$body    = $this->wrap_html( $body, $subject );
 
 		$headers = array(
@@ -68,6 +76,12 @@ class G2AB_Email_Engine {
 
 		do_action( 'g2ab_email_sent', $event, $booking, $tpl, $results );
 		return $results;
+	}
+
+	private function strip_missing_pay_url_cta( $html ) {
+		$html = preg_replace( '#<p\b[^>]*>.*?<a\b[^>]*href=["\']\{pay_url\}["\'][^>]*>.*?</a>.*?</p>#is', '', $html );
+		$html = preg_replace( '#<a\b[^>]*href=["\']\{pay_url\}["\'][^>]*>.*?</a>#is', '', $html );
+		return $html;
 	}
 
 	/**
@@ -114,10 +128,14 @@ class G2AB_Email_Engine {
 	 */
 	public function merge( $template, $tags ) {
 		$out = $template;
+		$out = preg_replace_callback( '/\{\{#if\s+([a-zA-Z0-9_]+)\}\}(.*?)\{\{\/if\}\}/s', static function ( $m ) use ( $tags ) {
+			$key = $m[1];
+			return ! empty( $tags[ $key ] ) ? $m[2] : '';
+		}, $out );
 		foreach ( $tags as $k => $v ) {
 			$out = str_replace( '{' . $k . '}', (string) $v, $out );
 		}
-		return $out;
+		return preg_replace( '/\{[a-zA-Z0-9_]+\}/', '', $out );
 	}
 
 	/**
@@ -125,9 +143,14 @@ class G2AB_Email_Engine {
 	 * bodies. Admin-authored template markup is left untouched.
 	 */
 	private function escape_customer_tags( $tags ) {
-		foreach ( array( 'customer_name', 'customer_email', 'customer_phone' ) as $k ) {
+		foreach ( array( 'customer_name', 'customer_email', 'customer_phone', 'resource_name', 'service_name', 'event_title', 'booking_type', 'business_name', 'business_phone', 'business_address', 'confirmation_number', 'payment_status', 'booking_status' ) as $k ) {
 			if ( isset( $tags[ $k ] ) ) {
 				$tags[ $k ] = esc_html( (string) $tags[ $k ] );
+			}
+		}
+		foreach ( array( 'invoice_url', 'pay_url', 'payment_resume_url', 'cancel_url', 'site_url', 'directions_url', 'brand_logo_url' ) as $k ) {
+			if ( isset( $tags[ $k ] ) ) {
+				$tags[ $k ] = esc_url( (string) $tags[ $k ] );
 			}
 		}
 		return $tags;
@@ -138,6 +161,7 @@ class G2AB_Email_Engine {
 	 */
 	public function build_tags( $booking, $context = array() ) {
 		$booking = is_object( $booking ) ? (array) $booking : (array) $booking;
+		$booking = $this->hydrate_booking_tags_row( $booking );
 
 		$site_url    = home_url( '/' );
 		$biz_name    = g2ab_business_name();
@@ -149,20 +173,40 @@ class G2AB_Email_Engine {
 		$uuid = isset( $booking['uuid'] ) ? $booking['uuid'] : '';
 		$invoice_url = $uuid ? add_query_arg( 'g2ab_invoice', $uuid, $site_url ) : '';
 		$pay_url     = isset( $context['pay_url'] ) ? $context['pay_url'] : '';
-		$cancel_url  = $uuid ? add_query_arg( array( 'g2ab_cancel' => $uuid ), $site_url ) : '';
-
-		$customer_name  = '';
-		$customer_email = '';
-		$customer_phone = '';
-		if ( ! empty( $booking['fields'] ) ) {
-			$fields = is_string( $booking['fields'] ) ? json_decode( $booking['fields'], true ) : $booking['fields'];
-			if ( is_array( $fields ) ) {
-				$customer_name  = $fields['name'] ?? trim( ( $fields['first_name'] ?? '' ) . ' ' . ( $fields['last_name'] ?? '' ) );
-				$customer_email = $fields['email'] ?? '';
-				$customer_phone = $fields['phone'] ?? '';
+		if ( empty( $pay_url ) && ! empty( $booking['latest_payment_response'] ) ) {
+			$response = is_string( $booking['latest_payment_response'] ) ? json_decode( $booking['latest_payment_response'], true ) : $booking['latest_payment_response'];
+			if ( is_array( $response ) && ! empty( $response['url'] ) ) {
+				$pay_url = esc_url_raw( (string) $response['url'] );
 			}
 		}
-		if ( empty( $customer_email ) && ! empty( $booking['customer_email'] ) ) $customer_email = $booking['customer_email'];
+		$cancel_url  = $uuid ? add_query_arg( array( 'g2ab_cancel' => $uuid ), $site_url ) : '';
+
+		$form_data = ! empty( $booking['form_data'] ) ? json_decode( (string) $booking['form_data'], true ) : array();
+		$form_data = is_array( $form_data ) ? $form_data : array();
+		$customer_name  = trim( (string) ( $booking['customer_name'] ?? '' ) );
+		$customer_email = trim( (string) ( $booking['customer_email'] ?? '' ) );
+		$customer_phone = trim( (string) ( $booking['customer_phone'] ?? '' ) );
+		if ( '' === $customer_name ) {
+			$customer_name = trim( (string) ( $form_data['name'] ?? '' ) );
+		}
+		if ( '' === $customer_name ) {
+			$customer_name = trim( (string) ( ( $form_data['first_name'] ?? '' ) . ' ' . ( $form_data['last_name'] ?? '' ) ) );
+		}
+		if ( '' === $customer_email ) {
+			$customer_email = trim( (string) ( $form_data['email'] ?? '' ) );
+		}
+		if ( '' === $customer_phone ) {
+			$customer_phone = trim( (string) ( $form_data['phone'] ?? '' ) );
+		}
+
+		$total        = isset( $booking['total_amount'] ) ? (float) $booking['total_amount'] : (float) ( $booking['amount'] ?? 0 );
+		$paid         = isset( $booking['paid_amount'] ) ? (float) $booking['paid_amount'] : 0.0;
+		$latest_amt   = isset( $booking['latest_payment_amount'] ) ? (float) $booking['latest_payment_amount'] : 0.0;
+		$balance_due  = max( 0, $total - $paid );
+		$due_now      = (float) ( $context['due_now'] ?? ( $latest_amt > 0 ? $latest_amt : $balance_due ) );
+		$currency     = strtoupper( (string) ( $context['currency'] ?? ( $booking['currency'] ?? get_option( 'g2ab_currency', 'USD' ) ) ) );
+		$service_name = $booking['event_title'] ?? ( $booking['resource_name'] ?? ( $booking['type_name'] ?? '' ) );
+		$expires_at   = (string) ( $context['checkout_expires_at'] ?? ( $booking['checkout_expires_at'] ?? '' ) );
 
 		return array(
 			'customer_name'    => $customer_name ?: 'Guest',
@@ -170,24 +214,63 @@ class G2AB_Email_Engine {
 			'customer_phone'   => $customer_phone,
 			'booking_id'       => isset( $booking['id'] ) ? (int) $booking['id'] : 0,
 			'uuid'             => $uuid,
+			'confirmation_number' => $uuid,
 			'resource_name'    => $booking['resource_name'] ?? ( $context['resource_name'] ?? '' ),
+			'service_name'     => $service_name,
+			'event_title'      => $booking['event_title'] ?? '',
+			'booking_type'     => $booking['type_name'] ?? '',
 			'start_at'         => isset( $booking['start_at'] ) ? $this->format_dt( $booking['start_at'] ) : '',
 			'end_at'           => isset( $booking['end_at'] ) ? $this->format_dt( $booking['end_at'] ) : '',
 			'duration'         => isset( $booking['duration_min'] ) ? (int) $booking['duration_min'] : 60,
 			'party_size'       => isset( $booking['party_size'] ) ? (int) $booking['party_size'] : 1,
-			'amount'           => isset( $booking['amount'] ) ? number_format( (float) $booking['amount'], 2 ) : '0.00',
-			'currency'         => get_option( 'g2ab_currency', 'USD' ),
+			'amount'           => number_format( $total, 2 ),
+			'due_now'          => number_format( $due_now, 2 ),
+			'balance_due'      => number_format( $balance_due, 2 ),
+			'paid_amount'      => number_format( $paid, 2 ),
+			'currency'         => $currency,
+			'gateway'          => $context['gateway'] ?? ( $booking['latest_gateway'] ?? '' ),
+			'payment_status'   => $booking['latest_payment_status'] ?? '',
+			'booking_status'   => $booking['status'] ?? '',
+			'checkout_expires_at' => $expires_at ? $this->format_dt( $expires_at ) : '',
 			'business_name'    => $biz_name,
 			'business_phone'   => $biz_phone,
 			'business_address' => $biz_addr,
 			'invoice_url'      => $invoice_url,
 			'pay_url'          => $pay_url,
+			'payment_resume_url' => $pay_url,
 			'cancel_url'       => $cancel_url,
 			'site_url'         => $site_url,
+			'directions_url'   => get_option( 'g2ab_business_directions_url', '' ),
 			'date_now'         => date_i18n( get_option( 'date_format' ) ),
 			'brand_color'      => $brand_color,
 			'brand_logo_url'   => $brand_logo,
 		);
+	}
+
+	private function hydrate_booking_tags_row( $booking ) {
+		$id = absint( $booking['id'] ?? 0 );
+		if ( ! $id ) {
+			return $booking;
+		}
+		global $wpdb;
+		$bt = $wpdb->prefix . 'g2ab_bookings';
+		$rt = $wpdb->prefix . 'g2ab_resources';
+		$tt = $wpdb->prefix . 'g2ab_booking_types';
+		$et = $wpdb->prefix . 'g2ab_events';
+		$pt = $wpdb->prefix . 'g2ab_payments';
+		$row = $wpdb->get_row( $wpdb->prepare(
+			"SELECT b.*, r.name AS resource_name, t.name AS type_name, e.title AS event_title,
+			        p.gateway AS latest_gateway, p.status AS latest_payment_status, p.amount AS latest_payment_amount,
+			        p.gateway_response AS latest_payment_response, p.checkout_expires_at
+			 FROM {$bt} b
+			 LEFT JOIN {$rt} r ON r.id = b.resource_id
+			 LEFT JOIN {$tt} t ON t.id = b.booking_type_id
+			 LEFT JOIN {$et} e ON e.id = b.event_id
+			 LEFT JOIN {$pt} p ON p.id = (SELECT pp.id FROM {$pt} pp WHERE pp.booking_id = b.id ORDER BY pp.created_at DESC, pp.id DESC LIMIT 1)
+			 WHERE b.id = %d LIMIT 1",
+			$id
+		), ARRAY_A );
+		return is_array( $row ) ? array_merge( $booking, $row ) : $booking;
 	}
 
 	private function format_dt( $iso ) {
@@ -273,7 +356,40 @@ class G2AB_Email_Engine {
 					. '<tr><td style="' . $row . '"><div style="' . $label . '">Duration</div><div style="' . $value . '">{duration} min</div></td></tr>'
 					. '<tr><td style="padding:12px 0;"><div style="' . $label . '">Party size</div><div style="' . $value . '">{party_size}</div></td></tr>'
 					. '</table>'
-					. '<p style="margin:24px 0 0;"><a href="{pay_url}" style="' . $cta . '">Complete payment</a></p>'
+					. '<p style="' . $muted . '">If payment is required, a secure payment email will follow once checkout is ready. Need to make changes? Reply to this email or call {business_phone}.</p>',
+			),
+			'payment_required' => array(
+				'enabled'            => 1,
+				'recipient_customer' => 1,
+				'recipient_admin'    => 1,
+				'subject'            => 'Payment required to confirm {service_name}',
+				'body_html'          => '<h2 style="' . $h2 . 'color:{brand_color};">Complete Payment</h2>'
+					. '<p style="margin:0 0 8px;">Hi {customer_name},</p>'
+					. '<p style="margin:0 0 20px;color:#3A3940;">Your reservation hold is ready. Complete secure payment to move it onto the confirmed booking roster.</p>'
+					. '<table role="presentation" style="width:100%;border-collapse:collapse;">'
+					. '<tr><td style="' . $row . '"><div style="' . $label . '">Confirmation #</div><div style="' . $value . '">{confirmation_number}</div></td></tr>'
+					. '<tr><td style="' . $row . '"><div style="' . $label . '">Service</div><div style="' . $value . '">{service_name}</div></td></tr>'
+					. '<tr><td style="' . $row . '"><div style="' . $label . '">When</div><div style="' . $value . '">{start_at}</div></td></tr>'
+					. '<tr><td style="' . $row . '"><div style="' . $label . '">Due now</div><div style="' . $value . '">${due_now} {currency}</div></td></tr>'
+					. '<tr><td style="padding:12px 0;"><div style="' . $label . '">Checkout expires</div><div style="' . $value . '">{checkout_expires_at}</div></td></tr>'
+					. '</table>'
+					. '{{#if pay_url}}<p style="margin:24px 0 0;"><a href="{pay_url}" style="' . $cta . '">Pay securely now</a></p>{{/if}}'
+					. '<p style="' . $muted . '">This hold is not confirmed until payment is verified by Stripe. If the link has expired, reply to this email or call {business_phone}.</p>',
+			),
+			'pay_in_store_reservation' => array(
+				'enabled'            => 1,
+				'recipient_customer' => 1,
+				'recipient_admin'    => 1,
+				'subject'            => 'Pay-at-store reservation received - {service_name}',
+				'body_html'          => '<h2 style="' . $h2 . 'color:{brand_color};">Reservation Held</h2>'
+					. '<p style="margin:0 0 8px;">Hi {customer_name},</p>'
+					. '<p style="margin:0 0 20px;color:#3A3940;">Your pay-at-store reservation is on the operational roster. Please arrive early and pay at the front desk.</p>'
+					. '<table role="presentation" style="width:100%;border-collapse:collapse;">'
+					. '<tr><td style="' . $row . '"><div style="' . $label . '">Confirmation #</div><div style="' . $value . '">{confirmation_number}</div></td></tr>'
+					. '<tr><td style="' . $row . '"><div style="' . $label . '">Service</div><div style="' . $value . '">{service_name}</div></td></tr>'
+					. '<tr><td style="' . $row . '"><div style="' . $label . '">When</div><div style="' . $value . '">{start_at}</div></td></tr>'
+					. '<tr><td style="padding:12px 0;"><div style="' . $label . '">Balance due</div><div style="' . $value . '">${balance_due} {currency}</div></td></tr>'
+					. '</table>'
 					. '<p style="' . $muted . '">Need to make changes? Reply to this email or call {business_phone}.</p>',
 			),
 			'booking_confirmed' => array(
@@ -372,7 +488,9 @@ class G2AB_Email_Engine {
 
 	public function event_labels() {
 		return array(
-			'booking_created'      => 'Booking Created (sent on form submit)',
+			'booking_created'      => 'Booking Received (no payment CTA)',
+			'payment_required'     => 'Payment Required (after checkout URL is saved)',
+			'pay_in_store_reservation' => 'Pay-at-Store Reservation',
 			'booking_confirmed'    => 'Booking Confirmed (after admin approval)',
 			'booking_paid'         => 'Payment Received',
 			'booking_reminder_24h' => 'Reminder — 24 hours before',

@@ -178,6 +178,15 @@ CREATE TABLE {$prefix}memberistic_logs (
   KEY source (source),
   KEY created_at (created_at)
 ) {$charset_collate};
+CREATE TABLE {$prefix}memberistic_rate_limits (
+  rate_key_hash CHAR(64) NOT NULL,
+  attempt_count INT UNSIGNED NOT NULL DEFAULT 0,
+  window_started_at DATETIME NOT NULL,
+  expires_at DATETIME NOT NULL,
+  updated_at DATETIME NOT NULL,
+  PRIMARY KEY  (rate_key_hash),
+  KEY expires_at (expires_at)
+) {$charset_collate};
 CREATE TABLE {$prefix}memberistic_email_logs (
   id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
   membership_id BIGINT UNSIGNED NULL,

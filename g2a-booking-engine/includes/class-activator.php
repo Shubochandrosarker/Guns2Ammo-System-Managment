@@ -79,6 +79,7 @@ final class G2AB_Activator {
 			'g2ab_reminder_hours_before'    => 24,
 			'g2ab_admin_notification_email' => get_option( 'admin_email' ),
 			'g2ab_payment_gateway_default'  => 'pay_in_store',
+			'g2ab_allow_event_pay_in_store_fallback' => 0,
 			'g2ab_stripe_enabled'           => 0,
 			'g2ab_stripe_test_mode'         => 1,
 			'g2ab_stripe_publishable_key'   => '',

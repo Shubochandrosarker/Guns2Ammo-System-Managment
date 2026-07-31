@@ -118,8 +118,8 @@ final class G2AB_Frontend_Shortcode_Reschedule {
 			return $this->error_box( __( 'Booking not found. It may already have been cancelled.', 'g2a-booking' ) );
 		}
 		$meta   = json_decode( (string) $row->metadata, true );
-		$stored = isset( $meta['confirm_token'] ) ? (string) $meta['confirm_token'] : '';
-		if ( '' === $stored || ! hash_equals( $stored, $token ) ) {
+		$meta   = is_array( $meta ) ? $meta : array();
+		if ( ! function_exists( 'g2ab_verify_public_token' ) || ! g2ab_verify_public_token( $token, $meta ) ) {
 			return $this->error_box( __( 'This link has expired. Please call us if you need to make changes.', 'g2a-booking' ) );
 		}
 		$ts = strtotime( (string) $row->start_at );

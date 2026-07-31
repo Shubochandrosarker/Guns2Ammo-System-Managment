@@ -114,6 +114,7 @@ final class G2AB_Plugin
 				if (class_exists('G2AB_Admin_Forms_List'))         G2AB_Admin_Forms_List::instance();
 				if (class_exists('G2AB_Admin_Availability_Crud'))  G2AB_Admin_Availability_Crud::instance();
 				if (class_exists('G2AB_Admin_Payments_List'))      G2AB_Admin_Payments_List::instance();
+				if (class_exists('G2AB_Admin_Checkout_Attempts'))  G2AB_Admin_Checkout_Attempts::instance();
 				if (class_exists('G2AB_Admin_Reports'))            G2AB_Admin_Reports::instance();
 				if (class_exists('G2AB_Admin_Settings_Pro'))       G2AB_Admin_Settings_Pro::instance();
 				if (class_exists('G2AB_Admin_Manual_Booking'))     G2AB_Admin_Manual_Booking::instance();

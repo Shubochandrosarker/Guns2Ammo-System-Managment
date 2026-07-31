@@ -45,7 +45,9 @@ class G2AB_Email_Cron {
 		$lg = $wpdb->prefix . 'g2ab_logs';
 
 		// Only care about confirmed/paid bookings — reservations not yet paid don't get reminders.
-		$active_statuses = "'reserved','confirmed','paid'";
+		$operational_sql = class_exists( 'G2AB_Booking_Visibility' )
+			? G2AB_Booking_Visibility::operational_sql( 'b' )
+			: "( b.status IN ('confirmed','paid','completed') OR ( b.status = 'reserved' AND b.payment_mode = 'in_store' ) )";
 
 		// bookings.start_at is stored as site-local wall-clock time (see
 		// class-bookings-controller.php), so window bounds must be computed
@@ -63,7 +65,7 @@ class G2AB_Email_Cron {
 		$end_24   = $now->modify( '+25 hours' )->format( 'Y-m-d H:i:s' );
 
 		$rows_24 = $wpdb->get_results( $wpdb->prepare(
-			"SELECT * FROM {$bk} WHERE start_at BETWEEN %s AND %s AND status IN ({$active_statuses}) AND id NOT IN ( SELECT booking_id FROM {$lg} WHERE booking_id IS NOT NULL AND event_type = %s ) ORDER BY start_at ASC LIMIT 200",
+			"SELECT b.* FROM {$bk} b WHERE b.start_at BETWEEN %s AND %s AND {$operational_sql} AND b.id NOT IN ( SELECT booking_id FROM {$lg} WHERE booking_id IS NOT NULL AND event_type = %s ) ORDER BY b.start_at ASC LIMIT 200",
 			$start_24, $end_24, self::LOG_24H
 		) ); // phpcs:ignore
 
@@ -83,7 +85,7 @@ class G2AB_Email_Cron {
 		$end_2   = $now->modify( '+135 minutes' )->format( 'Y-m-d H:i:s' );
 
 		$rows_2 = $wpdb->get_results( $wpdb->prepare(
-			"SELECT * FROM {$bk} WHERE start_at BETWEEN %s AND %s AND status IN ({$active_statuses}) AND id NOT IN ( SELECT booking_id FROM {$lg} WHERE booking_id IS NOT NULL AND event_type = %s ) ORDER BY start_at ASC LIMIT 200",
+			"SELECT b.* FROM {$bk} b WHERE b.start_at BETWEEN %s AND %s AND {$operational_sql} AND b.id NOT IN ( SELECT booking_id FROM {$lg} WHERE booking_id IS NOT NULL AND event_type = %s ) ORDER BY b.start_at ASC LIMIT 200",
 			$start_2, $end_2, self::LOG_2H
 		) ); // phpcs:ignore
 

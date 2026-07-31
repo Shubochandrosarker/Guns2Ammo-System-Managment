@@ -38,6 +38,7 @@ final class G2AB_Admin_Events {
 		add_action( 'admin_post_g2ab_delete_event', array( $this, 'handle_delete_event' ) );
 		add_action( 'admin_post_g2ab_add_occurrence', array( $this, 'handle_add_occurrence' ) );
 		add_action( 'admin_post_g2ab_delete_occurrence', array( $this, 'handle_delete_occurrence' ) );
+		add_action( 'admin_post_g2ab_recalculate_occurrence_capacity', array( $this, 'handle_recalculate_occurrence_capacity' ) );
 	}
 
 	public function register_menu() {
@@ -241,17 +242,37 @@ final class G2AB_Admin_Events {
 						<th><?php esc_html_e( 'Seats', 'g2a-booking' ); ?></th>
 						<th><?php esc_html_e( 'Booked', 'g2a-booking' ); ?></th>
 						<th><?php esc_html_e( 'Open', 'g2a-booking' ); ?></th>
+						<th><?php esc_html_e( 'Capacity check', 'g2a-booking' ); ?></th>
 						<th><?php esc_html_e( 'Price', 'g2a-booking' ); ?></th>
 						<th><?php esc_html_e( 'Status', 'g2a-booking' ); ?></th>
 						<th></th>
 					</tr></thead>
 					<tbody>
-						<?php foreach ( $occs as $o ) : ?>
+						<?php foreach ( $occs as $o ) :
+							$diag = class_exists( 'G2AB_Event_Capacity_Service' ) ? G2AB_Event_Capacity_Service::diagnostics( $o->id ) : null;
+							?>
 							<tr class="<?php echo 'cancelled' === $o->status ? 'is-cancelled' : ''; ?>">
 								<td><?php echo esc_html( $this->fmt_dt( $o->start_at ) ); ?></td>
 								<td><?php echo (int) $o->seats_total; ?></td>
 								<td><?php echo (int) $o->seats_booked; ?></td>
 								<td><strong><?php echo (int) $o->seats_left; ?></strong></td>
+								<td>
+									<?php if ( is_array( $diag ) ) : ?>
+										<details class="g2ab-ev__diag">
+											<summary><?php echo (int) $diag['reserved']; ?>/<?php echo (int) $diag['capacity']; ?> <?php esc_html_e( 'live', 'g2a-booking' ); ?></summary>
+											<p><?php printf( esc_html__( 'Confirmed: %1$d | Active holds: %2$d | Pay in store: %3$d | Expired holds: %4$d', 'g2a-booking' ), (int) $diag['confirmed_seats'], (int) $diag['active_pending_holds'], (int) $diag['reserved_pay_store_seats'], (int) $diag['expired_pending_holds'] ); ?></p>
+											<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
+												<?php wp_nonce_field( 'g2ab_recalculate_occurrence_capacity_' . $o->id, '_g2ab_nonce' ); ?>
+												<input type="hidden" name="action" value="g2ab_recalculate_occurrence_capacity" />
+												<input type="hidden" name="id" value="<?php echo (int) $o->id; ?>" />
+												<input type="hidden" name="event_id" value="<?php echo (int) $ev->id; ?>" />
+												<button class="g2ab-ev__btn g2ab-ev__btn--sm"><?php esc_html_e( 'RECALC', 'g2a-booking' ); ?></button>
+											</form>
+										</details>
+									<?php else : ?>
+										<span class="g2ab-ev__next-none"><?php esc_html_e( 'Unavailable', 'g2a-booking' ); ?></span>
+									<?php endif; ?>
+								</td>
 								<td><?php echo (int) $ev->is_free === 1 ? esc_html__( 'Free', 'g2a-booking' ) : '$' . esc_html( number_format( (float) $o->price_effective, 2 ) ); ?></td>
 								<td><?php echo esc_html( ucfirst( $o->status ) ); ?></td>
 								<td>
@@ -372,6 +393,29 @@ final class G2AB_Admin_Events {
 
 	/* ───────────────────────── Helpers ───────────────────────── */
 
+	public function handle_recalculate_occurrence_capacity() {
+		$id       = (int) ( $_POST['id'] ?? 0 );
+		$event_id = (int) ( $_POST['event_id'] ?? 0 );
+		if ( ! current_user_can( self::CAP ) ) {
+			wp_die( esc_html__( 'No permission.', 'g2a-booking' ) );
+		}
+		check_admin_referer( 'g2ab_recalculate_occurrence_capacity_' . $id, '_g2ab_nonce' );
+		if ( ! class_exists( 'G2AB_Event_Capacity_Service' ) ) {
+			$this->set_notice( 'error', __( 'Capacity service is unavailable.', 'g2a-booking' ) );
+			wp_safe_redirect( admin_url( 'admin.php?page=' . self::PAGE_SLUG . '&action=edit&id=' . $event_id ) );
+			exit;
+		}
+		$expired = G2AB_Event_Capacity_Service::expire_stale_holds( $id );
+		$diag    = G2AB_Event_Capacity_Service::diagnostics( $id );
+		if ( is_wp_error( $diag ) ) {
+			$this->set_notice( 'error', $diag->get_error_message() );
+		} else {
+			$this->set_notice( 'success', sprintf( __( 'Capacity recalculated. Expired holds: %1$d. Live open seats: %2$d of %3$d.', 'g2a-booking' ), (int) $expired, (int) $diag['seats_left'], (int) $diag['capacity'] ) );
+		}
+		wp_safe_redirect( admin_url( 'admin.php?page=' . self::PAGE_SLUG . '&action=edit&id=' . $event_id ) );
+		exit;
+	}
+
 	private function fmt_dt( $sql ) {
 		return G2AB_Events::format_local( $sql, 'D, M j · g:i A' );
 	}
@@ -457,6 +501,8 @@ final class G2AB_Admin_Events {
 		.g2ab-ev__occ-table td{padding:9px 10px;border-bottom:1px solid var(--ev-border);color:var(--ev-text);}
 		.g2ab-ev__occ-table tr.is-cancelled{opacity:.5;}
 		.g2ab-ev__occ-table form{margin:0;}
+		.g2ab-ev__diag summary{cursor:pointer;color:#7BD389;font-weight:700;}
+		.g2ab-ev__diag p{margin:8px 0;color:var(--ev-muted);font-size:11px;line-height:1.45;max-width:260px;}
 		</style>
 		<?php
 	}

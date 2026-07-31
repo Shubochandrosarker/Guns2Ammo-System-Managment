@@ -67,6 +67,13 @@ final class Stripe_Service {
 	 */
 	private static $cancel_preflight_done = array();
 
+	/**
+	 * Per-request id used only in safe checkout diagnostics.
+	 *
+	 * @var string
+	 */
+	private static $checkout_request_id = '';
+
 	public static function is_enabled() {
 		return 'yes' === memberistic_get_setting( 'stripe_enabled', 'no' ) && '' !== self::get_secret_key();
 	}
@@ -82,12 +89,24 @@ final class Stripe_Service {
 			return;
 		}
 
+		self::send_checkout_no_cache_headers();
+
 		if ( ! isset( $_SERVER['REQUEST_METHOD'] ) || 'POST' !== $_SERVER['REQUEST_METHOD'] ) {
-			return;
+			self::checkout_error(
+				'memberistic_checkout_method_not_allowed',
+				__( 'Checkout requests must be submitted from the membership checkout form.', 'memberistic' ),
+				405,
+				__( 'Invalid checkout request', 'memberistic' )
+			);
 		}
 
 		if ( empty( $_POST['memberistic_action'] ) || 'start_checkout' !== sanitize_key( wp_unslash( $_POST['memberistic_action'] ) ) ) {
-			return;
+			self::checkout_error(
+				'memberistic_checkout_missing_action',
+				__( 'Checkout request could not be started. No payment was taken.', 'memberistic' ),
+				400,
+				__( 'Invalid checkout request', 'memberistic' )
+			);
 		}
 
 		self::handle_checkout_request();
@@ -554,18 +573,20 @@ final class Stripe_Service {
 	}
 
 	public static function handle_checkout_request() {
+		self::send_checkout_no_cache_headers();
+
 		if ( empty( $_POST['_wpnonce'] ) || ! wp_verify_nonce( sanitize_text_field( wp_unslash( $_POST['_wpnonce'] ) ), 'memberistic_checkout' ) ) {
-			wp_die( esc_html__( 'Checkout request could not be verified.', 'memberistic' ) );
+			self::checkout_error( 'memberistic_checkout_nonce_failed', __( 'Checkout request could not be verified. No payment was taken.', 'memberistic' ), 403, __( 'Checkout verification failed', 'memberistic' ) );
 		}
 
 		if ( ! self::is_enabled() ) {
-			wp_die( esc_html__( 'Stripe checkout is not enabled yet.', 'memberistic' ) );
+			self::checkout_error( 'memberistic_checkout_disabled', __( 'We couldn\'t connect to secure payment checkout. No payment was taken. Please try again.', 'memberistic' ), 503, __( 'Checkout temporarily unavailable', 'memberistic' ) );
 		}
 
 		// Throttle the public checkout endpoint per IP. The signup nonce is
 		// rendered on a public page (identical for all logged-out visitors),
-		// so without this a script could seed pending memberships and fire
-		// 'membership_created' mail to arbitrary addresses. 8 attempts / 10 min.
+		// so without this a script could seed pending memberships for
+		// arbitrary addresses. 8 attempts / 10 min.
 		// Checked and charged as one atomic step (MySQL advisory lock) so a
 		// scripted concurrent burst can't have two requests both read the
 		// same stale count and both slip through — the lost-update race
@@ -578,20 +599,24 @@ final class Stripe_Service {
 		$terms         = isset( $_POST['terms_acceptance'] ) ? sanitize_key( wp_unslash( $_POST['terms_acceptance'] ) ) : '';
 		$plan          = $plan_id ? Plans_Repository::get( $plan_id ) : null;
 
+		if ( ! self::checkout_referer_is_same_origin() ) {
+			self::checkout_error( 'memberistic_checkout_cross_origin', __( 'Checkout request could not be verified. No payment was taken.', 'memberistic' ), 403, __( 'Checkout verification failed', 'memberistic' ) );
+		}
+
 		if ( ! $plan ) {
-			wp_die( esc_html__( 'The selected membership plan was not found or is no longer available.', 'memberistic' ) );
+			self::checkout_error( 'memberistic_checkout_invalid_plan', __( 'The selected membership plan was not found or is no longer available. No payment was taken.', 'memberistic' ), 400, __( 'Invalid checkout request', 'memberistic' ) );
 		}
 
 		if ( '' === $full_name ) {
-			wp_die( esc_html__( 'Please enter your full name.', 'memberistic' ) );
+			self::checkout_error( 'memberistic_checkout_missing_name', __( 'Please enter your full name. No payment was taken.', 'memberistic' ), 400, __( 'Invalid checkout request', 'memberistic' ) );
 		}
 
 		if ( ! is_email( $email ) ) {
-			wp_die( esc_html__( 'Please enter a valid email address.', 'memberistic' ) );
+			self::checkout_error( 'memberistic_checkout_invalid_email', __( 'Please enter a valid email address. No payment was taken.', 'memberistic' ), 400, __( 'Invalid checkout request', 'memberistic' ) );
 		}
 
 		if ( 'yes' !== $terms ) {
-			wp_die( esc_html__( 'You must accept the terms to continue.', 'memberistic' ) );
+			self::checkout_error( 'memberistic_checkout_terms_required', __( 'You must accept the terms to continue. No payment was taken.', 'memberistic' ), 400, __( 'Invalid checkout request', 'memberistic' ) );
 		}
 
 		// Age-verification gate (Verifyistic integration). When "require
@@ -627,37 +652,24 @@ final class Stripe_Service {
 		if ( $pending_existing && ! empty( $pending_existing['id'] ) ) {
 			$existing_session = self::resume_pending_checkout_session( $pending_existing, $plan, $billing_cycle, $email );
 			if ( is_wp_error( $existing_session ) ) {
-				wp_die( esc_html( $existing_session->get_error_message() ) );
+				self::checkout_error( $existing_session->get_error_code(), self::checkout_public_message_for_error( $existing_session ), self::checkout_status_for_error( $existing_session ), __( 'Checkout temporarily unavailable', 'memberistic' ) );
 			}
 			if ( ! empty( $existing_session['url'] ) ) {
-				$redirect_url  = esc_url_raw( $existing_session['url'] );
-				$redirect_host = wp_parse_url( $redirect_url, PHP_URL_HOST );
-				if ( in_array( $redirect_host, array( 'checkout.stripe.com', 'billing.stripe.com', wp_parse_url( home_url( '/' ), PHP_URL_HOST ) ), true ) ) {
-					wp_redirect( $redirect_url ); // phpcs:ignore WordPress.Security.SafeRedirect.wp_redirect_wp_redirect
-					exit;
-				}
+				self::redirect_to_checkout_url( (string) $existing_session['url'], true );
 			}
 		}
 
 		$mem_rl_key = 'memberistic_checkout_rl_' . md5( self::client_ip() . '|' . hash( 'sha256', strtolower( $email ) ) );
 		$limit_check = self::atomic_check_and_increment( $mem_rl_key, (int) apply_filters( 'memberistic_checkout_rate_limit', 8 ), 10 * MINUTE_IN_SECONDS );
 		if ( is_wp_error( $limit_check ) ) {
-			wp_die(
-				esc_html( $limit_check->get_error_message() ),
-				esc_html__( 'Checkout temporarily unavailable', 'memberistic' ),
-				array( 'response' => 503 )
-			);
+			self::checkout_error( $limit_check->get_error_code(), self::checkout_public_message_for_error( $limit_check ), self::checkout_status_for_error( $limit_check ), __( 'Checkout temporarily unavailable', 'memberistic' ) );
 		}
 		if ( ! $limit_check ) {
 			if ( ! headers_sent() ) {
 				status_header( 429 );
 				header( 'Retry-After: 600' );
 			}
-			wp_die(
-				esc_html__( 'Too many checkout attempts. Please wait a few minutes and try again.', 'memberistic' ),
-				esc_html__( 'Slow down', 'memberistic' ),
-				array( 'response' => 429 )
-			);
+			self::checkout_error( 'memberistic_checkout_rate_limited', __( 'Too many checkout attempts. Please wait a few minutes and try again.', 'memberistic' ), 429, __( 'Slow down', 'memberistic' ) );
 		}
 
 		$membership_id = Memberships_Repository::create(
@@ -672,7 +684,7 @@ final class Stripe_Service {
 		);
 
 		if ( ! $membership_id ) {
-			wp_die( esc_html__( 'Membership could not be created.', 'memberistic' ) );
+			self::checkout_error( 'memberistic_checkout_membership_create_failed', __( 'We couldn\'t start checkout. No payment was taken. Please contact Guns 2 Ammo if the issue continues.', 'memberistic' ), 503, __( 'Checkout temporarily unavailable', 'memberistic' ) );
 		}
 
 		$person_id = People_Repository::create(
@@ -688,8 +700,6 @@ final class Stripe_Service {
 			)
 		);
 
-		Email_Service::send_membership_email( $membership_id, 'membership_created' );
-
 		Activity_Repository::log(
 			array(
 				'membership_id' => $membership_id,
@@ -702,22 +712,119 @@ final class Stripe_Service {
 		$session = self::create_checkout_session( $membership_id, $plan, $billing_cycle, $email );
 
 		if ( is_wp_error( $session ) ) {
-			wp_die( esc_html( $session->get_error_message() ) );
+			self::record_manual_review( 'checkout_session_create_failed', $membership_id, array( 'message' => $session->get_error_message() ) );
+			self::checkout_error( $session->get_error_code(), self::checkout_public_message_for_error( $session ), self::checkout_status_for_error( $session ), __( 'Checkout temporarily unavailable', 'memberistic' ) );
 		}
 
 		if ( empty( $session['url'] ) ) {
-			wp_die( esc_html__( 'Stripe did not return a checkout URL.', 'memberistic' ) );
+			self::record_manual_review( 'checkout_session_missing_url', $membership_id );
+			self::checkout_error( 'memberistic_stripe_missing_checkout_url', __( 'We couldn\'t connect to secure payment checkout. No payment was taken. Please try again.', 'memberistic' ), 502, __( 'Checkout temporarily unavailable', 'memberistic' ) );
 		}
 
-		$redirect_url  = esc_url_raw( $session['url'] );
-		$redirect_host = wp_parse_url( $redirect_url, PHP_URL_HOST );
+		self::redirect_to_checkout_url( (string) $session['url'] );
+	}
 
-		if ( ! in_array( $redirect_host, array( 'checkout.stripe.com', 'billing.stripe.com' ), true ) ) {
-			wp_die( esc_html__( 'Stripe returned an invalid checkout URL.', 'memberistic' ) );
+	private static function checkout_referer_is_same_origin() {
+		$referer = wp_get_referer();
+		if ( ! $referer ) {
+			return true;
+		}
+
+		$referer_host = wp_parse_url( $referer, PHP_URL_HOST );
+		if ( ! $referer_host ) {
+			return true;
+		}
+
+		return strtolower( (string) $referer_host ) === strtolower( (string) wp_parse_url( home_url( '/' ), PHP_URL_HOST ) );
+	}
+
+	private static function redirect_to_checkout_url( $url, $allow_site_return = false ) {
+		$redirect_url  = esc_url_raw( $url );
+		$redirect_host = wp_parse_url( $redirect_url, PHP_URL_HOST );
+		$allowed_hosts = array( 'checkout.stripe.com' );
+
+		if ( $allow_site_return ) {
+			$site_host = wp_parse_url( home_url( '/' ), PHP_URL_HOST );
+			if ( $site_host ) {
+				$allowed_hosts[] = $site_host;
+			}
+		}
+
+		if ( ! $redirect_host || ! in_array( strtolower( (string) $redirect_host ), array_map( 'strtolower', $allowed_hosts ), true ) ) {
+			self::checkout_error( 'memberistic_invalid_checkout_redirect', __( 'We couldn\'t start checkout. No payment was taken. Please contact Guns 2 Ammo if the issue continues.', 'memberistic' ), 502, __( 'Checkout temporarily unavailable', 'memberistic' ) );
 		}
 
 		wp_redirect( $redirect_url ); // phpcs:ignore WordPress.Security.SafeRedirect.wp_redirect_wp_redirect
 		exit;
+	}
+
+	private static function checkout_public_message_for_error( $error ) {
+		$code = is_wp_error( $error ) ? (string) $error->get_error_code() : '';
+
+		if ( 'memberistic_rate_lock_contention' === $code ) {
+			return __( 'Checkout is handling another request. Please wait a few seconds and try again.', 'memberistic' );
+		}
+
+		if ( false !== strpos( $code, 'rate_limited' ) ) {
+			return __( 'Too many checkout attempts. Please wait a few minutes and try again.', 'memberistic' );
+		}
+
+		if ( false !== strpos( $code, 'stripe' ) || false !== strpos( $code, 'checkout_session' ) ) {
+			return __( 'We couldn\'t connect to secure payment checkout. No payment was taken. Please try again.', 'memberistic' );
+		}
+
+		return __( 'We couldn\'t start checkout. No payment was taken. Please contact Guns 2 Ammo if the issue continues.', 'memberistic' );
+	}
+
+	private static function checkout_status_for_error( $error ) {
+		$data = is_wp_error( $error ) ? $error->get_error_data() : array();
+		if ( is_array( $data ) && ! empty( $data['status'] ) ) {
+			return max( 400, min( 599, (int) $data['status'] ) );
+		}
+
+		$code = is_wp_error( $error ) ? (string) $error->get_error_code() : '';
+		if ( 'memberistic_rate_lock_contention' === $code ) {
+			return 409;
+		}
+		if ( false !== strpos( $code, 'rate_limited' ) ) {
+			return 429;
+		}
+		if ( false !== strpos( $code, 'stripe' ) || false !== strpos( $code, 'checkout_session' ) ) {
+			return 502;
+		}
+		return 503;
+	}
+
+	private static function checkout_error( $code, $message, $status = 400, $title = '' ) {
+		self::send_checkout_no_cache_headers();
+		$status = max( 400, min( 599, (int) $status ) );
+		$title  = $title ? $title : __( 'Checkout unavailable', 'memberistic' );
+
+		self::debug_log_checkout(
+			sanitize_key( (string) $code ),
+			array(
+				'result' => 'checkout_error',
+				'status' => $status,
+			)
+		);
+
+		wp_die(
+			esc_html( $message ),
+			esc_html( $title ),
+			array(
+				'response'  => $status,
+				'back_link' => true,
+			)
+		);
+	}
+
+	private static function send_checkout_no_cache_headers() {
+		if ( headers_sent() ) {
+			return;
+		}
+		nocache_headers();
+		header( 'Cache-Control: no-store, no-cache, must-revalidate, max-age=0' );
+		header( 'Pragma: no-cache' );
 	}
 
 	/**
@@ -1266,7 +1373,11 @@ final class Stripe_Service {
 		$lock_key = '';
 		if ( '' !== $event_id ) {
 			$lock_key = 'stripe_evt_' . $event_id;
-			if ( ! self::acquire_lock( $lock_key ) ) {
+			$lock = self::acquire_lock( $lock_key );
+			if ( is_wp_error( $lock ) ) {
+				return $lock;
+			}
+			if ( ! $lock ) {
 				return new \WP_Error( 'memberistic_stripe_webhook_locked', __( 'Could not acquire the idempotency lock; try again.', 'memberistic' ), array( 'status' => 503 ) );
 			}
 			if ( self::is_event_processed( $event_id ) ) {
@@ -1462,7 +1573,11 @@ final class Stripe_Service {
 		}
 
 		$lock_key = 'membership_activate_' . $membership_id;
-		if ( ! self::acquire_lock( $lock_key ) ) {
+		$lock = self::acquire_lock( $lock_key );
+		if ( is_wp_error( $lock ) ) {
+			return $lock;
+		}
+		if ( ! $lock ) {
 			return new \WP_Error( 'memberistic_membership_locked', __( 'Membership activation is already processing.', 'memberistic' ), array( 'status' => 503 ) );
 		}
 
@@ -1674,8 +1789,12 @@ final class Stripe_Service {
 	 * @return bool True when the counter was under `$max` and got charged.
 	 */
 	private static function atomic_check_and_increment( $key, $max, $ttl ) {
-		if ( ! self::acquire_lock( $key ) ) {
-			return new \WP_Error( 'memberistic_rate_lock_timeout', __( 'Checkout is busy. Please try again in a moment.', 'memberistic' ), array( 'status' => 503 ) );
+		$lock = self::acquire_lock( $key );
+		if ( is_wp_error( $lock ) ) {
+			return self::fallback_atomic_check_and_increment( $key, $max, $ttl, $lock );
+		}
+		if ( ! $lock ) {
+			return new \WP_Error( 'memberistic_rate_lock_contention', __( 'Checkout is handling another request. Please wait a few seconds and try again.', 'memberistic' ), array( 'status' => 409 ) );
 		}
 		try {
 			$count = (int) get_transient( $key );
@@ -1811,9 +1930,30 @@ final class Stripe_Service {
 	private static function acquire_lock( $key, $timeout = 3 ) {
 		global $wpdb;
 		if ( ! is_object( $wpdb ) || ! method_exists( $wpdb, 'get_var' ) ) {
+			return new \WP_Error( 'memberistic_lock_database_unavailable', __( 'Database locking is unavailable.', 'memberistic' ), array( 'status' => 503 ) );
+		}
+
+		$lock_name = self::rate_limit_lock_name( $key );
+		$result    = $wpdb->get_var( $wpdb->prepare( 'SELECT GET_LOCK(%s, %d)', $lock_name, max( 0, $timeout ) ) );
+		$category  = self::lock_result_category( $result );
+
+		if ( 'acquired' === $category ) {
 			return true;
 		}
-		return 1 === (int) $wpdb->get_var( $wpdb->prepare( 'SELECT GET_LOCK(%s, %d)', 'memberistic_rl_lock_' . $key, max( 0, $timeout ) ) );
+
+		self::debug_log_checkout(
+			'memberistic_lock_' . $category,
+			array(
+				'lock_name_length' => strlen( $lock_name ),
+				'result'           => $category,
+			)
+		);
+
+		if ( 'contention' === $category ) {
+			return false;
+		}
+
+		return new \WP_Error( 'memberistic_lock_database_' . $category, __( 'Database locking is unavailable.', 'memberistic' ), array( 'status' => 503 ) );
 	}
 
 	private static function release_lock( $key ) {
@@ -1821,6 +1961,110 @@ final class Stripe_Service {
 		if ( ! is_object( $wpdb ) || ! method_exists( $wpdb, 'get_var' ) ) {
 			return;
 		}
-		$wpdb->get_var( $wpdb->prepare( 'SELECT RELEASE_LOCK(%s)', 'memberistic_rl_lock_' . $key ) );
+		$wpdb->get_var( $wpdb->prepare( 'SELECT RELEASE_LOCK(%s)', self::rate_limit_lock_name( $key ) ) );
+	}
+
+	private static function rate_limit_lock_name( $key ) {
+		$prefix = 'memberistic_rl_';
+		return $prefix . substr( hash( 'sha256', (string) $key ), 0, 64 - strlen( $prefix ) );
+	}
+
+	private static function lock_result_category( $result ) {
+		if ( null === $result || false === $result ) {
+			return 'failure';
+		}
+		if ( 1 === (int) $result ) {
+			return 'acquired';
+		}
+		if ( 0 === (int) $result ) {
+			return 'contention';
+		}
+		return 'failure';
+	}
+
+	private static function fallback_atomic_check_and_increment( $key, $max, $ttl, $lock_error ) {
+		global $wpdb;
+
+		self::debug_log_checkout(
+			'memberistic_rate_limit_lock_fallback',
+			array(
+				'result'           => 'fallback',
+				'lock_error_code'  => is_wp_error( $lock_error ) ? $lock_error->get_error_code() : '',
+				'lock_name_length' => strlen( self::rate_limit_lock_name( $key ) ),
+			)
+		);
+
+		if ( ! is_object( $wpdb ) || ! method_exists( $wpdb, 'query' ) || ! method_exists( $wpdb, 'get_var' ) ) {
+			return new \WP_Error( 'memberistic_rate_limit_unavailable', __( 'Checkout rate limiting is unavailable.', 'memberistic' ), array( 'status' => 503 ) );
+		}
+
+		$table       = $wpdb->prefix . 'memberistic_rate_limits';
+		$key_hash    = hash( 'sha256', (string) $key );
+		$now_ts      = current_time( 'timestamp' );
+		$now         = wp_date( 'Y-m-d H:i:s', $now_ts );
+		$expires_at  = wp_date( 'Y-m-d H:i:s', $now_ts + max( 1, (int) $ttl ) );
+		$table_sql   = esc_sql( $table );
+
+		$query = $wpdb->prepare(
+			"INSERT INTO `{$table_sql}` ( rate_key_hash, attempt_count, window_started_at, expires_at, updated_at )
+			VALUES ( %s, 1, %s, %s, %s )
+			ON DUPLICATE KEY UPDATE
+				attempt_count = IF( expires_at <= VALUES( updated_at ), 1, attempt_count + 1 ),
+				window_started_at = IF( expires_at <= VALUES( updated_at ), VALUES( window_started_at ), window_started_at ),
+				expires_at = IF( expires_at <= VALUES( updated_at ), VALUES( expires_at ), expires_at ),
+				updated_at = VALUES( updated_at )",
+			$key_hash,
+			$now,
+			$expires_at,
+			$now
+		);
+
+		if ( false === $wpdb->query( $query ) ) { // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+			self::debug_log_checkout( 'memberistic_rate_limit_fallback_query_failed', array( 'result' => 'failure' ) );
+			return new \WP_Error( 'memberistic_rate_limit_unavailable', __( 'Checkout rate limiting is unavailable.', 'memberistic' ), array( 'status' => 503 ) );
+		}
+
+		$count = (int) $wpdb->get_var( $wpdb->prepare( "SELECT attempt_count FROM `{$table_sql}` WHERE rate_key_hash = %s LIMIT 1", $key_hash ) );
+		return $count <= max( 1, (int) $max );
+	}
+
+	public static function prune_expired_rate_limits() {
+		global $wpdb;
+		if ( ! is_object( $wpdb ) || ! method_exists( $wpdb, 'query' ) ) {
+			return;
+		}
+		$table = esc_sql( $wpdb->prefix . 'memberistic_rate_limits' );
+		$wpdb->query( $wpdb->prepare( "DELETE FROM `{$table}` WHERE expires_at < %s", current_time( 'mysql' ) ) );
+	}
+
+	private static function checkout_request_id() {
+		if ( '' === self::$checkout_request_id ) {
+			self::$checkout_request_id = function_exists( 'wp_generate_uuid4' ) ? wp_generate_uuid4() : uniqid( 'memberistic_', true );
+		}
+		return self::$checkout_request_id;
+	}
+
+	private static function debug_log_checkout( $code, $context = array() ) {
+		if ( ! defined( 'WP_DEBUG_LOG' ) || ! WP_DEBUG_LOG ) {
+			return;
+		}
+
+		global $wpdb;
+		$db_version = '';
+		if ( is_object( $wpdb ) && method_exists( $wpdb, 'get_var' ) ) {
+			$db_version = (string) $wpdb->get_var( 'SELECT VERSION()' );
+			$db_version = preg_replace( '/[^0-9A-Za-z.\-_+ ]/', '', $db_version );
+		}
+
+		$payload = array_merge(
+			array(
+				'code'       => sanitize_key( (string) $code ),
+				'request_id' => sanitize_text_field( self::checkout_request_id() ),
+				'db_version' => $db_version,
+			),
+			is_array( $context ) ? $context : array()
+		);
+
+		error_log( 'Memberistic checkout diagnostic: ' . wp_json_encode( $payload ) ); // phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log
 	}
 }

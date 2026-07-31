@@ -403,6 +403,19 @@ function g2ab_table_exists( $table ) {
 	return $cache[ $table ];
 }
 
+function g2ab_column_exists( $table, $column ) {
+	global $wpdb;
+	static $cache = array();
+	$table  = (string) $table;
+	$column = (string) $column;
+	$key    = $table . '.' . $column;
+	if ( isset( $cache[ $key ] ) ) {
+		return $cache[ $key ];
+	}
+	$cache[ $key ] = (bool) $wpdb->get_var( $wpdb->prepare( "SHOW COLUMNS FROM {$table} LIKE %s", $column ) );
+	return $cache[ $key ];
+}
+
 function g2ab_mysql_lock( $key, $timeout = 3 ) {
 	global $wpdb;
 	if ( ! is_object( $wpdb ) || ! method_exists( $wpdb, 'get_var' ) ) {
@@ -417,6 +430,159 @@ function g2ab_mysql_unlock( $key ) {
 		return;
 	}
 	$wpdb->get_var( $wpdb->prepare( 'SELECT RELEASE_LOCK(%s)', (string) $key ) );
+}
+
+function g2ab_hash_public_token( $token ) {
+	$token = (string) $token;
+	if ( '' === $token ) {
+		return '';
+	}
+	return hash_hmac( 'sha256', $token, wp_salt( 'auth' ) );
+}
+
+function g2ab_verify_public_token( $incoming_token, array $metadata, $legacy_key = 'confirm_token' ) {
+	$incoming_token = (string) $incoming_token;
+	if ( '' === $incoming_token ) {
+		return false;
+	}
+	$incoming_hash = g2ab_hash_public_token( $incoming_token );
+	$stored_hash   = isset( $metadata[ $legacy_key . '_hash' ] ) ? (string) $metadata[ $legacy_key . '_hash' ] : '';
+	if ( '' !== $stored_hash ) {
+		return hash_equals( $stored_hash, $incoming_hash );
+	}
+	$legacy_raw = isset( $metadata[ $legacy_key ] ) ? (string) $metadata[ $legacy_key ] : '';
+	return '' !== $legacy_raw && hash_equals( $legacy_raw, $incoming_token );
+}
+
+function g2ab_rate_limit_check( $scope, array $parts, $limit, $window_seconds ) {
+	global $wpdb;
+	$scope          = sanitize_key( (string) $scope );
+	$limit          = max( 1, (int) $limit );
+	$window_seconds = max( 1, (int) $window_seconds );
+	$key            = 'g2ab_rl_' . md5( $scope . '|' . implode( '|', array_map( 'strval', $parts ) ) );
+	$option_name    = '_g2ab_rate_' . $key;
+	$lock_name      = 'g2ab_rate_' . md5( $option_name );
+	$now            = time();
+	$expires        = $now + $window_seconds;
+	$count          = 1;
+
+	if ( ! g2ab_mysql_lock( $lock_name, 2 ) ) {
+		return array( 'limited' => false, 'count' => 0, 'retry_after' => $window_seconds, 'key' => $key );
+	}
+
+	try {
+		$raw = (string) get_option( $option_name, '' );
+		if ( '' !== $raw ) {
+			$data = json_decode( $raw, true );
+			if ( is_array( $data ) && ! empty( $data['expires'] ) && (int) $data['expires'] > $now ) {
+				$expires = (int) $data['expires'];
+				$count   = (int) ( $data['count'] ?? 0 ) + 1;
+			}
+		}
+
+		update_option(
+			$option_name,
+			wp_json_encode(
+				array(
+					'count'   => $count,
+					'expires' => $expires,
+				)
+			),
+			false
+		);
+	} finally {
+		g2ab_mysql_unlock( $lock_name );
+	}
+
+	return array(
+		'limited'     => $count > $limit,
+		'count'       => $count,
+		'retry_after' => max( 1, $expires - $now ),
+		'key'         => $key,
+	);
+}
+
+function g2ab_rate_limit_clear( $scope, array $parts ) {
+	$key = '_g2ab_rate_g2ab_rl_' . md5( sanitize_key( (string) $scope ) . '|' . implode( '|', array_map( 'strval', $parts ) ) );
+	delete_option( $key );
+}
+
+function g2ab_provision_booking_customer_account( $booking_id ) {
+	global $wpdb;
+	$booking_id = absint( $booking_id );
+	if ( ! $booking_id ) {
+		return 0;
+	}
+	$lock_name = 'g2ab_customer_' . $booking_id;
+	if ( ! g2ab_mysql_lock( $lock_name, 3 ) ) {
+		return 0;
+	}
+
+	try {
+		$table   = $wpdb->prefix . 'g2ab_bookings';
+		$booking = $wpdb->get_row( $wpdb->prepare( "SELECT * FROM {$table} WHERE id = %d LIMIT 1", $booking_id ) );
+		if ( ! $booking || ! is_email( $booking->customer_email ) ) {
+			return 0;
+		}
+		if ( ! empty( $booking->user_id ) ) {
+			return (int) $booking->user_id;
+		}
+
+		$user = get_user_by( 'email', (string) $booking->customer_email );
+		if ( $user instanceof WP_User ) {
+			$user_id = (int) $user->ID;
+			update_user_meta( $user_id, 'g2ab_last_booking_contact_phone', (string) $booking->customer_phone );
+		} else {
+			$parts      = preg_split( '/\s+/', trim( (string) $booking->customer_name ) );
+			$first_name = $parts ? array_shift( $parts ) : '';
+			$last_name  = $parts ? implode( ' ', $parts ) : '';
+			$base_login = sanitize_user( current( explode( '@', (string) $booking->customer_email ) ), true );
+			if ( '' === $base_login ) {
+				$base_login = 'g2a_customer';
+			}
+			$user_login = $base_login;
+			$suffix     = 1;
+			while ( username_exists( $user_login ) ) {
+				$user_login = $base_login . $suffix;
+				$suffix++;
+			}
+			$user_id = wp_insert_user(
+				array(
+					'user_login'   => $user_login,
+					'user_pass'    => wp_generate_password( 20, true, true ),
+					'user_email'   => (string) $booking->customer_email,
+					'display_name' => (string) $booking->customer_name,
+					'first_name'   => $first_name,
+					'last_name'    => $last_name,
+					'role'         => 'subscriber',
+				)
+			);
+			if ( is_wp_error( $user_id ) ) {
+				return 0;
+			}
+			update_user_meta( $user_id, 'billing_first_name', $first_name );
+			update_user_meta( $user_id, 'billing_last_name', $last_name );
+			update_user_meta( $user_id, 'billing_email', (string) $booking->customer_email );
+			update_user_meta( $user_id, 'billing_phone', (string) $booking->customer_phone );
+			update_user_meta( $user_id, 'g2ab_customer_created_from_booking', current_time( 'mysql' ) );
+			wp_new_user_notification( $user_id, null, 'user' );
+		}
+
+		$wpdb->update(
+			$table,
+			array(
+				'user_id'    => (int) $user_id,
+				'created_by' => (int) $user_id,
+				'updated_at' => current_time( 'mysql' ),
+			),
+			array( 'id' => $booking_id ),
+			array( '%d', '%d', '%s' ),
+			array( '%d' )
+		);
+		return (int) $user_id;
+	} finally {
+		g2ab_mysql_unlock( $lock_name );
+	}
 }
 
 function g2ab_queue_booking_paid_side_effects( $booking_id, $gateway, $previous_status, $payload = array() ) {
@@ -466,6 +632,8 @@ function g2ab_run_booking_paid_side_effects( $booking_id, $gateway = 'stripe', $
 	if ( ! $booking ) {
 		return;
 	}
+
+	g2ab_provision_booking_customer_account( $booking_id );
 
 	do_action( 'g2ab_payment_succeeded', $booking_id, $gateway, $context );
 	do_action( 'g2ab_booking_paid', $booking, $context );

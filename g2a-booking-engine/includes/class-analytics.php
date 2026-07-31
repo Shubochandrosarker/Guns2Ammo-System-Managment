@@ -392,6 +392,7 @@ final class G2AB_Analytics {
 			'per_page' => 20,
 			'date_from'=> '',
 			'date_to'  => '',
+			'operational' => true,
 		) );
 
 		$bt = $wpdb->prefix . 'g2ab_bookings';
@@ -409,6 +410,14 @@ final class G2AB_Analytics {
 			$where[] = "b.event_id IS NOT NULL AND (e.category IS NULL OR e.category <> 'ccw-class')";
 		} elseif ( 'class' === $tab ) {
 			$where[] = "b.event_id IS NOT NULL AND e.category = 'ccw-class'";
+		} elseif ( 'pay_store' === $tab ) {
+			$where[] = "b.status = 'reserved' AND b.payment_mode = 'in_store'";
+		} elseif ( 'completed' === $tab ) {
+			$where[] = "b.status = 'completed'";
+		}
+
+		if ( ! empty( $args['operational'] ) && class_exists( 'G2AB_Booking_Visibility' ) ) {
+			$where[] = G2AB_Booking_Visibility::operational_sql( 'b' );
 		}
 
 		$search = trim( (string) $args['search'] );
@@ -477,11 +486,14 @@ final class G2AB_Analytics {
 		global $wpdb;
 		$bt  = $wpdb->prefix . 'g2ab_bookings';
 		$et  = $wpdb->prefix . 'g2ab_events';
-		$all = (int) $wpdb->get_var( "SELECT COUNT(*) FROM {$bt}" );
-		$lane = (int) $wpdb->get_var( "SELECT COUNT(*) FROM {$bt} WHERE event_id IS NULL" );
-		$class = (int) $wpdb->get_var( "SELECT COUNT(*) FROM {$bt} b LEFT JOIN {$et} e ON e.id = b.event_id WHERE b.event_id IS NOT NULL AND e.category = 'ccw-class'" );
+		$operational = class_exists( 'G2AB_Booking_Visibility' ) ? G2AB_Booking_Visibility::operational_sql( 'b' ) : "b.status IN ('confirmed','paid','completed')";
+		$all = (int) $wpdb->get_var( "SELECT COUNT(*) FROM {$bt} b WHERE {$operational}" );
+		$lane = (int) $wpdb->get_var( "SELECT COUNT(*) FROM {$bt} b WHERE b.event_id IS NULL AND {$operational}" );
+		$class = (int) $wpdb->get_var( "SELECT COUNT(*) FROM {$bt} b LEFT JOIN {$et} e ON e.id = b.event_id WHERE b.event_id IS NOT NULL AND e.category = 'ccw-class' AND {$operational}" );
 		$event = max( 0, $all - $lane - $class );
-		$cache = array( 'all' => $all, 'lane' => $lane, 'event' => $event, 'class' => $class );
+		$pay_store = (int) $wpdb->get_var( "SELECT COUNT(*) FROM {$bt} b WHERE b.status = 'reserved' AND b.payment_mode = 'in_store'" );
+		$completed = (int) $wpdb->get_var( "SELECT COUNT(*) FROM {$bt} b WHERE b.status = 'completed'" );
+		$cache = array( 'all' => $all, 'lane' => $lane, 'event' => $event, 'class' => $class, 'pay_store' => $pay_store, 'completed' => $completed );
 		return $cache;
 	}
 
@@ -506,11 +518,12 @@ final class G2AB_Analytics {
 		$end        = wp_date( 'Y-m-d 23:59:59', $now );
 
 		$scope_sql = self::scope_clause( $scope );
+		$operational_sql = class_exists( 'G2AB_Booking_Visibility' ) ? ' AND ' . G2AB_Booking_Visibility::operational_sql( 'b' ) : " AND b.status IN ('confirmed','paid','completed')";
 		$paid_in   = "'" . implode( "','", self::PAID_STATUSES ) . "'";
 
-		$book = function ( $a, $b ) use ( $wpdb, $bt, $et, $scope_sql ) {
+		$book = function ( $a, $b ) use ( $wpdb, $bt, $et, $scope_sql, $operational_sql ) {
 			return (int) $wpdb->get_var( $wpdb->prepare(
-				"SELECT COUNT(*) FROM {$bt} b LEFT JOIN {$et} e ON e.id = b.event_id WHERE b.created_at BETWEEN %s AND %s {$scope_sql}",
+				"SELECT COUNT(*) FROM {$bt} b LEFT JOIN {$et} e ON e.id = b.event_id WHERE b.created_at BETWEEN %s AND %s {$scope_sql} {$operational_sql}",
 				$a, $b
 			) );
 		};
@@ -528,11 +541,11 @@ final class G2AB_Analytics {
 
 		// Distinct shooters active in window.
 		$shooters_now = (int) $wpdb->get_var( $wpdb->prepare(
-			"SELECT COUNT(DISTINCT LOWER(b.customer_email)) FROM {$bt} b LEFT JOIN {$et} e ON e.id = b.event_id WHERE b.created_at BETWEEN %s AND %s AND b.customer_email <> '' {$scope_sql}",
+			"SELECT COUNT(DISTINCT LOWER(b.customer_email)) FROM {$bt} b LEFT JOIN {$et} e ON e.id = b.event_id WHERE b.created_at BETWEEN %s AND %s AND b.customer_email <> '' {$scope_sql} {$operational_sql}",
 			$start, $end
 		) );
 		$shooters_prev = (int) $wpdb->get_var( $wpdb->prepare(
-			"SELECT COUNT(DISTINCT LOWER(b.customer_email)) FROM {$bt} b LEFT JOIN {$et} e ON e.id = b.event_id WHERE b.created_at BETWEEN %s AND %s AND b.customer_email <> '' {$scope_sql}",
+			"SELECT COUNT(DISTINCT LOWER(b.customer_email)) FROM {$bt} b LEFT JOIN {$et} e ON e.id = b.event_id WHERE b.created_at BETWEEN %s AND %s AND b.customer_email <> '' {$scope_sql} {$operational_sql}",
 			$prev_start, $prev_end
 		) );
 
@@ -580,9 +593,10 @@ final class G2AB_Analytics {
 		$bt = $wpdb->prefix . 'g2ab_bookings';
 		$et = $wpdb->prefix . 'g2ab_events';
 		$scope_sql = self::scope_clause( $scope );
+		$operational_sql = class_exists( 'G2AB_Booking_Visibility' ) ? ' AND ' . G2AB_Booking_Visibility::operational_sql( 'b' ) : " AND b.status IN ('confirmed','paid','completed')";
 		$rows = $wpdb->get_results( $wpdb->prepare(
 			"SELECT b.status AS s, COUNT(*) AS c FROM {$bt} b LEFT JOIN {$et} e ON e.id = b.event_id
-			 WHERE b.created_at BETWEEN %s AND %s {$scope_sql} GROUP BY b.status",
+			 WHERE b.created_at BETWEEN %s AND %s {$scope_sql} {$operational_sql} GROUP BY b.status",
 			$start, $end
 		) );
 		$out = array();
@@ -610,13 +624,14 @@ final class G2AB_Analytics {
 		$rt = $wpdb->prefix . 'g2ab_resources';
 		$limit = max( 1, (int) $limit );
 		$paid_in = "'" . implode( "','", self::PAID_STATUSES ) . "'";
+		$operational_join = class_exists( 'G2AB_Booking_Visibility' ) ? ' AND ' . G2AB_Booking_Visibility::operational_sql( 'b' ) : " AND b.status IN ('confirmed','paid','completed')";
 
 		if ( 'lane' === $scope ) {
 			$rows = $wpdb->get_results( $wpdb->prepare(
 				"SELECT r.name AS label, COUNT(b.id) AS bookings,
 				        COALESCE(SUM(CASE WHEN b.status IN ({$paid_in}) THEN b.paid_amount ELSE 0 END),0) AS revenue
 				 FROM {$rt} r
-				 LEFT JOIN {$bt} b ON b.resource_id = r.id AND b.event_id IS NULL
+				 LEFT JOIN {$bt} b ON b.resource_id = r.id AND b.event_id IS NULL {$operational_join}
 				 WHERE r.is_active = 1
 				 GROUP BY r.id ORDER BY bookings DESC LIMIT %d",
 				$limit
@@ -632,7 +647,7 @@ final class G2AB_Analytics {
 				"SELECT e.title AS label, COUNT(b.id) AS bookings,
 				        COALESCE(SUM(CASE WHEN b.status IN ({$paid_in}) THEN b.paid_amount ELSE 0 END),0) AS revenue
 				 FROM {$et} e
-				 LEFT JOIN {$bt} b ON b.event_id = e.id
+				 LEFT JOIN {$bt} b ON b.event_id = e.id {$operational_join}
 				 WHERE e.status = 'publish' {$cat}
 				 GROUP BY e.id ORDER BY bookings DESC LIMIT %d",
 				$limit
@@ -658,6 +673,7 @@ final class G2AB_Analytics {
 		$bt    = $wpdb->prefix . 'g2ab_bookings';
 		$limit = max( 1, (int) $limit );
 		$now   = current_time( 'mysql' );
+		$operational_sql = class_exists( 'G2AB_Booking_Visibility' ) ? G2AB_Booking_Visibility::operational_sql( 'bb' ) : "bb.status IN ('confirmed','paid','completed')";
 
 		$cat = '';
 		if ( 'event' === $scope ) {
@@ -668,7 +684,7 @@ final class G2AB_Analytics {
 		$rows = $wpdb->get_results( $wpdb->prepare(
 			"SELECT o.id AS occ_id, o.start_at, o.capacity, o.status AS occ_status,
 			        e.id AS event_id, e.title, e.category,
-			        (SELECT COUNT(*) FROM {$bt} bb WHERE bb.event_occurrence_id = o.id AND bb.status IN ('pending','reserved','confirmed','paid','completed')) AS booked
+			        (SELECT COUNT(*) FROM {$bt} bb WHERE bb.event_occurrence_id = o.id AND {$operational_sql}) AS booked
 			 FROM {$ot} o
 			 INNER JOIN {$et} e ON e.id = o.event_id
 			 WHERE o.start_at >= %s AND e.status = 'publish' {$cat}

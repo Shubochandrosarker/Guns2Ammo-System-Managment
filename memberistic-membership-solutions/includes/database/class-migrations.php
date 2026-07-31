@@ -58,12 +58,21 @@ final class Migrations {
 			'1.8.0' => array( self::class, 'migrate_1_8_0' ),
 			'1.9.0' => array( self::class, 'migrate_1_9_0' ),
 			'1.10.0' => array( self::class, 'migrate_1_10_0' ),
+			'1.11.0' => array( self::class, 'migrate_1_11_0' ),
 		);
 	}
 
 	/**
 	 * 1.9.0 — Kiosk station attribution on waiver signatures.
 	 */
+	/**
+	 * 1.11.0 - durable public checkout rate-limit fallback table.
+	 */
+	public static function migrate_1_11_0() {
+		Schema::create_tables();
+		return true;
+	}
+
 	public static function migrate_1_10_0() {
 		global $wpdb;
 

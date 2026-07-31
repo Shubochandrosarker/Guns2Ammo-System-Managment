@@ -53,29 +53,32 @@ final class G2AB_Admin_Reports {
 
 		$f = $from . ' 00:00:00';
 		$t = $to . ' 23:59:59';
+		$operational = class_exists( 'G2AB_Booking_Visibility' )
+			? G2AB_Booking_Visibility::operational_sql( 'b' )
+			: "( b.status IN ('confirmed','paid','completed') OR ( b.status = 'reserved' AND b.payment_mode = 'in_store' ) )";
 
 		// Totals
 		$totals = $wpdb->get_row( $wpdb->prepare(
-			"SELECT COUNT(*) AS bookings, COALESCE(SUM(total_amount),0) AS revenue, COALESCE(SUM(paid_amount),0) AS paid, COALESCE(AVG(total_amount),0) AS avg_value, COALESCE(SUM(party_size),0) AS shooters FROM {$bt} WHERE created_at BETWEEN %s AND %s", $f, $t
+			"SELECT COUNT(*) AS bookings, COALESCE(SUM(b.total_amount),0) AS revenue, COALESCE(SUM(b.paid_amount),0) AS paid, COALESCE(AVG(b.total_amount),0) AS avg_value, COALESCE(SUM(b.party_size),0) AS shooters FROM {$bt} b WHERE b.created_at BETWEEN %s AND %s AND {$operational}", $f, $t
 		) );
 
 		$status_breakdown = $wpdb->get_results( $wpdb->prepare(
-			"SELECT status, COUNT(*) c FROM {$bt} WHERE created_at BETWEEN %s AND %s GROUP BY status", $f, $t
+			"SELECT b.status, COUNT(*) c FROM {$bt} b WHERE b.created_at BETWEEN %s AND %s AND {$operational} GROUP BY b.status", $f, $t
 		), OBJECT_K );
 
 		// Daily bookings
 		$daily = $wpdb->get_results( $wpdb->prepare(
-			"SELECT DATE(created_at) AS d, COUNT(*) AS c, COALESCE(SUM(total_amount),0) AS rev FROM {$bt} WHERE created_at BETWEEN %s AND %s GROUP BY DATE(created_at) ORDER BY d ASC", $f, $t
+			"SELECT DATE(b.created_at) AS d, COUNT(*) AS c, COALESCE(SUM(b.total_amount),0) AS rev FROM {$bt} b WHERE b.created_at BETWEEN %s AND %s AND {$operational} GROUP BY DATE(b.created_at) ORDER BY d ASC", $f, $t
 		) );
 
 		// Top resources
 		$top_resources = $wpdb->get_results( $wpdb->prepare(
-			"SELECT r.name, r.type, COUNT(b.id) c, COALESCE(SUM(b.total_amount),0) rev FROM {$bt} b LEFT JOIN {$rt} r ON r.id = b.resource_id WHERE b.created_at BETWEEN %s AND %s GROUP BY b.resource_id ORDER BY c DESC LIMIT 10", $f, $t
+			"SELECT r.name, r.type, COUNT(b.id) c, COALESCE(SUM(b.total_amount),0) rev FROM {$bt} b LEFT JOIN {$rt} r ON r.id = b.resource_id WHERE b.created_at BETWEEN %s AND %s AND {$operational} GROUP BY b.resource_id ORDER BY c DESC LIMIT 10", $f, $t
 		) );
 
 		// Top booking types
 		$top_types = $wpdb->get_results( $wpdb->prepare(
-			"SELECT t.name, t.category, COUNT(b.id) c, COALESCE(SUM(b.total_amount),0) rev FROM {$bt} b LEFT JOIN {$btt} t ON t.id = b.booking_type_id WHERE b.created_at BETWEEN %s AND %s GROUP BY b.booking_type_id ORDER BY c DESC LIMIT 10", $f, $t
+			"SELECT t.name, t.category, COUNT(b.id) c, COALESCE(SUM(b.total_amount),0) rev FROM {$bt} b LEFT JOIN {$btt} t ON t.id = b.booking_type_id WHERE b.created_at BETWEEN %s AND %s AND {$operational} GROUP BY b.booking_type_id ORDER BY c DESC LIMIT 10", $f, $t
 		) );
 
 		$this->print_styles();
@@ -220,8 +223,11 @@ final class G2AB_Admin_Reports {
 		$bt = $wpdb->prefix . 'g2ab_bookings';
 		$rt = $wpdb->prefix . 'g2ab_resources';
 		$btt = $wpdb->prefix . 'g2ab_booking_types';
+		$operational = class_exists( 'G2AB_Booking_Visibility' )
+			? G2AB_Booking_Visibility::operational_sql( 'b' )
+			: "( b.status IN ('confirmed','paid','completed') OR ( b.status = 'reserved' AND b.payment_mode = 'in_store' ) )";
 		$rows = $wpdb->get_results( $wpdb->prepare(
-			"SELECT b.id, b.uuid, b.customer_name, b.customer_email, b.customer_phone, b.start_at, b.end_at, b.duration_min, b.party_size, b.status, b.payment_mode, b.total_amount, b.paid_amount, b.currency, r.name AS resource, t.name AS type FROM {$bt} b LEFT JOIN {$rt} r ON r.id = b.resource_id LEFT JOIN {$btt} t ON t.id = b.booking_type_id WHERE b.created_at BETWEEN %s AND %s ORDER BY b.created_at DESC",
+			"SELECT b.id, b.uuid, b.customer_name, b.customer_email, b.customer_phone, b.start_at, b.end_at, b.duration_min, b.party_size, b.status, b.payment_mode, b.total_amount, b.paid_amount, b.currency, r.name AS resource, t.name AS type FROM {$bt} b LEFT JOIN {$rt} r ON r.id = b.resource_id LEFT JOIN {$btt} t ON t.id = b.booking_type_id WHERE b.created_at BETWEEN %s AND %s AND {$operational} ORDER BY b.created_at DESC",
 			$from . ' 00:00:00', $to . ' 23:59:59'
 		), ARRAY_A );
 
@@ -258,6 +264,9 @@ final class G2AB_Admin_Reports {
 		global $wpdb;
 		$bt = $wpdb->prefix . 'g2ab_bookings';
 		$pt = $wpdb->prefix . 'g2ab_payments';
+		$operational = class_exists( 'G2AB_Booking_Visibility' )
+			? G2AB_Booking_Visibility::operational_sql( 'b' )
+			: "( b.status IN ('confirmed','paid','completed') OR ( b.status = 'reserved' AND b.payment_mode = 'in_store' ) )";
 
 		$rows = $wpdb->get_results( $wpdb->prepare(
 			"SELECT DATE_FORMAT(b.start_at, '%%Y-%%m') AS ym,
@@ -269,7 +278,7 @@ final class G2AB_Admin_Reports {
 			        COALESCE(SUM(b.total_amount), 0) AS gross_revenue,
 			        COALESCE(SUM(b.paid_amount),  0) AS paid_revenue
 			 FROM {$bt} b
-			 WHERE b.start_at BETWEEN %s AND %s
+			 WHERE b.start_at BETWEEN %s AND %s AND {$operational}
 			 GROUP BY ym
 			 ORDER BY ym ASC",
 			$from . ' 00:00:00', $to . ' 23:59:59'

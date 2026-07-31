@@ -4,7 +4,7 @@ Tags: membership, operations, staff dashboard, stripe, woocommerce, rest api
 Requires at least: 6.0
 Requires PHP: 8.0
 Tested up to: 6.7
-Stable tag: 1.18.4
+Stable tag: 1.18.5
 License: GPLv2 or later
 
 A modern membership operations engine for service businesses. Co-developed by WordPressistic and launch partner Guns 2 Ammo (https://guns2ammo.com).
@@ -73,6 +73,13 @@ See CHANGELOG.md for the full history.
 Note: the plugin's version numbering was reset after 1.46.1 back to a 1.9.9.x line. Entries below are in release order (newest first), so 1.46.1 and the earlier "legacy line" 1.10.0 release predate the 1.9.9.2–1.12.0 entries above them.
 
 Note: entries for 1.14.0–1.18.0 (the native waiver e-signature engine, kiosk mode, dashboard Waivers page, and SMS automations) are not yet documented here — see CHANGELOG.md and the merged PR history in the meantime.
+
+= 1.18.5 =
+* Hotfix: checkout advisory lock names are now hashed and capped at MySQL's 64-character limit, preventing false "Checkout is busy" failures before Stripe is contacted.
+* Hotfix: advisory lock failures now fall back to a durable database rate-limit table instead of taking checkout offline.
+* Security: checkout handler is POST/action/nonce-only, sends no-cache headers, checks same-origin referers when available, and validates Stripe checkout redirect hosts.
+* Fix: checkout-start email is no longer sent before Stripe returns a Checkout Session; activation remains Stripe webhook/API-authoritative.
+* UX: the checkout form disables its submit button while connecting to secure checkout to reduce double submissions.
 
 = 1.18.3 =
 * Hotfix: Stripe webhooks now hold the idempotency lock through processing and mark events processed only after successful handling.

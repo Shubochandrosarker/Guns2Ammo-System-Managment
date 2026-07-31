@@ -2,6 +2,20 @@
 
 All notable changes are tracked here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## 1.18.5 - Public checkout lock hotfix (2026-07-28)
+
+### Fixed
+- Fixed public checkout rate-limit advisory lock names so MySQL `GET_LOCK()` / `RELEASE_LOCK()` never receive names longer than the 64-character limit.
+- `GET_LOCK()` results now distinguish acquired locks, real contention, and database/compatibility failures instead of reporting every failure as "Checkout is busy."
+- Added a durable database-table fallback for checkout rate limiting when advisory locks are unavailable.
+- Hardened the public checkout endpoint with no-cache headers, POST/action/nonce enforcement, same-origin referer checks when available, safe Stripe redirect host validation, and clearer customer-facing error messages.
+- Prevented the checkout form from submitting twice client-side while preserving server-side idempotency as authoritative.
+- Stopped sending the checkout-start membership email before Stripe Checkout Session creation succeeds; payment activation remains webhook/API-authoritative.
+
+### Added
+- `memberistic_rate_limits` table and hourly cleanup for durable fallback rate limiting.
+- Developer incident note with confirmed failure path, cache exclusions, staging QA, deployment, and rollback steps.
+
 ## 1.18.4 - Account dashboard color-contrast fix (2026-07-20)
 
 ### Fixed

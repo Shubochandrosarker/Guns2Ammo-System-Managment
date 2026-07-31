@@ -129,6 +129,9 @@ if ( is_user_logged_in() ) {
 	var summaryName   = document.getElementById('memberistic-summary-name');
 	var summaryTag    = document.getElementById('memberistic-summary-tag');
 	var summaryPrice  = document.getElementById('memberistic-summary-price');
+	var submitButton  = form.querySelector('[type="submit"]');
+	var submitLabel   = submitButton ? submitButton.textContent : '';
+	var submitting    = false;
 
 	var planData = {};
 	<?php foreach ( $plans as $plan ) : ?>
@@ -156,6 +159,29 @@ if ( is_user_logged_in() ) {
 
 	if (planSelect)  planSelect.addEventListener('change', updateSummary);
 	if (cycleSelect) cycleSelect.addEventListener('change', updateSummary);
+	form.addEventListener('submit', function (event) {
+		if (submitting) {
+			event.preventDefault();
+			return;
+		}
+		if (typeof form.checkValidity === 'function' && !form.checkValidity()) {
+			return;
+		}
+		submitting = true;
+		if (submitButton) {
+			submitButton.disabled = true;
+			submitButton.setAttribute('aria-disabled', 'true');
+			submitButton.textContent = '<?php echo esc_js( __( 'Connecting to secure checkout', 'memberistic' ) ); ?>' + '\u2026';
+		}
+		window.setTimeout(function () {
+			if (submitButton && !document.hidden) {
+				submitButton.disabled = false;
+				submitButton.setAttribute('aria-disabled', 'false');
+				submitButton.textContent = submitLabel;
+				submitting = false;
+			}
+		}, 15000);
+	});
 	updateSummary();
 })();
 </script>
