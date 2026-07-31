@@ -278,12 +278,21 @@ function unwrapMockEnvelope<T>(envelope: ApiSuccess<T>): Enveloped<T> {
 async function httpContentList(path: string): Promise<ContentPage> {
   const res = await httpRaw(path)
   const items = (await res.json()) as WpContentItem[]
-  const total = Number(res.headers.get('X-WP-Total'))
-  const totalPages = Number(res.headers.get('X-WP-TotalPages'))
+  // A missing header must fall through to the fallback, and it did not:
+  // Number(null) is 0, which passes `isFinite && >= 0`, so an absent
+  // X-WP-Total was read as "0 results" and X-WP-TotalPages as "0 pages" even
+  // with items on the page. Parse only what is actually there.
+  const parseCount = (header: string): number | null => {
+    const raw = res.headers.get(header)
+    if (raw === null || raw.trim() === '') return null
+    const value = Number(raw)
+    return Number.isFinite(value) && value >= 0 ? value : null
+  }
+
   return {
     items,
-    total: Number.isFinite(total) && total >= 0 ? total : items.length,
-    totalPages: Number.isFinite(totalPages) && totalPages >= 0 ? totalPages : 1,
+    total: parseCount('X-WP-Total') ?? items.length,
+    totalPages: parseCount('X-WP-TotalPages') ?? 1,
   }
 }
 

@@ -36,7 +36,30 @@ final class Roles {
 		// g2a_pos_manage_settings via register_caps(), which runs on every
 		// boot, so existing installs self-heal on upgrade.
 		'g2a_pos_manage_finance',
+		// v3.4.0 — taking payment on an existing order. Split out from
+		// g2a_pos_manage_register because a cashier must be able to capture a
+		// tender without also being able to open/close tills or void and
+		// refund lines. Before this, the shipped g2a_cashier role held neither
+		// g2a_pos_manage_register nor g2a_pos_process_firearm_sale, so a
+		// cashier could build a cart and submit the order but was refused at
+		// the moment of collecting money.
+		//
+		// Purely additive: the routes that already accepted manage_register or
+		// process_firearm_sale still do, this is only an extra way in.
+		'g2a_pos_take_payment',
 	);
+
+	/**
+	 * The full capability vocabulary, for callers that need to report which of
+	 * them a given user holds. The SPAs use this to decide what to render,
+	 * rather than inferring permission from role names — a user's role can be
+	 * customised on site, their capabilities cannot be guessed from it.
+	 *
+	 * @return string[]
+	 */
+	public static function all_caps(): array {
+		return self::CAPS;
+	}
 
 	public static function register_roles(): void {
 		add_role(
@@ -47,6 +70,7 @@ final class Roles {
 				'g2a_pos_access'           => true,
 				'g2a_pos_use_ai'           => true,
 				'g2a_pos_search_customers' => true,
+				'g2a_pos_take_payment'     => true,
 			)
 		);
 		add_role(
@@ -158,10 +182,13 @@ final class Roles {
 		}
 
 		$customRoles = array(
-			'g2a_cashier'            => array( 'g2a_pos_access', 'g2a_pos_use_ai', 'g2a_pos_search_customers' ),
+			// register_caps() strips every CAP before re-adding this list, so a
+			// capability missing here is removed on the next boot even if
+			// add_role() granted it.
+			'g2a_cashier'            => array( 'g2a_pos_access', 'g2a_pos_use_ai', 'g2a_pos_search_customers', 'g2a_pos_take_payment' ),
 			'g2a_inventory_staff'    => array( 'g2a_pos_access', 'g2a_pos_manage_inventory', 'g2a_pos_search_customers' ),
 			'g2a_range_staff'        => array( 'g2a_pos_access', 'g2a_pos_search_customers', 'g2a_pos_view_waivers', 'g2a_pos_checkin_range_customer' ),
-			'g2a_gunsmith'           => array( 'g2a_pos_access', 'g2a_pos_process_firearm_sale', 'g2a_pos_view_bound_book', 'g2a_pos_edit_bound_book', 'g2a_pos_manage_repairs' ),
+			'g2a_gunsmith'           => array( 'g2a_pos_access', 'g2a_pos_process_firearm_sale', 'g2a_pos_take_payment', 'g2a_pos_view_bound_book', 'g2a_pos_edit_bound_book', 'g2a_pos_manage_repairs' ),
 			'g2a_compliance_officer' => array( 'g2a_pos_access', 'g2a_pos_manage_compliance', 'g2a_pos_view_bound_book', 'g2a_pos_edit_bound_book', 'g2a_pos_view_waivers', 'g2a_pos_view_waiver_sensitive_data' ),
 		);
 		foreach ( $customRoles as $name => $allowed ) {
