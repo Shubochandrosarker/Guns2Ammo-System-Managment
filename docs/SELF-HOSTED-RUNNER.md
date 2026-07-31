@@ -1,45 +1,71 @@
 # Self-hosted GitHub Actions runner
 
-## Why
+## Check the billing error first — you may not need any of this
 
-These repos are **private, on a personal account**, so Actions minutes are metered.
-When the monthly allowance runs out, jobs are killed before a runner is ever
-assigned. The failure looks like this:
+A job that dies in seconds with `runner_id: 0`, no `steps` array and 404 logs
+has **two** possible causes that look identical through the API:
+
+| Cause | Fix |
+|---|---|
+| Included Actions minutes exhausted | raise the spending limit, upgrade, or wait for the cycle reset |
+| **A payment method has failed** | **update the card in GitHub billing** |
+
+The Actions **run page** distinguishes them — a failed payment shows *"recent
+account payments have failed or your spending limit needs to be increased"*.
+The API does not surface that string, which is how the two get confused.
+
+**Open a failed run and read the annotation before doing anything here.** If it
+is a payment problem, fixing the card restores CI on GitHub-hosted runners in
+minutes, with no new attack surface on your server. A self-hosted runner is a
+large, permanent change; do not make it to work around a declined card.
+
+This document was originally written assuming exhausted minutes. That
+assumption was wrong for this project.
+
+## If you still want a runner: what it actually costs you
+
+`server.wpistic.cloud` already exists to serve the dashboard, and a self-hosted
+runner is not minute-metered. The trade is privilege, not money — see below.
+
+## The runner is effectively root. Read this properly.
+
+A self-hosted runner executes whatever a workflow says. That is tolerable for a
+**private** repo with trusted pushers. It is not tolerable for a public one: on
+a public repo anyone can open a fork PR, and that PR's workflow runs their code
+here.
+
+> **Never attach a runner to a public repo.** If a repo is going public, remove
+> its runner first.
+
+An earlier version of this document claimed the installer granted a "narrow"
+sudo allowlist. **That claim was false and has been withdrawn.** The runner has
+to install packages — `shivammathur/setup-php` builds the 8.1/8.2/8.3 matrix,
+and the gitleaks step installs a binary — and the entries that permits are each
+trivially escalatable:
 
 ```
-runner_id: 0      runner_name: ""      steps: (absent)      logs: HTTP 404
-started 10:32:46Z → completed 10:32:58Z
+sudo tee /etc/sudoers.d/anything            # write any root-owned file
+sudo apt-get -o APT::Update::Pre-Invoke::=… # run any command as root
 ```
 
-No checkout, no setup, nothing — which reads like a broken workflow but is
-purely billing. Every PR merged during the 2026-07-20 → 07-31 window went in
-with red checks for this reason.
+So a CI job on this runner — including a compromised or misbehaving
+dependency — is **root on the machine serving your dashboard**. Sudoers cannot
+fix that; the package-install requirement is the problem.
 
-A self-hosted runner has **no minute metering**, so CI keeps working regardless
-of the allowance. The box already exists (`server.wpistic.cloud`, serving the
-dashboard), so this costs nothing extra.
+What the installer does still do:
 
-## Read this first
+- runs the runner as an unprivileged `gha-runner` user, not root
+- **refuses to run as root**, so it cannot be installed root-owned by accident
+- refuses if that user can write a web root, **where one exists** (this box
+  serves the dashboard from Docker and has no `/var/www`, so that check is
+  conditional rather than assumed)
+- checks every prerequisite **before** mutating anything, so a box that fails a
+  check is left exactly as it was
 
-A self-hosted runner executes whatever a workflow tells it to. That is fine for
-a **private** repo, where only trusted people can push.
-
-It is **not** fine for a public one. On a public repo, anyone can open a pull
-request from a fork, and that PR's workflow would run their code on your
-server — with access to the deployed dashboard, any credentials on the box, and
-your network.
-
-> **Never make one of these repos public while it has a self-hosted runner.**
-> If a repo is ever going public, remove its runner first.
-
-The installer reduces blast radius but does not eliminate it:
-
-- runs as a dedicated unprivileged `gha-runner` user, not root
-- refuses to proceed if that user is in `www-data`, so a job cannot write the
-  deployed dashboard under `/var/www/g2a-dashboard`
-- grants a **narrow** passwordless sudo allowlist (`apt-get`, `install`,
-  `update-alternatives`, `tee`) rather than `NOPASSWD: ALL` — `setup-php` and
-  the gitleaks step genuinely need package installs
+**Better design, not yet built:** this host runs Docker. Running the runner
+inside a container makes root *root-in-a-container* rather than root on the
+host, and sidesteps both the missing system PHP and the missing sudo user. If
+you want a runner long-term, that is the version worth building.
 
 ## Install
 
@@ -82,6 +108,10 @@ So switching is a settings change, not a code change:
 
 Set it under **Settings → Secrets and variables → Actions → Variables** in each
 repo. Delete it to switch straight back — useful if the VPS is down.
+
+**Set it last.** Only after the runner reports **Idle** under Settings → Actions
+→ Runners. Setting it while no runner is online makes every job queue
+indefinitely instead of failing, which is harder to notice than a red check.
 
 `ubuntu-latest` is the default on purpose. If `runs-on` named a self-hosted
 label directly and the runner were offline, every job would **queue forever**
