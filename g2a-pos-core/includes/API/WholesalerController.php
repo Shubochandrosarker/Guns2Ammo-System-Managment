@@ -517,7 +517,7 @@ final class WholesalerController {
 		$rows  = $repoP->withImages( $wholesalerId, $limit, $offset, $linkedOnly );
 		$total = $repoP->countWithImages( $wholesalerId, $linkedOnly );
 
-		$stats = array(
+		$stats    = array(
 			'processed' => 0,
 			'imported'  => 0,
 			'reused'    => 0,

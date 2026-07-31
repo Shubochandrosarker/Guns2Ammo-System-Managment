@@ -116,6 +116,7 @@
                 <element value="g2a_pos_process_firearm_sale"/>
                 <element value="g2a_pos_search_customers"/>
                 <element value="g2a_pos_submit_dropship"/>
+                <element value="g2a_pos_take_payment"/>
                 <element value="g2a_pos_use_ai"/>
                 <element value="g2a_pos_view_bound_book"/>
                 <element value="g2a_pos_view_customer_contact"/>

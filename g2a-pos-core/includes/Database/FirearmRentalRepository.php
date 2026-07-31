@@ -13,10 +13,10 @@ namespace G2A\POS\Database;
  */
 final class FirearmRentalRepository extends Repository {
 
-	public const STATUS_OUT       = 'out';
-	public const STATUS_RETURNED  = 'returned';
-	public const STATUS_OVERDUE   = 'overdue';
-	public const STATUS_INCIDENT  = 'incident';
+	public const STATUS_OUT      = 'out';
+	public const STATUS_RETURNED = 'returned';
+	public const STATUS_OVERDUE  = 'overdue';
+	public const STATUS_INCIDENT = 'incident';
 
 	/**
 	 * Statuses a rental can hold. 'incident' covers a firearm that came back
