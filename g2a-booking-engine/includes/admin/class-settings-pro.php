@@ -252,6 +252,15 @@ final class G2AB_Admin_Settings_Pro {
 				<select name="g2ab_payment_gateway_default" style="min-width:240px;">
 					<?php foreach ( self::GATEWAYS as $key => $g ) printf( '<option value="%1$s" %2$s>%3$s</option>', esc_attr( $key ), selected( get_option( 'g2ab_payment_gateway_default', 'pay_in_store' ), $key, false ), esc_html( $g['label'] ) ); ?>
 				</select>
+				<p style="margin-top:16px;">
+					<label>
+						<input type="checkbox" name="g2ab_require_public_prepay" value="1" <?php checked( 1, (int) get_option( 'g2ab_require_public_prepay', 0 ) ); ?> />
+						<?php esc_html_e( 'Require card payment up front for public (walk-in) bookings', 'g2a-booking' ); ?>
+					</label>
+				</p>
+				<p class="g2ab-set__desc">
+					<?php esc_html_e( 'Off (recommended): a walk-in reserves the lane and pays at the front desk, so no card checkout is created and abandoned bookings do not pile up as open checkout attempts. On: every public booking is sent to Stripe before the lane is held.', 'g2a-booking' ); ?>
+				</p>
 				<button class="g2ab-set__btn g2ab-set__btn--primary" type="submit"><?php esc_html_e( 'SAVE DEFAULT', 'g2a-booking' ); ?></button>
 			</form>
 		</div>
@@ -657,6 +666,10 @@ final class G2AB_Admin_Settings_Pro {
 			if ( $gw && isset( self::GATEWAYS[ $gw ] ) ) {
 				$bools[] = 'g2ab_' . $gw . '_enabled';
 				$bools[] = 'g2ab_' . $gw . '_test_mode';
+			}
+			// The default-gateway sub-form carries the public prepay toggle.
+			if ( 'default' === $gw ) {
+				$bools[] = 'g2ab_require_public_prepay';
 			}
 		} elseif ( 'notifications' === $tab ) {
 			$bools = array( 'g2ab_send_confirmation_email', 'g2ab_send_reminder_email', 'g2ab_sms_enabled' );

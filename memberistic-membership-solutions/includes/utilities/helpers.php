@@ -98,13 +98,30 @@ function memberistic_mask_secret( $value ) {
 }
 
 /**
- * Get filtered brand label.
+ * Customer-facing business brand — used in emails, waivers, PDFs and the member
+ * portal. This is NOT the admin menu label; the admin menu always reads
+ * "Memberistic" (see Admin\Admin_Menu::register).
+ *
+ * Resolution order, most specific first:
+ *   1. `business_name` — the trading name staff enter for customer documents
+ *      ("Guns 2 Ammo"). Preferred, because this is what a customer should see
+ *      on a receipt or a waiver.
+ *   2. `brand_label` — a legacy/shorthand override.
+ *   3. The WP site name, so a fresh install never exposes the plugin author's
+ *      own brand.
+ *
+ * Previously this read `brand_label` first. Because the admin menu used the
+ * same value, sites shortened it to fit the sidebar (e.g. "G2A") and that
+ * abbreviation then went out on every membership email and waiver. Splitting
+ * the two lets the menu stay "Memberistic" while customers see the full
+ * business name.
  */
 function memberistic_get_brand_label() {
-	// Default to the WP site name (e.g. "Guns 2 Ammo") so customer-
-	// facing email + dashboard strings never expose the plugin
-	// author's own brand on a fresh install.
-	$label = (string) memberistic_get_setting( 'brand_label', (string) get_bloginfo( 'name' ) );
+	$business = trim( (string) memberistic_get_setting( 'business_name', '' ) );
+	$legacy   = trim( (string) memberistic_get_setting( 'brand_label', '' ) );
+
+	$label = $business !== '' ? $business : ( $legacy !== '' ? $legacy : (string) get_bloginfo( 'name' ) );
+
 	return apply_filters( 'memberistic_brand_label', $label );
 }
 

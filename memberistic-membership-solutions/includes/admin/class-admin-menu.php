@@ -8,7 +8,6 @@
 namespace WordPressistic\Memberistic\Admin;
 
 use function WordPressistic\Memberistic\memberistic_current_user_can;
-use function WordPressistic\Memberistic\memberistic_get_brand_label;
 use function WordPressistic\Memberistic\memberistic_get_setting;
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -20,7 +19,14 @@ final class Admin_Menu {
 	 * Register plugin admin menu.
 	 */
 	public static function register() {
-		$label = apply_filters( 'memberistic_admin_menu_label', memberistic_get_brand_label() );
+		// The admin menu is staff-facing plumbing, so it always reads
+		// "Memberistic" — the product name. It deliberately does NOT use
+		// memberistic_get_brand_label(), which is the CUSTOMER-facing business
+		// brand used in emails and the member portal. Sharing one label between
+		// the two meant setting a short brand for emails (e.g. "G2A") also
+		// renamed the whole admin menu, leaving staff without an obvious
+		// "Memberistic" entry to look for.
+		$label = __( 'Memberistic', 'memberistic' );
 
 		add_menu_page(
 			$label,

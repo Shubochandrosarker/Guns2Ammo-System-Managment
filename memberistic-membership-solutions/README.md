@@ -4,7 +4,7 @@ A modern membership operations engine for service businesses — co-developed by
 
 Memberistic runs the full lifecycle of a membership — plans, signup, payment, renewals, family / linked members, check-ins, waivers, staff dashboards, REST API, and Stripe + WooCommerce integration — from a single WordPress plugin. It's the membership-management backbone behind the **Guns 2 Ammo Membership Engine** and the foundation of the upcoming Memberistic commercial product.
 
-- **Plugin version:** 1.18.5
+- **Plugin version:** 1.18.6
 - **WordPress:** 6.0+
 - **PHP:** 8.0+
 - **License:** GPLv2 or later

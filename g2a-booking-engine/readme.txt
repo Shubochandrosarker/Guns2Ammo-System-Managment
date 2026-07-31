@@ -4,7 +4,7 @@ Tags: booking, reservation, scheduling, appointments, shooting range, firearms, 
 Requires at least: 6.2
 Tested up to: 6.5
 Requires PHP: 8.0
-Stable tag: 1.9.9.19
+Stable tag: 1.9.9.20
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -206,6 +206,14 @@ Yes. REST API at `/wp-json/g2a-booking/v1/` covers bookings, forms, calendar, fr
 7. Migration wizard — dry-run preview before live import.
 
 == Changelog ==
+
+= 1.9.9.20 =
+* Fixed members being charged the full walk-in rate: guest-form bookings resolved to no user at all, so no membership was ever found and every booking priced as a non-member.
+* Fixed a Stripe Checkout Session being created for every public lane booking, which left an abandoned "open" checkout attempt behind whenever the customer didn't pay. Walk-ins now reserve the lane and settle at the front desk.
+* Added `g2ab_require_public_prepay` (Settings → Payments → Default gateway) for sites that do want card payment up front.
+* Added an advisory membership flag: when a logged-out booking's email matches an active membership, the booking is routed to the front desk and marked for a member-rate check instead of being charged the walk-in rate. A typed email still grants no discount by itself.
+* Fixed abandoned holds never expiring once their slot had passed, which inflated the Checkout Attempts screen and pending-revenue figures indefinitely.
+* Gateway selection now supports a per-booking-type allowlist via the new `g2ab_allowed_gateways_for_type` filter. The old docblock promised this behaviour but nothing consulted it; with no allowlist configured, selection is unchanged.
 
 = 1.9.9.19 =
 * Fixed event-seat capacity with a canonical capacity service, live hold expiry rules, and atomic occurrence locking.

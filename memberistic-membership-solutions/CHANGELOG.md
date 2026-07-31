@@ -2,6 +2,17 @@
 
 All notable changes are tracked here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## 1.18.6 - Branding split, notice scoping, plan entitlements (2026-07-31)
+
+### Fixed
+- The admin menu now always reads "Memberistic". It previously used the customer-facing brand label, so shortening that label for emails (e.g. to "G2A") also renamed the entire admin menu and left staff without a recognisable entry.
+- Customer-facing branding now prefers the **Business name** setting over the shorthand **Brand label**, falling back to the site name. An abbreviation intended for the admin sidebar no longer goes out on membership emails, waivers and PDFs.
+- The Stripe webhook health notice was hooked to global `admin_notices`, so it rendered at the top of every wp-admin page — including other plugins' dashboards — with no dismiss control and no way to act on it. It is now dismissible, limited to the WordPress dashboard and Memberistic screens, and links to the payments screen. Dismissals are fingerprinted against the current warning set, so a new or worsening problem re-surfaces rather than staying hidden.
+
+### Added
+- Plans can now mark booking types as **included** via `settings.included_booking_types` (a list of booking type ids, or `'all'`). A Guest Pass sold at the counter — annually, monthly, or at a custom price — resolves lane bookings to $0 directly, instead of depending on a 100% discount rule being configured for every booking type.
+- `g2ab_advisory_membership_hint` filter: reports that a typed email matches an active membership so the booking engine can route the customer to the front desk for a member-rate check. It carries no price and no access, preserving the audit C27 rule that a typed address alone never grants member pricing.
+
 ## 1.18.5 - Public checkout lock hotfix (2026-07-28)
 
 ### Fixed

@@ -59,6 +59,12 @@ final class Stripe_Service {
 	const CANCEL_RETRY_DELAYS = array( 300, 1800, 7200, 21600, 86400, 172800 );
 
 	/**
+	 * Per-user meta holding the fingerprint of the dismissed webhook-health
+	 * warning set.
+	 */
+	const WEBHOOK_NOTICE_DISMISSED_META = 'memberistic_webhook_notice_dismissed';
+
+	/**
 	 * Membership ids whose remote cancel was already attempted by
 	 * cancel_remote_first() during this request, so the status-change hook
 	 * listener doesn't call Stripe a second time for the same cancel.
@@ -537,8 +543,48 @@ final class Stripe_Service {
 		);
 	}
 
+	/**
+	 * Screens this notice is allowed to appear on.
+	 *
+	 * It used to render on every wp-admin page, so a Memberistic Stripe warning
+	 * greeted staff at the top of unrelated plugins' dashboards (the Booking
+	 * Engine's especially) with no way to dismiss it and no link to act on it.
+	 * It now shows only where it can actually be acted upon.
+	 */
+	private static function webhook_notice_is_relevant_screen() {
+		if ( ! function_exists( 'get_current_screen' ) ) {
+			return false;
+		}
+
+		$screen = get_current_screen();
+		if ( ! $screen ) {
+			return false;
+		}
+
+		// The main WP dashboard, plus any Memberistic admin page.
+		if ( 'dashboard' === $screen->id ) {
+			return true;
+		}
+
+		$page = isset( $_GET['page'] ) ? sanitize_key( wp_unslash( $_GET['page'] ) ) : ''; // phpcs:ignore WordPress.Security.NonceVerification.Recommended -- read-only screen check.
+
+		return '' !== $page && 0 === strpos( $page, 'memberistic' );
+	}
+
+	/**
+	 * Fingerprint of the current warning set, so dismissing today's notice
+	 * doesn't also hide tomorrow's different (possibly worse) problem.
+	 */
+	private static function webhook_notice_fingerprint( array $warnings ) {
+		return substr( md5( implode( '|', $warnings ) ), 0, 12 );
+	}
+
 	public static function render_webhook_health_notice() {
 		if ( ! current_user_can( 'manage_options' ) || ! self::is_enabled() ) {
+			return;
+		}
+
+		if ( ! self::webhook_notice_is_relevant_screen() ) {
 			return;
 		}
 
@@ -565,11 +611,51 @@ final class Stripe_Service {
 			return;
 		}
 
-		printf(
-			'<div class="notice notice-warning"><p><strong>%1$s</strong> %2$s</p></div>',
-			esc_html__( 'Memberistic webhook health:', 'memberistic' ),
-			esc_html( implode( ' ', $warnings ) )
+		// Respect a dismissal, but only of this exact warning set.
+		$fingerprint = self::webhook_notice_fingerprint( $warnings );
+		if ( get_user_meta( get_current_user_id(), self::WEBHOOK_NOTICE_DISMISSED_META, true ) === $fingerprint ) {
+			return;
+		}
+
+		$dismiss_url = wp_nonce_url(
+			add_query_arg(
+				array(
+					'memberistic_dismiss_webhook_notice' => $fingerprint,
+				),
+				admin_url( 'admin.php?page=memberistic-dashboard' )
+			),
+			'memberistic_dismiss_webhook_notice'
 		);
+
+		printf(
+			'<div class="notice notice-warning is-dismissible"><p><strong>%1$s</strong> %2$s</p><p><a href="%3$s" class="button button-secondary">%4$s</a> <a href="%5$s">%6$s</a></p></div>',
+			esc_html__( 'Memberistic webhook health:', 'memberistic' ),
+			esc_html( implode( ' ', $warnings ) ),
+			esc_url( admin_url( 'admin.php?page=memberistic-payments' ) ),
+			esc_html__( 'Review Stripe items', 'memberistic' ),
+			esc_url( $dismiss_url ),
+			esc_html__( 'Dismiss until this changes', 'memberistic' )
+		);
+	}
+
+	/**
+	 * Persist a dismissal of the webhook-health notice for the current user.
+	 *
+	 * Stores the warning fingerprint rather than a boolean, so the notice comes
+	 * back the moment the underlying problem changes.
+	 */
+	public static function handle_webhook_notice_dismissal() {
+		if ( empty( $_GET['memberistic_dismiss_webhook_notice'] ) || ! is_user_logged_in() ) {
+			return;
+		}
+
+		if ( ! isset( $_GET['_wpnonce'] ) || ! wp_verify_nonce( sanitize_text_field( wp_unslash( $_GET['_wpnonce'] ) ), 'memberistic_dismiss_webhook_notice' ) ) {
+			return;
+		}
+
+		$fingerprint = sanitize_text_field( wp_unslash( $_GET['memberistic_dismiss_webhook_notice'] ) );
+
+		update_user_meta( get_current_user_id(), self::WEBHOOK_NOTICE_DISMISSED_META, $fingerprint );
 	}
 
 	public static function handle_checkout_request() {
