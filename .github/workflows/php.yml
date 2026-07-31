@@ -3,8 +3,26 @@ name: PHP Composer
 on:
   push:
     branches: [ "main" ]
+    # Only spend Actions minutes when something PHP-shaped actually changed.
+    # This repo is a private repo on a personal account, so every minute is
+    # metered — a docs-only or image-only commit used to burn a full run.
+    paths:
+      - '**.php'
+      - '**/composer.json'
+      - '**/composer.lock'
+      - '.github/workflows/php.yml'
+      - 'scripts/lint-php.sh'
   pull_request:
     branches: [ "main" ]
+    paths:
+      - '**.php'
+      - '**/composer.json'
+      - '**/composer.lock'
+      - '.github/workflows/php.yml'
+      - 'scripts/lint-php.sh'
+  # Lets a maintainer re-run the checks by hand after a billing or runner
+  # outage, without having to push an empty commit.
+  workflow_dispatch:
 
 # Cancel a still-running check for the same branch/PR as soon as a newer
 # commit shows up, instead of letting both burn Actions minutes to
@@ -21,25 +39,27 @@ jobs:
   lint:
     name: PHP syntax lint (all plugins)
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
     - uses: actions/checkout@v4
 
-    - name: Set up PHP
-      uses: shivammathur/setup-php@v2
-      with:
-        php-version: '8.2'
+    # No setup-php step: the ubuntu-latest image already ships a PHP CLI, and
+    # `php -l` is a parser check whose result doesn't vary across 8.x. Dropping
+    # it removes a third-party action from the critical path (one less thing an
+    # actions-allowlist policy can block) and saves ~20-30s of metered runtime
+    # per run. Add setup-php back only if this job ever needs a pinned version.
+    - name: Report PHP version
+      run: php -v | head -1
 
+    # Delegates to the same script developers run locally, so CI and a
+    # pre-commit hook can never drift apart in what they consider valid.
     - name: php -l every plugin/theme file
-      run: |
-        ERRS=0
-        while IFS= read -r f; do
-          out=$(php -l "$f" 2>&1) || { echo "$out"; ERRS=1; }
-        done < <(find . -name '*.php' -not -path './.git/*' -not -path '*/vendor/*' -not -path '*/node_modules/*')
-        exit $ERRS
+      run: ./scripts/lint-php.sh
 
   composer:
     name: Validate composer projects
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     strategy:
       fail-fast: false
       matrix:
@@ -55,9 +75,13 @@ jobs:
     - name: Validate composer.json and composer.lock
       run: composer validate --strict --no-check-publish
 
+    # actions/cache v3 is retired; v4 is the supported release. A retired
+    # action fails the job immediately, before any of its own steps run.
+    # Note `path` is resolved from the workspace root, NOT from
+    # defaults.run.working-directory — that only applies to `run` steps.
     - name: Cache Composer packages
       id: composer-cache
-      uses: actions/cache@v3
+      uses: actions/cache@v4
       with:
         path: ${{ matrix.project }}/vendor
         key: ${{ runner.os }}-php-${{ matrix.project }}-${{ hashFiles(format('{0}/composer.lock', matrix.project)) }}
