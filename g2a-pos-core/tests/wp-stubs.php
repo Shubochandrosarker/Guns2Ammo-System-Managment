@@ -34,12 +34,18 @@ if (!class_exists('WP_Error')) {
         }
     }
 }
-if (!function_exists('is_wp_error')) {
-    function is_wp_error($thing): bool
-    {
-        return $thing instanceof \WP_Error;
-    }
-}
+// is_wp_error() is deliberately NOT defined here, even though WP_Error above is.
+//
+// A class can be shared safely; a function cannot. Defining is_wp_error() at
+// bootstrap makes it unstubbable: Brain Monkey rewrites functions through
+// Patchwork, which refuses with DefinedTooEarly once the function already
+// exists from a file included this early. LipseysApiClientTest legitimately
+// does Functions\when('is_wp_error'), and a definition here broke all five of
+// its cases.
+//
+// Tests that need it either stub it with Brain Monkey — which defines
+// undefined functions perfectly well — or declare their own copy inside the
+// test file, which loads late enough for Patchwork to instrument.
 
 if (!function_exists('wp_json_encode')) {
     function wp_json_encode($data, int $options = 0, int $depth = 512): string|false
