@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { download, get } from '../api';
 import PageHeader from '../components/PageHeader';
 import DataTable, { type Column } from '../components/DataTable';
+import { useAction, ActionFeedback } from '../components/useAction';
 
 interface Order {
   id: number;
@@ -17,6 +18,7 @@ interface Order {
 }
 
 export default function Orders() {
+  const { error, notice, setError } = useAction();
   const [rows, setRows] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
   const [status, setStatus] = useState('');
@@ -27,7 +29,7 @@ export default function Orders() {
     try {
       await download('/orders/export.csv', `g2a-orders-${new Date().toISOString().slice(0, 10)}.csv`, { status });
     } catch {
-      alert('Export failed — you may not have permission.');
+      setError('Export failed — you may not have permission.');
     } finally {
       setExporting(false);
     }
@@ -72,6 +74,8 @@ export default function Orders() {
           </button>
         }
       />
+
+      <ActionFeedback error={error} notice={notice} />
       <div className="card p-3 mb-4 flex gap-2">
         <select className="input" value={status} onChange={(e) => setStatus(e.target.value)}>
           <option value="">All statuses</option>

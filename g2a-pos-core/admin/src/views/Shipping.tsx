@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react';
 import { get, post, errorMessage } from '../api';
 import PageHeader from '../components/PageHeader';
 import DataTable, { type Column } from '../components/DataTable';
+import { useDialogs } from '../components/Dialogs';
+import { useAction, ActionFeedback } from '../components/useAction';
 
 interface Label {
   id: number;
@@ -38,6 +40,8 @@ interface LabelForm {
 }
 
 export default function Shipping() {
+  const dialogs = useDialogs();
+  const { error, notice, setNotice, setError } = useAction();
   const [rows, setRows] = useState<Label[]>([]);
   const [loading, setLoading] = useState(true);
   const [form, setForm] = useState<LabelForm>({
@@ -58,15 +62,21 @@ export default function Shipping() {
   const create = async () => {
     try {
       const res = await post<{ tracking_number?: string }>('/shipping/labels', form);
-      if (res?.tracking_number) alert('Label: ' + res.tracking_number);
+      if (res?.tracking_number) setNotice(`Label created — tracking ${res.tracking_number}.`);
       await refresh();
     } catch (e) {
-      alert(errorMessage(e, 'Failed (configure carrier credentials under Settings → Shipping).'));
+      setError(errorMessage(e, 'Label creation failed — check carrier credentials under Settings → Shipping.'));
     }
   };
 
   const voidLabel = async (id: number) => {
-    if (!confirm('Void this label?')) return;
+    const ok = await dialogs.confirm({
+      title: 'Void this label?',
+      body: 'The carrier will cancel the shipment. This cannot be undone.',
+      danger: true,
+      confirmLabel: 'Void label',
+    });
+    if (!ok) return;
     await post(`/shipping/labels/${id}/void`, {});
     await refresh();
   };
@@ -91,6 +101,8 @@ export default function Shipping() {
   return (
     <div>
       <PageHeader title="Shipping Labels" subtitle="UPS / FedEx label creation with Adult-Signature-Required pre-set (21+ for firearms)." />
+
+      <ActionFeedback error={error} notice={notice} />
       <div className="card p-4 mb-4">
         <div className="flex gap-2 mb-3">
           <select className="input" value={form.carrier} onChange={(e) => setForm({...form, carrier: e.target.value})}>

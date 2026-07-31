@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react';
 import { get, post, del } from '../api';
 import PageHeader from '../components/PageHeader';
+import { useDialogs } from '../components/Dialogs';
+import { useAction, ActionFeedback } from '../components/useAction';
 
 interface Distributor {
   id: number;
@@ -32,6 +34,8 @@ interface SyncRun {
 interface Adapter { slug: string; label: string; }
 
 export default function Distributors() {
+  const dialogs = useDialogs();
+  const { run, error, notice } = useAction();
   const [items, setItems] = useState<Distributor[]>([]);
   const [adapters, setAdapters] = useState<Adapter[]>([]);
   const [loading, setLoading] = useState(true);
@@ -69,9 +73,17 @@ export default function Distributors() {
   };
 
   const remove = async (id: number) => {
-    if (!confirm('Delete this distributor configuration?')) return;
-    await del(`/inventory/distributors/${id}`);
-    await load();
+    const ok = await dialogs.confirm({
+      title: 'Delete this distributor configuration?',
+      body: 'Stored credentials for this distributor are removed.',
+      danger: true,
+      confirmLabel: 'Delete',
+    });
+    if (!ok) return;
+    await run(async () => {
+      await del(`/inventory/distributors/${id}`);
+      await load();
+    }, 'Distributor deleted.');
   };
 
   const syncNow = async (id: number) => {
@@ -91,6 +103,8 @@ export default function Distributors() {
           </button>
         }
       />
+
+      <ActionFeedback error={error} notice={notice} />
 
       {loading && <div className="card p-6 text-sm text-zinc-500">Loading…</div>}
 

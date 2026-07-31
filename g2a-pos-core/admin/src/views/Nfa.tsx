@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react';
 import { get, post } from '../api';
 import PageHeader from '../components/PageHeader';
 import DataTable, { type Column } from '../components/DataTable';
+import { useDialogs } from '../components/Dialogs';
+import { useAction, ActionFeedback } from '../components/useAction';
 
 interface Item {
   id: number;
@@ -44,6 +46,8 @@ interface TrustForm {
 }
 
 export default function Nfa() {
+  const dialogs = useDialogs();
+  const { run, error, notice } = useAction();
   const [tab, setTab] = useState<'items' | 'trusts'>('items');
   const [items, setItems] = useState<Item[]>([]);
   const [trusts, setTrusts] = useState<Trust[]>([]);
@@ -71,12 +75,27 @@ export default function Nfa() {
     await refresh();
   };
 
+  // ATF form type was typed by hand, so "form 4" or a typo was filed against
+  // the item exactly as entered. It is a fixed set — pick it.
   const fileForm = async (id: number) => {
-    const ft = prompt('Form type (Form 3 / Form 4 / Form 5)?', 'Form 4');
-    if (!ft) return;
-    const stamp = parseFloat(prompt('Tax stamp $') || '200');
-    await post(`/nfa/items/${id}/forms`, { form_type: ft, tax_stamp_amount: stamp });
-    await refresh();
+    const values = await dialogs.prompt({
+      title: 'File ATF form',
+      confirmLabel: 'File form',
+      fields: [
+        { name: 'form_type', label: 'Form type', type: 'select', value: 'Form 4', options: [
+          { value: 'Form 3', label: 'Form 3 — dealer to dealer, tax exempt' },
+          { value: 'Form 4', label: 'Form 4 — transfer to individual or trust' },
+          { value: 'Form 5', label: 'Form 5 — tax-exempt transfer' },
+        ] },
+        { name: 'tax_stamp_amount', label: 'Tax stamp $', type: 'number', min: 0, step: 0.01, value: '200',
+          help: 'Form 3 and Form 5 transfers are normally $0.' },
+      ],
+    });
+    if (!values) return;
+    await run(async () => {
+      await post(`/nfa/items/${id}/forms`, values);
+      await refresh();
+    }, 'Form filed.');
   };
 
   const createTrust = async () => {
@@ -110,6 +129,8 @@ export default function Nfa() {
     <div>
       <PageHeader title="NFA Items (Class III / Title II)"
         subtitle="Class III / Title II inventory — suppressors, SBRs, SBSs, machine guns, AOWs, destructive devices. Kept in a separate ledger from the Title I bound book so an ACE audit isn't muddled. Tracks ATF Form 3 (FFL-to-FFL), Form 4 (FFL-to-individual), Form 5 (tax-exempt transfer), tax stamp status, CLE notification, two-stamp ownership, and gun trusts." />
+
+      <ActionFeedback error={error} notice={notice} />
 
       <div className="mb-4 flex gap-2">
         <button className={tab === 'items' ? 'btn-primary' : 'btn'} onClick={() => setTab('items')}>Items</button>

@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react';
 import { get, post } from '../api';
 import PageHeader from '../components/PageHeader';
 import DataTable, { type Column } from '../components/DataTable';
+import { useDialogs } from '../components/Dialogs';
+import { useAction, ActionFeedback } from '../components/useAction';
 
 interface ClassRow {
   id: number;
@@ -26,6 +28,8 @@ interface Session {
 }
 
 export default function Classes() {
+  const dialogs = useDialogs();
+  const { run, error, notice } = useAction();
   const [classes, setClasses] = useState<ClassRow[]>([]);
   const [sessions, setSessions] = useState<Session[]>([]);
   const [loading, setLoading] = useState(true);
@@ -71,11 +75,19 @@ export default function Classes() {
   };
 
   const enroll = async (sessionId: number) => {
-    const name = prompt('Student name?');
-    if (!name) return;
-    const email = prompt('Email?') ?? '';
-    await post(`/classes/sessions/${sessionId}/enroll`, { customer_name: name, customer_email: email });
-    await refresh();
+    const values = await dialogs.prompt({
+      title: 'Enroll a student',
+      confirmLabel: 'Enroll',
+      fields: [
+        { name: 'customer_name', label: 'Student name', required: true },
+        { name: 'customer_email', label: 'Email', placeholder: 'Used for the confirmation and reminders' },
+      ],
+    });
+    if (!values) return;
+    await run(async () => {
+      await post(`/classes/sessions/${sessionId}/enroll`, values);
+      await refresh();
+    }, 'Student enrolled.');
   };
 
   const classCols: Column<ClassRow>[] = [
@@ -100,6 +112,8 @@ export default function Classes() {
   return (
     <div>
       <PageHeader title="Classes & Training" subtitle="CCW, intro to pistol, etc. Course catalog + scheduled sessions + roster." />
+
+      <ActionFeedback error={error} notice={notice} />
 
       <div className="mb-4 flex gap-2">
         <button className={tab === 'sessions' ? 'btn-primary' : 'btn'} onClick={() => setTab('sessions')}>Sessions</button>

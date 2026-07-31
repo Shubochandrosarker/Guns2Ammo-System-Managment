@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react';
 import { get, post } from '../api';
 import PageHeader from '../components/PageHeader';
 import DataTable, { type Column } from '../components/DataTable';
+import { useDialogs } from '../components/Dialogs';
+import { useAction, ActionFeedback } from '../components/useAction';
 
 interface Identity {
   id: number;
@@ -45,6 +47,8 @@ interface SourcesPayload {
 }
 
 export default function CatalogIdentities() {
+  const dialogs = useDialogs();
+  const { error, notice, setNotice } = useAction();
   const [rows, setRows] = useState<Identity[]>([]);
   const [loading, setLoading] = useState(true);
   const [q, setQ] = useState('');
@@ -72,11 +76,16 @@ export default function CatalogIdentities() {
   };
 
   const runBackfill = async () => {
-    if (!confirm('Walk every wholesaler product through the matcher and link to canonical identities. Safe to re-run. Process up to 200 rows?')) return;
+    const ok = await dialogs.confirm({
+      title: 'Run identity backfill?',
+      body: 'Walks every wholesaler product through the matcher and links it to a canonical identity. Safe to re-run. Processes up to 200 rows.',
+      confirmLabel: 'Run backfill',
+    });
+    if (!ok) return;
     setBackfilling(true);
     try {
       const r = await post<{ processed: number; created: number; matched: number }>('/catalog/identities/backfill?limit=200', {});
-      alert(`Backfill: processed ${r.processed} · created ${r.created} · matched ${r.matched}`);
+      setNotice(`Backfill complete — processed ${r.processed}, created ${r.created}, matched ${r.matched}.`);
       await refresh();
     } finally { setBackfilling(false); }
   };
@@ -101,6 +110,8 @@ export default function CatalogIdentities() {
         subtitle="One canonical record per real-world item, regardless of how many vendor SKUs / UPCs / Woo products / mfg part numbers / used intakes refer to it. The catalog truth across the supply chain — and the foundation for the order-sheet sourcing panel."
         actions={<button className="btn-secondary" onClick={runBackfill} disabled={backfilling}>{backfilling ? 'Backfilling…' : 'Backfill from vendors'}</button>}
       />
+
+      <ActionFeedback error={error} notice={notice} />
 
       <div className="card p-3 mb-4 flex gap-2 items-center">
         <input className="input flex-1" placeholder="Search make/model/code/caliber"

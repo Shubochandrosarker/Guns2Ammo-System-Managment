@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { api, get, post, errorMessage } from '../api';
 import PageHeader from '../components/PageHeader';
+import { useDialogs } from '../components/Dialogs';
 
 interface QualifyingState {
   state_code: string;
@@ -34,6 +35,7 @@ interface EvalResult {
 }
 
 export default function CcwExemption() {
+  const dialogs = useDialogs();
   const [states, setStates] = useState<QualifyingState[]>([]);
   const [evalForm, setEvalForm] = useState<EvalForm>({ firearm_type: 'handgun' });
   const [evalResult, setEvalResult] = useState<EvalResult | null>(null);
@@ -100,7 +102,13 @@ export default function CcwExemption() {
   const clearOnForm = async () => {
     const formId = parseInt(recordFormId, 10);
     if (!formId) return;
-    if (!confirm(`Clear CCW exemption on 4473 #${formId}? NICS will be required again.`)) return;
+    const ok = await dialogs.confirm({
+      title: `Clear CCW exemption on 4473 #${formId}?`,
+      body: 'A NICS check will be required again for this transfer.',
+      danger: true,
+      confirmLabel: 'Clear exemption',
+    });
+    if (!ok) return;
     setRecordBusy(true);
     try {
       await api('DELETE', `/atf/4473/${formId}/ccw-exemption`);

@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react';
 import { get, post } from '../api';
 import PageHeader from '../components/PageHeader';
 import DataTable, { type Column } from '../components/DataTable';
+import { useDialogs } from '../components/Dialogs';
+import { useAction, ActionFeedback } from '../components/useAction';
 
 interface PO {
   id: number;
@@ -38,6 +40,8 @@ interface POForm {
 }
 
 export default function PurchaseOrders() {
+  const dialogs = useDialogs();
+  const { run, error, notice } = useAction();
   const [rows, setRows] = useState<PO[]>([]);
   const [loading, setLoading] = useState(true);
   const [showNew, setShowNew] = useState(false);
@@ -74,11 +78,19 @@ export default function PurchaseOrders() {
 
   const receive = async (po_item_id: number) => {
     if (!openPo) return;
-    const q = parseFloat(prompt('Quantity received?') || '0');
-    if (!q) return;
-    await post(`/purchase-orders/${openPo.id}/receive`, { po_item_id, quantity: q });
-    await openOne(openPo.id);
-    await refresh();
+    const values = await dialogs.prompt({
+      title: 'Receive against PO',
+      confirmLabel: 'Receive',
+      fields: [
+        { name: 'quantity', label: 'Quantity received', type: 'number', required: true, min: 0.01, step: 1 },
+      ],
+    });
+    if (!values) return;
+    await run(async () => {
+      await post(`/purchase-orders/${openPo.id}/receive`, { po_item_id, quantity: values.quantity });
+      await openOne(openPo.id);
+      await refresh();
+    }, 'Receipt recorded.');
   };
 
   const cols: Column<PO>[] = [
@@ -94,6 +106,8 @@ export default function PurchaseOrders() {
     <div>
       <PageHeader title="Purchase Orders" subtitle="Stock-order to wholesalers with partial receiving against PO."
         actions={<button className="btn-primary" onClick={() => setShowNew((s) => !s)}>{showNew ? 'Close' : '+ New PO'}</button>} />
+
+      <ActionFeedback error={error} notice={notice} />
 
       {showNew && (
         <div className="card p-4 mb-4">
