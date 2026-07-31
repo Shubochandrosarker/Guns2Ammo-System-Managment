@@ -18,7 +18,7 @@ This is a comprehensive system release featuring plugin integration updates, sec
 |-----------|---------|--------|-------|
 | **WPistic Theme for G2A** | 1.27.14 | ✅ Current | Theme with design tokens, SEO/AEO, business info |
 | **g2a-booking-engine** | 1.9.9.19 | ✅ Current | Lane bookings, events, payments, waivers |
-| **g2a-pos-core** | 3.3.5 | ✅ Current | Point-of-sale, ATF compliance, audit trails |
+| **g2a-pos-core** | 3.4.0 | ✅ Current | Point-of-sale, ATF compliance, audit trails |
 | **memberistic-membership-solutions** | 1.18.5 | ✅ Current | Memberships, renewals, family linking |
 | **messageistic** | 0.8.0 | ✅ Current | SMS/communication engine (Twilio, Android gateway) |
 | **verifyistic** | 1.4.7 | ✅ Current | Age verification popup, COPPA compliance |

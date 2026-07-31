@@ -1494,6 +1494,55 @@ final class Migrator {
             KEY idx_issued_at (issued_at)
         ) $charset";
 
+		// Firearm rentals. Deliberately a separate table from g2a_ammo_rentals:
+		// a rented firearm is a serialised item that physically leaves the
+		// counter, so it needs its own out/in lifecycle, the identity check that
+		// authorised it, and a record of who took it back. Ammo and the gun are
+		// routinely returned at different moments (the customer buys the rounds
+		// they didn't shoot and hands the gun back), so one shared record cannot
+		// close them independently.
+		//
+		// NOTE: this records the rental only. A loan for on-premises use is not a
+		// transfer, so this is NOT an acquisition/disposition record and must not
+		// be read as a bound-book entry — see the BoundBook module for A&D/4473.
+		$sql[] = "CREATE TABLE {$p}g2a_firearm_rentals (
+            id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+            reservation_id BIGINT UNSIGNED NULL,
+            lane_id BIGINT UNSIGNED NULL,
+            inventory_item_id BIGINT UNSIGNED NULL,
+            serial_number VARCHAR(100) NOT NULL,
+            manufacturer VARCHAR(120) NULL,
+            model VARCHAR(120) NULL,
+            caliber VARCHAR(60) NULL,
+            customer_name VARCHAR(200) NOT NULL,
+            customer_id BIGINT UNSIGNED NULL,
+            id_type VARCHAR(40) NOT NULL DEFAULT '',
+            id_last4 VARCHAR(8) NOT NULL DEFAULT '',
+            id_verified TINYINT(1) NOT NULL DEFAULT 0,
+            waiver_id BIGINT UNSIGNED NULL,
+            waiver_verified TINYINT(1) NOT NULL DEFAULT 0,
+            rate_cents INT NOT NULL DEFAULT 0,
+            deposit_cents INT NOT NULL DEFAULT 0,
+            total_charged_cents BIGINT NOT NULL DEFAULT 0,
+            status VARCHAR(20) NOT NULL DEFAULT 'out',
+            issued_by BIGINT UNSIGNED NOT NULL,
+            issued_at DATETIME NOT NULL,
+            due_back_at DATETIME NULL,
+            returned_by BIGINT UNSIGNED NULL,
+            returned_at DATETIME NULL,
+            condition_out TEXT NULL,
+            condition_in TEXT NULL,
+            pos_order_id BIGINT UNSIGNED NULL,
+            notes TEXT NULL,
+            created_at DATETIME NOT NULL,
+            updated_at DATETIME NOT NULL,
+            KEY idx_serial (serial_number),
+            KEY idx_status (status),
+            KEY idx_issued_at (issued_at),
+            KEY idx_reservation (reservation_id),
+            KEY idx_inventory_item (inventory_item_id)
+        ) $charset";
+
 		$sql[] = "CREATE TABLE {$p}g2a_brass_buybacks (
             id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
             customer_name VARCHAR(200) NOT NULL,

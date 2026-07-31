@@ -2267,6 +2267,45 @@ final class Routes {
 				'permission_callback' => static fn() => current_user_can( 'g2a_pos_access' ),
 			)
 		);
+		// Firearm rentals. Separate lifecycle from ammo rentals — a serialised
+		// firearm goes out and must come back, so it has an explicit return
+		// route rather than ammo's "close".
+		register_rest_route(
+			'g2a-pos/v1',
+			'/range/firearm-rentals',
+			array(
+				'methods'             => 'GET',
+				'callback'            => array( RangeOpsController::class, 'firearm_open' ),
+				'permission_callback' => static fn() => current_user_can( 'g2a_pos_access' ),
+			)
+		);
+		register_rest_route(
+			'g2a-pos/v1',
+			'/range/firearm-rentals/history',
+			array(
+				'methods'             => 'GET',
+				'callback'            => array( RangeOpsController::class, 'firearm_recent' ),
+				'permission_callback' => static fn() => current_user_can( 'g2a_pos_access' ),
+			)
+		);
+		register_rest_route(
+			'g2a-pos/v1',
+			'/range/firearm-rentals',
+			array(
+				'methods'             => 'POST',
+				'callback'            => array( RangeOpsController::class, 'firearm_issue' ),
+				'permission_callback' => static fn() => current_user_can( 'g2a_pos_access' ),
+			)
+		);
+		register_rest_route(
+			'g2a-pos/v1',
+			'/range/firearm-rentals/(?P<id>\d+)/return',
+			array(
+				'methods'             => 'POST',
+				'callback'            => array( RangeOpsController::class, 'firearm_return' ),
+				'permission_callback' => static fn() => current_user_can( 'g2a_pos_access' ),
+			)
+		);
 		register_rest_route(
 			'g2a-pos/v1',
 			'/range/brass',

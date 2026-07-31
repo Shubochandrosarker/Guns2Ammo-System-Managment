@@ -1,6 +1,46 @@
 <?php
 // Minimal WP stubs used by unit-only tests. Heavy logic should use Brain\Monkey instead.
 
+// WP_Error lives here rather than inline in one test file so every test sees the
+// same shape. BrainServiceBackendTest defines its own copy guarded by
+// class_exists(), which becomes a no-op now the bootstrap loads this first —
+// that copy only implemented get_error_message(), and repositories returning
+// WP_Error also need the code and the data payload.
+if (!class_exists('WP_Error')) {
+    class WP_Error
+    {
+        /** @param array<string,mixed> $data */
+        public function __construct(
+            private string $code = '',
+            private string $message = '',
+            private array $data = []
+        ) {
+        }
+
+        public function get_error_code(): string
+        {
+            return $this->code;
+        }
+
+        public function get_error_message(): string
+        {
+            return $this->message;
+        }
+
+        /** @return array<string,mixed> */
+        public function get_error_data(): array
+        {
+            return $this->data;
+        }
+    }
+}
+if (!function_exists('is_wp_error')) {
+    function is_wp_error($thing): bool
+    {
+        return $thing instanceof \WP_Error;
+    }
+}
+
 if (!function_exists('wp_json_encode')) {
     function wp_json_encode($data, int $options = 0, int $depth = 512): string|false
     {
