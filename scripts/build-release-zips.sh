@@ -27,9 +27,21 @@ cp "WPistic-Theme-For-G2A-Version-1.8.9.zip" \
 
 for plugin in g2a-booking-engine g2a-theme-control memberistic-membership-solutions verifyistic messageistic g2a-pos-core advanced-ffl-checkout formistic; do
   if [ -d "$plugin" ]; then
-    echo "→ Packaging $plugin"
+    # Read the version WordPress itself will display, from the plugin header.
+    version="$( grep -m1 -h '^ \* Version:' "$plugin"/*.php 2>/dev/null | sed 's/.*Version: *//' | tr -d ' \r' )"
+    version="${version:-dev}"
+
+    echo "→ Packaging $plugin ($version)"
     rm -f "${plugin}.zip"
     zip -rq "${plugin}.zip" "$plugin" -x "*/.DS_Store" "*/.git/*" "*/node_modules/*"
+
+    # Also drop a versioned copy in releases/. Previously only the THEME got
+    # one, so releases/ silently fell behind the source: g2a-booking-engine
+    # sat at 1.9.9.19 while the source was on .20, and — worse — a
+    # g2a-pos-core-3.4.0.zip existed whose contents predated several fixes
+    # landed under that same version number. A stale artefact carrying the
+    # right version string is undetectable at install time.
+    cp "${plugin}.zip" "releases/${plugin}-${version}.zip"
   fi
 done
 
