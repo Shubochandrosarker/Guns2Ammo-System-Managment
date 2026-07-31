@@ -67,6 +67,18 @@ inside a container makes root *root-in-a-container* rather than root on the
 host, and sidesteps both the missing system PHP and the missing sudo user. If
 you want a runner long-term, that is the version worth building.
 
+Two things that version must get right, or it buys nothing:
+
+- **Do not mount `/var/run/docker.sock` into the runner container.** Access to
+  the Docker socket is root on the *host* — `docker run -v /:/host` and the job
+  owns the machine. Mounting it back in is the same mistake as the `tee` entry
+  in the sudoers allowlist, just better disguised.
+- **Do not run it as the existing `github-runner` user (uid 1000).** That user
+  is in the `docker` group, which is root-equivalent for the same reason. Its
+  home also holds an unpacked, never-configured runner tarball from 2026-07-20
+  (no `.runner`, no `.service`, not running) — remove that rather than reuse
+  it. The preflight in `scripts/setup-actions-runner.sh` warns about both.
+
 ## Install
 
 A personal account cannot have organisation-level runners, so **each repository
@@ -113,10 +125,6 @@ repo. Delete it to switch straight back — useful if the VPS is down.
 → Runners. Setting it while no runner is online makes every job queue
 indefinitely instead of failing, which is harder to notice than a red check.
 
-`ubuntu-latest` is the default on purpose. If `runs-on` named a self-hosted
-label directly and the runner were offline, every job would **queue forever**
-rather than fail — much harder to notice than a red check.
-
 ## What the runner has to provide
 
 A self-hosted runner is a bare machine; none of GitHub's preinstalled image is
@@ -126,7 +134,7 @@ there. The installer provides:
 |---|---|
 | PHP 8.1 / 8.2 / 8.3 matrix | `ondrej/php` PPA, then `shivammathur/setup-php` per job |
 | PHP build prerequisites | `libonig`, `libxml2`, `libsodium`, `libzip`, `build-essential` |
-| Composer | installed to `/usr/local/bin`, checksum-verified |
+| Composer | `shivammathur/setup-php` per job — deliberately **not** installed system-wide |
 | Node 24 | `actions/setup-node` per job |
 | gitleaks (secret-scan) | downloaded per job — needs the `install` sudo entry |
 | git, curl, tar, unzip, jq | apt |
