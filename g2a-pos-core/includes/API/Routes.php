@@ -2828,6 +2828,27 @@ final class Routes {
 				'permission_callback' => static fn() => current_user_can( 'g2a_pos_manage_ai' ) || current_user_can( 'g2a_pos_manage_settings' ),
 			)
 		);
+		// Business-state refresh: pushes the operational picture (trading,
+		// compliance, range, inventory, membership, suppliers) into the brain.
+		// Runs hourly on cron; this is the manual trigger and its status.
+		register_rest_route(
+			'g2a-pos/v1',
+			'/ai/brain/refresh-business',
+			array(
+				'methods'             => 'POST',
+				'callback'            => array( AiController::class, 'brain_refresh_business' ),
+				'permission_callback' => static fn() => current_user_can( 'g2a_pos_manage_ai' ),
+			)
+		);
+		register_rest_route(
+			'g2a-pos/v1',
+			'/ai/brain/business-status',
+			array(
+				'methods'             => 'GET',
+				'callback'            => array( AiController::class, 'brain_business_status' ),
+				'permission_callback' => static fn() => current_user_can( 'g2a_pos_manage_ai' ) || current_user_can( 'g2a_pos_use_ai' ),
+			)
+		);
 		register_rest_route(
 			'g2a-pos/v1',
 			'/ai/brain/stats',

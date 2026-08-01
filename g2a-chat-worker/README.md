@@ -166,11 +166,17 @@ else.
 ## Not done yet
 
 - **Not deployed**, so never exercised against real Workers AI or the real index.
-- **The brain is empty of business data.** `g2a-brain` holds 22.76k vectors, but
-  nothing yet ingests POS, WooCommerce, membership or compliance records into
-  it. Until that runs, the Helper will correctly answer "I don't have that" to
-  most operational questions. That ingestion is the next piece of work, and it
-  is what actually makes the answers good.
+- **The business collectors have never run against live data.**
+  `G2A\POS\Ai\BusinessKnowledgeCollector` now feeds the brain the operational
+  picture — trading, compliance, range, inventory, membership, suppliers — on an
+  hourly cron, and `POST /ai/brain/refresh-business` triggers it by hand. But it
+  has only been exercised against a `$wpdb` double in tests. Until it runs on
+  the real database, `g2a-brain` still holds website content only, and the
+  Helper will correctly answer "I don't have that" to operational questions.
+- **Deliberately excluded from the brain: customer PII and firearm serials.**
+  The collectors emit aggregates and operational state only. See the class
+  docblock for why — the short version is that `/query` does not filter on
+  `scope`, so anything ingested is readable by anyone who can chat.
 - **No dashboard bubble yet** — this is the backend it will call.
 - `g2a-rag-worker` stores a `scope` on each chunk at ingest but `/query` does
   not filter on it, so a chunk marked internal is retrievable by any caller

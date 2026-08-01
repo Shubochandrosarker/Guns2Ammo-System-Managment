@@ -7,6 +7,7 @@ use G2A\POS\Admin\Assets;
 use G2A\POS\Admin\Menu;
 use G2A\POS\Auth\JWT;
 use G2A\POS\Compliance\ATF\NICS;
+use G2A\POS\Ai\BusinessKnowledgeCollector;
 use G2A\POS\Ai\WebsiteKnowledgeSeeder;
 use G2A\POS\Database\Migrator;
 use G2A\POS\Integrations\BookingEngineSync;
@@ -105,6 +106,10 @@ final class Plugin {
 		WooCatalogSync::boot();
 		BookingEngineSync::boot();
 		WebsiteKnowledgeSeeder::boot();
+		// The website seeder teaches the brain what a customer could read.
+		// This one teaches it the state of the business, which is what the
+		// assistant needs to answer "what needs my attention today".
+		BusinessKnowledgeCollector::boot();
 		WholesalerRegistry::boot();
 		MapPricingService::boot();
 		CarrierRegistry::boot();
