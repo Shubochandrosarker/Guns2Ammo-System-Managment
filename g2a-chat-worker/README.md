@@ -150,9 +150,15 @@ I don't handle. The commands above are what you run.
 ## Tests
 
 ```bash
-npm test        # 35 assertions, no framework, no added dependencies
+npm install     # required first — the runner needs this package's own esbuild
+npm test        # 35 assertions, no framework
 npm run typecheck
+npm run build   # wrangler dry-run: bundles and prints the bindings, deploys nothing
 ```
+
+`npm run build` is a safety net, not a build step — a Worker needs no compile,
+`wrangler deploy` bundles on the fly. Running it first tells you the code
+bundles and the bindings resolve without shipping anything.
 
 Covers: fail-closed auth (an unconfigured Worker refuses everything), that
 `/health` never echoes a secret, that a caller-supplied system turn is dropped,
