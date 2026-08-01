@@ -1,0 +1,29 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "g2a-rag-worker",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-07-27",
+
+  // Workers AI embeds chunks and queries with @cf/baai/bge-m3 (1024 dims).
+  "ai": {
+    "binding": "AI"
+  },
+
+  // Create this index before the first deploy:
+  //   npx wrangler vectorize create g2a-brain --dimensions=1024 --metric=cosine
+  "vectorize": [
+    {
+      "binding": "VECTOR_INDEX",
+      "index_name": "g2a-brain"
+    }
+  ],
+
+  // The value is set separately with `npx wrangler secret put AUTH_TOKEN`.
+  "secrets": {
+    "required": ["AUTH_TOKEN"]
+  },
+
+  "observability": {
+    "enabled": true
+  }
+}

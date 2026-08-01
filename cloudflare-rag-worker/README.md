@@ -28,23 +28,23 @@ overwrites its vectors in place and `/delete` removes the id range.
 ## Deploy (one time, ~5 minutes)
 
 ```bash
-# 1. Install wrangler and log in to your Cloudflare account
-npm i -g wrangler
-wrangler login
-
-# 2. From this directory, install dev deps
+# 1. From this directory, install the pinned dev dependencies
 cd cloudflare-rag-worker
-npm install
+npm ci
+
+# 2. Log in to your Cloudflare account
+npx wrangler login
 
 # 3. Create the Vectorize index (bge-m3 = 1024 dims, cosine metric)
-wrangler vectorize create g2a-brain --dimensions=1024 --metric=cosine
+npx wrangler vectorize create g2a-brain --dimensions=1024 --metric=cosine
 
 # 4. Set the shared bearer token (generate something long and random,
 #    e.g. `openssl rand -hex 32`) — you will paste the same value into the POS
-wrangler secret put AUTH_TOKEN
+npx wrangler secret put AUTH_TOKEN
 
 # 5. Deploy
-wrangler deploy
+npm run deploy:check
+npm run deploy
 ```
 
 `wrangler deploy` prints the Worker URL, e.g.
@@ -83,6 +83,8 @@ covers bge-m3 embedding of a corpus this size. No paid plan is required.
 ## Local development
 
 ```bash
-npm run dev        # wrangler dev (uses your remote Vectorize index)
+npm run dev        # wrangler dev (local Vectorize; Workers AI runs remotely)
+npm run deploy:check # validate and bundle without publishing
+npm run cf-typegen # regenerate Cloudflare binding/runtime types
 npm run typecheck  # tsc --noEmit
 ```
