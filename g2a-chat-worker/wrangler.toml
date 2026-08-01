@@ -1,0 +1,26 @@
+name = "g2a-chat-worker"
+main = "src/index.ts"
+compatibility_date = "2025-06-01"
+compatibility_flags = ["nodejs_compat"]
+
+# Workers AI — generation. Retrieval/embedding lives in g2a-rag-worker, which
+# already owns @cf/baai/bge-m3 and the g2a-brain index. Do not embed here too:
+# a query embedded with a different model than the corpus returns confident
+# nonsense, because the vectors are still the right shape.
+[ai]
+binding = "AI"
+
+[vars]
+# AI Gateway id (dash > AI > AI Gateway). Routes generation through the
+# gateway so it is logged, cached and rate-limited alongside everything else.
+AI_GATEWAY_ID = "42069"
+
+# Origins allowed to call this Worker directly from a browser. Normally EMPTY:
+# the dashboard calls through g2a-business-api so the API key stays server
+# side. Only set this if you accept the key being visible in a bundle.
+ALLOWED_ORIGINS = ""
+
+# Secrets — never put values in this file:
+#   wrangler secret put API_KEY     # what callers present as Bearer
+#   wrangler secret put RAG_URL     # https://g2a-rag-worker.<subdomain>.workers.dev
+#   wrangler secret put RAG_TOKEN   # the g2a-rag-worker AUTH_TOKEN

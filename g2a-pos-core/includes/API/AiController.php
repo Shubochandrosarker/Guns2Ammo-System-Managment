@@ -4,6 +4,7 @@ namespace G2A\POS\API;
 
 use G2A\POS\Ai\AgentService;
 use G2A\POS\Ai\BrainService;
+use G2A\POS\Ai\BusinessKnowledgeCollector;
 use G2A\POS\Ai\ToolRegistry;
 use G2A\POS\Database\AiAuditRepository;
 use G2A\POS\Database\AiBrainRepository;
@@ -199,6 +200,40 @@ final class AiController {
 	}
 
 	/** GET /ai/brain/stats — corpus size, embedded %, per-source breakdown, last refresh. */
+	/**
+	 * Push the current business state into the brain on demand.
+	 *
+	 * Runs the same collectors the hourly cron does. Slow by nature — it walks
+	 * several aggregates — so it is a POST behind manage_ai rather than
+	 * something a page load triggers.
+	 */
+	public static function brain_refresh_business( WP_REST_Request $request ) {
+		$result = BusinessKnowledgeCollector::refresh();
+
+		// Partial success is reported as such rather than as a flat failure: if
+		// five collectors landed and one threw, the brain is better off than it
+		// was and the caller still needs to see which one broke.
+		return array(
+			'ok'       => $result['ok'],
+			'ingested' => $result['ingested'],
+			'skipped'  => $result['skipped'],
+			'failed'   => $result['failed'],
+			'partial'  => ! $result['ok'] && $result['ingested'] > 0,
+		);
+	}
+
+	/** Last business refresh, for the dashboard to show staleness. */
+	public static function brain_business_status( WP_REST_Request $request ) {
+		$last = get_option( 'g2a_pos_brain_business_last_run', array() );
+		$next = wp_next_scheduled( BusinessKnowledgeCollector::CRON_HOOK );
+
+		return array(
+			'last_run'     => is_array( $last ) ? $last : array(),
+			'next_run_at'  => $next ? gmdate( 'c', (int) $next ) : null,
+			'cron_healthy' => (bool) $next,
+		);
+	}
+
 	public static function brain_stats( WP_REST_Request $request ) {
 		$stats                    = ( new AiBrainRepository() )->stats();
 		$stats['backend']         = BrainService::backend();
