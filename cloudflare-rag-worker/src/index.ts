@@ -21,8 +21,22 @@
 export interface Env {
   AI: Ai;
   VECTOR_INDEX: VectorizeIndex;
+  /** Full access: read any scope, ingest, delete. The POS plugin uses this. */
   AUTH_TOKEN: string;
+  /**
+   * Read-only, public-scope-only. Optional — when unset, no restricted caller
+   * exists and nothing changes.
+   *
+   * This is a SEPARATE credential rather than a `scope` parameter on /query,
+   * because a parameter is set by the caller: a bug or a compromise in the
+   * public chatbot would simply omit it and read internal documents. Tying the
+   * restriction to the token makes it unbypassable from the caller's side.
+   */
+  PUBLIC_AUTH_TOKEN?: string;
 }
+
+/** What a request is allowed to do, decided by which token it presented. */
+type Access = 'full' | 'public' | 'none';
 
 const EMBEDDING_MODEL = '@cf/baai/bge-m3';
 /** Vectorize metadata is capped per vector; keep the stored excerpt bounded. */
@@ -64,11 +78,18 @@ function timingSafeEqual(a: string, b: string): boolean {
   return diff === 0;
 }
 
-function authorized(request: Request, env: Env): boolean {
-  if (!env.AUTH_TOKEN) return false; // refuse to run without a token set
+function accessFor(request: Request, env: Env): Access {
+  if (!env.AUTH_TOKEN) return 'none'; // refuse to run without a token set
   const header = request.headers.get('Authorization') ?? '';
-  if (!header.startsWith('Bearer ')) return false;
-  return timingSafeEqual(header.slice('Bearer '.length).trim(), env.AUTH_TOKEN);
+  if (!header.startsWith('Bearer ')) return 'none';
+  const presented = header.slice('Bearer '.length).trim();
+
+  // Full token is checked first so that a misconfiguration setting both
+  // secrets to the same value grants full access rather than silently
+  // downgrading the POS plugin to public-only retrieval.
+  if (timingSafeEqual(presented, env.AUTH_TOKEN)) return 'full';
+  if (env.PUBLIC_AUTH_TOKEN && timingSafeEqual(presented, env.PUBLIC_AUTH_TOKEN)) return 'public';
+  return 'none';
 }
 
 async function embed(env: Env, texts: string[]): Promise<number[][]> {
@@ -125,22 +146,40 @@ async function handleIngest(request: Request, env: Env): Promise<Response> {
   return json({ ok: true, upserted: toUpsert.length, mutation_id: mutation.mutationId ?? null });
 }
 
-async function handleQuery(request: Request, env: Env): Promise<Response> {
-  const body = (await request.json().catch(() => null)) as { query?: string; k?: number } | null;
+async function handleQuery(request: Request, env: Env, access: Access): Promise<Response> {
+  const body = (await request.json().catch(() => null)) as
+    | { query?: string; k?: number; scope?: string }
+    | null;
   const query = typeof body?.query === 'string' ? body.query.trim() : '';
   if (query === '') {
     return json({ ok: false, error: 'query required' }, 400);
   }
   const k = Math.max(1, Math.min(20, Number(body?.k) || 5));
 
+  // A restricted caller is pinned to public regardless of what it asked for.
+  // A full caller may narrow voluntarily, or omit scope to search everything —
+  // which preserves the behaviour the POS plugin relies on today.
+  const requested = typeof body?.scope === 'string' ? body.scope.trim() : '';
+  const scope = access === 'public' ? 'public' : requested;
+
   const [vector] = await embed(env, [query]);
   const matches = await env.VECTOR_INDEX.query(vector, {
     topK: k,
     returnValues: false,
     returnMetadata: 'all',
+    ...(scope ? { filter: { scope } } : {}),
   });
 
-  const results = matches.matches.map((m) => ({
+  // Second line of defence. Vectorize's filter only works when a metadata
+  // index exists on `scope` (see README) — if that index is missing the filter
+  // is silently ignored and every document comes back. For a restricted caller
+  // that would be exactly the leak this change exists to prevent, so the
+  // returned metadata is re-checked here rather than trusted.
+  const filtered = scope
+    ? matches.matches.filter((m) => String(m.metadata?.scope ?? 'public') === scope)
+    : matches.matches;
+
+  const results = filtered.map((m) => ({
     id: m.id,
     score: m.score,
     doc_id: Number(m.metadata?.doc_id ?? 0),
@@ -149,8 +188,9 @@ async function handleQuery(request: Request, env: Env): Promise<Response> {
     label: String(m.metadata?.label ?? ''),
     source_type: String(m.metadata?.source_type ?? ''),
     source_uri: String(m.metadata?.source_uri ?? ''),
+    scope: String(m.metadata?.scope ?? 'public'),
   }));
-  return json({ ok: true, count: results.length, results });
+  return json({ ok: true, count: results.length, scope: scope || 'all', results });
 }
 
 async function handleDelete(request: Request, env: Env): Promise<Response> {
@@ -189,16 +229,23 @@ async function handleStats(env: Env): Promise<Response> {
 
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
-    if (!authorized(request, env)) {
+    const access = accessFor(request, env);
+    if (access === 'none') {
       return unauthorized();
     }
     const url = new URL(request.url);
     try {
+      // Retrieval is the only thing a restricted caller can do. Writing to the
+      // corpus, deleting from it, and reading its size are all full-token
+      // operations — a public chatbot has no business doing any of them.
+      if (access === 'public' && !(request.method === 'POST' && url.pathname === '/query')) {
+        return json({ ok: false, error: 'forbidden_for_restricted_token' }, 403);
+      }
       if (request.method === 'POST' && url.pathname === '/ingest') {
         return await handleIngest(request, env);
       }
       if (request.method === 'POST' && url.pathname === '/query') {
-        return await handleQuery(request, env);
+        return await handleQuery(request, env, access);
       }
       if (request.method === 'POST' && url.pathname === '/delete') {
         return await handleDelete(request, env);
