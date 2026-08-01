@@ -25,6 +25,54 @@ so an outage of this Worker degrades gracefully instead of breaking the agent.
 Vector ids are `"{doc_id}:{chunk_index}"`, so re-ingesting a document
 overwrites its vectors in place and `/delete` removes the id range.
 
+## Scopes: keeping internal data out of a public chatbot
+
+Every chunk is stored with a `scope` (`public` by default; the POS business
+collectors write `internal`). `/query` can now filter on it, and **the filter
+is decided by which token you present, not by a request parameter**:
+
+| Token | Can read | Can ingest / delete / stats |
+|---|---|---|
+| `AUTH_TOKEN` | any scope — omit `scope` for all, or pass one to narrow | yes |
+| `PUBLIC_AUTH_TOKEN` | **`public` only, always** | no — 403 |
+
+A `scope` field in the request body would have been simpler, and wrong: the
+caller sets it, so a bug or a compromise in a public-facing chatbot would just
+omit it and read the shop's margin, its open NICS count and its dead stock.
+Binding the restriction to the credential makes it unbypassable from outside.
+
+`PUBLIC_AUTH_TOKEN` is optional. Leave it unset and nothing changes — there is
+simply no restricted caller.
+
+### Required before the filter works
+
+Vectorize only applies a metadata filter when a **metadata index** exists for
+that property. Create it once:
+
+```bash
+wrangler vectorize create-metadata-index g2a-brain --property-name=scope --type=string
+```
+
+**Without this index Vectorize silently ignores the filter and returns
+everything** — no error, no warning. That is precisely the leak this feature
+exists to prevent, so `/query` also re-checks the `scope` on every returned
+match and drops any that disagree. The index makes it efficient; the re-check
+makes it safe. A test covers the missing-index case specifically.
+
+Note the index only covers vectors written *after* it is created. Re-ingest
+existing documents (`POST /ai/brain/refresh-business` and the site refresh in
+the POS plugin) so everything is indexed.
+
+### Setting the public token
+
+```bash
+openssl rand -base64 32
+wrangler secret put PUBLIC_AUTH_TOKEN
+```
+
+Give that value only to public-facing callers. It cannot write to the corpus
+and cannot read anything marked internal.
+
 ## Deploy (one time, ~5 minutes)
 
 ```bash
@@ -71,6 +119,21 @@ curl -s -H "Authorization: Bearer $TOKEN" $URL/stats
 curl -s -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' \
   -d '{"query":"what are the range hours?","k":3}' $URL/query
 ```
+
+## Tests
+
+```bash
+npm install
+npm test     # 21 assertions covering scope isolation
+```
+
+Covers: a restricted token pinned to public even when it asks for internal; the
+missing-metadata-index case still blocking the leak; write/delete/stats refused
+for restricted callers; and the full token behaving exactly as before, which is
+what the POS plugin depends on.
+
+Verified the suite can fail — removing the credential pin trips exactly the
+seven leak assertions and leaves the other fourteen passing.
 
 ## Costs
 
