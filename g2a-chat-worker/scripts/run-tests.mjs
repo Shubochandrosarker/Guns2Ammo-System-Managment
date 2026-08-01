@@ -1,19 +1,29 @@
 #!/usr/bin/env node
 // Minimal test runner: bundle each src/**/*.test.ts with esbuild and run it.
 //
-// No test framework is installed on purpose. esbuild already ships as a Vite
-// dependency, so this adds nothing to the dependency tree, and the tests
-// themselves are plain assertions that exit non-zero on failure. It exists so
-// `npm test` — which deploy.sh already invokes — actually runs something.
+// No test framework is installed on purpose: the tests are plain assertions
+// that exit non-zero on failure, so esbuild is the only thing needed to strip
+// the TypeScript. It is a declared devDependency here — unlike the front-end
+// packages, where esbuild comes along with Vite for free.
 
 import { execFileSync } from 'node:child_process';
-import { mkdtempSync, readdirSync, rmSync, statSync } from 'node:fs';
+import { existsSync, mkdtempSync, readdirSync, rmSync, statSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const root = fileURLToPath(new URL('..', import.meta.url));
-const esbuild = join(root, '..', 'dashboard-app', 'node_modules', '.bin', 'esbuild');
+const esbuild = join(root, 'node_modules', '.bin', 'esbuild');
+
+if (!existsSync(esbuild)) {
+  console.error(
+    'esbuild not found at ' + esbuild + '\n' +
+    'Run `npm install` in g2a-chat-worker first. (This used to reach into\n' +
+    'dashboard-app/node_modules, which only worked on a machine that had\n' +
+    'already installed that package — it failed on a fresh checkout.)',
+  );
+  process.exit(1);
+}
 
 function findTests(dir) {
   const out = [];

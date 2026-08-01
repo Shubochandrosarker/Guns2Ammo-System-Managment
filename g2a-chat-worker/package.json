@@ -2,14 +2,16 @@
   "name": "g2a-chat-worker",
   "version": "0.1.0",
   "private": true,
-  "description": "WPISTIC AI Helper — Guns2Ammo operations chatbot and agent runner",
+  "description": "WPISTIC AI Helper \u2014 Guns2Ammo operations chatbot and agent runner",
   "scripts": {
     "dev": "wrangler dev",
     "deploy": "wrangler deploy",
     "typecheck": "tsc --noEmit",
-    "test": "node scripts/run-tests.mjs"
+    "test": "node scripts/run-tests.mjs",
+    "build": "wrangler deploy --dry-run --outdir=dist"
   },
   "devDependencies": {
+    "esbuild": "^0.25.0",
     "typescript": "^5.6.2",
     "wrangler": "^4.0.0"
   }

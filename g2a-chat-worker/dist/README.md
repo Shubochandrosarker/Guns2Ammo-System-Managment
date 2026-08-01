@@ -1,0 +1,1 @@
+This folder contains the built output assets for the worker "g2a-chat-worker" generated at 2026-08-01T03:06:13.129Z.
