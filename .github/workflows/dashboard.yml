@@ -1,0 +1,128 @@
+name: Dashboard (app.guns2ammo.com)
+
+# The repo previously had CI for the PHP plugins only, so every change to the
+# React app that will be served from app.guns2ammo.com reached main unchecked —
+# including changes that break the production build outright. deploy/deploy.sh
+# runs typecheck, lint, tests and a build before it ships, which means those
+# failures were being discovered by whoever was deploying, mid-deploy, rather
+# than on the pull request.
+#
+# This job runs the same gates as the deploy, in the same order.
+#
+# Runner selection matches .github/workflows/php.yml:
+#   RUNNER_LABEL unset  -> GitHub-hosted (ubuntu-latest), metered minutes
+#   RUNNER_LABEL = g2a  -> the self-hosted runner on server.wpistic.cloud
+# ubuntu-latest stays the default deliberately: naming a self-hosted label
+# directly would make the job queue indefinitely whenever the runner is
+# offline, which is harder to spot than a red check.
+
+on:
+  push:
+    branches: [ "main" ]
+    # This repo is private on a personal account, so Actions minutes are
+    # metered — only spend them when the dashboard actually changed.
+    paths:
+      - 'dashboard-app/**'
+      - '.github/workflows/dashboard.yml'
+  pull_request:
+    branches: [ "main" ]
+    paths:
+      - 'dashboard-app/**'
+      - '.github/workflows/dashboard.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    working-directory: dashboard-app
+
+jobs:
+  build:
+    name: Typecheck, lint, test, production build
+    runs-on: ${{ vars.RUNNER_LABEL || 'ubuntu-latest' }}
+    timeout-minutes: 15
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+          cache-dependency-path: dashboard-app/package-lock.json
+
+      # `npm ci` (not `npm install`): it fails when package.json and the
+      # lockfile disagree, which is exactly what CI should catch. deploy.sh
+      # refuses to build without a lockfile for the same reason.
+      - name: Install locked dependencies
+        run: npm ci --no-audit --no-fund
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      # Invoked directly, not with --if-present: that form silently skips a
+      # missing script, and a lint config that disappears should fail the
+      # check rather than pass it quietly. Same wording as deploy.sh.
+      - name: Lint
+        run: npm run lint
+
+      # The runner refuses to report success on zero test files, so an empty
+      # suite cannot masquerade as a pass.
+      - name: Tests
+        run: npm test
+
+      # Build exactly as the deploy does: same relative API base (served
+      # through the nginx proxy so the session cookie is same-origin) and
+      # mocks hard-off. env.ts throws at module load if the API base is
+      # missing, so a misconfigured build fails here rather than shipping a
+      # bundle that points nowhere.
+      - name: Production build
+        run: npm run build
+        env:
+          VITE_G2A_API_BASE: /wp-json/g2a/v1
+          VITE_G2A_USE_MOCKS: '0'
+
+      # The identical script deploy.sh runs at step 7/10 — no source maps, no
+      # dev fixtures in the bundle, API base compiled in, noindex + robots.txt
+      # present, no inline <script> that the CSP would block.
+      - name: Verify the built bundle
+        run: ./scripts/verify-build.sh dist /wp-json/g2a/v1
+
+  nginx:
+    name: Validate the app.guns2ammo.com vhost
+    runs-on: ${{ vars.RUNNER_LABEL || 'ubuntu-latest' }}
+    timeout-minutes: 10
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # The vhost is the piece that decides whether the API proxy, the SPA
+      # fallback, the login rate limit and every security header actually
+      # work, and until now nothing checked it even parsed. A typo shipped
+      # here means `nginx -t` fails on the server and the reload silently
+      # leaves the previous config in place.
+      - name: Install nginx
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq nginx-light
+
+      - name: Stage the vhost and its snippet
+        run: |
+          sudo mkdir -p /etc/nginx/snippets /etc/ssl/g2a /var/www/g2a-dashboard/current/dist
+          sudo cp deploy/nginx-security-headers.conf /etc/nginx/snippets/g2a-security-headers.conf
+          sudo cp deploy/nginx-app.guns2ammo.com.conf /etc/nginx/sites-available/app.guns2ammo.com
+          sudo ln -sf /etc/nginx/sites-available/app.guns2ammo.com /etc/nginx/sites-enabled/app.guns2ammo.com
+          sudo rm -f /etc/nginx/sites-enabled/default
+          # The vhost references a certificate that only exists on the VPS;
+          # `nginx -t` reads the file, so give it a throwaway self-signed one.
+          sudo openssl req -x509 -newkey rsa:2048 -nodes -days 1 \
+            -keyout /etc/ssl/g2a/app.guns2ammo.com.key \
+            -out /etc/ssl/g2a/app.guns2ammo.com.pem \
+            -subj /CN=app.guns2ammo.com 2>/dev/null
+
+      - name: nginx -t
+        run: sudo nginx -t

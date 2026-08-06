@@ -1,0 +1,10 @@
+# app.guns2ammo.com is the private business control centre — owner and
+# manager only. Nothing here should ever appear in a search result, and a
+# crawler hitting /login on repeat is noise in the rate limiter besides.
+#
+# This is belt-and-braces alongside the <meta name="robots" content="noindex">
+# in index.html: robots.txt asks crawlers not to fetch, the meta tag tells the
+# ones that fetch anyway not to index. Neither is access control — every route
+# is behind the session cookie regardless.
+User-agent: *
+Disallow: /

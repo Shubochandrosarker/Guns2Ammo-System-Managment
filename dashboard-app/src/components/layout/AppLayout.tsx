@@ -1,7 +1,9 @@
-import { useRef, useState } from 'react'
-import { Outlet, useNavigate } from 'react-router-dom'
+import { Suspense, useRef, useState } from 'react'
+import { Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { Sidebar } from './Sidebar'
 import { TopBar } from './TopBar'
+import { ErrorBoundary } from '@/components/ErrorBoundary'
+import { Spinner } from '@/components/ui/Spinner'
 import type { SessionUser } from '@/types/auth'
 import { api } from '@/lib/api'
 import { useBodyScrollLock, useDialogA11y } from '@/lib/hooks'
@@ -13,6 +15,7 @@ interface Props {
 
 export function AppLayout({ session, onSessionChange }: Props) {
   const nav = useNavigate()
+  const location = useLocation()
   const [mobileOpen, setMobileOpen] = useState(false)
 
   // Lock body scroll while the mobile nav drawer is open so the page behind
@@ -50,7 +53,25 @@ export function AppLayout({ session, onSessionChange }: Props) {
         />
         <main className="flex-1 overflow-y-auto">
           <div className="px-3 sm:px-4 lg:px-8 py-4 sm:py-6 max-w-[1400px] mx-auto w-full">
-            <Outlet />
+            {/*
+              Both boundaries sit here rather than around the whole app so the
+              chrome survives: a lazily-loaded page arriving over shop wifi
+              shows a spinner in the content area instead of blanking the
+              sidebar, and a page that throws leaves the rest of the dashboard
+              reachable. resetKey drops a stale error the moment the user
+              navigates somewhere else.
+            */}
+            <ErrorBoundary resetKey={location.pathname}>
+              <Suspense
+                fallback={
+                  <div className="py-16 flex items-center justify-center">
+                    <Spinner label="Loading…" />
+                  </div>
+                }
+              >
+                <Outlet />
+              </Suspense>
+            </ErrorBoundary>
           </div>
         </main>
       </div>
