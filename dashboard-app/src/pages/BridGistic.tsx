@@ -8,14 +8,18 @@ interface HistoryItem extends BridGisticAskResult {
   ts: string
 }
 
+// Plain text, not HTML. These were previously stored with `&apos;` entities
+// and rendered through dangerouslySetInnerHTML — which meant this file was
+// the one place in an authenticated admin app that injected raw HTML, purely
+// to draw an apostrophe. JSX escapes the character natively.
 const SUGGESTIONS = [
-  'Show this week&apos;s booking revenue',
+  'Show this week’s booking revenue',
   'Find members expiring this month',
   'Analyze why store sales dropped',
   'Draft a customer follow-up email',
   'Show pending FFL transfers',
   'Create a task to improve the CCW class page',
-  'Generate this week&apos;s business report',
+  'Generate this week’s business report',
 ]
 
 export function BridGistic() {
@@ -126,10 +130,11 @@ export function BridGistic() {
             <button
               key={s}
               type="button"
-              onClick={() => setInput(s.replace(/&apos;/g, "'"))}
+              onClick={() => setInput(s)}
               className="text-xs px-2.5 py-1 rounded-full bg-ink-100 text-ink-700 hover:bg-ink-200"
-              dangerouslySetInnerHTML={{ __html: s }}
-            />
+            >
+              {s}
+            </button>
           ))}
         </div>
 

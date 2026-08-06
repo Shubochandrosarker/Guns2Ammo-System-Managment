@@ -83,33 +83,13 @@ cmd_deploy() {
     npm run build
 
     info "[7/10] Post-build safety checks"
-    [ -f dist/index.html ] || die "dist/index.html missing — build produced nothing"
-    if compgen -G "dist/**/*.map" > /dev/null || compgen -G "dist/assets/*.map" > /dev/null; then
-        die "source maps present in dist/ — aborting."
-    fi
-    # Prove the dev fixtures were tree-shaken out, via a tripwire token that
-    # exists ONLY in src/mocks/data.ts (written as a globalThis assignment there
-    # so it survives minification whenever that module is reachable).
-    #
-    # The original check was /g2a\.mocks|USE_MOCKS *= *(1|true)/, which matched
-    # env.ts's own "VITE_G2A_USE_MOCKS=1 is ignored in production builds"
-    # warning string. That string is in every production bundle, so that step
-    # aborted EVERY deploy while mocks were in fact correctly absent.
-    #
-    # Catches: any static import of the fixtures reaching the bundle — the way
-    # this realistically regresses. The existing dynamic import in api.ts sits
-    # behind a literal import.meta.env.DEV guard and a hard useMocks=false, so
-    # Rollup eliminates that path outright; it cannot leak and so does not trip
-    # this. Verified in both directions before shipping.
-    if grep -RqF "G2A_MOCK_FIXTURES_PRESENT_DO_NOT_SHIP" dist/assets/*.js 2>/dev/null; then
-        die "dev mock fixtures are present in the production bundle — aborting."
-    fi
-    # The API base is compiled in at build time. If it did not make it into the
-    # bundle the app points somewhere else entirely, with no runtime error to
-    # reveal it.
-    if ! grep -rqF "$VITE_G2A_API_BASE" dist/assets/*.js; then
-        die "built bundle does not contain VITE_G2A_API_BASE (${VITE_G2A_API_BASE}) — the build did not pick it up."
-    fi
+    # The checks themselves live in scripts/verify-build.sh so that CI
+    # (.github/workflows/dashboard.yml) runs the identical gate on every pull
+    # request. When they lived inline here, a regression that reintroduced
+    # source maps or pulled the dev fixtures into the bundle stayed green on
+    # the PR and only surfaced at deploy time.
+    ./scripts/verify-build.sh dist "$VITE_G2A_API_BASE"
+
     printf '{"release":"%s","builtAt":"%s","api":"%s"}\n' \
         "${release_id}" "$(date -u +%FT%TZ)" "$VITE_G2A_API_BASE" > dist/healthz.json
 
@@ -149,6 +129,27 @@ cmd_deploy() {
             esac
             ;;
     esac
+
+    # Confirm the vhost that is actually serving is the current one.
+    #
+    # The security headers are emitted from an nginx snippet
+    # (deploy/nginx-security-headers.conf) that has to be installed by hand to
+    # /etc/nginx/snippets/. If it is missing, `nginx -t` fails, the reload is
+    # refused, and the PREVIOUS vhost keeps serving — so a deploy sails through
+    # green while the app is being served with no CSP and no HSTS. Nothing else
+    # in this script can see that; a header probe can.
+    local headers
+    headers="$(curl -fsS -o /dev/null -D - "${APP_ORIGIN}/" 2>/dev/null || true)"
+    for header in Content-Security-Policy Strict-Transport-Security X-Frame-Options X-Content-Type-Options; do
+        if ! printf '%s' "$headers" | grep -qi "^${header}:"; then
+            echo "WARNING: ${APP_ORIGIN}/ is missing the ${header} response header." >&2
+            echo "         nginx is probably still serving an older vhost — install" >&2
+            echo "         deploy/nginx-security-headers.conf to /etc/nginx/snippets/" >&2
+            echo "         g2a-security-headers.conf, then 'nginx -t && systemctl reload nginx'." >&2
+            echo "         Not rolling back: the release is fine, the web server config is not." >&2
+            break
+        fi
+    done
 
     ssh_run "cd '${DEPLOY_ROOT}/releases' && ls -1t | tail -n +$((KEEP_RELEASES + 1)) | xargs -r rm -rf --"
     echo "Deployed ${release_id} ✔"

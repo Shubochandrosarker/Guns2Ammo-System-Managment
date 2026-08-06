@@ -104,12 +104,38 @@ a Vite dependency — no test framework is installed) and runs it. It exits
 non-zero if it finds no test files, so an empty suite cannot masquerade as a
 pass.
 
-Current coverage is the envelope transport in `src/lib/api.ts`: a `200` that
-carries `success:false`, a `200` that is not an envelope at all, structured
-errors recovered from non-2xx bodies, and content-list pagination. That last
-one caught a live bug — `Number(null)` is `0`, so a missing `X-WP-Total`
-header was being read as "0 results" instead of falling back to the item
-count.
+Current coverage:
+
+- **`src/lib/api.ts`** — the envelope transport: a `200` that carries
+  `success:false`, a `200` that is not an envelope at all, structured errors
+  recovered from non-2xx bodies, and content-list pagination. That last one
+  caught a live bug — `Number(null)` is `0`, so a missing `X-WP-Total` header
+  was being read as "0 results" instead of falling back to the item count.
+- **`src/lib/lazy.ts`** — which failures count as "the chunk this tab wants
+  was deleted by the last deploy" (five real browser wordings), which do not
+  (a `TypeError` from a bad API shape must not trigger a reload loop), and
+  that recovery reloads exactly once.
+- **`src/lib/redirect.ts`** — the post-sign-in redirect guard. The refusal
+  cases matter most: an absolute URL, a protocol-relative `//host`, a
+  backslash variant and a `javascript:` URL all fall back to `/` rather than
+  turning the login screen into an open redirect.
+
+## Production behaviour worth knowing
+
+- **Surviving a deploy.** Releases get new fingerprinted filenames and old
+  ones are pruned, so an already-open tab asks for chunks that are gone.
+  `src/lib/lazy.ts` reloads the page once on that specific failure; anything
+  else — and any second failure — goes to an `ErrorBoundary` instead.
+- **Error boundaries.** One around the whole app, one inside `AppLayout`
+  around the routed page, so a single screen throwing leaves the sidebar and
+  every other screen usable rather than emptying `<div id="root">`.
+- **Deep links.** A signed-out hit on `/waivers?status=active` remembers where
+  it was going and lands there after sign-in.
+- **No white flash.** `public/theme-boot.js` applies the saved theme in
+  `<head>` before the first paint; `src/lib/theme.tsx` only re-applies it.
+  Keep the two in sync.
+- **Not indexable.** `public/robots.txt` plus a `noindex` meta tag; both are
+  enforced by `scripts/verify-build.sh`.
 
 ## Deploying
 
@@ -119,12 +145,21 @@ count.
 ```
 
 Preflight runs before anything is built: lockfile present, API base set and
-of a valid shape. After the build it refuses to ship source maps, refuses a
-bundle containing the dev fixtures (via a tripwire token that exists only in
-`src/mocks/data.ts`), and requires the API base to actually appear in the
-bundle. After the atomic switch it checks `/healthz` for the new release id
-and then probes the API through the nginx proxy — a `404` there means every
-screen would be empty even though the files are being served.
+of a valid shape. After the build, `scripts/verify-build.sh` gates the
+bundle — no source maps, no dev fixtures (via a tripwire token that exists
+only in `src/mocks/data.ts`), API base actually compiled in, `noindex` and
+`robots.txt` present, and no inline `<script>` that the CSP would block. CI
+runs that same script on every pull request, so a regression fails on the PR
+rather than mid-deploy.
+
+After the atomic switch it checks `/healthz` for the new release id, probes
+the API through the nginx proxy — a `404` there means every screen would be
+empty even though the files are being served — and probes the live security
+headers, which is how a refused `nginx -t` reload (still serving the old
+vhost) gets noticed.
+
+The two nginx files in `deploy/` both need installing; see
+[`DEPLOYMENT.md`](../DEPLOYMENT.md#2-serve-the-app-and-the-api-from-the-same-origin).
 
 ## Build order (matches the plan)
 

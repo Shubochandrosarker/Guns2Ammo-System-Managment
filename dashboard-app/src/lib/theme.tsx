@@ -8,6 +8,12 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useState, t
 //    styles/index.css switch.
 //  - Also stamps <html data-theme="light|dark"> so anything that consumed
 //    the raw class before can still key off an attribute.
+//
+// NOTE: this runs in an effect, i.e. after the bundle has downloaded and
+// React has mounted — far too late to prevent a white flash for dark-mode
+// users. `public/theme-boot.js` does the same read and the same apply()
+// synchronously in <head> before the first paint, which makes the effect
+// below a no-op on load. STORAGE_KEY and apply() must stay in sync with it.
 
 export type Theme = 'light' | 'dark'
 export type ThemeChoice = Theme | 'system'

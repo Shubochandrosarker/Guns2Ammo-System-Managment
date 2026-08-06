@@ -1,6 +1,7 @@
 import { FormEvent, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useLocation, useNavigate } from 'react-router-dom'
 import { api, ApiError } from '@/lib/api'
+import { safeRedirect } from '@/lib/redirect'
 import type { SessionUser } from '@/types/auth'
 
 interface Props {
@@ -21,6 +22,7 @@ function loginErrorMessage(err: unknown): string {
 
 export function Login({ onSignedIn }: Props) {
   const nav = useNavigate()
+  const location = useLocation()
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
   const [busy, setBusy] = useState(false)
@@ -35,7 +37,7 @@ export function Login({ onSignedIn }: Props) {
       // credential-shaped is ever stored client-side.
       const user = await api.auth.login(username, password)
       onSignedIn(user)
-      nav('/', { replace: true })
+      nav(safeRedirect(location.state), { replace: true })
     } catch (err) {
       setError(loginErrorMessage(err))
     } finally {
