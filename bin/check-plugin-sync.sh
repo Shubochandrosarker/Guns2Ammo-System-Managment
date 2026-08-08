@@ -5,8 +5,8 @@
 #
 # The monorepo carries byte-identical copies of two plugins that also live in
 # standalone repos:
-#   g2a-booking-engine/                → github.com/Shubochandrosarker/g2a-booking-engine
-#   memberistic-membership-solutions/  → github.com/Shubochandrosarker/memberistic-membership-solutions
+#   plugins/g2a-booking-engine/                → github.com/Shubochandrosarker/g2a-booking-engine
+#   plugins/memberistic-membership-solutions/  → github.com/Shubochandrosarker/memberistic-membership-solutions
 #
 # Usage:
 #   bin/check-plugin-sync.sh [G2A_CHECKOUT] [MEMBERISTIC_CHECKOUT]
@@ -77,8 +77,8 @@ compare_tree() {
   rm -f "$report"
 }
 
-compare_tree "g2a-booking-engine"               "${1:-${ROOT}/../g2a-booking-engine}"
-compare_tree "memberistic-membership-solutions" "${2:-${ROOT}/../memberistic-membership-solutions}"
+compare_tree "plugins/g2a-booking-engine"               "${1:-${ROOT}/../g2a-booking-engine}"
+compare_tree "plugins/memberistic-membership-solutions" "${2:-${ROOT}/../memberistic-membership-solutions}"
 
 if [ "$compared" -eq 0 ]; then
   echo "Nothing compared (no standalone checkouts found) — treating as success."

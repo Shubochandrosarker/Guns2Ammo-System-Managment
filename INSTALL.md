@@ -2,7 +2,9 @@
 
 Installable archives for the Guns 2 Ammo WordPress build (Phase 1 + Phase 2 hardening included).
 
-**Current system release: [2.5.0](RELEASE-2.5.0.md)** (July 20, 2026) — Stripe webhook/membership-activation incident fix, a six-plugin crossmatch reconciliation against each plugin's dedicated repo and the live site, and a sitewide dark/light color-contrast fix. See that doc for the full writeup; this file stays current with whatever `releases/` actually contains.
+**Current system release: 3.0.0** (8 August 2026) — Memberistic becomes the single membership authority, Paid Memberships Pro removed system-wide, non-member bookings require verified online payment, and the repository is reorganised into `plugins/`, `themes/`, `apps/`, `dist/` and `archives/`.
+
+Installable ZIPs live in [`dist/`](dist/); component versions are in [VERSIONS.md](VERSIONS.md) and the feature list in [FEATURES.md](FEATURES.md). Historical release notes are in `archives/release-notes/`.
 
 ## Download
 
@@ -10,7 +12,7 @@ All zips are at the repo root and can be uploaded directly via **WP Admin → Pl
 
 | Artifact | Filename | Current version |
 |---|---|---|
-| Theme | `WPistic-Theme-For-G2A-Version-1.8.9.zip` *(also in `releases/`, current archive `WPistic-Theme-For-G2A-Version-1.27.14.zip`)* | **1.27.14** ✅ |
+| Theme | `WPistic-Theme-For-G2A-Version-1.8.9.zip` *(built to `dist/guns2ammo-1.27.14.zip`)* | **1.27.14** ✅ |
 | G2A Booking Engine plugin | `g2a-booking-engine.zip` (current archive `g2a-booking-engine-1.9.9.19.zip`) | **1.9.9.19** ✅ (Stripe webhook signature/idempotency fix, see `docs/INCIDENT-AUDIT-2026-07-19-STRIPE-SIGNUP.md`) |
 | Memberistic Membership Solutions plugin | `memberistic-membership-solutions.zip` (current archive `memberistic-membership-solutions-1.18.5.zip`) | **1.18.5** ✅ (Stripe webhook + activation reliability fix) |
 | G2A Theme Control plugin | `g2a-theme-control.zip` (current archive `g2a-theme-control-1.0.1.zip`) | **1.0.1** ✅ |
@@ -29,7 +31,7 @@ All zips are at the repo root and can be uploaded directly via **WP Admin → Pl
 
 > The root `WPistic-Theme-For-G2A-Version-1.8.9.zip` filename is preserved so the WP "Replace existing theme" flow recognises the upgrade. The `style.css` header inside reads `Version: 1.27.0` so WP treats it as an update, not a downgrade.
 >
-> `releases/` keeps only the two most-recent versions of each artifact (current + previous) for easy rollback; older archives are pruned.
+> `dist/` holds the current build of every component. Historical builds are retained in `archives/releases-legacy/`.
 
 ## Install order (fresh site) — Release 2.5.0
 
@@ -254,4 +256,4 @@ Every change lives in a separate commit on `claude/practical-hawking-LQW9g`. To 
 
 ## Source diffs
 
-The repo tracks extracted source under `guns2ammo/`, `g2a-booking-engine/`, `memberistic-membership-solutions/`, `formistic/`, `g2a-theme-control/`. Those mirror what's inside the zips. Future edits should land in the source dirs; rebuild the zips before releasing.
+The repo tracks extracted source under `plugins/` (all WordPress plugins) and `themes/guns2ammo/`. Those mirror what's inside the zips in `dist/`. Future edits land in the source dirs; run `scripts/build-release-zips.sh` to rebuild the zips before releasing.

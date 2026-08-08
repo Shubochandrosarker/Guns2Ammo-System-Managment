@@ -27,7 +27,7 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT" || exit 1
 
 # Files permitted to MENTION PMPro (documentation / migration tooling only).
-ALLOWLIST_RE='^(docs/|.*\.md$|.*\.html$|releases/|memberistic-membership-solutions/(includes/admin/class-import-page\.php|includes/database/class-migrations\.php|includes/database/class-memberships-repository\.php|CHANGELOG\.md)$|bin/check-no-pmpro\.sh$|\.github/workflows/)'
+ALLOWLIST_RE='^(archives/|docs/|.*\.md$|.*\.html$|releases/|plugins/memberistic-membership-solutions/(includes/admin/class-import-page\.php|includes/database/class-migrations\.php|includes/database/class-memberships-repository\.php|CHANGELOG\.md)$|bin/check-no-pmpro\.sh$|\.github/workflows/)'
 
 # Runtime symbols that are NEVER acceptable, anywhere.
 RUNTIME_RE='pmpro_hasMembershipLevel|pmpro_getMembershipLevel|pmpro_getAllLevels|pmpro_changeMembershipLevel|PMPRO_VERSION|pmpro_memberships_users|pmpro_membership_levels|pmpro_after_checkout|pmpro_send_expiration_warning_email|pmproeewe_'
@@ -68,9 +68,9 @@ fi
 # ── 3. Allowlist hygiene: entries must still mention PMPro ───────────────────
 # Stops the allowlist rotting into a blanket exemption after a file is cleaned.
 for f in \
-  memberistic-membership-solutions/includes/admin/class-import-page.php \
-  memberistic-membership-solutions/includes/database/class-migrations.php \
-  memberistic-membership-solutions/includes/database/class-memberships-repository.php
+  plugins/memberistic-membership-solutions/includes/admin/class-import-page.php \
+  plugins/memberistic-membership-solutions/includes/database/class-migrations.php \
+  plugins/memberistic-membership-solutions/includes/database/class-memberships-repository.php
 do
   if [ -f "$f" ] && ! grep -qi "pmpro" "$f"; then
     echo "NOTE: $f no longer mentions PMPro — drop it from ALLOWLIST_RE."

@@ -2,8 +2,8 @@ name: Plugin Sync
 
 # Verifies that the monorepo's embedded plugin copies are byte-identical to
 # the standalone plugin repos:
-#   g2a-booking-engine/                <-> Shubochandrosarker/g2a-booking-engine
-#   memberistic-membership-solutions/  <-> Shubochandrosarker/memberistic-membership-solutions
+#   plugins/g2a-booking-engine/                <-> Shubochandrosarker/g2a-booking-engine
+#   plugins/memberistic-membership-solutions/  <-> Shubochandrosarker/memberistic-membership-solutions
 #
 # Branch selection tolerates the standalone repos being ahead: an optional
 # workflow input picks the standalone branch to compare against; by default

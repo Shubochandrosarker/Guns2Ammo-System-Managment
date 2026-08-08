@@ -1,0 +1,144 @@
+# Guns 2 Ammo — system feature list
+
+What the system does, grouped by domain. Versions for every component are in
+[VERSIONS.md](VERSIONS.md).
+
+---
+
+## 1. Membership (Memberistic 1.20.0)
+
+**The single membership authority.** Everything else in the system asks
+Memberistic; nothing makes its own membership assumptions.
+
+**Plans & members**
+- Plan catalogue with stable slugs, pricing, billing cycles, benefits and per-plan settings
+- Memberships with status lifecycle: `active`, `comped`, `trial`, `past_due`, `suspended`, `expired`, `cancelled`, `needs_review`
+- Household/family memberships — linked people on one membership, each with their own account
+- Corporate group memberships: seat pools, owner self-service portal, invitations, seat requests, group reporting
+- Member digital card, dynamic check-in QR, member account dashboard
+
+**Public service API** — `Membership_Service` + global helpers
+- `get_user_membership_status()` — live status, plan, role, dates, expiry
+- `user_has_active_plan()` / `get_user_plan()` / `is_guest_user()`
+- `can_book_lane()` / `requires_payment_for_booking()` — booking entitlement
+- `assign_plan_after_payment()` — refuses without **verified** payment evidence
+- `assign_plan_manually()` — requires capability **and** an audited reason
+- `remove_plan()` — expires entitlement, preserves all history
+
+**Entitlement rules**
+- Only `defender`, `patriot`, `guardian` include free lane time (configurable via `memberistic_lane_included_plan_slugs`)
+- Only `active` and `comped` statuses are eligible (configurable via `memberistic_lane_eligible_statuses`)
+- Resolved from the **authenticated session only** — a typed email never grants or reveals membership
+- Expired renewal date disqualifies, even on an `active` row
+
+**Billing**
+- Stripe subscriptions, checkout, billing portal, webhook-driven activation
+- WordPress-side cancellation propagates to Stripe (with retry + admin visibility)
+- Payment history, receipts, failed-payment recovery
+
+**Waivers** — e-sign for members, guests and kiosk stations; minors; generated PDFs; versioned waiver text with re-consent; expiry and renewal reminders; waiver archive with import
+
+**Tooling** — CSV importer for legacy member bases; `wp memberistic guest-pass-audit` (dry-run by default, batched, resumable, reversible)
+
+---
+
+## 2. Booking (G2A Booking Engine 1.11.0)
+
+**Booking types & inventory**
+- Lane bookings, classes, instructor sessions, events with occurrences
+- Two capacity modes: `booking_count` (lanes) and `party_size` (seats)
+- Buffer time before/after, enforced in both directions
+- Business hours, blackout dates, min lead time, max advance window
+- Database-level locking — two customers cannot take the same slot
+
+**Payment policy (the core business rule)**
+- Eligible members reserve for **$0**, confirmed immediately
+- Everyone else pays the **full server-calculated price online** before the lane is held
+- Public deposits and public pay-at-store are not permitted
+- Offline gateways (`pay_in_store`, cash, terminal, comp, manual) are rejected on public payable endpoints — even for a crafted request
+- Front-desk settlement for non-members requires an explicit **double admin opt-in**, both defaulting to the safe answer
+- Fail-closed: if checkout can't be created, no reservation, no account, no email — recoverable error instead
+
+**Booking states**
+`pending` (checkout hold) · `reserved` · `confirmed` · `paid` · `partially_refunded` · `completed` · `cancelled` · `no_show` · `refunded` · `payment_failed` · `expired`
+
+- Central transition service with an explicit allowed-transition map
+- `paid` requires a matching successful payment-ledger entry (booking, currency, amount)
+- `confirmed` requires $0-with-valid-reason or verified payment
+- Refunded states require a gateway refund or an explicitly recorded offline refund
+- Every change carries the previous status into hooks and the audit log
+
+**Payments**
+- Stripe (Checkout Sessions, signed webhooks), PayPal, Fortis, Authorize.net, WooCommerce bridge
+- Server-side amount recalculation; browser totals are never trusted
+- Persistent claim-based webhook dedup — retries survive transient failures without double-charging
+- Request idempotency fingerprinting actor, type, resource, time, quantity, gateway, amount and currency
+- Partial-refund awareness across gateways
+
+**Operations**
+- Front-desk terminal: today's roster, search, check-in, waiver verification, payment collection, printable receipts
+- FullCalendar admin view with drag-to-reschedule
+- Checkout Attempts diagnostics screen for holds, failures and expiries
+- Range Guests list + CSV export for paid non-member customers
+- Reports, KPIs and exports — all sharing one operational visibility predicate
+- Customer-facing reschedule and cancel pages behind signed tokens
+
+**Email automation**
+- Branded 600px responsive template with bulletproof CTA buttons and plain-text fallback
+- Purpose-bound signed action links (complete payment, view, cancel, reschedule) with expiry and site-wide revocation
+- "Complete payment" safely mints a fresh Stripe session when the original expired
+- Delivery log with idempotency keys — webhook retries cannot duplicate emails
+- Confirmations only after verified payment; reminders select operational bookings only
+- Per-template preview and send-test
+
+---
+
+## 3. Point of sale (G2A POS Core 3.4.0)
+
+- Counter checkout, cart, tenders, receipts
+- Membership lookup at the counter — **Memberistic only**
+- Range check-in and booking lookup by customer
+- Inventory, products, categories
+- PDF receipt generation (ships its own runtime dependencies)
+- Admin SPA with provider configuration and test-lookup tooling
+
+---
+
+## 4. Supporting components
+
+| Component | Features |
+| --- | --- |
+| **advanced-ffl-checkout** 1.21.1 | FFL transfer workflow, dealer database, customer portal, 2FA, reminders, webhooks, CSV export, licence/feature gating |
+| **verifyistic** 1.4.7 | ID/age verification, QR verification endpoints, staff verification card |
+| **formistic** 2.1.1 | Form builder for public site forms with submissions |
+| **messageistic** 0.8.1 | Transactional messaging / SMS bridge |
+| **g2a-theme-control** 1.0.1 | Theme presentation toggles |
+| **g2a-business-api** | Internal business API surface |
+| **guns2ammo** theme 1.27.14 | Public site, Elementor-compatible, SEO redirects, structured data |
+| **dashboard-app** | Staff/owner dashboard |
+| **g2a-chat-worker** + **cloudflare-rag-worker** | Site chat with retrieval-backed answers |
+
+---
+
+## 5. Security & data integrity
+
+- Nonce verification and capability checks on every admin and staff action
+- Prepared SQL throughout; no unvalidated `$_POST`/`$_GET`/`$_REQUEST` use
+- Webhook signature validation for every gateway
+- Idempotent webhook and order handlers
+- No booking confirmation from client-side state
+- No membership assignment from untrusted request data
+- Audit logs for status changes, membership assignment/removal, refunds and manual overrides
+- Signed, expiring, revocable tokens for all public action links; no open redirects
+
+## 6. Quality gates (CI)
+
+| Gate | Scope |
+| --- | --- |
+| `no-pmpro` | Whole repo — fails on any Paid Memberships Pro dependency |
+| `plugin-sync` | Monorepo plugin copies vs standalone repos, byte-identical |
+| PHP lint | Every PHP file, PHP 8.1 + 8.3 |
+| PHPUnit | 68 booking-engine tests, 38 Memberistic tests |
+| JS syntax | All plugin assets |
+| PHPCS PSR-12 | New service classes (advisory) |
+| Composer validate | POS, business API, messageistic |
