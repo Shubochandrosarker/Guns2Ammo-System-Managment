@@ -10,14 +10,14 @@ _Last updated: 8 August 2026._
 | Component | Version | Purpose | Install order |
 | --- | --- | --- | --- |
 | **memberistic-membership-solutions** | **1.20.0** | Membership authority — plans, members, entitlement, waivers, corporate groups, Stripe billing | 1 |
-| **g2a-booking-engine** | **1.11.0** | Lane/class/event bookings, payments, front desk, calendar, email automation | 2 |
+| **g2a-booking-engine** | **1.12.0** | Lane/class/event bookings, payments, front desk, calendar, email automation | 2 |
 | **g2a-pos-core** | **3.4.0** | Point of sale — counter checkout, membership lookup, receipts, inventory | 3 |
 | advanced-ffl-checkout | 1.21.1 | FFL transfer workflow + dealer portal | 4 |
 | verifyistic | 1.4.7 | ID / age verification and check-in QR verification | 4 |
 | formistic | 2.1.1 | Form builder used by public site forms | 4 |
 | messageistic | 0.8.1 | Transactional messaging / SMS bridge | 4 |
 | g2a-theme-control | 1.0.1 | Theme-level toggles and presentation control | 4 |
-| g2a-business-api | see plugin header | Internal business API surface | 4 |
+| g2a-business-api | 0.4.3 | Internal business API surface | 4 |
 
 **Install order matters for the first three.** Memberistic must be active before the
 booking engine, because the booking engine asks Memberistic for every entitlement

@@ -19,7 +19,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-define( 'G2ABA_VERSION', '0.4.2' );
+define( 'G2ABA_VERSION', '0.4.3' );
 define( 'G2ABA_FILE', __FILE__ );
 define( 'G2ABA_PATH', plugin_dir_path( __FILE__ ) );
 define( 'G2ABA_URL', plugin_dir_url( __FILE__ ) );

@@ -1,8 +1,25 @@
-# Dashboard Stack — Current State Inventory
+# Dashboard Stack — Current State Inventory (SUPERSEDED)
+
+> **Archived 2026-08-08. Do not treat this as current.** This is a
+> point-in-time inventory taken on 2026-07-15, before the dashboard
+> authentication rewrite and the repository reorganisation.
+>
+> Two things below are no longer true:
+>
+> 1. **Authentication.** It describes a client-side `base64(email:app-password)`
+>    credential held in `localStorage` under `g2a.auth.token`, validated by
+>    `GET /auth/me`. That was replaced by a server-managed session: an HttpOnly,
+>    Secure cookie plus an `X-G2A-CSRF` header, booted from `GET /auth/session`.
+>    Nothing is stored in `localStorage` any more.
+> 2. **Paths.** Every `dashboard-app/` path is now `apps/dashboard-app/`, and
+>    every `g2a-business-api/` path is now `plugins/g2a-business-api/`.
+>
+> For the current architecture see `DEPLOYMENT.md` and
+> `apps/dashboard-app/README.md`.
 
 Audit date: 2026-07-15 (read-only audit; no code was modified).
 Scope: `dashboard-app/` (React SPA) and `g2a-business-api/` (WordPress plugin, REST namespace `g2a/v1`).
-All paths below are relative to `/home/user/Guns2Ammo-System-Managment/` unless absolute.
+All paths below are relative to the repository root unless absolute.
 
 ---
 

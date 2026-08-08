@@ -29,7 +29,7 @@ if ( version_compare( PHP_VERSION, '8.1', '<' ) ) {
 }
 
 // ── Constants ─────────────────────────────────────────────────────────────────
-define( 'WPISTIC_FFL_VERSION',   '1.21.0' );
+define( 'WPISTIC_FFL_VERSION',   '1.21.1' );
 define( 'WPISTIC_FFL_FILE',      __FILE__ );
 define( 'WPISTIC_FFL_PATH',      plugin_dir_path( __FILE__ ) );
 define( 'WPISTIC_FFL_URL',       plugin_dir_url( __FILE__ ) );

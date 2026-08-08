@@ -19,7 +19,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 
 // ─── Constants ────────────────────────────────────────────────────────────────
-define( 'VERIFYISTIC_VERSION',       '1.4.6' );
+define( 'VERIFYISTIC_VERSION',       '1.4.7' );
 define( 'VERIFYISTIC_PLUGIN_FILE',   __FILE__ );
 define( 'VERIFYISTIC_PLUGIN_DIR',    plugin_dir_path( __FILE__ ) );
 define( 'VERIFYISTIC_PLUGIN_URL',    plugin_dir_url( __FILE__ ) );

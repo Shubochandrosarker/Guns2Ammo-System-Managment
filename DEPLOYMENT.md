@@ -12,11 +12,17 @@ WordPress' REST API:
 
 ## 1. Install the plugin on WordPress
 
-Zip the plugin directory and upload it via Plugins → Add New → Upload:
+A production-clean build is already in [`dist/`](dist/) — use it rather than
+hand-zipping, so what you install matches what CI verified:
+
+```
+dist/g2a-business-api-0.4.3.zip
+```
+
+To rebuild every plugin ZIP from the current tree:
 
 ```bash
-cd g2a-business-api
-zip -r ../g2a-business-api.zip . -x "vendor/*" "tests/*" "*.log" "composer.lock"
+scripts/build-release-zips.sh
 ```
 
 Then in WordPress:
@@ -122,7 +128,7 @@ sign-in cannot work at all.
 ## 3. Build and deploy
 
 ```bash
-cd dashboard-app
+cd apps/dashboard-app
 ./deploy/deploy.sh deploy      # ten steps, atomic release, auto-rollback
 ./deploy/deploy.sh rollback    # instant, to the previous release
 ```
@@ -151,7 +157,7 @@ and exits non-zero.
 ### Manual build (only if you are not using `deploy.sh`)
 
 ```bash
-cd dashboard-app
+cd apps/dashboard-app
 npm ci
 VITE_G2A_API_BASE=/wp-json/g2a/v1 VITE_G2A_USE_MOCKS=0 npm run build
 ./scripts/verify-build.sh dist /wp-json/g2a/v1
@@ -195,7 +201,7 @@ Once DNS + certs are live, walk through this list:
 ## Rollback
 
 ```bash
-cd dashboard-app && ./deploy/deploy.sh rollback
+cd apps/dashboard-app && ./deploy/deploy.sh rollback
 ```
 
 Releases are atomic symlink switches and the last five are kept on the

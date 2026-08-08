@@ -155,16 +155,22 @@ surface already treats `pending` as "unpaid hold, not a reservation".
 
 | Setting | Default | Effect |
 | --- | --- | --- |
-| `g2ab_require_nonmember_payment` | **on** | Non-members must complete online checkout before the lane is held |
-| `g2ab_allow_nonmember_front_desk` | **off** | Only takes effect when the above is off; allows a public web booking to be settled at the desk. Never applies to paid events |
 | `g2ab_reservation_hold_minutes` | 15 | How long an unpaid hold blocks the slot (bounded 1–1440) |
 | `g2ab_payment_gateway_default` | `stripe` | Default online gateway (was `pay_in_store`) |
 | `memberistic_lane_included_plan_slugs` | `defender, patriot, guardian` | Plans whose membership includes lane time |
 | `memberistic_lane_eligible_statuses` | `active, comped` | Statuses that keep the benefit usable |
 
-Both new booking-engine toggles are saved through the existing settings handler
-with capability check (`manage_g2ab_settings`), nonce verification
-(`g2ab_save_settings_pro`) and explicit unchecked-box clearing.
+Settings are saved through the existing handler with a capability check
+(`manage_g2ab_settings`), nonce verification (`g2ab_save_settings_pro`) and
+explicit unchecked-box clearing.
+
+> **Changed in 1.12.0.** This table previously listed
+> `g2ab_require_nonmember_payment` and `g2ab_allow_nonmember_front_desk`, an
+> admin opt-in pair that could reopen pay-at-the-desk reservations for public
+> bookings. Both are gone: a non-member always pays online, and the rule is no
+> longer configurable. Their option rows are deleted on activation. Staff take
+> desk bookings through **Bookings → Add Booking**, which requires the
+> `manage_g2ab_bookings` capability and records who took the booking.
 
 ## Migrating an existing PMPro member base
 

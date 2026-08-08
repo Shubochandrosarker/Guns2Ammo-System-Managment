@@ -47,37 +47,25 @@ final class G2AB_Checkout_Policy {
 	}
 
 	/**
-	 * Must a non-member pay online before the reservation is confirmed?
+	 * Must a public non-member pay online before the reservation is held?
 	 *
-	 * ON by default and the safe answer. Turning it off is an explicit,
-	 * audited business decision (Settings → Payments) that re-opens
-	 * pay-at-the-desk reservations for public lane bookings.
+	 * Always. This is a fixed business rule, not a setting: a non-member
+	 * cannot obtain a lane reservation without a verified online payment.
 	 *
-	 * @return bool
+	 * There is deliberately no option, filter or capability that relaxes this
+	 * on the public path. Staff settle at the desk through
+	 * POST /admin/bookings, which requires the `manage_g2ab_bookings`
+	 * capability and a verified nonce, and records the acting staff user.
+	 * Keeping the escape hatch there rather than here means the rule cannot
+	 * be weakened from wp-admin, by a stale option row, or by a filter added
+	 * in a theme.
+	 *
+	 * @since 1.12.0 Replaced the `g2ab_require_nonmember_payment` /
+	 *               `g2ab_allow_nonmember_front_desk` admin opt-in pair.
+	 * @return true
 	 */
 	public static function require_payment_for_non_members() {
-		return (bool) apply_filters(
-			'g2ab_require_payment_for_non_members',
-			1 === (int) get_option( 'g2ab_require_nonmember_payment', 1 )
-		);
-	}
-
-	/**
-	 * May a PUBLIC non-member settle a lane booking at the front desk?
-	 *
-	 * OFF by default. Only an explicit admin opt-in allows it, and it never
-	 * applies to paid events (those always require verified online payment).
-	 *
-	 * @return bool
-	 */
-	public static function allow_non_member_front_desk() {
-		if ( self::require_payment_for_non_members() ) {
-			return false;
-		}
-		return (bool) apply_filters(
-			'g2ab_allow_non_member_front_desk',
-			1 === (int) get_option( 'g2ab_allow_nonmember_front_desk', 0 )
-		);
+		return true;
 	}
 
 	/**
@@ -172,25 +160,14 @@ final class G2AB_Checkout_Policy {
 		}
 
 		// ── Public payable ────────────────────────────────────────────────────
-		// Front-desk settlement is only reachable when an admin has explicitly
-		// disabled "require payment for non-members" AND enabled the
-		// front-desk option. Both default to the safe answer, so the normal
-		// path below is: online gateway only, full amount, checkout hold.
+		// Offline settlement is not reachable from this path under any
+		// configuration. Desk/cash/terminal/comp bookings are created by staff
+		// through POST /admin/bookings (capability + nonce + recorded actor).
 		if ( self::is_offline_gateway( $requested_gateway ) ) {
-			if ( ! self::allow_non_member_front_desk() ) {
-				return new WP_Error(
-					'g2ab_gateway_not_allowed',
-					__( 'This reservation requires secure online payment.', 'g2a-booking' ),
-					array( 'status' => 400 )
-				);
-			}
-			return array(
-				'amount_due'     => 0.0,
-				'payment_mode'   => 'in_store',
-				'gateway_policy' => 'pay_in_store',
-				'initial_status' => 'reserved',
-				'zero_reason'    => 'admin_enabled_front_desk',
-				'entitlement'    => $entitlement,
+			return new WP_Error(
+				'g2ab_gateway_not_allowed',
+				__( 'This reservation requires secure online payment.', 'g2a-booking' ),
+				array( 'status' => 400 )
 			);
 		}
 

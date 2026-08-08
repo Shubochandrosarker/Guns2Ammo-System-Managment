@@ -87,7 +87,7 @@ A 10-minute setup gets you from activation to taking real bookings.
 2. **Resources.** `G2A Booking → Resources`. Edit the seeded lanes or add your own: name, capacity per slot, category (lane, class, room, etc.).
 3. **Booking types.** `G2A Booking → Booking Types`. Each type maps a service (e.g. "Lane Rental", "CCW Class") to its rules: duration, buffer time, capacity mode, payment modes, members-only flag.
 4. **Availability.** `G2A Booking → Availability`. Set weekly open / close hours per resource and add blackout dates for holidays.
-5. **Payments.** `G2A Booking → Settings → Payments`. Enable the gateways you want. At a minimum, enable Pay-In-Store so reservations work before you wire up Stripe.
+5. **Payments.** `G2A Booking → Settings → Payments`. **Configure Stripe first — it is not optional.** A non-member must pay online before a lane is held, so until an online gateway is live, public bookings cannot complete at all. Pay-In-Store is for staff-created bookings only and will not serve a public reservation.
 6. **Email automation.** `G2A Booking → Settings → Email Automation`. Set the From name + From address and the admin notification email. The default templates are production-ready.
 7. **Drop the shortcode.** Add `[g2a_lane_booking]` to a public page. Visit it as a logged-out user and run a test booking end-to-end.
 

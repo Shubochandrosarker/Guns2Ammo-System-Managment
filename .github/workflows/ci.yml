@@ -31,6 +31,21 @@ jobs:
       - name: bin/check-no-pmpro.sh
         run: bash bin/check-no-pmpro.sh
 
+  plugin-versions:
+    name: Plugin version headers match runtime constants
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+
+      # The runtime constant is what activation writes to the options table
+      # for schema bookkeeping, while the header is what WordPress and the
+      # release tooling display. When they drift, the Plugins screen and the
+      # database disagree and version-gated upgrade routines misfire — with no
+      # error anywhere. Five plugins had drifted before this gate existed.
+      - name: bin/check-plugin-versions.sh
+        run: bash bin/check-plugin-versions.sh
+
   php-lint:
     name: PHP syntax lint ${{ matrix.plugin }} (${{ matrix.php-version }})
     runs-on: ubuntu-latest

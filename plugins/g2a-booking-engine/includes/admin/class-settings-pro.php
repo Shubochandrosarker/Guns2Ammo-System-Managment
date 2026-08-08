@@ -213,7 +213,7 @@ final class G2AB_Admin_Settings_Pro {
 	}
 
 	private function render_payments_overview() {
-		$default = get_option( 'g2ab_payment_gateway_default', 'pay_in_store' );
+		$default = get_option( 'g2ab_payment_gateway_default', 'stripe' );
 		?>
 		<div class="g2ab-set__gw-grid">
 			<?php foreach ( self::GATEWAYS as $key => $g ) :
@@ -250,30 +250,21 @@ final class G2AB_Admin_Settings_Pro {
 				<input type="hidden" name="active_tab" value="payments" />
 				<input type="hidden" name="active_gw" value="default" />
 				<select name="g2ab_payment_gateway_default" style="min-width:240px;">
-					<?php foreach ( self::GATEWAYS as $key => $g ) printf( '<option value="%1$s" %2$s>%3$s</option>', esc_attr( $key ), selected( get_option( 'g2ab_payment_gateway_default', 'pay_in_store' ), $key, false ), esc_html( $g['label'] ) ); ?>
+					<?php foreach ( self::GATEWAYS as $key => $g ) printf( '<option value="%1$s" %2$s>%3$s</option>', esc_attr( $key ), selected( get_option( 'g2ab_payment_gateway_default', 'stripe' ), $key, false ), esc_html( $g['label'] ) ); ?>
 				</select>
 				<p class="g2ab-set__desc" style="margin-top:16px;">
 					<?php esc_html_e( 'Members whose plan includes lane time always reserve for $0. Everyone else follows the non-member policy below. Paid events always require verified online payment and ignore these options.', 'g2a-booking' ); ?>
 				</p>
 
 				<h3 style="margin:22px 0 6px;"><?php esc_html_e( 'NON-MEMBER PAYMENT POLICY', 'g2a-booking' ); ?></h3>
-				<p style="margin:0 0 6px;">
-					<label class="g2ab-set__check">
-						<input type="checkbox" name="g2ab_require_nonmember_payment" value="1" <?php checked( 1, (int) get_option( 'g2ab_require_nonmember_payment', 1 ) ); ?> />
-						<?php esc_html_e( 'Require online payment for non-members (recommended)', 'g2a-booking' ); ?>
-					</label>
+				<p class="g2ab-set__desc">
+					<strong><?php esc_html_e( 'A non-member must complete secure online payment before a lane is held. This is a fixed rule and cannot be turned off here.', 'g2a-booking' ); ?></strong>
 				</p>
 				<p class="g2ab-set__desc">
-					<?php esc_html_e( 'On by default: a non-member must complete secure online checkout before the lane is held. The reservation stays a pending-payment hold until the payment is verified.', 'g2a-booking' ); ?>
-				</p>
-				<p style="margin:14px 0 6px;">
-					<label class="g2ab-set__check">
-						<input type="checkbox" name="g2ab_allow_nonmember_front_desk" value="1" <?php checked( 1, (int) get_option( 'g2ab_allow_nonmember_front_desk', 0 ) ); ?> />
-						<?php esc_html_e( 'Allow non-members to pay at the front desk', 'g2a-booking' ); ?>
-					</label>
+					<?php esc_html_e( 'The reservation stays a pending-payment hold, invisible to operational rosters, until the payment is verified. Offline gateways (pay at store, cash, terminal, comp) are rejected on the public booking endpoint even for a crafted request.', 'g2a-booking' ); ?>
 				</p>
 				<p class="g2ab-set__desc">
-					<?php esc_html_e( 'Off by default, and only takes effect when the option above is unchecked. Enabling it lets a public web booking be held without payment and settled at the desk.', 'g2a-booking' ); ?>
+					<?php esc_html_e( 'To take a booking at the desk, staff use Bookings → Add Booking, which records the staff member who took it. That path requires the "manage bookings" capability.', 'g2a-booking' ); ?>
 				</p>
 				<p style="margin:14px 0 6px;">
 					<label><?php esc_html_e( 'Pending-payment hold expiry (minutes)', 'g2a-booking' ); ?></label><br />
@@ -693,13 +684,10 @@ final class G2AB_Admin_Settings_Pro {
 				$bools[] = 'g2ab_' . $gw . '_enabled';
 				$bools[] = 'g2ab_' . $gw . '_test_mode';
 			}
-			// The default-gateway sub-form carries the non-member payment
-			// policy. Both toggles default to the SAFE answer (require
-			// payment on, front-desk off) — see G2AB_Checkout_Policy.
-			if ( 'default' === $gw ) {
-				$bools[] = 'g2ab_require_nonmember_payment';
-				$bools[] = 'g2ab_allow_nonmember_front_desk';
-			}
+			// The non-member payment policy is no longer a saved option: a
+			// public non-member always pays online. Accepting either retired
+			// checkbox name here would let a hand-crafted POST re-create the
+			// option row, so nothing is added for the 'default' sub-form.
 		} elseif ( 'notifications' === $tab ) {
 			$bools = array( 'g2ab_send_confirmation_email', 'g2ab_send_reminder_email', 'g2ab_sms_enabled' );
 		} elseif ( 'danger' === $tab ) {

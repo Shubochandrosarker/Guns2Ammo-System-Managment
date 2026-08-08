@@ -18,7 +18,7 @@
 
 defined( 'ABSPATH' ) || exit;
 
-define( 'MESSAGEISTIC_VERSION', '0.8.0' );
+define( 'MESSAGEISTIC_VERSION', '0.8.1' );
 define( 'MESSAGEISTIC_FILE', __FILE__ );
 define( 'MESSAGEISTIC_DIR', plugin_dir_path( __FILE__ ) );
 define( 'MESSAGEISTIC_URL', plugin_dir_url( __FILE__ ) );
