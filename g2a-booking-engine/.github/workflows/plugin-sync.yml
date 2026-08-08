@@ -42,15 +42,33 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Clone monorepo
+        id: clone
         run: |
           set -e
           auth=()
           if [ -n "$SYNC_TOKEN" ]; then
             auth=(-c "http.https://github.com/.extraheader=AUTHORIZATION: basic $(printf 'x-access-token:%s' "$SYNC_TOKEN" | base64 -w0)")
           fi
-          git "${auth[@]}" clone --quiet https://github.com/Shubochandrosarker/Guns2Ammo-System-Managment /tmp/monorepo
+          if git "${auth[@]}" clone --quiet https://github.com/Shubochandrosarker/Guns2Ammo-System-Managment /tmp/monorepo 2>/tmp/clone_err.log; then
+            exit 0
+          fi
+          if [ -n "$SYNC_TOKEN" ]; then
+            echo "::error::Clone of the monorepo failed even with PLUGIN_SYNC_TOKEN set."
+            cat /tmp/clone_err.log
+            exit 1
+          fi
+          # No token configured and an anonymous clone failed — most likely
+          # the monorepo is private. This check can't run without read
+          # access; skip it informationally rather than failing on missing
+          # infrastructure it can't self-provision. A repo admin can add a
+          # PLUGIN_SYNC_TOKEN secret (a PAT with read access to the
+          # monorepo) to make this check fully enforcing.
+          echo "::warning::Could not clone the monorepo anonymously (likely private). Add a PLUGIN_SYNC_TOKEN repo secret to enable sync verification. Skipping this run."
+          cat /tmp/clone_err.log
+          echo "skip=true" >> "$GITHUB_OUTPUT"
 
       - name: Select monorepo comparison branch
+        if: steps.clone.outputs.skip != 'true'
         run: |
           set -e
           if [ -n "$COMPARE_REF" ] && git -C /tmp/monorepo rev-parse -q --verify "origin/$COMPARE_REF" >/dev/null; then
@@ -64,6 +82,7 @@ jobs:
           git -C /tmp/monorepo checkout --quiet "$ref"
 
       - name: Compare plugin trees
+        if: steps.clone.outputs.skip != 'true'
         run: |
           set -u
           if [ ! -d "/tmp/monorepo/$PLUGIN_DIR" ]; then
