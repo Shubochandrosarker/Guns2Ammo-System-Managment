@@ -54,6 +54,7 @@ final class Plugin {
 			'includes/database/class-email-logs-repository.php',
 			'includes/emails/class-email-service.php',
 			'includes/integrations/class-integrations-registry.php',
+			'includes/integrations/class-entitlement-service.php',
 			'includes/integrations/class-booking-engine.php',
 			'includes/integrations/class-woocommerce-bridge.php',
 			'includes/integrations/class-woocommerce-discounts.php',
@@ -64,6 +65,7 @@ final class Plugin {
 			'includes/integrations/class-ffl-checkout-bridge.php',
 			'includes/payments/class-stripe-service.php',
 			'includes/cli/class-stripe-recovery-command.php',
+			'includes/cli/class-guest-pass-audit-command.php',
 			'includes/admin/class-admin-menu.php',
 			'includes/admin/class-dashboard-page.php',
 			'includes/admin/class-members-page.php',
@@ -107,6 +109,7 @@ final class Plugin {
 		add_action( 'init', array( $this, 'load_textdomain' ) );
 		add_action( 'init', array( Payments\Stripe_Service::class, 'maybe_handle_public_checkout_request' ) );
 		CLI\Stripe_Recovery_Command::register();
+		CLI\Guest_Pass_Audit_Command::register();
 		add_action( 'init', array( Payments\Stripe_Service::class, 'maybe_handle_billing_portal_request' ) );
 		// Propagate WordPress-side cancellations to Stripe so the
 		// subscription actually stops billing — previously a cancel on the
@@ -149,10 +152,13 @@ final class Plugin {
 		add_action( 'init', array( Frontend\Staff_Dashboard::class, 'handle_actions' ) );
 		add_action( 'init', array( Content_Restrictions::class, 'register' ) );
 		// Booking integration is gated by its Integrations toggle (default on
-		// whenever the Booking Engine plugin is present).
+		// whenever the Booking Engine plugin is present). The entitlement
+		// service always registers with it: it is the single authority the
+		// booking engine consults for "does this membership include lane time".
 		add_action( 'init', function () {
 			if ( Integrations\Integrations_Registry::is_enabled( 'booking' ) ) {
 				Integrations\Booking_Engine::register();
+				Integrations\Entitlement_Service::register();
 			}
 		} );
 		// WooCommerce bridge is gated by its Integrations toggle. Was registered

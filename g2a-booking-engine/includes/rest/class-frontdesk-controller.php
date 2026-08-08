@@ -150,6 +150,7 @@ final class G2AB_REST_Frontdesk_Controller {
 			   LEFT JOIN {$rt} r  ON r.id  = b.resource_id
 			   LEFT JOIN {$ci} c  ON c.booking_id = b.id
 			  WHERE b.start_at BETWEEN %s AND %s
+			    AND " . G2AB_Booking_Visibility::operational_sql( 'b' ) . "
 			  ORDER BY b.start_at ASC, r.sort_order ASC
 			  LIMIT 500",
 			$start_sql,
@@ -450,15 +451,13 @@ window.addEventListener('load', function () {
 		}
 		$balance = max( 0, round( (float) $row->total_amount - (float) $row->paid_amount, 2 ) );
 
-		// Surface the advisory membership hint so the desk knows to check ID and
-		// apply the member rate before taking payment. Set when a logged-out
-		// booking's email matched an active membership — we can't trust a typed
-		// address enough to discount automatically, but staff can verify it.
-		$meta         = ! empty( $row->metadata ) ? json_decode( (string) $row->metadata, true ) : array();
-		$hint         = ( is_array( $meta ) && ! empty( $meta['membership_hint'] ) && is_array( $meta['membership_hint'] ) )
-			? $meta['membership_hint']
+		// The entitlement snapshot (why this booking priced the way it did) is
+		// available for staff context. The retired email-matched
+		// "membership_hint" is gone: a typed email never reveals membership.
+		$meta        = ! empty( $row->metadata ) ? json_decode( (string) $row->metadata, true ) : array();
+		$entitlement = ( is_array( $meta ) && ! empty( $meta['entitlement'] ) && is_array( $meta['entitlement'] ) )
+			? $meta['entitlement']
 			: array();
-		$needs_rate   = ! empty( $hint['needs_desk_rate'] );
 
 		return array(
 			'id'                => (int) $row->id,
@@ -491,8 +490,8 @@ window.addEventListener('load', function () {
 			'checkin_note'      => $row->checkin_note ?? '',
 			'notes'             => $row->notes,
 			'source'            => $row->source,
-			'member_rate_check' => $needs_rate,
-			'member_hint_label' => (string) ( $hint['label'] ?? '' ),
+			'entitlement_plan'  => (string) ( $entitlement['plan_name'] ?? '' ),
+			'member_included'   => 'member_included' === (string) ( $entitlement['pricing_type'] ?? '' ),
 		);
 	}
 }

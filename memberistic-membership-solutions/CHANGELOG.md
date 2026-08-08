@@ -2,6 +2,20 @@
 
 All notable changes are tracked here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## 1.19.0 - Lane entitlement policy, Guest Pass cleanup (2026-08-08)
+
+### Changed
+- **BREAKING (policy):** Only memberships on the included plan slugs (default `defender`, `patriot`, `guardian` — documented setting `memberistic_lane_included_plan_slugs`) in an eligible status (default `active`, `comped` — `memberistic_lane_eligible_statuses`) resolve lane bookings to $0. New `Entitlement_Service` answers the booking engine's `g2ab_lane_entitlement` filter with a structured snapshot (membership id, plan slug, status, eligibility reason code, pricing type, timestamp). Guest Pass never includes free lane time, even when sold intentionally.
+- `g2ab_user_is_member` and `g2ab_booking_pricing` now resolve through the entitlement service: trials, past-due, suspended, expired and Guest Pass holders no longer count as members for booking purposes. Linked/family members qualify only through their own authenticated account.
+
+### Removed
+- **Automatic Guest Pass enrollment.** Booking a lane (`g2ab_booking_created` / `g2ab_booking_paid`) or buying a WooCommerce product no longer creates a Memberistic membership. The explicit `[memberistic_guest_pass]` registration form is the only remaining issue path. Non-member bookers are classified by the booking engine as the `range_guest` customer segment instead (user meta, no membership row).
+- `g2ab_advisory_membership_hint` handler: a typed email address no longer reveals whether it belongs to a member, in any form.
+
+### Added
+- `wp memberistic guest-pass-audit` WP-CLI command: dry-run by default, CSV/JSON report, confidence-bucketed classification (auto-created vs legitimate vs ambiguous), batched + resumable, transaction-safe `--apply` that expires only high-confidence auto-created memberships (users, bookings, payments, waivers, QR history preserved; `range_guest` segment assigned), full audit journal, and `--rollback` support. See docs/guest-pass-audit.md.
+- docs/entitlements.md — the lane-entitlement business rules and result contract.
+
 ## 1.18.6 - Branding split, notice scoping, plan entitlements (2026-07-31)
 
 ### Fixed

@@ -170,17 +170,28 @@ final class G2AB_Gateway_Paypal {
 		) );
 		if ( is_wp_error( $resp ) ) return $resp;
 		$json = json_decode( wp_remote_retrieve_body( $resp ), true );
-		if ( ! empty( $json['status'] ) && in_array( $json['status'], array( 'COMPLETED', 'APPROVED' ), true ) ) {
+		// Only COMPLETED means the capture actually moved money. APPROVED after
+		// a capture call means the capture did NOT complete — never mark paid.
+		if ( ! empty( $json['status'] ) && 'COMPLETED' === $json['status'] ) {
 			return $this->mark_booking_paid( $json );
 		}
 		return false;
 	}
 
-	public function refund( $capture_id, $amount = 0 ) {
+	public function refund( $capture_id, $amount = 0, $currency = '' ) {
 		$token = $this->access_token();
 		if ( is_wp_error( $token ) ) return $token;
+		if ( '' === $currency ) {
+			// Resolve from the payment ledger row — never assume USD.
+			global $wpdb;
+			$currency = (string) $wpdb->get_var( $wpdb->prepare(
+				"SELECT currency FROM {$wpdb->prefix}g2ab_payments WHERE gateway = 'paypal' AND transaction_id = %s ORDER BY id DESC LIMIT 1",
+				(string) $capture_id
+			) );
+		}
+		$currency = strtoupper( $currency ?: (string) get_option( 'g2ab_currency', 'USD' ) );
 		$body = array();
-		if ( $amount > 0 ) $body['amount'] = array( 'value' => number_format( (float) $amount, 2, '.', '' ), 'currency_code' => 'USD' );
+		if ( $amount > 0 ) $body['amount'] = array( 'value' => number_format( (float) $amount, 2, '.', '' ), 'currency_code' => $currency );
 		$resp = wp_remote_post( $this->api_base() . '/v2/payments/captures/' . urlencode( $capture_id ) . '/refund', array(
 			'timeout' => 20,
 			'headers' => array( 'Authorization' => 'Bearer ' . $token, 'Content-Type' => 'application/json' ),
@@ -241,18 +252,53 @@ final class G2AB_Gateway_Paypal {
 		$event_id = (string) ( $event['id'] ?? '' );
 		$res      = $event['resource'] ?? array();
 
-		// Idempotency: PayPal retries any non-2xx response.
-		if ( $event_id && function_exists( 'g2ab_webhook_event_is_new' ) && ! g2ab_webhook_event_is_new( 'paypal', $event_id ) ) {
+		// Claim-based dedup (same as Stripe): the event is only marked
+		// processed AFTER handling succeeds, so a transient failure can be
+		// retried by PayPal instead of being burned as a duplicate.
+		if ( $event_id && function_exists( 'g2ab_webhook_event_claim' ) ) {
+			$claim = g2ab_webhook_event_claim( 'paypal', $event_id, $type, wp_json_encode( $event ) );
+			if ( is_wp_error( $claim ) ) {
+				return $claim;
+			}
+			if ( 'duplicate' === $claim ) {
+				return array( 'handled' => true, 'type' => $type, 'reason' => 'duplicate_event', 'event_id' => $event_id );
+			}
+		} elseif ( $event_id && function_exists( 'g2ab_webhook_event_is_new' ) && ! g2ab_webhook_event_is_new( 'paypal', $event_id ) ) {
 			return array( 'handled' => true, 'type' => $type, 'reason' => 'duplicate_event', 'event_id' => $event_id );
 		}
 
-		if ( 'PAYMENT.CAPTURE.COMPLETED' === $type || 'CHECKOUT.ORDER.APPROVED' === $type || 'CHECKOUT.ORDER.COMPLETED' === $type ) {
-			return $this->mark_booking_paid( $res );
+		$result = array( 'handled' => false, 'type' => $type );
+		if ( 'PAYMENT.CAPTURE.COMPLETED' === $type ) {
+			// Only a COMPLETED CAPTURE means money moved. ORDER.APPROVED is the
+			// buyer's approval BEFORE capture — treating it as paid confirmed
+			// bookings that were never charged.
+			$result = $this->mark_booking_paid( $res );
+		} elseif ( 'CHECKOUT.ORDER.APPROVED' === $type ) {
+			// Capture now, then mark paid from the capture result.
+			$order_id = (string) ( $res['id'] ?? '' );
+			$captured = $order_id ? $this->confirm_payment( $order_id ) : false;
+			$result   = is_wp_error( $captured )
+				? array( 'handled' => false, 'type' => $type, 'reason' => $captured->get_error_code(), 'retryable' => true )
+				: ( is_array( $captured ) ? $captured : array( 'handled' => (bool) $captured, 'type' => $type, 'reason' => 'order_capture_attempted' ) );
+		} elseif ( 'CHECKOUT.ORDER.COMPLETED' === $type ) {
+			$result = $this->mark_booking_paid( $res );
+		} elseif ( 'PAYMENT.CAPTURE.REFUNDED' === $type ) {
+			$result = $this->mark_booking_refunded( $res );
+		} else {
+			$result = array( 'handled' => true, 'type' => $type, 'reason' => 'verified_event_ignored' );
 		}
-		if ( 'PAYMENT.CAPTURE.REFUNDED' === $type ) {
-			return $this->mark_booking_refunded( $res );
+
+		if ( $event_id && function_exists( 'g2ab_webhook_event_claim' ) ) {
+			if ( is_wp_error( $result ) || ! empty( $result['retryable'] ) ) {
+				if ( function_exists( 'g2ab_webhook_event_mark_failed' ) ) {
+					g2ab_webhook_event_mark_failed( 'paypal', $event_id, is_wp_error( $result ) ? $result->get_error_message() : wp_json_encode( $result ) );
+				}
+			} elseif ( function_exists( 'g2ab_webhook_event_mark_processed' ) ) {
+				g2ab_webhook_event_mark_processed( 'paypal', $event_id );
+			}
 		}
-		return array( 'handled' => false, 'type' => $type );
+
+		return $result;
 	}
 
 	private function mark_booking_paid( $res ) {
@@ -326,8 +372,16 @@ final class G2AB_Gateway_Paypal {
 			'context' => wp_json_encode( array( 'capture_id' => $capture_id ) ),
 			'created_at' => current_time( 'mysql' ),
 		) );
-		do_action( 'g2ab_payment_succeeded', $booking->id, 'paypal', $res );
-		do_action( 'g2ab_booking_status_changed', $booking->id, 'paid', $previous_status );
+		// Full paid side-effect sequence (provisioning, classification,
+		// g2ab_booking_paid, emails) — same path Stripe uses, deduped by
+		// gateway+booking+txn so webhook retries can't double-fire.
+		if ( function_exists( 'g2ab_queue_booking_paid_side_effects' ) ) {
+			g2ab_queue_booking_paid_side_effects( (int) $booking->id, 'paypal', $previous_status, array( 'id' => $capture_id ) );
+		} else {
+			do_action( 'g2ab_payment_succeeded', $booking->id, 'paypal', $res );
+			do_action( 'g2ab_booking_paid', $booking, array( 'gateway' => 'paypal', 'capture_id' => $capture_id ) );
+			do_action( 'g2ab_booking_status_changed', $booking->id, 'paid', $previous_status );
+		}
 		return array( 'handled' => true, 'booking_id' => $booking->id, 'status' => 'paid' );
 	}
 
@@ -369,17 +423,33 @@ final class G2AB_Gateway_Paypal {
 
 		$refund_amount = (float) ( $res['amount']['value'] ?? 0 );
 
+		// Partial-aware, like the Stripe path: a $5 partial refund must not
+		// release the whole reservation state.
+		$prior_refunded = (float) $payment->refund_amount;
+		$total_refunded = round( $prior_refunded + $refund_amount, 2 );
+		$is_full        = $total_refunded >= round( (float) $payment->amount, 2 ) - 0.01;
+		$payment_status = $is_full ? 'refunded' : 'partial_refund';
+		$booking_status = $is_full ? 'refunded' : 'partially_refunded';
+
 		$wpdb->update( $pt, array(
-			'status'        => 'refunded',
-			'refund_amount' => $refund_amount,
+			'status'        => $payment_status,
+			'refund_amount' => $total_refunded,
 		), array( 'id' => $payment->id ), array( '%s', '%f' ), array( '%d' ) );
 
-		$wpdb->update( $wpdb->prefix . 'g2ab_bookings', array(
-			'status'     => 'refunded',
-			'updated_at' => current_time( 'mysql' ),
-		), array( 'id' => $payment->booking_id ), array( '%s', '%s' ), array( '%d' ) );
+		if ( class_exists( 'G2AB_Booking_Transitions' ) ) {
+			G2AB_Booking_Transitions::transition( (int) $payment->booking_id, $booking_status, array(
+				'source'     => 'gateway',
+				'reason'     => 'paypal_capture_refunded',
+				'payment_id' => (int) $payment->id,
+			) );
+		} else {
+			$wpdb->update( $wpdb->prefix . 'g2ab_bookings', array(
+				'status'     => $booking_status,
+				'updated_at' => current_time( 'mysql' ),
+			), array( 'id' => $payment->booking_id ), array( '%s', '%s' ), array( '%d' ) );
+		}
 
-		do_action( 'g2ab_payment_refunded', $payment->booking_id, $refund_amount );
-		return array( 'handled' => true, 'booking_id' => $payment->booking_id, 'status' => 'refunded' );
+		do_action( 'g2ab_payment_refunded', $payment->booking_id, $refund_amount, 'paypal', $res );
+		return array( 'handled' => true, 'booking_id' => $payment->booking_id, 'status' => $booking_status );
 	}
 }

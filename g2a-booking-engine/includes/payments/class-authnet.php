@@ -260,20 +260,40 @@ final class G2AB_Gateway_Authnet {
 			return array( 'handled' => false, 'type' => $type, 'reason' => 'missing_transaction_id' );
 		}
 
-		// Idempotency: skip duplicates. Authorize.net retries on non-2xx responses.
-		if ( $event_id && function_exists( 'g2ab_webhook_event_is_new' ) && ! g2ab_webhook_event_is_new( 'authnet', $event_id ) ) {
+		// Claim-based dedup (same as Stripe): the event is marked processed only
+		// AFTER handling succeeds, so a transient failure stays retryable
+		// instead of being burned as a duplicate at check time.
+		if ( $event_id && function_exists( 'g2ab_webhook_event_claim' ) ) {
+			$claim = g2ab_webhook_event_claim( 'authnet', $event_id, $type, wp_json_encode( $event ) );
+			if ( is_wp_error( $claim ) ) {
+				return $claim;
+			}
+			if ( 'duplicate' === $claim ) {
+				return array( 'handled' => true, 'type' => $type, 'reason' => 'duplicate_event', 'event_id' => $event_id );
+			}
+		} elseif ( $event_id && function_exists( 'g2ab_webhook_event_is_new' ) && ! g2ab_webhook_event_is_new( 'authnet', $event_id ) ) {
 			return array( 'handled' => true, 'type' => $type, 'reason' => 'duplicate_event', 'event_id' => $event_id );
 		}
 
 		if ( false !== stripos( $type, 'refund' ) || false !== stripos( $type, 'void' ) ) {
-			return $this->mark_booking_refunded( $transaction_id, $payload );
+			$result = $this->mark_booking_refunded( $transaction_id, $payload );
+		} elseif ( false !== stripos( $type, 'authcapture' ) || false !== stripos( $type, 'capture' ) || false !== stripos( $type, 'payment' ) ) {
+			$result = $this->mark_booking_paid_from_transaction( $transaction_id, $payload );
+		} else {
+			$result = array( 'handled' => true, 'type' => $type, 'reason' => 'verified_event_ignored' );
 		}
 
-		if ( false !== stripos( $type, 'authcapture' ) || false !== stripos( $type, 'capture' ) || false !== stripos( $type, 'payment' ) ) {
-			return $this->mark_booking_paid_from_transaction( $transaction_id, $payload );
+		if ( $event_id && function_exists( 'g2ab_webhook_event_claim' ) ) {
+			if ( is_wp_error( $result ) || ( is_array( $result ) && empty( $result['handled'] ) ) ) {
+				if ( function_exists( 'g2ab_webhook_event_mark_failed' ) ) {
+					g2ab_webhook_event_mark_failed( 'authnet', $event_id, is_wp_error( $result ) ? $result->get_error_message() : wp_json_encode( $result ) );
+				}
+			} elseif ( function_exists( 'g2ab_webhook_event_mark_processed' ) ) {
+				g2ab_webhook_event_mark_processed( 'authnet', $event_id );
+			}
 		}
 
-		return array( 'handled' => false, 'type' => $type );
+		return $result;
 	}
 
 	/**
@@ -335,6 +355,7 @@ final class G2AB_Gateway_Authnet {
 			return array( 'handled' => false, 'reason' => 'amount_mismatch', 'paid' => $amount, 'expected' => (float) $booking->total_amount );
 		}
 
+		$previous_status = (string) $booking->status;
 		$wpdb->update(
 			$bookings_table,
 			array(
@@ -376,7 +397,15 @@ final class G2AB_Gateway_Authnet {
 			'created_at' => current_time( 'mysql' ),
 		) );
 
-		do_action( 'g2ab_payment_succeeded', (int) $booking->id, 'authnet', $details );
+		// Full paid side-effect sequence (provisioning, classification,
+		// g2ab_booking_paid, emails) — deduped by gateway+booking+txn.
+		if ( function_exists( 'g2ab_queue_booking_paid_side_effects' ) ) {
+			g2ab_queue_booking_paid_side_effects( (int) $booking->id, 'authnet', $previous_status, array( 'id' => $transaction_id ) );
+		} else {
+			do_action( 'g2ab_payment_succeeded', (int) $booking->id, 'authnet', $details );
+			do_action( 'g2ab_booking_paid', $booking, array( 'gateway' => 'authnet', 'transaction_id' => $transaction_id ) );
+			do_action( 'g2ab_booking_status_changed', (int) $booking->id, 'paid', $previous_status );
+		}
 		return array( 'handled' => true, 'booking_id' => (int) $booking->id, 'status' => 'paid', 'transaction_id' => $transaction_id );
 	}
 

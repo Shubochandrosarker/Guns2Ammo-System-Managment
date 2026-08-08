@@ -20,7 +20,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 $plans_url   = memberistic_get_page_url( 'plans_page_id', 'memberships', '' );
 if ( ! $plans_url ) { $plans_url = memberistic_get_page_url( 'plans_page_id', 'memberistic-memberships', home_url( '/memberships/' ) ); }
 $support_url = home_url( '/get-support/' );
-$lane_url    = home_url( '/book-a-lane/' );
+$lane_url    = memberistic_get_page_url( 'booking_page_id', 'book-a-lane', home_url( '/book-a-lane/' ) );
 ?>
 <div class="memberistic-frontend memberistic-account memberistic-acct">
 <?php if ( ! $current ) : ?>

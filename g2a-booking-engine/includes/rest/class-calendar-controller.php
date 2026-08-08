@@ -174,8 +174,15 @@ final class G2AB_REST_Calendar_Controller {
 			$params[]  = $category;
 		}
 		if ( '' !== $status && G2AB_Booking_Statuses::is_valid( $status ) ) {
+			// Explicit status filter: staff deliberately inspecting one bucket
+			// (including non-operational ones like pending/expired).
 			$sql      .= ' AND b.status = %s';
 			$params[]  = $status;
+		} elseif ( class_exists( 'G2AB_Booking_Visibility' ) ) {
+			// Default calendar = operational bookings only. Checkout holds,
+			// failed payments and abandoned attempts belong on the Checkout
+			// Attempts screen, not on the calendar staff plan the day from.
+			$sql .= ' AND ' . G2AB_Booking_Visibility::operational_sql( 'b' );
 		}
 		$sql .= ' ORDER BY b.start_at ASC LIMIT 1000';
 
@@ -359,12 +366,15 @@ final class G2AB_REST_Calendar_Controller {
 		$wpdb->query( 'START TRANSACTION' );
 
 		$load_select = ( 'party_size' === $capacity_mode ) ? 'COALESCE(SUM(b.party_size), 0)' : 'COUNT(*)';
+		$blocking_in = implode( ',', array_map( static function ( $s ) {
+			return "'" . esc_sql( $s ) . "'";
+		}, G2AB_Booking_Statuses::blocking() ) );
 		$current_load = (int) $wpdb->get_var( $wpdb->prepare(
 			"SELECT {$load_select} FROM {$bookings_table} b
 			   LEFT JOIN {$bt_table} bt ON bt.id = b.booking_type_id
 			  WHERE b.resource_id = %d
 			    AND b.id <> %d
-			    AND b.status IN ('pending','reserved','confirmed','paid')
+			    AND b.status IN ({$blocking_in})
 			    AND DATE_SUB(b.start_at, INTERVAL COALESCE(bt.buffer_before, 0) MINUTE) < %s
 			    AND DATE_ADD(b.end_at,   INTERVAL COALESCE(bt.buffer_after,  0) MINUTE) > %s
 			  FOR UPDATE",
@@ -440,73 +450,95 @@ final class G2AB_REST_Calendar_Controller {
 
 	private function cancel_booking( $booking, $reason, $reason_text, $user_id, $source, $mark_refunded, $send_email ) {
 		global $wpdb;
-		if ( G2AB_Booking_Statuses::is_terminal( $booking->status ) ) {
-			return new WP_Error( 'g2ab_terminal', __( 'Booking already finalised.', 'g2a-booking' ), array( 'status' => 409 ) );
+
+		$reason_clean = sanitize_text_field( $reason );
+		$reason_label = '' !== $reason_text ? sanitize_text_field( $reason_text ) : $reason_clean;
+
+		$result = G2AB_Booking_Transitions::transition( (int) $booking->id, G2AB_Booking_Statuses::CANCELLED, array(
+			'source'   => $source,
+			'actor_id' => (int) $user_id,
+			'reason'   => $reason_label,
+		) );
+		if ( is_wp_error( $result ) ) {
+			return $result;
 		}
 
 		$now = current_time( 'mysql' );
-		$reason_clean = sanitize_text_field( $reason );
-		$reason_label = '' !== $reason_text ? sanitize_text_field( $reason_text ) : $reason_clean;
-		$new_status   = $mark_refunded ? G2AB_Booking_Statuses::REFUNDED : G2AB_Booking_Statuses::CANCELLED;
-
-		$ok = $wpdb->update(
+		$wpdb->update(
 			$wpdb->prefix . 'g2ab_bookings',
 			array(
-				'status'               => $new_status,
 				'cancelled_at'         => $now,
 				'cancel_reason'        => mb_substr( $reason_label, 0, 255 ),
 				'cancelled_by_user_id' => $user_id ?: null,
-				'updated_at'           => $now,
 			),
 			array( 'id' => (int) $booking->id ),
-			array( '%s', '%s', '%s', '%d', '%s' ),
+			array( '%s', '%s', '%d' ),
 			array( '%d' )
 		);
-		if ( false === $ok ) {
-			return new WP_Error( 'g2ab_update_failed', __( 'Cancel failed.', 'g2a-booking' ), array( 'status' => 500 ) );
+
+		// "Mark refunded" is no longer a checkbox that just writes a status:
+		// the transition invariant requires a real gateway-refund ledger row or
+		// an explicitly recorded offline refund. Without evidence, the cancel
+		// stands and the caller is told the refund was NOT recorded.
+		$refund_recorded = false;
+		$refund_error    = '';
+		if ( $mark_refunded ) {
+			$refund = G2AB_Booking_Transitions::transition( (int) $booking->id, G2AB_Booking_Statuses::REFUNDED, array(
+				'source'   => $source,
+				'actor_id' => (int) $user_id,
+				'reason'   => $reason_label,
+			) );
+			if ( is_wp_error( $refund ) ) {
+				$refund_error = $refund->get_error_message();
+			} else {
+				$refund_recorded = true;
+			}
 		}
 
 		G2AB_Booking_Activity::log(
 			(int) $booking->id,
 			'cancelled',
 			array( 'status' => $booking->status ),
-			array( 'status' => $new_status, 'reason' => $reason_clean, 'reason_text' => $reason_text ),
+			array( 'status' => $refund_recorded ? G2AB_Booking_Statuses::REFUNDED : G2AB_Booking_Statuses::CANCELLED, 'reason' => $reason_clean, 'reason_text' => $reason_text ),
 			sprintf( '%s cancel — %s', $source, $reason_label ),
 			$user_id ?: null
 		);
 
-		if ( $send_email ) {
-			do_action( 'g2ab_booking_cancelled', (int) $booking->id, array(
-				'reason'      => $reason_clean,
-				'reason_text' => $reason_text,
-				'source'      => $source,
-				'refunded'    => $mark_refunded,
-			) );
-		}
-		do_action( 'g2ab_booking_status_changed', (int) $booking->id, $new_status, $booking->status );
+		// The lifecycle hook always fires — seat release, waitlists and
+		// accounting must never depend on the email toggle. Listeners that
+		// send mail read send_email from the payload.
+		do_action( 'g2ab_booking_cancelled', (int) $booking->id, array(
+			'reason'      => $reason_clean,
+			'reason_text' => $reason_text,
+			'source'      => $source,
+			'refunded'    => $refund_recorded,
+			'send_email'  => (bool) $send_email,
+		) );
 
 		return rest_ensure_response( array(
 			'success' => true,
 			'data'    => array(
-				'id'     => (int) $booking->id,
-				'status' => $new_status,
+				'id'              => (int) $booking->id,
+				'status'          => $refund_recorded ? G2AB_Booking_Statuses::REFUNDED : G2AB_Booking_Statuses::CANCELLED,
+				'refund_recorded' => $refund_recorded,
+				'refund_error'    => $refund_error,
 			),
 		) );
 	}
 
 	private function set_status( $booking, $new_status, $action, $user_id ) {
-		global $wpdb;
-		if ( ! G2AB_Booking_Statuses::is_valid( $new_status ) ) {
-			return new WP_Error( 'g2ab_bad_status', __( 'Invalid status.', 'g2a-booking' ), array( 'status' => 400 ) );
+		// The transition service enforces the allowed-transition map (no
+		// resurrecting refunded/cancelled bookings into completed) and the
+		// payment invariants, and fires status hooks with previous status.
+		$result = G2AB_Booking_Transitions::transition( (int) $booking->id, $new_status, array(
+			'source'   => 'admin_calendar',
+			'actor_id' => (int) $user_id,
+			'reason'   => sanitize_key( $action ),
+		) );
+		if ( is_wp_error( $result ) ) {
+			return $result;
 		}
-		$now = current_time( 'mysql' );
-		$wpdb->update(
-			$wpdb->prefix . 'g2ab_bookings',
-			array( 'status' => $new_status, 'updated_at' => $now ),
-			array( 'id' => (int) $booking->id ),
-			array( '%s', '%s' ),
-			array( '%d' )
-		);
+
 		G2AB_Booking_Activity::log(
 			(int) $booking->id,
 			$action,
@@ -515,7 +547,6 @@ final class G2AB_REST_Calendar_Controller {
 			'',
 			$user_id ?: null
 		);
-		do_action( 'g2ab_booking_status_changed', (int) $booking->id, $new_status, $booking->status );
 		switch ( $new_status ) {
 			case G2AB_Booking_Statuses::NO_SHOW:
 				do_action( 'g2ab_booking_no_show', (int) $booking->id );

@@ -72,17 +72,92 @@ final class G2AB_Frontend {
 		}
 		wp_enqueue_style( 'g2ab-frontend' );
 		wp_enqueue_script( 'g2ab-frontend' );
+
+		// Entitlement snapshot for the CURRENT authenticated user only — never
+		// resolved from a typed email, never another user's data. Used by the
+		// widgets to render "included with your plan" copy; the server remains
+		// the authority on pricing at booking time.
+		$entitlement = array( 'eligible' => false, 'plan_name' => '' );
+		if ( is_user_logged_in() && class_exists( 'G2AB_Checkout_Policy' ) ) {
+			$ent = G2AB_Checkout_Policy::lane_entitlement( get_current_user_id() );
+			$entitlement['eligible']  = ! empty( $ent['eligible'] );
+			$entitlement['plan_name'] = (string) ( $ent['plan_name'] ?? '' );
+		}
+
 		wp_localize_script(
 			'g2ab-frontend',
 			'G2AB_DATA',
 			array(
-				'rest_url'       => esc_url_raw( rest_url( G2AB_REST_NAMESPACE . '/' ) ),
-				'rest_namespace' => G2AB_REST_NAMESPACE,
-				'nonce'          => wp_create_nonce( 'wp_rest' ),
-				'currency'       => get_option( 'g2ab_currency', 'USD' ),
+				'rest_url'        => esc_url_raw( rest_url( G2AB_REST_NAMESPACE . '/' ) ),
+				'rest_namespace'  => G2AB_REST_NAMESPACE,
+				'nonce'           => wp_create_nonce( 'wp_rest' ),
+				'currency'        => get_option( 'g2ab_currency', 'USD' ),
+				'currency_prefix' => $this->currency_prefix(),
+				'is_logged_in'    => is_user_logged_in(),
+				'entitlement'     => $entitlement,
+				'i18n'            => array(
+					'confirming'          => __( "We're confirming your payment…", 'g2a-booking' ),
+					'confirming_body'     => __( 'Hold tight — this usually only takes a few seconds.', 'g2a-booking' ),
+					'confirmed_title'     => __( 'Booking confirmed.', 'g2a-booking' ),
+					'confirmed_body'      => __( 'Your payment was received. A confirmation email is on its way.', 'g2a-booking' ),
+					'confirmation'        => __( 'Confirmation:', 'g2a-booking' ),
+					'not_verified_title'  => __( "We couldn't confirm your payment yet.", 'g2a-booking' ),
+					'not_verified_body'   => __( "Your reservation is not confirmed until payment is verified. If you completed checkout you'll get an email as soon as it settles — otherwise you can try again below.", 'g2a-booking' ),
+					'try_again'           => __( 'Try payment again', 'g2a-booking' ),
+					'cancelled_title'     => __( 'Payment was cancelled — your lane is not reserved.', 'g2a-booking' ),
+					'cancelled_body'      => __( 'No charge was made. Any held time or seats will be released shortly unless you complete payment.', 'g2a-booking' ),
+					'resuming'            => __( 'Preparing secure checkout…', 'g2a-booking' ),
+					'resume_failed'       => __( 'We could not restart checkout.', 'g2a-booking' ),
+					'try_later'           => __( 'Please try again in a moment.', 'g2a-booking' ),
+					'slot_released_title' => __( 'That time is no longer available.', 'g2a-booking' ),
+					'slot_released_body'  => __( 'Your hold was released and the slot has since been taken or expired. Please pick a new time and book again.', 'g2a-booking' ),
+					'pick_new_time'       => __( 'Pick a new time', 'g2a-booking' ),
+					'already_paid'        => __( "This booking is already paid — you're all set.", 'g2a-booking' ),
+					'dismiss'             => __( 'Dismiss', 'g2a-booking' ),
+				),
 			)
 		);
 		$this->enqueued = true;
+	}
+
+	/**
+	 * Format an amount in the SITE currency (never a hardcoded '$').
+	 */
+	private function format_price( $amount ) {
+		if ( function_exists( 'g2ab_format_currency' ) ) {
+			return g2ab_format_currency( (float) $amount );
+		}
+		return '$' . number_format( (float) $amount, 2 );
+	}
+
+	/**
+	 * The currency prefix ("$", "€", "USD ") for client-side price rendering,
+	 * derived from the same map g2ab_format_currency() uses so PHP and JS
+	 * always agree.
+	 */
+	private function currency_prefix() {
+		if ( function_exists( 'g2ab_format_currency' ) ) {
+			$prefix = str_replace( number_format_i18n( 0, 2 ), '', g2ab_format_currency( 0 ) );
+			if ( '' !== $prefix ) {
+				return $prefix;
+			}
+		}
+		return '$';
+	}
+
+	/**
+	 * URL the visitor should come back to after logging in — the page that
+	 * embeds the booking widget.
+	 */
+	private function current_page_url() {
+		if ( is_singular() ) {
+			$permalink = get_permalink();
+			if ( $permalink ) {
+				return $permalink;
+			}
+		}
+		$request_uri = isset( $_SERVER['REQUEST_URI'] ) ? sanitize_text_field( wp_unslash( $_SERVER['REQUEST_URI'] ) ) : '/';
+		return home_url( $request_uri );
 	}
 
 	private function mark_booking_page_dynamic() {
@@ -340,7 +415,34 @@ final class G2AB_Frontend {
 		$service_subtitle = $tokens['subtitle'] ?: '';
 		$service_desc     = $tokens['description'] ?: '';
 		$price_total      = (float) $display_pric['total'];
-		$price_label      = $price_total <= 0 ? __( 'FREE', 'g2a-booking' ) : sprintf( '$%s', number_format( $price_total, 2 ) );
+
+		// Structured entitlement for the CURRENT authenticated user only (the
+		// server re-checks at booking time; this is display state, not policy).
+		$member_included = false;
+		$member_plan     = '';
+		if ( is_user_logged_in() && class_exists( 'G2AB_Checkout_Policy' ) ) {
+			$entitlement     = G2AB_Checkout_Policy::lane_entitlement( get_current_user_id() );
+			$member_included = ! empty( $entitlement['eligible'] );
+			$member_plan     = (string) ( $entitlement['plan_name'] ?? '' );
+		}
+
+		if ( $member_included ) {
+			$price_label = __( 'Included', 'g2a-booking' );
+		} else {
+			$price_label = $price_total <= 0 ? __( 'FREE', 'g2a-booking' ) : $this->format_price( $price_total );
+		}
+
+		// Payment-aware CTA. An explicit Form Customizer submit label still wins.
+		if ( '' !== $tokens['submit_label'] ) {
+			$submit_label = $tokens['submit_label'];
+		} elseif ( $member_included || $price_total <= 0 ) {
+			$submit_label = __( 'Confirm reservation', 'g2a-booking' );
+		} else {
+			/* translators: %s formatted amount */
+			$submit_label = sprintf( __( 'Pay %s securely', 'g2a-booking' ), $this->format_price( $price_total ) );
+		}
+
+		$login_url = wp_login_url( $this->current_page_url() );
 
 		// Unified "what do you want to book?" switch — only shown when there are
 		// published events with upcoming dates. The lane flow below is unchanged;
@@ -355,13 +457,17 @@ final class G2AB_Frontend {
 		?>
 		<div class="g2ab-unified g2ab-theme-<?php echo esc_attr( $tokens['theme'] ); ?>" id="<?php echo esc_attr( $switch_id ); ?>" style="<?php echo esc_attr( $this->build_css_vars( $tokens ) ); ?>">
 			<div class="g2ab-unified__switch">
-				<span class="g2ab-unified__q"><?php esc_html_e( 'What do you want to book?', 'g2a-booking' ); ?></span>
-				<div class="g2ab-unified__opts" role="tablist">
-					<button type="button" class="g2ab-unified__opt is-active" data-mode="lane"><?php esc_html_e( 'Lane / Range Time', 'g2a-booking' ); ?></button>
-					<button type="button" class="g2ab-unified__opt" data-mode="event"><?php esc_html_e( 'Events &amp; Classes', 'g2a-booking' ); ?></button>
+				<span class="g2ab-unified__q" id="<?php echo esc_attr( $switch_id ); ?>-q"><?php esc_html_e( 'What do you want to book?', 'g2a-booking' ); ?></span>
+				<div class="g2ab-unified__opts" role="tablist" aria-labelledby="<?php echo esc_attr( $switch_id ); ?>-q">
+					<button type="button" class="g2ab-unified__opt is-active" data-mode="lane"
+						id="<?php echo esc_attr( $switch_id ); ?>-tab-lane" role="tab" aria-selected="true"
+						aria-controls="<?php echo esc_attr( $switch_id ); ?>-panel-lane" tabindex="0"><?php esc_html_e( 'Lane / Range Time', 'g2a-booking' ); ?></button>
+					<button type="button" class="g2ab-unified__opt" data-mode="event"
+						id="<?php echo esc_attr( $switch_id ); ?>-tab-event" role="tab" aria-selected="false"
+						aria-controls="<?php echo esc_attr( $switch_id ); ?>-panel-event" tabindex="-1"><?php esc_html_e( 'Events &amp; Classes', 'g2a-booking' ); ?></button>
 				</div>
 			</div>
-			<div class="g2ab-unified__panel" data-mode-panel="lane">
+			<div class="g2ab-unified__panel" data-mode-panel="lane" id="<?php echo esc_attr( $switch_id ); ?>-panel-lane" role="tabpanel" aria-labelledby="<?php echo esc_attr( $switch_id ); ?>-tab-lane">
 		<?php endif; ?>
 		<div id="<?php echo esc_attr( $instance_id ); ?>"
 			class="g2ab g2ab-booking g2ab-theme-<?php echo esc_attr( $tokens['theme'] ); ?> g2ab-layout-<?php echo esc_attr( $tokens['layout'] ); ?> <?php echo $tokens['animations'] ? 'g2ab-animate' : 'g2ab-static'; ?>"
@@ -409,13 +515,35 @@ final class G2AB_Frontend {
 							</ul>
 						<?php endif; ?>
 
-						<?php if ( $tokens['show_pricing'] && (float) $display_pric['discount_amount'] > 0 ) : ?>
+						<?php if ( $tokens['show_pricing'] && $member_included ) : ?>
+							<div class="g2ab-included">
+								<span class="g2ab-included__mark" aria-hidden="true">✓</span>
+								<div>
+									<p class="g2ab-included__title">
+										<?php
+										echo esc_html( $member_plan
+											? sprintf( /* translators: %s plan name */ __( 'Included with your %s membership', 'g2a-booking' ), $member_plan )
+											: __( 'Included with your membership', 'g2a-booking' ) );
+										?>
+									</p>
+									<p class="g2ab-included__due">
+										<?php
+										printf(
+											/* translators: %s formatted zero amount, e.g. $0.00 */
+											esc_html__( 'Amount due today: %s', 'g2a-booking' ),
+											esc_html( $this->format_price( 0 ) )
+										);
+										?>
+									</p>
+								</div>
+							</div>
+						<?php elseif ( $tokens['show_pricing'] && (float) $display_pric['discount_amount'] > 0 ) : ?>
 							<p class="g2ab-aside__discount-note">
 								<?php
 								printf(
-									/* translators: 1: original price, 2: discount label */
-									esc_html__( 'Original $%1$s. %2$s applied.', 'g2a-booking' ),
-									esc_html( number_format( (float) $display_pric['subtotal'], 2 ) ),
+									/* translators: 1: original formatted price, 2: discount label */
+									esc_html__( 'Original %1$s. %2$s applied.', 'g2a-booking' ),
+									esc_html( $this->format_price( (float) $display_pric['subtotal'] ) ),
 									esc_html( $display_pric['discount_label'] ?: __( 'Member discount', 'g2a-booking' ) )
 								);
 								?>
@@ -482,7 +610,7 @@ final class G2AB_Frontend {
 								</div>
 							</div>
 							<div class="g2ab-pick__slots">
-								<p class="g2ab-pick__hint" data-slots-hint><?php esc_html_e( 'Pick a date to see available times', 'g2a-booking' ); ?></p>
+								<p class="g2ab-pick__hint" data-slots-hint role="status" aria-live="polite"><?php esc_html_e( 'Pick a date to see available times', 'g2a-booking' ); ?></p>
 								<div class="g2ab-slots" data-slots></div>
 							</div>
 						</div>
@@ -507,6 +635,14 @@ final class G2AB_Frontend {
 							<p class="g2ab-stage__meta" data-summary-line></p>
 						</header>
 
+						<?php if ( ! is_user_logged_in() ) : ?>
+							<p class="g2ab-login-note">
+								<?php esc_html_e( 'Already a member?', 'g2a-booking' ); ?>
+								<a href="<?php echo esc_url( $login_url ); ?>"><?php esc_html_e( 'Log in to use your benefit', 'g2a-booking' ); ?></a>
+								<span class="g2ab-login-note__hint"><?php esc_html_e( 'Continuing as a guest books at the full public price.', 'g2a-booking' ); ?></span>
+							</p>
+						<?php endif; ?>
+
 						<form class="g2ab-form" novalidate
 							action="javascript:void(0);"
 							method="post"
@@ -514,14 +650,53 @@ final class G2AB_Frontend {
 							data-g2ab-form="1">
 							<?php $this->render_form_fields( $fields ); ?>
 
-							<div class="g2ab-form__error" data-form-error hidden></div>
+							<?php if ( $tokens['show_pricing'] ) : ?>
+								<div class="g2ab-order" data-order-summary>
+									<p class="g2ab-order__title"><?php esc_html_e( 'Order summary', 'g2a-booking' ); ?></p>
+									<?php if ( $member_included ) : ?>
+										<div class="g2ab-order__row">
+											<span>
+												<?php
+												echo esc_html( $member_plan
+													? sprintf( /* translators: %s plan name */ __( 'Included with your %s membership', 'g2a-booking' ), $member_plan )
+													: __( 'Included with your membership', 'g2a-booking' ) );
+												?>
+											</span>
+											<span class="g2ab-order__amount" data-order-total><?php echo esc_html( $this->format_price( 0 ) ); ?></span>
+										</div>
+										<div class="g2ab-order__row g2ab-order__row--total">
+											<span><?php esc_html_e( 'Amount due today', 'g2a-booking' ); ?></span>
+											<span class="g2ab-order__amount" data-order-total><?php echo esc_html( $this->format_price( 0 ) ); ?></span>
+										</div>
+									<?php else : ?>
+										<div class="g2ab-order__row">
+											<span><span data-order-unit><?php echo esc_html( $this->format_price( (float) $display_pric['subtotal'] ) ); ?></span> × <span data-order-qty>1</span></span>
+											<span data-order-subtotal><?php echo esc_html( $this->format_price( (float) $display_pric['subtotal'] ) ); ?></span>
+										</div>
+										<div class="g2ab-order__row g2ab-order__row--discount" data-order-discount-row<?php echo (float) $display_pric['discount_amount'] > 0 ? '' : ' hidden'; ?>>
+											<span><?php echo esc_html( $display_pric['discount_label'] ?: __( 'Discount', 'g2a-booking' ) ); ?></span>
+											<span data-order-discount>−<?php echo esc_html( $this->format_price( (float) $display_pric['discount_amount'] ) ); ?></span>
+										</div>
+										<div class="g2ab-order__row g2ab-order__row--total">
+											<span><?php esc_html_e( 'Total due today', 'g2a-booking' ); ?></span>
+											<span class="g2ab-order__amount" data-order-total><?php echo esc_html( $this->format_price( (float) $display_pric['total'] ) ); ?></span>
+										</div>
+										<?php if ( (float) $display_pric['total'] > 0 ) : ?>
+											<p class="g2ab-order__note"><?php esc_html_e( 'Secure online payment. Your lane is held while you complete checkout — it is not reserved until payment succeeds.', 'g2a-booking' ); ?></p>
+										<?php endif; ?>
+									<?php endif; ?>
+								</div>
+							<?php endif; ?>
+
+							<div class="g2ab-form__error" data-form-error role="alert" hidden></div>
+							<div class="g2ab-form__status" data-form-status role="status" aria-live="polite" hidden></div>
 
 							<footer class="g2ab-stage__foot">
 								<button type="button" class="g2ab-btn g2ab-btn--ghost" data-back-time>
 									<?php esc_html_e( 'Back', 'g2a-booking' ); ?>
 								</button>
-								<button type="submit" class="g2ab-btn g2ab-btn--primary">
-									<?php echo esc_html( $tokens['submit_label'] ?: sprintf( /* translators: %s resource label */ __( 'Reserve my %s', 'g2a-booking' ), strtolower( $resource_label ) ) ); ?>
+								<button type="submit" class="g2ab-btn g2ab-btn--primary" data-submit-cta>
+									<?php echo esc_html( $submit_label ); ?>
 								</button>
 							</footer>
 						</form>
@@ -536,7 +711,7 @@ final class G2AB_Frontend {
 							<div class="g2ab-done__check" aria-hidden="true">
 								<svg viewBox="0 0 64 64" width="64" height="64"><circle cx="32" cy="32" r="30" fill="none" stroke="currentColor" stroke-width="3"/><path d="M20 33 L29 42 L45 24" fill="none" stroke="currentColor" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/></svg>
 							</div>
-							<h3 class="g2ab-done__title"><?php esc_html_e( 'Booking confirmed', 'g2a-booking' ); ?></h3>
+							<h3 class="g2ab-done__title" data-done-title><?php esc_html_e( 'Booking confirmed', 'g2a-booking' ); ?></h3>
 							<p class="g2ab-done__msg" data-done-msg></p>
 							<div class="g2ab-done__recap" data-done-recap hidden>
 								<div class="g2ab-done__recap-row">
@@ -562,10 +737,17 @@ final class G2AB_Frontend {
 				</main>
 			</div>
 		</div>
-		<?php $this->render_inline_bootstrap( $instance_id ); ?>
+		<?php
+		$this->render_inline_bootstrap( $instance_id, array(
+			'member_included'     => $member_included,
+			'plan_name'           => $member_plan,
+			'pricing'             => $display_pric,
+			'custom_submit_label' => (string) $tokens['submit_label'],
+		) );
+		?>
 		<?php if ( $has_events ) : ?>
 			</div><!-- /lane panel -->
-			<div class="g2ab-unified__panel" data-mode-panel="event" hidden>
+			<div class="g2ab-unified__panel" data-mode-panel="event" id="<?php echo esc_attr( $switch_id ); ?>-panel-event" role="tabpanel" aria-labelledby="<?php echo esc_attr( $switch_id ); ?>-tab-event" hidden>
 				<?php echo $event_widget; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?>
 			</div>
 		</div><!-- /g2ab-unified -->
@@ -576,6 +758,8 @@ final class G2AB_Frontend {
 		.g2ab-unified__opts{display:inline-flex;gap:8px;background:var(--g2ab-bg,var(--color-void));padding:4px;border-radius:999px;border:1px solid var(--g2ab-border,var(--color-hairline));}
 		.g2ab-unified__opt{appearance:none;border:none;background:transparent;color:var(--g2ab-muted,var(--color-silver));padding:8px 18px;border-radius:999px;font-size:13px;font-weight:700;cursor:pointer;transition:all .15s ease;}
 		.g2ab-unified__opt.is-active{background:var(--g2ab-primary,var(--color-brass));color:var(--color-ink);}
+		.g2ab-unified__opt:focus-visible{outline:2px solid var(--g2ab-primary,var(--color-brass));outline-offset:2px;}
+		@media (prefers-reduced-motion: reduce){.g2ab-unified__opt{transition:none;}}
 		.g2ab-unified__panel{margin-top:-1px;}
 		.g2ab-unified__panel[hidden]{display:none;}
 		.g2ab-unified .g2ab-evb{margin-top:0;border-radius:0 0 12px 12px;border-top:none;max-width:none;}
@@ -585,13 +769,30 @@ final class G2AB_Frontend {
 			var root = document.getElementById(<?php echo wp_json_encode( $switch_id ); ?>);
 			if (!root || root.dataset.switchBooted) return;
 			root.dataset.switchBooted = '1';
-			var opts = root.querySelectorAll('.g2ab-unified__opt');
+			var opts = Array.prototype.slice.call(root.querySelectorAll('.g2ab-unified__opt'));
 			var panels = root.querySelectorAll('[data-mode-panel]');
-			opts.forEach(function(btn){
-				btn.addEventListener('click', function(){
-					var mode = btn.getAttribute('data-mode');
-					opts.forEach(function(b){ b.classList.toggle('is-active', b===btn); });
-					panels.forEach(function(p){ p.hidden = (p.getAttribute('data-mode-panel') !== mode); });
+			function activate(btn, focus){
+				var mode = btn.getAttribute('data-mode');
+				opts.forEach(function(b){
+					var on = b === btn;
+					b.classList.toggle('is-active', on);
+					b.setAttribute('aria-selected', on ? 'true' : 'false');
+					b.tabIndex = on ? 0 : -1;
+				});
+				panels.forEach(function(p){ p.hidden = (p.getAttribute('data-mode-panel') !== mode); });
+				if (focus) btn.focus();
+			}
+			opts.forEach(function(btn, i){
+				btn.addEventListener('click', function(){ activate(btn, false); });
+				btn.addEventListener('keydown', function(e){
+					var dir = 0;
+					if (e.key === 'ArrowRight' || e.key === 'ArrowDown') dir = 1;
+					else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') dir = -1;
+					else if (e.key === 'Home') { e.preventDefault(); activate(opts[0], true); return; }
+					else if (e.key === 'End') { e.preventDefault(); activate(opts[opts.length - 1], true); return; }
+					if (!dir) return;
+					e.preventDefault();
+					activate(opts[(i + dir + opts.length) % opts.length], true);
 				});
 			});
 		})();
@@ -779,13 +980,29 @@ final class G2AB_Frontend {
 	 * Per-instance inline JS. Selects its root by id so page-builders and
 	 * caching plugins can't break the binding by inserting nodes between
 	 * the wrapper and the script.
+	 *
+	 * @param string $instance_id Widget root element id.
+	 * @param array  $view        Display state: member_included(bool),
+	 *                            plan_name(string), pricing(array from
+	 *                            display_pricing_for_booking_type()),
+	 *                            custom_submit_label(string, '' = payment-aware).
 	 */
-	private function render_inline_bootstrap( $instance_id ) {
-		$config = array(
+	private function render_inline_bootstrap( $instance_id, $view = array() ) {
+		$pricing = isset( $view['pricing'] ) && is_array( $view['pricing'] ) ? $view['pricing'] : array();
+		$config  = array(
 			'rest_url'    => esc_url_raw( rest_url( G2AB_REST_NAMESPACE . '/' ) ),
 			'ajax_url'    => esc_url_raw( admin_url( 'admin-ajax.php' ) ),
 			'nonce'       => wp_create_nonce( 'wp_rest' ),
 			'instance_id' => $instance_id,
+			'currency_prefix'     => $this->currency_prefix(),
+			'member_included'     => ! empty( $view['member_included'] ),
+			'plan_name'           => (string) ( $view['plan_name'] ?? '' ),
+			'custom_submit_label' => (string) ( $view['custom_submit_label'] ?? '' ),
+			'pricing'     => array(
+				'unit_subtotal' => (float) ( $pricing['subtotal'] ?? 0 ),
+				'unit_discount' => (float) ( $pricing['discount_amount'] ?? 0 ),
+				'unit_total'    => (float) ( $pricing['total'] ?? 0 ),
+			),
 			'i18n'        => array(
 				'loading'  => __( 'Loading available times…', 'g2a-booking' ),
 				'no_slots' => __( 'No times available on this date.', 'g2a-booking' ),
@@ -793,6 +1010,15 @@ final class G2AB_Frontend {
 				'submitting' => __( 'Reserving…', 'g2a-booking' ),
 				'failed'   => __( 'Could not complete booking. Please try again.', 'g2a-booking' ),
 				'pick_first' => __( 'Please choose a date and time first.', 'g2a-booking' ),
+				'confirm_reservation' => __( 'Confirm reservation', 'g2a-booking' ),
+				/* translators: %s formatted amount */
+				'pay_securely'        => __( 'Pay %s securely', 'g2a-booking' ),
+				'invalid_email'       => __( 'Please enter a valid email address.', 'g2a-booking' ),
+				'required_fields'     => __( 'Please fill in the highlighted required fields.', 'g2a-booking' ),
+				'checkout_hold'       => __( 'Checkout hold — payment required. Your lane is held for a short time while you complete secure checkout.', 'g2a-booking' ),
+				'redirecting'         => __( 'Redirecting to secure checkout…', 'g2a-booking' ),
+				'confirmed_title'     => __( 'Booking confirmed', 'g2a-booking' ),
+				'hold_note'           => __( 'Your reservation is not confirmed until payment is completed.', 'g2a-booking' ),
 				'months'   => array(
 					__( 'January', 'g2a-booking' ), __( 'February', 'g2a-booking' ), __( 'March', 'g2a-booking' ), __( 'April', 'g2a-booking' ),
 					__( 'May', 'g2a-booking' ), __( 'June', 'g2a-booking' ), __( 'July', 'g2a-booking' ), __( 'August', 'g2a-booking' ),
@@ -835,6 +1061,20 @@ final class G2AB_Frontend {
 			function headers(hasBody){ var h = {}; if (hasBody !== false) { h['Content-Type'] = 'application/json'; if (config.nonce) h['X-WP-Nonce'] = config.nonce; } return h; }
 			function pad(n){ return n < 10 ? '0'+n : ''+n; }
 			function ymd(d){ return d.getFullYear() + '-' + pad(d.getMonth()+1) + '-' + pad(d.getDate()); }
+			// Site-currency formatter (prefix localised from PHP — no hardcoded '$').
+			function money(n){ return (config.currency_prefix || '$') + (Math.round(Number(n) * 100) / 100).toFixed(2); }
+			// Remember uuid → confirm_token before redirecting to the gateway so a
+			// ?g2ab_cancel return (which carries no token) can still offer
+			// "Try payment again" via resume-payment.
+			function storePayCtx(uuid, token){
+				if (!uuid || !token) return;
+				try {
+					var raw = window.sessionStorage.getItem('g2abPayCtx');
+					var map = raw ? JSON.parse(raw) : {};
+					map[uuid] = { t: token, ts: Date.now() };
+					window.sessionStorage.setItem('g2abPayCtx', JSON.stringify(map));
+				} catch (e) { /* storage unavailable — resume just won't be offered */ }
+			}
 
 			// ── state ───────────────────────────────────────────────
 			var singleId = root.querySelector('[data-single-resource-id]');
@@ -952,10 +1192,14 @@ final class G2AB_Frontend {
 			}
 
 			// ── slot loading ────────────────────────────────────────
+			// Monotonic request counter: a slow availability response for an
+			// OLD resource/date selection must never overwrite the newer one.
+			var slotsReq = 0;
 			function loadSlots(){
 				var box = $('[data-slots]');
 				var hint = $('[data-slots-hint]');
 				if (!box) return;
+				var seq = ++slotsReq;
 				if (!state.resourceId || !state.date) {
 					box.innerHTML = '';
 					if (hint) { hint.style.display = ''; hint.textContent = config.i18n.pick_first || 'Pick a date'; }
@@ -966,6 +1210,7 @@ final class G2AB_Frontend {
 				fetch(config.rest_url + 'availability?resource_id=' + encodeURIComponent(state.resourceId) + '&date=' + encodeURIComponent(state.date) + '&duration=' + encodeURIComponent(root.dataset.duration || 60), { headers: headers(false) })
 					.then(function(r){ return r.json(); })
 					.then(function(json){
+						if (seq !== slotsReq) return; // stale response — a newer selection is in flight/rendered.
 						var data = json && json.success ? json.data : null;
 						if (hint) hint.style.display = 'none';
 						if (!data) { box.innerHTML = '<p class="g2ab-muted">' + config.i18n.no_slots + '</p>'; return; }
@@ -993,9 +1238,90 @@ final class G2AB_Frontend {
 						});
 					})
 					.catch(function(){
+						if (seq !== slotsReq) return;
 						if (hint) hint.style.display = 'none';
 						box.innerHTML = '<p class="g2ab-muted">' + config.i18n.no_slots + '</p>';
 					});
+			}
+
+			// ── order summary + payment-aware CTA ───────────────────
+			function partySize(){
+				var input = form ? form.querySelector('[name="fields[party_size]"]') : null;
+				var p = input ? parseInt(input.value, 10) : 1;
+				return p > 0 ? p : 1;
+			}
+			function updateCta(total){
+				if (config.custom_submit_label) return; // admin label always wins.
+				var cta = $('[data-submit-cta]');
+				if (!cta) return;
+				if (config.member_included || total <= 0) {
+					cta.textContent = config.i18n.confirm_reservation;
+				} else {
+					cta.textContent = config.i18n.pay_securely.replace('%s', money(total));
+				}
+			}
+			// Re-render the order summary from the server-calculated per-unit
+			// pricing whenever the party size changes (dynamic price updates).
+			function renderOrder(){
+				if (config.member_included) { updateCta(0); return; }
+				var qty = partySize();
+				var sub = config.pricing.unit_subtotal * qty;
+				var disc = config.pricing.unit_discount * qty;
+				var total = config.pricing.unit_total * qty;
+				var qtyEl = $('[data-order-qty]');
+				if (qtyEl) qtyEl.textContent = String(qty);
+				var subEl = $('[data-order-subtotal]');
+				if (subEl) subEl.textContent = money(sub);
+				var discRow = $('[data-order-discount-row]');
+				if (discRow) {
+					discRow.hidden = disc <= 0;
+					var discEl = $('[data-order-discount]');
+					if (discEl) discEl.textContent = '−' + money(disc);
+				}
+				$$('[data-order-total]').forEach(function(el){ el.textContent = money(total); });
+				updateCta(total);
+			}
+
+			// ── client-side validation (server still validates) ─────
+			function validateForm(showError){
+				if (!form) return true;
+				var els = $$('input, select, textarea', form);
+				var checkedRadios = {};
+				els.forEach(function(el){ if (el.type === 'radio' && el.checked) checkedRadios[el.name] = true; });
+				var seenRadios = {};
+				var firstBad = null;
+				var badEmail = false;
+				els.forEach(function(el){
+					if (el.disabled || el.type === 'hidden' || el.type === 'submit' || el.type === 'button') return;
+					var bad = false;
+					if (el.required) {
+						if (el.type === 'checkbox') {
+							bad = !el.checked;
+						} else if (el.type === 'radio') {
+							if (seenRadios[el.name]) return;
+							seenRadios[el.name] = true;
+							bad = !checkedRadios[el.name];
+						} else {
+							bad = !String(el.value || '').trim();
+						}
+					}
+					if (!bad && el.type === 'email' && String(el.value || '').trim()) {
+						bad = !/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(String(el.value).trim());
+						if (bad) badEmail = true;
+					}
+					if (bad) {
+						el.setAttribute('aria-invalid', 'true');
+						if (!firstBad) firstBad = el;
+					} else {
+						el.removeAttribute('aria-invalid');
+					}
+				});
+				if (firstBad) {
+					if (showError) showError(badEmail && firstBad.type === 'email' ? config.i18n.invalid_email : config.i18n.required_fields);
+					try { firstBad.focus(); } catch (e) { /* noop */ }
+					return false;
+				}
+				return true;
 			}
 
 			function updateSummary(){
@@ -1083,11 +1409,25 @@ final class G2AB_Frontend {
 				form.addEventListener('submit', function(event){
 					event.preventDefault();
 					var errEl = $('[data-form-error]', form);
+					var statusEl = $('[data-form-status]', form);
 					var submit = form.querySelector('button[type="submit"]');
 					var originalLabel = submit ? submit.textContent : '';
+					function showErr(msg){
+						if (errEl) { errEl.textContent = msg; errEl.hidden = false; }
+					}
+					function showStatus(msg){
+						if (statusEl) { statusEl.textContent = msg; statusEl.hidden = false; }
+					}
 					try {
+					if (statusEl) { statusEl.hidden = true; statusEl.textContent = ''; }
 					if (!state.resourceId || !state.slot) {
-						if (errEl) { errEl.textContent = config.i18n.pick_first; errEl.hidden = false; }
+						showErr(config.i18n.pick_first);
+						return;
+					}
+					// Client-side validation (required fields, email format) with
+					// focus moved to the first invalid control. The server still
+					// re-validates everything.
+					if (!validateForm(showErr)) {
 						return;
 					}
 					var fields = {};
@@ -1141,7 +1481,36 @@ final class G2AB_Frontend {
 							throw new Error(msg);
 						}
 						var data = res.body.data || {};
-						if (data.redirect_url) { window.location.href = data.redirect_url; return; }
+						var isHold = !!data.payment_required || data.state === 'checkout_hold';
+						var isConfirmed = data.state === 'confirmed' || data.status === 'confirmed' || data.status === 'paid';
+
+						if (isHold) {
+							// Checkout hold — NOT a confirmed booking. Announce the
+							// hold, keep the confirm_token for a possible cancel
+							// return, and hand off to the gateway.
+							storePayCtx(data.uuid, data.confirm_token);
+							showStatus((data.message || config.i18n.checkout_hold) + (data.redirect_url ? ' ' + config.i18n.redirecting : ' ' + config.i18n.hold_note));
+							if (data.redirect_url) {
+								window.setTimeout(function(){ window.location.href = data.redirect_url; }, 150);
+								return;
+							}
+							// No checkout URL (e.g. idempotent replay of a pending
+							// attempt): never show a confirmation — surface the hold
+							// copy and let the visitor retry.
+							if (submit) { submit.disabled = false; submit.textContent = originalLabel; }
+							return;
+						}
+
+						if (!isConfirmed) {
+							// Unknown/unpaid state — never render the confirmed panel.
+							showStatus(data.message || config.i18n.hold_note);
+							if (submit) { submit.disabled = false; submit.textContent = originalLabel; }
+							return;
+						}
+
+						// Confirmed by the server (free booking or member-included $0).
+						var titleEl = $('[data-done-title]');
+						if (titleEl) titleEl.textContent = config.i18n.confirmed_title;
 						var msgEl = $('[data-done-msg]'); var uuidEl = $('[data-done-uuid]');
 						if (msgEl) msgEl.textContent = data.message || '';
 						if (uuidEl) uuidEl.textContent = data.uuid || '';
@@ -1163,11 +1532,22 @@ final class G2AB_Frontend {
 				});
 			}
 
+			// Party-size changes re-price the order summary + CTA live.
+			if (form) {
+				var partyInput = form.querySelector('[name="fields[party_size]"]');
+				if (partyInput) {
+					['change', 'input'].forEach(function(ev){
+						partyInput.addEventListener(ev, renderOrder);
+					});
+				}
+			}
+
 			// ── boot ────────────────────────────────────────────────
 			var now = new Date();
 			state.viewYear = now.getFullYear();
 			state.viewMonth = now.getMonth();
 			renderCalendar();
+			renderOrder();
 			showStage('time');
 		})(<?php echo wp_json_encode( $config ); ?>);
 		</script>

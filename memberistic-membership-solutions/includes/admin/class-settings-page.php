@@ -132,6 +132,10 @@ final class Settings_Page {
 			'thank_you_page_id'        => isset( $settings['thank_you_page_id'] ) ? absint( $settings['thank_you_page_id'] ) : 0,
 			'failed_payment_page_id'   => isset( $settings['failed_payment_page_id'] ) ? absint( $settings['failed_payment_page_id'] ) : 0,
 			'staff_dashboard_page_id'  => isset( $settings['staff_dashboard_page_id'] ) ? absint( $settings['staff_dashboard_page_id'] ) : 0,
+			// Booking page (Book a Lane) — used by email/URL resolvers so
+			// booking-related links point at the configured page instead of
+			// a guessed slug.
+			'booking_page_id'          => isset( $settings['booking_page_id'] ) ? absint( $settings['booking_page_id'] ) : 0,
 		);
 
 		// ── Integration toggles ─────────────────────────────────────────
@@ -227,6 +231,13 @@ final class Settings_Page {
 				continue;
 			}
 
+			// Map-only entries (e.g. the booking page, whose content is owned
+			// by the booking-engine plugin) are matched to an existing page
+			// but never auto-created by Memberistic.
+			if ( ! empty( $page['map_only'] ) ) {
+				continue;
+			}
+
 			$page_id = wp_insert_post(
 				array(
 					'post_title'   => $page['title'],
@@ -264,6 +275,9 @@ final class Settings_Page {
 			'thank_you_page_id'      => array( 'title' => 'Thank You',       'slug' => 'membership-thank-you', 'content' => '[memberistic_thank_you]' ),
 			'failed_payment_page_id' => array( 'title' => 'Payment Failed',  'slug' => 'payment-failed',  'content' => '[memberistic_payment_failed]' ),
 			'staff_dashboard_page_id'=> array( 'title' => 'Staff Dashboard', 'slug' => 'staff-dashboard', 'content' => '[memberistic_staff_dashboard]' ),
+			// Booking page: mapped when a /book-a-lane/ page exists, but never
+			// created here — its shortcode belongs to the booking-engine plugin.
+			'booking_page_id'        => array( 'title' => 'Book a Lane',     'slug' => 'book-a-lane',     'content' => '', 'map_only' => true ),
 		);
 
 		return apply_filters( 'memberistic_required_pages', $pages );

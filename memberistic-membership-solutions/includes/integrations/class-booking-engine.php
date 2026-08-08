@@ -22,7 +22,6 @@ final class Booking_Engine {
 		add_filter( 'memberistic_booking_discount', array( self::class, 'booking_discount' ), 10, 3 );
 		add_action( 'memberistic_booking_recorded', array( self::class, 'record_booking_activity' ), 10, 3 );
 		add_filter( 'g2ab_user_is_member', array( self::class, 'g2ab_user_is_member' ), 10, 4 );
-		add_filter( 'g2ab_advisory_membership_hint', array( self::class, 'g2ab_advisory_membership_hint' ), 10, 2 );
 		add_filter( 'g2ab_booking_pricing', array( self::class, 'g2ab_booking_pricing' ), 10, 5 );
 		add_filter( 'g2ab_booking_display_pricing', array( self::class, 'g2ab_booking_pricing' ), 10, 4 );
 		add_action( 'g2ab_booking_created', array( self::class, 'g2ab_booking_created' ), 10, 2 );
@@ -51,70 +50,55 @@ final class Booking_Engine {
 		return isset( $rules['default'] ) ? max( 0, (float) $rules['default'] ) : $discount;
 	}
 
+	/**
+	 * "Is this user an active member?" for the booking engine.
+	 *
+	 * Only the real membership tiers count (the lane-entitlement plan
+	 * allowlist — defender/patriot/guardian by default) in an eligible status
+	 * (active/comped by default). Guest Pass holders, trials, past-due,
+	 * suspended and expired memberships are NOT members for booking purposes:
+	 * they must never unlock members-only access or member pricing.
+	 *
+	 * Entitlement is resolved from the AUTHENTICATED user id only. The typed
+	 * email is deliberately ignored (audit C27: anyone who knew a member's
+	 * email could book at member rates by typing it into the guest form).
+	 */
 	public static function g2ab_user_is_member( $allowed, $user_id, $booking_type, $customer_email = '' ) {
-		if ( self::get_active_membership_for_user( $user_id ) ) {
+		$entitlement = Entitlement_Service::resolve_for_user( (int) $user_id );
+		if ( ! empty( $entitlement['eligible'] ) ) {
 			return true;
 		}
 
-		// Audit C27: the previous fallback granted member status
-		// (and the member discount via g2ab_booking_pricing below)
-		// whenever the SUPPLIED EMAIL matched an active membership,
-		// even when the caller wasn't logged in as that member.
-		// Anyone who knew a member's email could book at member
-		// rates by typing it into the guest form. Now: require a
-		// real authenticated user.
 		return (bool) $allowed;
 	}
 
-	/**
-	 * Tell the booking engine that a typed email MAY belong to an active
-	 * member, without granting anything.
-	 *
-	 * Audit C27 correctly stopped email-only matching from setting prices. But
-	 * the booking engine still needs to know a member might be on the other end,
-	 * so it can route them to the front desk instead of charging the walk-in
-	 * rate to a card. The hint carries no price and no access — only a flag and
-	 * a plan name for staff.
-	 *
-	 * @param array  $hint           Default hint.
-	 * @param string $customer_email Email typed into the booking form.
-	 * @return array
-	 */
-	public static function g2ab_advisory_membership_hint( $hint, $customer_email ) {
-		$membership = self::get_active_membership_for_email( $customer_email );
+	public static function g2ab_booking_pricing( $pricing, $booking_type, $party_size, $user_id, $customer_email = '' ) {
+		// Central policy: only an authenticated member on an included plan
+		// (defender/patriot/guardian, active/comped) gets lane time at $0.
+		// Everyone else — guest passes, trials, lapsed members, typed emails —
+		// pays the full public price. See Entitlement_Service.
+		$entitlement = Entitlement_Service::resolve_for_user( (int) $user_id );
 
-		if ( ! $membership ) {
-			return $hint;
+		if ( empty( $entitlement['eligible'] ) ) {
+			return $pricing;
 		}
 
-		return array(
-			'matched' => true,
-			'label'   => self::plan_name( $membership ),
-		);
-	}
-
-	public static function g2ab_booking_pricing( $pricing, $booking_type, $party_size, $user_id, $customer_email = '' ) {
-		// Audit C27: same fix as above — discount only applies to
-		// the LOGGED-IN member, not anyone who types a member's
-		// email into the guest form.
-		$membership = self::get_active_membership_for_user( $user_id );
-
-		if ( ! $membership ) {
+		$membership = Memberships_Repository::get( (int) $entitlement['membership_id'] );
+		if ( ! is_array( $membership ) ) {
 			return $pricing;
 		}
 
 		$subtotal = isset( $pricing['subtotal'] ) ? (float) $pricing['subtotal'] : ( (float) $booking_type->base_price * max( 1, (int) $party_size ) );
 
-		// A plan may INCLUDE a booking type outright (e.g. a Guest Pass bought
-		// annually at the counter that covers lane time). That is not the same
-		// as a 100% discount rule: it is an entitlement of the plan, so it
-		// applies even when no percentage rule was configured for this type.
-		if ( self::booking_type_is_included( $membership, $booking_type ) ) {
+		// The plan INCLUDES lane time outright: resolve to $0 as a plan
+		// entitlement, not a discount rule someone has to remember to add.
+		if ( self::booking_type_is_included( $membership, $booking_type ) || self::booking_type_is_lane( $booking_type ) ) {
 			$pricing['discount_amount']         = $subtotal;
 			$pricing['total']                   = 0.0;
 			$pricing['member_discount_percent'] = 100.0;
 			$pricing['membership_level_id']     = (int) ( $membership['plan_id'] ?? 0 );
 			$pricing['membership_source']       = 'memberistic';
+			$pricing['entitlement']             = $entitlement;
 			$pricing['discount_label']          = sprintf(
 				/* translators: %s: plan name */
 				__( 'Included with your %s membership', 'memberistic' ),
@@ -343,6 +327,25 @@ final class Booking_Engine {
 		$booking_type_id = isset( $booking_type->id ) ? (int) $booking_type->id : 0;
 
 		return $booking_type_id > 0 && in_array( $booking_type_id, array_map( 'absint', $included ), true );
+	}
+
+	/**
+	 * True when a booking type is a range-lane reservation — the thing the
+	 * Defender/Patriot/Guardian tiers include. Category/settings-driven so a
+	 * renamed lane type keeps working; classrooms and instructor time never
+	 * match.
+	 *
+	 * @param object $booking_type Booking type row.
+	 * @return bool
+	 */
+	private static function booking_type_is_lane( $booking_type ) {
+		$settings   = isset( $booking_type->settings ) ? json_decode( (string) $booking_type->settings, true ) : array();
+		$configured = is_array( $settings ) && ! empty( $settings['resource_type'] ) ? sanitize_key( $settings['resource_type'] ) : '';
+		if ( '' !== $configured ) {
+			return 'lane' === $configured;
+		}
+		$category = isset( $booking_type->category ) ? sanitize_key( (string) $booking_type->category ) : 'lane';
+		return 'class' !== $category;
 	}
 
 	private static function discount_percent_for_booking_type( $membership, $booking_type ) {

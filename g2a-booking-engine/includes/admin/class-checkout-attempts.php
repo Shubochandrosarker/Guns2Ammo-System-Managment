@@ -142,7 +142,13 @@ final class G2AB_Admin_Checkout_Attempts {
 									</td>
 									<td>
 										<span class="g2ab-ca__pill g2ab-ca__pill--<?php echo esc_attr( sanitize_html_class( $row['status'] ) ); ?>"><?php echo esc_html( strtoupper( str_replace( '_', ' ', $row['status'] ) ) ); ?></span>
-										<span><?php echo esc_html( class_exists( 'G2AB_Booking_Visibility' ) ? G2AB_Booking_Visibility::status_label( $row ) : ( $row['booking_status'] ?: '' ) ); ?></span>
+										<span><?php
+										// The row's `status` key is the ATTEMPT status — relabel the
+										// BOOKING's status explicitly so the second line shows the
+										// booking state, not a re-label of the attempt.
+										$booking_shape = array( 'status' => (string) ( $row['booking_status'] ?? '' ), 'payment_mode' => (string) ( $row['payment_mode'] ?? '' ) );
+										echo esc_html( class_exists( 'G2AB_Booking_Visibility' ) ? G2AB_Booking_Visibility::status_label( $booking_shape ) : ( $row['booking_status'] ?: '' ) );
+										?></span>
 									</td>
 									<td><?php echo esc_html( ! empty( $row['checkout_expires_at'] ) ? mysql2date( 'M j, Y g:i A', $row['checkout_expires_at'] ) : __( 'Unknown', 'g2a-booking' ) ); ?></td>
 								</tr>

@@ -34,6 +34,25 @@ function g2ab_url( $relative = '' ) {
 }
 
 /**
+ * Format an amount in the SITE currency — never a hardcoded '$'.
+ *
+ * @param float  $amount   Amount.
+ * @param string $currency Optional ISO code; defaults to the site option.
+ * @return string e.g. "$20.00", "€20,00" (symbol map falls back to "USD 20.00").
+ */
+function g2ab_format_currency( $amount, $currency = '' ) {
+	$currency = strtoupper( sanitize_text_field( $currency ?: (string) get_option( 'g2ab_currency', 'USD' ) ) );
+	$symbols  = (array) apply_filters( 'g2ab_currency_symbols', array(
+		'USD' => '$', 'CAD' => 'CA$', 'AUD' => 'A$', 'EUR' => '€', 'GBP' => '£', 'JPY' => '¥', 'MXN' => 'MX$', 'NZD' => 'NZ$', 'CHF' => 'CHF ', 'SEK' => 'kr ', 'BDT' => '৳',
+	) );
+	$formatted = number_format_i18n( (float) $amount, 2 );
+	if ( isset( $symbols[ $currency ] ) ) {
+		return $symbols[ $currency ] . $formatted;
+	}
+	return $currency . ' ' . $formatted;
+}
+
+/**
  * Generate a v4 UUID.
  *
  * Used for public-facing booking identifiers so we don't expose auto-increment

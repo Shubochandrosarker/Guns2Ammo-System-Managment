@@ -35,6 +35,7 @@
 		{ key: 'thank_you_page_id',       label: __('Thank You Page', 'memberistic') },
 		{ key: 'failed_payment_page_id',  label: __('Failed Payment Page', 'memberistic') },
 		{ key: 'staff_dashboard_page_id', label: __('Staff Dashboard Page', 'memberistic') },
+		{ key: 'booking_page_id',         label: __('Booking Page (Book a Lane)', 'memberistic') },
 	];
 
 	function Field(props) {

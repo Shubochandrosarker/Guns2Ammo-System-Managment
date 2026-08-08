@@ -37,7 +37,8 @@ class G2AB_Email_Cron {
 	}
 
 	/**
-	 * Cron tick — find upcoming bookings + send reminders.
+	 * Cron tick — find upcoming bookings + send reminders, then re-attempt
+	 * recently failed sends.
 	 */
 	public function tick() {
 		global $wpdb;
@@ -96,6 +97,14 @@ class G2AB_Email_Cron {
 					$this->log( $b->id, self::LOG_2H );
 				}
 			}
+		}
+
+		// Re-attempt failed sends ≤ 24h old (delete + resend — see
+		// G2AB_Email_Engine::retry_failed()). Disable sitewide with:
+		//   add_filter( 'g2ab_email_retry_failed', '__return_false' );
+		if ( apply_filters( 'g2ab_email_retry_failed', true )
+			&& method_exists( $this->engine, 'retry_failed' ) ) {
+			$this->engine->retry_failed( 24 );
 		}
 	}
 

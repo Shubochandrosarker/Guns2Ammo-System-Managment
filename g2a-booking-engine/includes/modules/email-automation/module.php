@@ -7,6 +7,7 @@
 if ( ! defined( 'ABSPATH' ) ) exit;
 
 // Load the bootstrap class.
+require_once __DIR__ . '/class-email-branding.php';
 require_once __DIR__ . '/class-email-engine.php';
 require_once __DIR__ . '/class-email-cron.php';
 require_once __DIR__ . '/class-email-settings.php';

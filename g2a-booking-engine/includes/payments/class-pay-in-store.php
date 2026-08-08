@@ -16,12 +16,28 @@ final class G2AB_Gateway_Pay_In_Store {
 	/**
 	 * No external intent — just mark booking as 'reserved' and return a no-op response.
 	 *
+	 * STAFF ONLY: pay-at-store is a back-office workflow (front desk, phone,
+	 * POS). A public web checkout can never settle here — the checkout policy
+	 * rejects the gateway upstream, and this guard makes the invariant hold
+	 * even for a crafted call path.
+	 *
 	 * @param object $booking Booking row.
 	 * @param float  $amount  Amount.
-	 * @return array
+	 * @return array|WP_Error
 	 */
 	public function create_intent( $booking, $amount ) {
 		global $wpdb;
+
+		$staff_context = current_user_can( 'manage_g2ab_bookings' )
+			|| ( class_exists( 'G2AB_Booking_Visibility' )
+				&& in_array( sanitize_key( (string) ( $booking->source ?? '' ) ), G2AB_Booking_Visibility::staff_sources(), true ) );
+		if ( ! $staff_context ) {
+			return new WP_Error(
+				'g2ab_gateway_not_allowed',
+				__( 'Pay-at-store is available for staff-created bookings only.', 'g2a-booking' ),
+				array( 'status' => 403 )
+			);
+		}
 		$wpdb->update(
 			$wpdb->prefix . 'g2ab_bookings',
 			array( 'status' => 'reserved', 'updated_at' => current_time( 'mysql' ) ),

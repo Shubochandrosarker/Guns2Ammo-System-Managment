@@ -275,76 +275,6 @@ final class G2AB_Gateway_Stripe {
 			'redirect_url'    => esc_url_raw( (string) $json['url'] ),
 			'publishable_key' => $this->publishable_key(),
 		);
-
-		$amount_cents = (int) round( $amount * 100 );
-		$currency = strtolower( $booking->currency ?? 'usd' );
-		$success = add_query_arg( array( 'g2ab_paid' => $booking->uuid ), home_url( '/' ) );
-		$cancel  = add_query_arg( array( 'g2ab_cancel' => $booking->uuid ), home_url( '/' ) );
-
-		// The confirm-payment REST fallback refuses to act without the
-		// confirm_token issued at booking creation, so the return page must
-		// carry it. The customer already holds this token (it's in the
-		// create-booking response), so the URL adds no new exposure.
-		$meta = json_decode( (string) ( $booking->metadata ?? '' ), true );
-		if ( ! empty( $meta['confirm_token'] ) ) {
-			$success = add_query_arg( array( 'g2ab_token' => rawurlencode( (string) $meta['confirm_token'] ) ), $success );
-		}
-
-		$body = array(
-			'mode' => 'payment',
-			'payment_method_types[]' => 'card',
-			'success_url' => $success . '&session_id={CHECKOUT_SESSION_ID}',
-			'cancel_url'  => $cancel,
-			'customer_email' => $booking->customer_email,
-			'customer_creation' => 'always',
-			'phone_number_collection[enabled]' => 'true',
-			'client_reference_id' => $booking->uuid,
-			'line_items[0][quantity]' => 1,
-			'line_items[0][price_data][currency]' => $currency,
-			'line_items[0][price_data][unit_amount]' => $amount_cents,
-			'line_items[0][price_data][product_data][name]' => sprintf( '%s — %s', $booking->customer_name, mysql2date( 'M j, Y g:i A', $booking->start_at ) ),
-			'metadata[booking_id]' => (int) $booking->id,
-			'metadata[booking_uuid]' => $booking->uuid,
-		);
-
-		$resp = wp_remote_post( self::API_BASE . '/checkout/sessions', array(
-			'timeout' => 20,
-			'headers' => array(
-				'Authorization' => 'Bearer ' . $this->secret_key(),
-				'Content-Type'  => 'application/x-www-form-urlencoded',
-			),
-			'body' => $body,
-		) );
-
-		if ( is_wp_error( $resp ) ) return $resp;
-		$code = wp_remote_retrieve_response_code( $resp );
-		$json = json_decode( wp_remote_retrieve_body( $resp ), true );
-		if ( $code >= 400 || empty( $json['url'] ) ) {
-			return new WP_Error( 'stripe_create_failed', $json['error']['message'] ?? 'Stripe Checkout creation failed', array( 'status' => 502 ) );
-		}
-
-		// Track the pending payment intent.
-		global $wpdb;
-		$wpdb->insert( $wpdb->prefix . 'g2ab_payments', array(
-			'booking_id' => (int) $booking->id,
-			'gateway' => 'stripe',
-			'transaction_id' => $json['id'],
-			'amount' => (float) $amount,
-			'currency' => strtoupper( $currency ),
-			'status' => 'pending',
-			'payment_method' => 'card',
-			'gateway_response' => wp_json_encode( $json ),
-			'created_at' => current_time( 'mysql' ),
-		) );
-
-		do_action( 'g2ab_payment_intent_created', 'stripe', $booking->id, $amount, $json );
-
-		return array(
-			'gateway' => 'stripe',
-			'gateway_ref' => $json['id'],
-			'redirect_url' => $json['url'],
-			'publishable_key' => $this->publishable_key(),
-		);
 	}
 
 	/**
@@ -641,97 +571,6 @@ final class G2AB_Gateway_Stripe {
 		}
 
 		return array( 'handled' => true, 'booking_id' => (int) $booking->id, 'status' => 'paid' );
-
-		// Amount.
-		$amount_cents = (int) ( $session['amount_total'] ?? 0 );
-		$amount = $amount_cents / 100.0;
-		$currency = strtoupper( $session['currency'] ?? $booking->currency );
-
-		// Amount cross-check: refuse to flip status if reported amount doesn't match.
-		if ( function_exists( 'g2ab_validate_payment_amount' ) && ! g2ab_validate_payment_amount( $booking, $amount ) ) {
-			$wpdb->insert( $wpdb->prefix . 'g2ab_logs', array(
-				'booking_id' => (int) $booking->id,
-				'event_type' => 'payment_amount_mismatch',
-				'severity'   => 'warning',
-				'message'    => sprintf( 'Stripe amount mismatch: paid=%s expected=%s', number_format( $amount, 2 ), number_format( (float) $booking->total_amount, 2 ) ),
-				'context'    => wp_json_encode( array( 'session_id' => $session['id'] ?? '' ) ),
-				'created_at' => current_time( 'mysql' ),
-			) );
-			return array( 'handled' => false, 'reason' => 'amount_mismatch', 'paid' => $amount, 'expected' => (float) $booking->total_amount );
-		}
-
-		// Capture previous status so listeners get correct context.
-		$previous_status = (string) $booking->status;
-
-		$session_id         = isset( $session['id'] ) ? sanitize_text_field( (string) $session['id'] ) : '';
-		$payment_intent_id  = isset( $session['payment_intent'] ) ? sanitize_text_field( (string) $session['payment_intent'] ) : '';
-		$ledger_txn_id      = '' !== $payment_intent_id ? $payment_intent_id : $session_id;
-		$payment_metadata   = wp_json_encode( array(
-			'checkout_session_id' => $session_id,
-			'payment_intent_id'   => $payment_intent_id,
-		) );
-
-		$updated = $wpdb->update( $bt, array(
-			'status' => 'paid',
-			'paid_amount' => $amount,
-			'gateway_intent_id' => $payment_intent_id,
-			'updated_at' => current_time( 'mysql' ),
-		), array( 'id' => $booking->id ), array( '%s', '%f', '%s', '%s' ), array( '%d' ) );
-		if ( false === $updated ) {
-			return array( 'handled' => false, 'retryable' => true, 'reason' => 'booking_update_failed' );
-		}
-
-		// Update or insert payment row.
-		$pt = $wpdb->prefix . 'g2ab_payments';
-		$existing = $wpdb->get_var( $wpdb->prepare(
-			"SELECT id FROM {$pt} WHERE gateway = 'stripe' AND ( transaction_id = %s OR transaction_id = %s ) LIMIT 1",
-			$session_id,
-			$ledger_txn_id
-		) );
-		if ( $existing ) {
-			$wpdb->update( $pt, array(
-				'transaction_id' => $ledger_txn_id,
-				'status' => 'succeeded',
-				'amount' => $amount,
-				'gateway_response' => wp_json_encode( $session ),
-				'metadata' => $payment_metadata,
-				'processed_at' => current_time( 'mysql' ),
-			), array( 'id' => $existing ), array( '%s', '%s', '%f', '%s', '%s', '%s' ), array( '%d' ) );
-		} else {
-			g2ab_insert_or_update_payment( $pt, array(
-				'booking_id' => $booking->id,
-				'gateway' => 'stripe',
-				'transaction_id' => $ledger_txn_id,
-				'amount' => $amount,
-				'currency' => $currency,
-				'status' => 'succeeded',
-				'payment_method' => 'card',
-				'gateway_response' => wp_json_encode( $session ),
-				'metadata' => $payment_metadata,
-				'processed_at' => current_time( 'mysql' ),
-				'created_at' => current_time( 'mysql' ),
-			), array( '%d', '%s', '%s', '%f', '%s', '%s', '%s', '%s', '%s', '%s', '%s' ) );
-		}
-
-		// Audit log.
-		$wpdb->insert( $wpdb->prefix . 'g2ab_logs', array(
-			'booking_id' => $booking->id,
-			'event_type' => 'payment_succeeded',
-			'severity' => 'info',
-			'message' => sprintf( 'Stripe payment succeeded: $%s', number_format( $amount, 2 ) ),
-			'context' => wp_json_encode( array( 'session_id' => $session_id, 'payment_intent_id' => $payment_intent_id ) ),
-			'created_at' => current_time( 'mysql' ),
-		) );
-
-		if ( function_exists( 'g2ab_queue_booking_paid_side_effects' ) ) {
-			g2ab_queue_booking_paid_side_effects( $booking->id, 'stripe', $previous_status, $session );
-		} else {
-			do_action( 'g2ab_payment_succeeded', $booking->id, 'stripe', $session );
-			do_action( 'g2ab_booking_paid', $booking, array( 'gateway' => 'stripe', 'session_id' => $session_id, 'payment_intent' => $payment_intent_id ) );
-			do_action( 'g2ab_booking_status_changed', $booking->id, 'paid', $previous_status );
-		}
-
-		return array( 'handled' => true, 'booking_id' => $booking->id, 'status' => 'paid' );
 	}
 
 	private function mark_booking_refunded( $charge ) {
@@ -771,25 +610,23 @@ final class G2AB_Gateway_Stripe {
 		$this->add_payment_field( $update, $formats, $cols, 'updated_at', current_time( 'mysql' ), '%s' );
 		$wpdb->update( $pt, $update, array( 'id' => $payment->id ), $formats, array( '%d' ) );
 
-		$wpdb->update( $wpdb->prefix . 'g2ab_bookings', array(
-			'status' => $booking_status,
-			'updated_at' => current_time( 'mysql' ),
-		), array( 'id' => $payment->booking_id ), array( '%s', '%s' ), array( '%d' ) );
+		// The ledger row above IS the refund evidence, so the transition
+		// service's invariant passes; it also records previous status in the
+		// audit trail and fires status hooks with correct context.
+		if ( class_exists( 'G2AB_Booking_Transitions' ) ) {
+			G2AB_Booking_Transitions::transition( (int) $payment->booking_id, $booking_status, array(
+				'source'     => 'gateway',
+				'reason'     => 'stripe_charge_refunded',
+				'payment_id' => (int) $payment->id,
+			) );
+		} else {
+			$wpdb->update( $wpdb->prefix . 'g2ab_bookings', array(
+				'status' => $booking_status,
+				'updated_at' => current_time( 'mysql' ),
+			), array( 'id' => $payment->booking_id ), array( '%s', '%s' ), array( '%d' ) );
+		}
 
 		do_action( 'g2ab_payment_refunded', $payment->booking_id, $refund_amount, 'stripe', $charge );
 		return array( 'handled' => true, 'booking_id' => $payment->booking_id, 'status' => $booking_status, 'refund_amount' => $refund_amount );
-
-		$wpdb->update( $pt, array(
-			'status' => 'refunded',
-			'refund_amount' => $refund_amount,
-		), array( 'id' => $payment->id ), array( '%s', '%f' ), array( '%d' ) );
-
-		$wpdb->update( $wpdb->prefix . 'g2ab_bookings', array(
-			'status' => 'refunded',
-			'updated_at' => current_time( 'mysql' ),
-		), array( 'id' => $payment->booking_id ), array( '%s', '%s' ), array( '%d' ) );
-
-		do_action( 'g2ab_payment_refunded', $payment->booking_id, $refund_amount, 'stripe', $charge );
-		return array( 'handled' => true, 'booking_id' => $payment->booking_id, 'status' => 'refunded' );
 	}
 }

@@ -1,0 +1,63 @@
+name: CI
+
+# Monorepo equivalents of the standalone plugin repos' ci.yml jobs:
+# PHP syntax lint across the two synced plugin directories (the full-repo
+# lint lives in php.yml; the sync comparison lives in plugin-sync.yml).
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  php-lint:
+    name: PHP syntax lint ${{ matrix.plugin }} (${{ matrix.php-version }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        php-version: ['8.1', '8.3']
+        plugin: [g2a-booking-engine, memberistic-membership-solutions]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup PHP ${{ matrix.php-version }}
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ matrix.php-version }}
+          coverage: none
+
+      - name: php -l every file in ${{ matrix.plugin }}
+        run: find ${{ matrix.plugin }} -name '*.php' -not -path '*/vendor/*' -not -path '*/node_modules/*' -print0 | xargs -0 -n1 php -l
+
+  js-lint:
+    name: JS syntax check (both plugins)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: node --check every plugin asset script
+        run: |
+          set -e
+          found=0
+          while IFS= read -r -d '' f; do
+            found=1
+            echo "checking $f"
+            node --check "$f"
+          done < <(find g2a-booking-engine/assets memberistic-membership-solutions/assets -name '*.js' -not -path '*/node_modules/*' -print0 2>/dev/null)
+          if [ "$found" -eq 0 ]; then
+            echo "no JS files found — nothing to check"
+          fi

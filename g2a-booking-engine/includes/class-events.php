@@ -23,7 +23,10 @@ if ( ! defined( 'ABSPATH' ) ) {
 final class G2AB_Events {
 
 	/** Deprecated: use G2AB_Event_Capacity_Service for authoritative capacity. */
-	const ACTIVE_STATUSES = array( 'pending', 'reserved', 'confirmed', 'paid', 'completed' );
+	// Statuses that consume seats. Includes 'pending' on purpose: an unexpired
+	// checkout hold blocks inventory (the capacity service applies the hold
+	// window); partially_refunded attendees still hold their seats.
+	const ACTIVE_STATUSES = array( 'pending', 'reserved', 'confirmed', 'paid', 'completed', 'partially_refunded' );
 
 	public static function table() {
 		global $wpdb;

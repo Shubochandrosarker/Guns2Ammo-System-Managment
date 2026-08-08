@@ -349,12 +349,24 @@ final class G2AB_Admin_Bookings_List {
 							<input type="hidden" name="action" value="g2ab_change_status" />
 							<input type="hidden" name="booking_id" value="<?php echo (int) $b->id; ?>" />
 							<select name="status" class="g2ab-bk__select">
-								<?php foreach ( array( 'pending', 'reserved', 'confirmed', 'paid', 'completed', 'cancelled', 'no_show', 'refunded', 'expired' ) as $s ) : ?>
+								<?php foreach ( array_keys( G2AB_Booking_Statuses::all() ) as $s ) : ?>
 									<option value="<?php echo esc_attr( $s ); ?>" <?php selected( $b->status, $s ); ?>><?php echo esc_html( ucwords( str_replace( '_', ' ', $s ) ) ); ?></option>
 								<?php endforeach; ?>
 							</select>
+							<p class="g2ab-bk__muted" style="margin:8px 0 4px;"><?php esc_html_e( 'Reason (required for refunds and manual overrides):', 'g2a-booking' ); ?></p>
+							<input type="text" name="status_reason" class="g2ab-bk__select" placeholder="<?php esc_attr_e( 'Why is this status changing?', 'g2a-booking' ); ?>" />
+							<details style="margin:8px 0;">
+								<summary><?php esc_html_e( 'Record an offline refund (cash / terminal)', 'g2a-booking' ); ?></summary>
+								<p class="g2ab-bk__muted"><?php esc_html_e( 'Refunded status requires payment evidence: either the gateway already refunded, or you record the offline refund here.', 'g2a-booking' ); ?></p>
+								<input type="number" step="0.01" min="0" name="offline_refund_amount" placeholder="<?php esc_attr_e( 'Amount refunded', 'g2a-booking' ); ?>" />
+								<input type="text" name="offline_refund_method" placeholder="<?php esc_attr_e( 'Method (cash, terminal…)', 'g2a-booking' ); ?>" />
+								<input type="text" name="offline_refund_reference" placeholder="<?php esc_attr_e( 'Receipt / reference #', 'g2a-booking' ); ?>" />
+							</details>
 							<button class="g2ab-bk__btn g2ab-bk__btn--primary"><?php esc_html_e( 'Update status', 'g2a-booking' ); ?></button>
 						</form>
+						<?php if ( isset( $_GET['transition_error'] ) ) : // phpcs:ignore WordPress.Security.NonceVerification.Recommended ?>
+							<p class="g2ab-bk__muted" role="alert" style="color:#C62828;"><?php echo esc_html( sanitize_text_field( wp_unslash( $_GET['transition_error'] ) ) ); // phpcs:ignore WordPress.Security.NonceVerification.Recommended ?></p>
+						<?php endif; ?>
 						<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" class="g2ab-bk__deleteform" onsubmit="return confirm('<?php echo esc_js( __( 'Permanently delete this booking?', 'g2a-booking' ) ); ?>');">
 							<?php wp_nonce_field( 'g2ab_delete_booking_' . $b->id, '_g2ab_nonce' ); ?>
 							<input type="hidden" name="action" value="g2ab_delete_booking" />
@@ -390,24 +402,37 @@ final class G2AB_Admin_Bookings_List {
 		}
 		$id = (int) ( $_POST['booking_id'] ?? 0 );
 		check_admin_referer( 'g2ab_change_status_' . $id, '_g2ab_nonce' );
-		$status  = sanitize_key( wp_unslash( $_POST['status'] ?? '' ) );
-		$allowed = array( 'pending', 'reserved', 'confirmed', 'paid', 'completed', 'cancelled', 'no_show', 'refunded', 'expired' );
-		if ( ! in_array( $status, $allowed, true ) ) {
+		$status = sanitize_key( wp_unslash( $_POST['status'] ?? '' ) );
+		if ( ! G2AB_Booking_Statuses::is_valid( $status ) ) {
 			wp_die( esc_html__( 'Invalid status.', 'g2a-booking' ) );
 		}
-		global $wpdb;
-		$wpdb->update( $wpdb->prefix . 'g2ab_bookings', array( 'status' => $status, 'updated_at' => current_time( 'mysql' ) ), array( 'id' => $id ), array( '%s', '%s' ), array( '%d' ) );
-		$wpdb->insert( $wpdb->prefix . 'g2ab_logs', array(
-			'booking_id' => $id,
-			'user_id'    => get_current_user_id(),
-			'event_type' => 'status_changed',
-			'severity'   => 'info',
-			'message'    => sprintf( 'Status set to %s by admin', $status ),
-			'context'    => wp_json_encode( array() ),
-			'created_at' => current_time( 'mysql' ),
-		) );
-		do_action( 'g2ab_booking_status_changed', $id, $status );
-		wp_safe_redirect( add_query_arg( array( 'page' => self::PAGE_SLUG, 'view' => 'detail', 'booking_id' => $id, 'updated' => '1' ), admin_url( 'admin.php' ) ) );
+
+		$context = array(
+			'source'   => 'admin',
+			'actor_id' => get_current_user_id(),
+			'reason'   => sanitize_text_field( wp_unslash( $_POST['status_reason'] ?? '' ) ),
+		);
+		$offline_amount = round( (float) ( $_POST['offline_refund_amount'] ?? 0 ), 2 );
+		if ( $offline_amount > 0 ) {
+			$context['offline_refund'] = array(
+				'amount'    => $offline_amount,
+				'method'    => sanitize_key( wp_unslash( $_POST['offline_refund_method'] ?? '' ) ),
+				'reference' => sanitize_text_field( wp_unslash( $_POST['offline_refund_reference'] ?? '' ) ),
+			);
+		}
+
+		// All manual changes flow through the transition service: it enforces
+		// the allowed-transition map and the payment-evidence invariants
+		// (paid needs a ledger entry, refunded needs a real refund record).
+		$result = G2AB_Booking_Transitions::transition( $id, $status, $context );
+
+		$redirect_args = array( 'page' => self::PAGE_SLUG, 'view' => 'detail', 'booking_id' => $id );
+		if ( is_wp_error( $result ) ) {
+			$redirect_args['transition_error'] = rawurlencode( $result->get_error_message() );
+		} else {
+			$redirect_args['updated'] = '1';
+		}
+		wp_safe_redirect( add_query_arg( $redirect_args, admin_url( 'admin.php' ) ) );
 		exit;
 	}
 
@@ -456,12 +481,15 @@ final class G2AB_Admin_Bookings_List {
 		} elseif ( 'completed' === $tab ) {
 			$where .= " AND b.status = 'completed' ";
 		}
-		if ( class_exists( 'G2AB_Booking_Visibility' ) ) {
-			$where .= ' AND ' . G2AB_Booking_Visibility::operational_sql( 'b' ) . ' ';
-		}
+		// Default export = operational bookings (same policy as the roster).
+		// An EXPLICIT status filter overrides it so staff can deliberately
+		// export non-operational buckets (pending holds, cancelled, refunded)
+		// instead of silently receiving an empty CSV.
 		if ( $status ) {
 			$where  .= ' AND b.status = %s ';
 			$args[]  = $status;
+		} elseif ( class_exists( 'G2AB_Booking_Visibility' ) ) {
+			$where .= ' AND ' . G2AB_Booking_Visibility::operational_sql( 'b' ) . ' ';
 		}
 		if ( $search ) {
 			$where  .= ' AND (b.customer_name LIKE %s OR b.customer_email LIKE %s OR b.uuid LIKE %s) ';
@@ -584,6 +612,7 @@ final class G2AB_Admin_Bookings_List {
 .g2ab-bk__st-completed{background:rgba(21,101,192,.12);color:#1565C0;}
 .g2ab-bk__st-pending,.g2ab-bk__st-reserved{background:rgba(232,119,46,.14);color:#b45309;}
 .g2ab-bk__st-cancelled,.g2ab-bk__st-no_show,.g2ab-bk__st-refunded{background:rgba(198,40,40,.12);color:#c62828;}
+.g2ab-bk__st-partially_refunded{background:rgba(109,40,217,.12);color:#6D28D9;}
 .g2ab-bk__st-expired{background:#EEF1F6;color:var(--ink-soft);}
 .g2ab-bk__c-amt{text-align:right;font-weight:700;color:var(--ink);font-variant-numeric:tabular-nums;white-space:nowrap;}
 .g2ab-bk__c-act{width:40px;text-align:right;}

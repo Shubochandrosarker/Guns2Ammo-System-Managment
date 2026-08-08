@@ -242,20 +242,19 @@ final class G2AB_REST_Admin_Bookings_Controller {
 			'created_at' => $now_mysql,
 		) );
 
-		// Lifecycle hooks. Email automation listens to these; the controller
-		// honors the `send_email` flag by suppressing the hook when staff
-		// chose not to email the customer.
-		if ( $send_email ) {
-			do_action( 'g2ab_booking_created', $booking_id, array(
-				'uuid'        => $uuid,
-				'resource_id' => $resource_id,
-				'start_at'    => $start_sql,
-				'source'      => $source,
-			) );
-			if ( 'confirmed' === $status ) {
-				do_action( 'g2ab_booking_confirmed', $booking_id );
-				do_action( 'g2ab_booking_status_changed', $booking_id, 'confirmed', 'created' );
-			}
+		// Lifecycle hooks ALWAYS fire — downstream listeners (activity,
+		// integrations, classification) must never depend on the email toggle.
+		// Email listeners read send_email from the payload and skip sending.
+		do_action( 'g2ab_booking_created', $booking_id, array(
+			'uuid'        => $uuid,
+			'resource_id' => $resource_id,
+			'start_at'    => $start_sql,
+			'source'      => $source,
+			'send_email'  => (bool) $send_email,
+		) );
+		if ( 'confirmed' === $status ) {
+			do_action( 'g2ab_booking_confirmed', $booking_id, array( 'send_email' => (bool) $send_email ) );
+			do_action( 'g2ab_booking_status_changed', $booking_id, 'confirmed', 'created' );
 		}
 
 		return rest_ensure_response( array(

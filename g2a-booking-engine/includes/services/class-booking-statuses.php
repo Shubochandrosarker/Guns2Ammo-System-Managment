@@ -25,15 +25,16 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 final class G2AB_Booking_Statuses {
 
-	const PENDING   = 'pending';
-	const RESERVED  = 'reserved';
-	const CONFIRMED = 'confirmed';
-	const PAID      = 'paid';
-	const COMPLETED = 'completed';
-	const CANCELLED = 'cancelled';
-	const NO_SHOW   = 'no_show';
-	const REFUNDED  = 'refunded';
-	const EXPIRED   = 'expired';
+	const PENDING            = 'pending';
+	const RESERVED           = 'reserved';
+	const CONFIRMED          = 'confirmed';
+	const PAID               = 'paid';
+	const COMPLETED          = 'completed';
+	const CANCELLED          = 'cancelled';
+	const NO_SHOW            = 'no_show';
+	const REFUNDED           = 'refunded';
+	const PARTIALLY_REFUNDED = 'partially_refunded';
+	const EXPIRED            = 'expired';
 
 	/**
 	 * All statuses, including legacy values that still appear in pre-1.3.0 data.
@@ -42,23 +43,25 @@ final class G2AB_Booking_Statuses {
 	 */
 	public static function all() {
 		return array(
-			self::PENDING   => __( 'Pending',   'g2a-booking' ),
-			self::RESERVED  => __( 'Reserved',  'g2a-booking' ),
-			self::CONFIRMED => __( 'Confirmed', 'g2a-booking' ),
-			self::PAID      => __( 'Paid',      'g2a-booking' ),
-			self::COMPLETED => __( 'Completed', 'g2a-booking' ),
-			self::CANCELLED => __( 'Cancelled', 'g2a-booking' ),
-			self::NO_SHOW   => __( 'No Show',   'g2a-booking' ),
-			self::REFUNDED  => __( 'Refunded',  'g2a-booking' ),
-			self::EXPIRED   => __( 'Expired',   'g2a-booking' ),
+			self::PENDING            => __( 'Pending',   'g2a-booking' ),
+			self::RESERVED           => __( 'Reserved',  'g2a-booking' ),
+			self::CONFIRMED          => __( 'Confirmed', 'g2a-booking' ),
+			self::PAID               => __( 'Paid',      'g2a-booking' ),
+			self::COMPLETED          => __( 'Completed', 'g2a-booking' ),
+			self::CANCELLED          => __( 'Cancelled', 'g2a-booking' ),
+			self::NO_SHOW            => __( 'No Show',   'g2a-booking' ),
+			self::REFUNDED           => __( 'Refunded',  'g2a-booking' ),
+			self::PARTIALLY_REFUNDED => __( 'Partially Refunded', 'g2a-booking' ),
+			self::EXPIRED            => __( 'Expired',   'g2a-booking' ),
 		);
 	}
 
 	/**
 	 * Statuses that should still occupy a calendar slot (block the lane).
+	 * PARTIALLY_REFUNDED bookings are still attending — the seat stays taken.
 	 */
 	public static function blocking() {
-		return array( self::PENDING, self::RESERVED, self::CONFIRMED, self::PAID );
+		return array( self::PENDING, self::RESERVED, self::CONFIRMED, self::PAID, self::PARTIALLY_REFUNDED );
 	}
 
 	/**
@@ -94,15 +97,16 @@ final class G2AB_Booking_Statuses {
 	 */
 	public static function color( $status ) {
 		$map = array(
-			self::PENDING   => '#4B5563', // slate gray (was #9CA3AF — 2.54:1 with white text)
-			self::RESERVED  => '#B45309', // amber, darkened (was #F59E0B — 2.15:1 with white text)
-			self::CONFIRMED => '#2563EB', // blue, darkened (was #3B82F6 — 3.68:1 with white text)
-			self::PAID      => '#047857', // green, darkened (was #10B981 — 2.54:1 with white text)
-			self::COMPLETED => '#0F2044', // navy
-			self::CANCELLED => '#6B7280', // dark gray
-			self::NO_SHOW   => '#C62828', // red
-			self::REFUNDED  => '#7C3AED', // purple
-			self::EXPIRED   => '#92400E', // brown
+			self::PENDING            => '#4B5563', // slate gray (was #9CA3AF — 2.54:1 with white text)
+			self::RESERVED           => '#B45309', // amber, darkened (was #F59E0B — 2.15:1 with white text)
+			self::CONFIRMED          => '#2563EB', // blue, darkened (was #3B82F6 — 3.68:1 with white text)
+			self::PAID               => '#047857', // green, darkened (was #10B981 — 2.54:1 with white text)
+			self::COMPLETED          => '#0F2044', // navy
+			self::CANCELLED          => '#6B7280', // dark gray
+			self::NO_SHOW            => '#C62828', // red
+			self::REFUNDED           => '#7C3AED', // purple
+			self::PARTIALLY_REFUNDED => '#6D28D9', // deep purple — still attending, money partially returned
+			self::EXPIRED            => '#92400E', // brown
 		);
 		return $map[ (string) $status ] ?? '#6B7280';
 	}

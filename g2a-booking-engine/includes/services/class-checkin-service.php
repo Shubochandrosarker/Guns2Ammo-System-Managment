@@ -184,20 +184,34 @@ final class G2AB_Checkin_Service {
 			array( '%d', '%s', '%s', '%f', '%s', '%s', '%s', '%s', '%s', '%s', '%s' )
 		);
 
-		// If booking is now fully paid, advance status.
-		$total_due = (float) $booking->total_amount;
+		// If booking is now fully paid, advance status through the transition
+		// service — the ledger row inserted above IS the payment evidence its
+		// invariant checks, so a bare status flip without money is impossible.
+		$total_due  = (float) $booking->total_amount;
 		$new_status = $booking->status;
 		if ( $total_due > 0 && $new_paid >= $total_due && in_array( $booking->status, array( 'pending', 'reserved', 'confirmed' ), true ) ) {
-			$new_status = 'paid';
-			$wpdb->update(
-				$wpdb->prefix . 'g2ab_bookings',
-				array( 'status' => 'paid', 'updated_at' => $now ),
-				array( 'id' => (int) $booking_id ),
-				array( '%s', '%s' ),
-				array( '%d' )
-			);
-			do_action( 'g2ab_booking_status_changed', (int) $booking_id, 'paid', $booking->status );
-			do_action( 'g2ab_booking_paid', (int) $booking_id, array( 'amount' => $amount, 'method' => $method ) );
+			$transition = class_exists( 'G2AB_Booking_Transitions' )
+				? G2AB_Booking_Transitions::transition( (int) $booking_id, 'paid', array(
+					'source'      => 'frontdesk',
+					'actor_id'    => (int) $user_id,
+					'reason'      => 'desk_payment_' . $method,
+					'paid_amount' => $new_paid,
+				) )
+				: null;
+			if ( null === $transition || ! is_wp_error( $transition ) ) {
+				$new_status = 'paid';
+				if ( null === $transition ) {
+					$wpdb->update(
+						$wpdb->prefix . 'g2ab_bookings',
+						array( 'status' => 'paid', 'updated_at' => $now ),
+						array( 'id' => (int) $booking_id ),
+						array( '%s', '%s' ),
+						array( '%d' )
+					);
+					do_action( 'g2ab_booking_status_changed', (int) $booking_id, 'paid', $booking->status );
+				}
+				do_action( 'g2ab_booking_paid', (int) $booking_id, array( 'amount' => $amount, 'method' => $method ) );
+			}
 		}
 
 		if ( class_exists( 'G2AB_Booking_Activity' ) ) {
