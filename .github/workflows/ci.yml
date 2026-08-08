@@ -17,6 +17,20 @@ permissions:
   contents: read
 
 jobs:
+  no-pmpro:
+    name: No Paid Memberships Pro dependency (whole repo)
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+
+      # Scans EVERY plugin, theme, POS adapter and admin bundle in the repo —
+      # not just the two synced plugin dirs. Memberistic is the single
+      # membership authority; runtime PMPro symbols fail unconditionally, and
+      # mentions are only tolerated in documented migration tooling and docs.
+      - name: bin/check-no-pmpro.sh
+        run: bash bin/check-no-pmpro.sh
+
   php-lint:
     name: PHP syntax lint ${{ matrix.plugin }} (${{ matrix.php-version }})
     runs-on: ubuntu-latest

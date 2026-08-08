@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Guns2Ammo Waiver Manager
  * Plugin URI: https://wordpressistic.com/
- * Description: Guns2Ammo Waiver Manager is a custom-built WordPress plugin that automates the waiver and user management process for the Guns2Ammo site. It integrates tightly with ApproveMe WP E-Signature and Paid Memberships Pro (PMPro) to manage both membership and kiosk walk-in users, ensuring that waiver forms are signed, users are registered, and access is controlled — all hands-free.
+ * Description: RETIRED — superseded by Memberistic's built-in waiver system. This plugin is kept for archival reference only and registers no runtime behaviour; it self-disables after showing a retirement notice. Deactivate and delete it.
  * Version: 1.5.1
  * Author: Wordpressistic
  * Author URI: https://wordpressistic.com/
@@ -17,16 +17,26 @@ define( 'G2A_WAIVER_VERSION', '1.5.1' );
 // === RETIRED: superseded by Memberistic's built-in waiver system === //
 // Memberistic >= 1.17 covers everything this plugin did — e-sign (member,
 // guest, and station-token kiosk modes), minors, generated PDFs, versioned
-// waiver text, expiry + renewal reminders — without ApproveMe or PMPro.
-// This plugin is kept in the repo only for archival reference.
+// waiver text, expiry + renewal reminders — without ApproveMe or any
+// third-party membership plugin.
+//
+// The plugin now HARD-STOPS below: it shows the retirement notice and then
+// returns, so none of the legacy integration hooks are ever registered even
+// if the plugin is left active on a site. Everything after the `return` is
+// dead code kept purely for archival reference — do not re-enable it. The
+// legacy membership-checkout redirect and the third-party dependency notice
+// were removed outright, since Memberistic owns both flows now.
 add_action( 'admin_notices', function () {
 	if ( ! current_user_can( 'activate_plugins' ) ) {
 		return;
 	}
-	echo '<div class="notice notice-warning"><p><strong>Guns2Ammo Waiver Manager is retired.</strong> '
+	echo '<div class="notice notice-warning"><p><strong>Guns2Ammo Waiver Manager is retired and inactive.</strong> '
 		. 'Waivers now run on Memberistic (Memberistic &rarr; Waivers: e-sign, kiosk stations, minors, PDFs, versioning, renewal reminders). '
-		. 'This plugin no longer needs to be active &mdash; please deactivate and delete it.</p></div>';
+		. 'This plugin registers no functionality &mdash; please deactivate and delete it.</p></div>';
 } );
+
+// Nothing below this line runs. See the note above.
+return;
 
 // === CREATE CUSTOM "kiosk" ROLE ON PLUGIN ACTIVATION === //
 register_activation_hook(__FILE__, function () {
@@ -45,36 +55,6 @@ function guns2ammo_waiver_kiosk_doc_id() {
     $doc_id = (int) get_option( 'g2a_waiver_kiosk_document_id', 28 );
     return (int) apply_filters( 'g2a_waiver_kiosk_document_id', $doc_id );
 }
-
-// === WARN WHEN INTEGRATION PLUGINS ARE MISSING === //
-add_action('admin_notices', function () {
-    if ( ! current_user_can( 'manage_options' ) ) {
-        return;
-    }
-    $missing = [];
-    if ( ! function_exists( 'pmpro_getMembershipLevelForUser' ) && ! defined( 'PMPRO_VERSION' ) ) {
-        $missing[] = 'Paid Memberships Pro';
-    }
-    if ( ! class_exists( 'WP_E_Sig' ) && ! defined( 'ESIG_PLUGIN_PATH' ) ) {
-        $missing[] = 'ApproveMe WP E-Signature';
-    }
-    if ( $missing ) {
-        echo '<div class="notice notice-warning"><p><strong>Guns2Ammo Waiver Manager:</strong> '
-            . esc_html( implode( ' and ', $missing ) )
-            . ' not detected — the related waiver automation is inactive until it is activated.</p></div>';
-    }
-});
-
-// === REDIRECT PMPro MEMBERS TO MEMBERSHIP WAIVER === //
-function pmpro_redirect_to_waiver_after_checkout($user_id) {
-    $user = get_user_by('ID', $user_id);
-    if (!$user) return;
-    // Site-relative (works on staging/domain moves), filterable, safe redirect.
-    $url = apply_filters( 'g2a_waiver_after_checkout_url', home_url( '/membership-waiver-agreement/' ) );
-    wp_safe_redirect( $url );
-    exit;
-}
-add_action('pmpro_after_checkout', 'pmpro_redirect_to_waiver_after_checkout');
 
 // === STORE WAIVER SIGN DATE FROM APPROVEME SIGNING EVENTS === //
 // The signed-document event is the trustworthy source for ALL documents

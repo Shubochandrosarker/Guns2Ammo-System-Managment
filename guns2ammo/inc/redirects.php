@@ -72,7 +72,7 @@ function g2a_redirects_handle() {
 		exit;
 	}
 
-	// Pattern matches — e.g. /membership-checkout/?pmpro_level=N to /memberships/
+	// Pattern matches — e.g. legacy /membership-checkout/ to /memberships/
 	foreach ( g2a_redirect_patterns() as $rule ) {
 		if ( preg_match( $rule['pattern'], $path ) ) {
 			wp_safe_redirect( home_url( $rule['to'] ), 301 );
@@ -86,7 +86,7 @@ function g2a_redirects_handle() {
  *   /church-security-training-mesa-packages/ → existing /church-security-training-packages/
  *   /get-support/                            → existing /contact/
  *   /faqs/                                   → new FAQs page (this drop)
- *   /membership-checkout/                    → /memberships/ (legacy PMPro)
+ *   /membership-checkout/                    → /memberships/ (legacy)
  *   /machine-gun-packages/, /machine-gun-rentals/  → /machine-gun/
  *   /firearms-transfer-service/              → /transfers/
  *   /price-and-fees/                         → /pricing/
@@ -154,12 +154,12 @@ function g2a_redirect_map() {
  */
 function g2a_redirect_patterns() {
 	return apply_filters( 'g2a_redirect_patterns', array(
-		// Legacy PMPro level checkout (/membership-checkout/?pmpro_level=N).
+		// Legacy membership checkout URL from the previous membership plugin.
 		array(
 			'pattern' => '#^/membership-checkout/?#i',
 			'to'      => '/memberships/',
 		),
-		// Legacy PMPro account/billing URLs found in renewal and card-update emails.
+		// Legacy account/billing URLs found in old renewal and card-update emails.
 		array(
 			'pattern' => '#^/membership-(account|billing|invoice|cancel|confirmation)/?#i',
 			'to'      => '/account/',
@@ -177,18 +177,15 @@ function g2a_redirect_patterns() {
 }
 
 
-/**
- * Legacy PMPro email guard.
+/*
+ * NOTE: this file used to register filters against the legacy membership
+ * plugin's expiration-warning emails, to stop its cron sending stale notices
+ * during the migration window. Those filters are gone: Memberistic is now the
+ * only membership system, that plugin is no longer installed, and a theme
+ * carrying live hooks for it kept a runtime dependency alive that the system
+ * is not supposed to have.
  *
- * The site now uses Memberistic for customer memberships. If Paid
- * Memberships Pro (or its Extra Expiration Warning Emails add-on) remains
- * installed during migration, its cron can still send stale expiration notices
- * containing PMPro checkout/billing URLs. Keep the old URLs redirected above,
- * and suppress PMPro expiration-warning email jobs so only Memberistic owns
- * customer renewal messaging.
+ * The legacy URL redirects above are deliberately KEPT — they are pure SEO /
+ * inbox cleanup for links already out in the wild (old renewal and
+ * card-update emails), and they resolve to Memberistic pages.
  */
-add_filter( 'pmpro_send_expiration_warning_email', '__return_false' );
-add_filter( 'pmproeewe_email_frequency_and_templates', 'g2a_disable_pmpro_extra_expiration_warning_emails', 99 );
-function g2a_disable_pmpro_extra_expiration_warning_emails( $templates ) {
-	return array();
-}
