@@ -2,6 +2,17 @@
 
 All notable changes are tracked here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## 1.20.0 - Single membership authority (2026-08-08)
+
+### Added
+- **`Membership_Service`** (`includes/class-membership-service.php`) — the public façade every other plugin calls for membership state. Exposes `get_user_membership_status()`, `user_has_active_plan()`, `get_user_plan()`, `is_guest_user()`, `can_book_lane()`, `requires_payment_for_booking()`, `assign_plan_after_payment()`, `assign_plan_manually()` and `remove_plan()`. Lane-entitlement rules are delegated to `Integrations\Entitlement_Service`, never restated, so there is exactly one rulebook.
+- Global helpers for cross-plugin use: `memberistic_get_membership_status()`, `memberistic_user_has_active_membership()`, `memberistic_can_user_book()`, `memberistic_booking_requires_payment()`, `memberistic_is_guest_user()`.
+- Plan-assignment guard rails: `assign_plan_after_payment()` refuses without `payment_verified` **and** an order/transaction reference; `assign_plan_manually()` requires the management capability **and** a non-empty reason. Both write an activity entry and an audit-log row. `remove_plan()` expires the membership while preserving all history (bookings, payments, waivers, QR).
+- docs/PMPRO-REMOVAL.md (in the booking engine) documents the removal, the replacement architecture, the assignment rules and the migration path.
+
+### Changed
+- Paid Memberships Pro is no longer referenced by any runtime code path anywhere in the system. The only remaining mentions are the **CSV importer** — one-way migration of a legacy PMPro member base into Memberistic — plus two explanatory comments. This is enforced in CI by `PmproRemovalTest`, which carries an explicit allowlist and fails if an allow-listed file stops mentioning PMPro.
+
 ## 1.19.0 - Lane entitlement policy, Guest Pass cleanup (2026-08-08)
 
 ### Changed

@@ -35,6 +35,7 @@ final class Plugin {
 			'includes/utilities/class-verification.php',
 			'includes/class-capabilities.php',
 			'includes/class-roles.php',
+			'includes/class-membership-service.php',
 			'includes/class-content-restrictions.php',
 			'includes/class-account-provisioner.php',
 			'includes/class-scheduler.php',

@@ -951,19 +951,22 @@ final class G2AB_Frontend {
 		return '<div class="g2ab g2ab-error"><p>' . esc_html( $msg ) . '</p></div>';
 	}
 
+	/**
+	 * Members-only display gate.
+	 *
+	 * Memberistic is the only membership authority. The former
+	 * `memberistic_active_plan_id` user-meta fallback is gone: that meta is
+	 * written on activation but never cleared on expiry or cancellation, so it
+	 * kept lapsed members inside members-only surfaces. With Memberistic
+	 * unavailable this fails closed for everyone but staff.
+	 */
 	private function current_user_is_member() {
 		$user_id = get_current_user_id();
 		$allowed = false;
 		if ( $user_id ) {
-			if ( function_exists( 'pmpro_hasMembershipLevel' ) ) {
-				$allowed = (bool) pmpro_hasMembershipLevel( null, $user_id );
-			} elseif ( function_exists( 'memberistic_user_has_active_membership' ) ) {
-				$allowed = (bool) memberistic_user_has_active_membership( $user_id );
-			} elseif ( get_user_meta( $user_id, 'memberistic_active_plan_id', true ) ) {
-				$allowed = true;
-			} else {
-				$allowed = current_user_can( 'manage_g2ab_bookings' );
-			}
+			$allowed = function_exists( 'memberistic_user_has_active_membership' )
+				? (bool) memberistic_user_has_active_membership( $user_id )
+				: current_user_can( 'manage_g2ab_bookings' );
 		}
 		return (bool) apply_filters( 'g2ab_user_is_member', $allowed, $user_id, (object) array( 'members_only' => 1 ), '' );
 	}

@@ -82,6 +82,11 @@ final class G2AB_Activator {
 			// exists only for staff-created bookings and is never a public
 			// default; the retired event pay-in-store fallback option is gone.
 			'g2ab_payment_gateway_default'  => 'stripe',
+			// Non-member payment policy — safe defaults. Require online
+			// payment; never offer public front-desk settlement unless an
+			// admin explicitly turns both of these around.
+			'g2ab_require_nonmember_payment'  => 1,
+			'g2ab_allow_nonmember_front_desk' => 0,
 			'g2ab_stripe_enabled'           => 0,
 			'g2ab_stripe_test_mode'         => 1,
 			'g2ab_stripe_publishable_key'   => '',

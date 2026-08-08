@@ -22,7 +22,7 @@ It's the plugin you install when you want to run a real business on WordPress, n
 - **6 built-in payment gateways.** Pay-In-Store, Stripe, PayPal, Fortis Pay, Authorize.net, plus a WooCommerce Bridge that exposes every active WC gateway.
 - **Lifecycle email automation.** Branded HTML templates for every event, 20+ merge tags, 5-minute reminder cron with dedupe.
 - **PDF invoices.** Signed-token download URLs, auto-generated on payment success, auto-attached to the paid email.
-- **Membership rules.** Paid Memberships Pro and Memberistic modules — detect the logged-in level, apply per-level percent discounts, gate members-only booking types.
+- **Membership rules.** Memberistic is the single membership authority — detects the logged-in member's live plan, applies per-plan percent discounts, gate members-only booking types.
 - **Front-desk terminal.** Today's roster, instant search, check-in, waiver verification, on-the-spot payment collection, printable receipts.
 - **FullCalendar admin view.** Drag to reschedule, color-coded by status, filter by lane / category / status.
 - **Customer reschedule + cancel.** Signed-token protected, configurable min-lead window.
@@ -48,7 +48,7 @@ A full operator's manual ships with the plugin at `docs/USER-GUIDE.md` (Markdown
 | PHP | 8.0 |
 | MySQL / MariaDB | 5.7 / 10.3 |
 
-Optional integrations: WooCommerce 7.0+, Paid Memberships Pro 2.9+, Memberistic 1.0+.
+Optional integrations: WooCommerce 7.0+. Membership features require Memberistic 1.20+ (the only supported membership plugin).
 
 ## Repository layout
 
@@ -81,7 +81,6 @@ Each module under `includes/modules/<slug>/` is self-contained — it ships a `m
 | `email-automation` | On | Free | Lifecycle-event emails, reminders, branded templates |
 | `pdf-invoices` | On | Pro | Signed-token PDF invoices, auto-generated on payment |
 | `migration` | On | Free | Amelia / Bookly / BookingPress / CSV importer with rollback |
-| `pmpro-memberships` | On | Free | PMPro level detection, member-only, discount rules |
 | `memberistic` | Off | Free | Memberistic plan integration |
 | `verifyistic` | Off | Free | Waiver / e-signature integration hooks |
 | `woocommerce-bridge` | Off | Pro | Route bookings through WooCommerce checkout, bidirectional sync |

@@ -104,7 +104,7 @@ final class G2AB_Booking_Visibility {
 	 * @return string[]
 	 */
 	public static function diagnostic_statuses() {
-		return array( 'pending', 'expired', 'cancelled' );
+		return array( 'pending', 'payment_failed', 'expired', 'cancelled' );
 	}
 
 	/**

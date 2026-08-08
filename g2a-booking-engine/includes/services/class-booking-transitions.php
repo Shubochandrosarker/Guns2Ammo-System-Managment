@@ -37,7 +37,10 @@ final class G2AB_Booking_Transitions {
 	 */
 	public static function allowed() {
 		$map = array(
-			'pending'            => array( 'paid', 'confirmed', 'cancelled', 'expired' ),
+			'pending'            => array( 'paid', 'confirmed', 'cancelled', 'expired', 'payment_failed' ),
+			// A declined payment is recoverable: the customer may retry through
+			// the resume-payment flow, which re-checks inventory first.
+			'payment_failed'     => array( 'pending', 'paid', 'cancelled', 'expired' ),
 			'reserved'           => array( 'paid', 'confirmed', 'completed', 'cancelled', 'expired', 'no_show' ),
 			'confirmed'          => array( 'completed', 'cancelled', 'no_show', 'paid', 'refunded' ),
 			'paid'               => array( 'completed', 'cancelled', 'no_show', 'refunded', 'partially_refunded' ),
