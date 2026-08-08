@@ -28,6 +28,18 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 final class Email_Service {
 	/**
+	 * Plain-text AltBody for the message currently being dispatched —
+	 * attached via phpmailer_init so branded HTML mail goes out
+	 * multipart/alternative with the original plain-text template body.
+	 *
+	 * @var string
+	 */
+	private static $alt_body = '';
+
+	/** @var bool */
+	private static $mail_hooks_registered = false;
+
+	/**
 	 * Registered transactional templates exposed to the admin UI.
 	 *
 	 * @return array<int, array<string, string>>
@@ -183,13 +195,22 @@ final class Email_Service {
 
 		// Branded HTML mode (default on): wrap the rendered plain-text body
 		// in the shared 600px shell. Plain-text sending stays fully intact
-		// when the email_html_enabled setting is switched off.
+		// when the email_html_enabled setting is switched off, and HTML
+		// sends carry the original plain-text body as a multipart
+		// alternative (see phpmailer_init hook below).
 		$html_mode = self::html_enabled();
 		$body      = $html_mode
-			? self::wrap_html( $message['body'], $message['subject'], $context )
+			? self::wrap_html( $message['body'], $message['subject'], $context, $template )
 			: $message['body'];
 
+		if ( $html_mode ) {
+			self::register_mail_hooks();
+			self::$alt_body = (string) $message['body'];
+		}
+
 		$sent = wp_mail( $recipient, $message['subject'], $body, self::headers( $html_mode ) );
+
+		self::$alt_body = '';
 
 		Email_Logs_Repository::log(
 			array(
@@ -251,6 +272,20 @@ final class Email_Service {
 		$current_user = wp_get_current_user();
 		$staff_name   = $current_user && $current_user->exists() ? $current_user->display_name : '';
 
+		// {payment_link}: members on a Stripe subscription must land on the
+		// Stripe billing-portal handler (update card / retry the failed
+		// charge), built exactly the way the account dashboard builds it via
+		// Stripe_Service::billing_portal_action_url(). Only members with NO
+		// Stripe subscription/customer fall back to the generic renewal page.
+		$payment_link = $renewal_url;
+		$stripe_sub   = trim( (string) ( $membership['stripe_subscription_id'] ?? '' ) );
+		$stripe_cust  = trim( (string) ( $membership['stripe_customer_id'] ?? '' ) );
+		if ( ( '' !== $stripe_sub || '' !== $stripe_cust )
+			&& class_exists( '\WordPressistic\Memberistic\Payments\Stripe_Service' )
+			&& \WordPressistic\Memberistic\Payments\Stripe_Service::is_enabled() ) {
+			$payment_link = \WordPressistic\Memberistic\Payments\Stripe_Service::billing_portal_action_url();
+		}
+
 		// Tokenised self-serve waiver link for this member (no login needed).
 		// Falls back to the account page if the person has no WP user yet.
 		$waiver_url = '';
@@ -267,10 +302,15 @@ final class Email_Service {
 			'{renewal_date}'       => ! empty( $membership['renewal_date'] ) ? date_i18n( get_option( 'date_format' ), strtotime( $membership['renewal_date'] ) ) : __( 'Not set', 'memberistic' ),
 			'{expiration_date}'    => ! empty( $membership['end_date'] ) ? date_i18n( get_option( 'date_format' ), strtotime( $membership['end_date'] ) ) : ( ! empty( $membership['renewal_date'] ) ? date_i18n( get_option( 'date_format' ), strtotime( $membership['renewal_date'] ) ) : __( 'Not set', 'memberistic' ) ),
 			'{amount}'             => isset( $extra_context['amount'] ) ? (string) $extra_context['amount'] : '',
+			// Actual transaction amount (partial/deposit charges included) —
+			// receipts must show what was charged, never the full plan value.
+			'{paid_amount}'        => isset( $extra_context['paid_amount'] )
+				? (string) $extra_context['paid_amount']
+				: ( isset( $extra_context['amount'] ) ? (string) $extra_context['amount'] : '' ),
 			'{transaction_id}'     => isset( $extra_context['transaction_id'] ) ? (string) $extra_context['transaction_id'] : '',
 			'{payment_date}'       => isset( $extra_context['payment_date'] ) ? (string) $extra_context['payment_date'] : date_i18n( get_option( 'date_format' ) ),
 			'{payment_method}'     => isset( $extra_context['payment_method'] ) ? (string) $extra_context['payment_method'] : __( 'Card on file', 'memberistic' ),
-			'{payment_link}'       => $renewal_url,
+			'{payment_link}'       => $payment_link,
 			'{renewal_link}'       => $renewal_url,
 			'{account_url}'        => $account_url,
 			'{booking_url}'        => $booking_url,
@@ -337,7 +377,7 @@ final class Email_Service {
 			),
 			'payment_receipt'      => array(
 				'subject' => __( 'Your {brand_label} payment receipt', 'memberistic' ),
-				'body'    => __( "Hi {member_name},\n\nThis confirms a payment was processed for your {plan_name} membership ({membership_id}).\n\nAmount: {amount}\nDate: {payment_date}\nPayment method: {payment_method}\nReference: {transaction_id}\n\nNext renewal: {renewal_date}\n\nKeep this email for your records. View your full billing history any time: {account_url}\n\nThanks for being a member.\n\n{brand_label}\n{business_phone}", 'memberistic' ),
+				'body'    => __( "Hi {member_name},\n\nThis confirms a payment was processed for your {plan_name} membership ({membership_id}).\n\nAmount paid: {paid_amount}\nDate: {payment_date}\nPayment method: {payment_method}\nReference: {transaction_id}\n\nNext renewal: {renewal_date}\n\nKeep this email for your records. View your full billing history any time: {account_url}\n\nThanks for being a member.\n\n{brand_label}\n{business_phone}", 'memberistic' ),
 			),
 			'renewal_reminder'     => array(
 				'subject' => __( 'Your {brand_label} membership renewal is coming up', 'memberistic' ),
@@ -419,28 +459,109 @@ final class Email_Service {
 	}
 
 	/**
+	 * Bulletproof, image-free CTA button — mirrors the booking engine's
+	 * G2AB_Email_Branding::button() so membership + booking emails read as
+	 * one system. Table-based (Outlook-safe); 14px vertical padding + 16px
+	 * line height keeps the touch target at 44px minimum. Primary is solid
+	 * orange (#E8802F) with near-black text; secondary is a brass outline.
+	 *
+	 * @param string $url   Destination URL.
+	 * @param string $label Button label (plain text — escaped here).
+	 * @param string $style 'primary' or 'secondary'.
+	 */
+	public static function button( $url, $label, $style = 'primary' ) {
+		$href = esc_url( (string) $url );
+		if ( '' === $href ) {
+			return '';
+		}
+
+		if ( 'secondary' === $style ) {
+			$td_style = 'border-radius:6px;border:2px solid #C9A84C;background:transparent;';
+			$a_style  = 'display:inline-block;padding:12px 30px;font-family:Arial,Helvetica,sans-serif;font-size:15px;line-height:16px;font-weight:bold;color:#7A621F;text-decoration:none;border-radius:6px;';
+			$bgcolor  = '';
+		} else {
+			$td_style = 'border-radius:6px;background:#E8802F;';
+			$a_style  = 'display:inline-block;padding:14px 32px;font-family:Arial,Helvetica,sans-serif;font-size:15px;line-height:16px;font-weight:bold;color:#1A1408;text-decoration:none;border-radius:6px;';
+			$bgcolor  = ' bgcolor="#E8802F"';
+		}
+
+		return '<table role="presentation" border="0" cellspacing="0" cellpadding="0" style="margin:20px 0 8px;">'
+			. '<tr><td align="center"' . $bgcolor . ' style="' . $td_style . '">'
+			. '<a href="' . $href . '" style="' . $a_style . '">' . esc_html( $label ) . '</a>'
+			. '</td></tr></table>';
+	}
+
+	/**
+	 * Per-template primary CTA appended below the body copy so members get
+	 * a real button instead of a bare link for the message's main action.
+	 *
+	 * @param string $template Template id.
+	 * @param array  $context  Rendered merge-tag context.
+	 * @return string Button HTML fragment ('' when no CTA applies).
+	 */
+	private static function primary_cta( $template, $context ) {
+		$map = array(
+			'payment_failed'       => array( '{payment_link}', __( 'Update payment method', 'memberistic' ) ),
+			'renewal_reminder'     => array( '{renewal_link}', __( 'Renew membership', 'memberistic' ) ),
+			'expiring_7_days'      => array( '{renewal_link}', __( 'Renew membership', 'memberistic' ) ),
+			'expiring_tomorrow'    => array( '{renewal_link}', __( 'Renew membership', 'memberistic' ) ),
+			'membership_expired'   => array( '{renewal_link}', __( 'Renew membership', 'memberistic' ) ),
+			'expiring_30_days'     => array( '{account_url}', __( 'Manage membership', 'memberistic' ) ),
+			'payment_receipt'      => array( '{account_url}', __( 'View billing history', 'memberistic' ) ),
+			'membership_renewed'   => array( '{account_url}', __( 'View your account', 'memberistic' ) ),
+			'membership_created'   => array( '{account_url}', __( 'View your account', 'memberistic' ) ),
+			'membership_activated' => array( '{account_url}', __( 'View your account', 'memberistic' ) ),
+			'linked_member_added'  => array( '{account_url}', __( 'View linked members', 'memberistic' ) ),
+			'waiver_missing'       => array( '{waiver_url}', __( 'Sign your waiver', 'memberistic' ) ),
+			'waiver_renewal'       => array( '{waiver_url}', __( 'Re-sign your waiver', 'memberistic' ) ),
+		);
+
+		$map = apply_filters( 'memberistic_email_primary_cta', $map, $template, $context );
+
+		if ( empty( $map[ $template ] ) || ! is_array( $map[ $template ] ) ) {
+			return '';
+		}
+
+		list( $tag, $label ) = $map[ $template ];
+		$url = isset( $context[ $tag ] ) ? trim( (string) $context[ $tag ] ) : '';
+		if ( '' === $url ) {
+			return '';
+		}
+
+		return self::button( $url, $label, 'primary' );
+	}
+
+	/**
 	 * Wrap a rendered plain-text email body in the branded HTML shell.
 	 *
-	 * Bulletproof 600px table layout, fully inlined styles: dark header
-	 * band with the logo, brass top border + accent divider, white content
-	 * card, footer with the business name / phone. The plain-text body is
-	 * escaped, URLs linkified, and newlines converted so existing template
-	 * copy (and admin overrides) keep working untouched.
+	 * Mirrors the booking engine's shared shell (G2AB_Email_Branding) so
+	 * booking + membership emails look like one system: bulletproof 600px
+	 * table layout, fully inlined styles, dark #0F1115 header band with the
+	 * logo (brass wordmark fallback), brass top border + accent divider,
+	 * light #F4F1EA content card on an #EDEAE2 page, brass/orange CTA
+	 * button, footer with the business name / address / phone. The
+	 * plain-text body is escaped, URLs linkified, and newlines converted so
+	 * existing template copy (and admin overrides) keep working untouched.
 	 *
-	 * @param string $body    Rendered plain-text body (merge tags applied).
-	 * @param string $subject Rendered subject (used for the <title>).
-	 * @param array  $context Rendered merge-tag context.
+	 * @param string $body     Rendered plain-text body (merge tags applied).
+	 * @param string $subject  Rendered subject (used for the <title>).
+	 * @param array  $context  Rendered merge-tag context.
+	 * @param string $template Template id (drives the primary CTA button).
 	 */
-	private static function wrap_html( $body, $subject, $context ) {
-		$dark  = '#1A191E';
+	private static function wrap_html( $body, $subject, $context, $template = '' ) {
+		$dark  = '#0F1115';
 		$brass = '#C9A84C';
+		$page  = '#EDEAE2';
+		$card  = '#F4F1EA';
+		$text  = '#26241F';
+		$muted = '#6F6A5E';
 
 		$brand = (string) ( $context['{brand_label}'] ?? memberistic_get_brand_label() );
 		$logo  = self::logo_url( $context );
 
 		$header = $logo
-			? '<img src="' . esc_url( $logo ) . '" alt="' . esc_attr( $brand ) . '" width="220" style="display:block;width:220px;max-width:100%;height:auto;border:0;margin:0 auto;">'
-			: '<strong style="color:#ffffff;font-family:Impact,Arial,sans-serif;font-size:26px;letter-spacing:.08em;text-transform:uppercase;">' . esc_html( $brand ) . '</strong>';
+			? '<img src="' . esc_url( $logo ) . '" alt="' . esc_attr( $brand ) . '" width="200" style="display:block;width:200px;max-width:100%;height:auto;border:0;margin:0 auto;">'
+			: '<strong style="color:' . $brass . ';font-family:Arial,Helvetica,sans-serif;font-size:24px;letter-spacing:.06em;text-transform:uppercase;">' . esc_html( $brand ) . '</strong>';
 
 		// Escape → linkify → preserve line breaks. make_clickable() turns the
 		// bare URLs used throughout the plain-text templates into real links.
@@ -450,9 +571,14 @@ final class Email_Service {
 		}
 		$content = nl2br( $content );
 
+		$content .= self::primary_cta( $template, $context );
+
 		$footer_bits = array();
 		if ( ! empty( $context['{business_name}'] ) ) {
 			$footer_bits[] = esc_html( (string) $context['{business_name}'] );
+		}
+		if ( ! empty( $context['{business_address}'] ) ) {
+			$footer_bits[] = esc_html( preg_replace( '/\s+/', ' ', (string) $context['{business_address}'] ) );
 		}
 		if ( ! empty( $context['{business_phone}'] ) ) {
 			$footer_bits[] = esc_html( (string) $context['{business_phone}'] );
@@ -461,21 +587,31 @@ final class Email_Service {
 			$footer_bits[] = esc_html( $brand );
 		}
 
-		$footer = '<p style="margin:0 0 6px;font-size:12px;line-height:1.6;color:#8A8894;">' . implode( ' &middot; ', $footer_bits ) . '</p>'
-			. '<p style="margin:0;font-size:12px;color:#8A8894;">&copy; ' . esc_html( gmdate( 'Y' ) ) . ' ' . esc_html( $brand ) . '</p>';
+		$footer = '<p style="margin:0 0 6px;font-size:12px;line-height:1.6;color:' . $muted . ';">' . implode( ' &middot; ', $footer_bits ) . '</p>'
+			. '<p style="margin:0;font-size:11px;color:' . $muted . ';">&copy; ' . esc_html( gmdate( 'Y' ) ) . ' ' . esc_html( $brand ) . '. ' . esc_html__( 'All rights reserved.', 'memberistic' ) . '</p>';
+
+		$note = sprintf(
+			/* translators: %s: brand label */
+			esc_html__( 'You are receiving this message about your %s membership. Questions? Reply to this email or contact us directly.', 'memberistic' ),
+			esc_html( $brand )
+		);
 
 		$html = '<!doctype html><html lang="en"><head><meta charset="UTF-8">'
 			. '<meta name="viewport" content="width=device-width,initial-scale=1">'
 			. '<meta http-equiv="X-UA-Compatible" content="IE=edge">'
+			. '<meta name="color-scheme" content="light">'
 			. '<title>' . esc_html( $subject ) . '</title></head>'
-			. '<body style="margin:0;padding:0;background:#F4F3F0;font-family:Arial,Helvetica,sans-serif;color:' . $dark . ';-webkit-text-size-adjust:100%;">'
-			. '<table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background:#F4F3F0;">'
+			. '<body style="margin:0;padding:0;background:' . $page . ';font-family:Arial,Helvetica,sans-serif;font-size:15px;line-height:1.6;color:' . $text . ';-webkit-text-size-adjust:100%;">'
+			. '<table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background:' . $page . ';">'
 			. '<tr><td align="center" style="padding:32px 16px;">'
-			. '<table role="presentation" width="600" cellspacing="0" cellpadding="0" border="0" style="background:#ffffff;max-width:600px;width:100%;border-collapse:collapse;border-top:4px solid ' . $brass . ';">'
-			. '<tr><td align="center" bgcolor="' . $dark . '" style="background:' . $dark . ';padding:28px 32px;">' . $header . '</td></tr>'
+			. '<table role="presentation" width="600" cellspacing="0" cellpadding="0" border="0" style="background:' . $card . ';max-width:600px;width:100%;border-collapse:collapse;border-top:4px solid ' . $brass . ';">'
+			. '<tr><td align="center" bgcolor="' . $dark . '" style="background:' . $dark . ';padding:26px 32px;">' . $header . '</td></tr>'
 			. '<tr><td style="font-size:0;line-height:0;height:3px;background:' . $brass . ';">&nbsp;</td></tr>'
-			. '<tr><td style="padding:32px;font-size:15px;line-height:1.7;color:' . $dark . ';">' . $content . '</td></tr>'
-			. '<tr><td style="background:#F4F3F0;padding:22px 32px;border-top:1px solid #E4E2DC;" align="center">' . $footer . '</td></tr>'
+			. '<tr><td style="padding:32px;font-family:Arial,Helvetica,sans-serif;font-size:15px;line-height:1.6;color:' . $text . ';">' . $content . '</td></tr>'
+			. '<tr><td style="background:#E9E5DB;padding:22px 32px;border-top:1px solid #DDD8CC;" align="center">' . $footer . '</td></tr>'
+			. '</table>'
+			. '<table role="presentation" width="600" cellspacing="0" cellpadding="0" border="0" style="max-width:600px;width:100%;">'
+			. '<tr><td align="center" style="padding:16px 12px 0;font-family:Arial,Helvetica,sans-serif;font-size:11px;line-height:1.6;color:' . $muted . ';">' . $note . '</td></tr>'
 			. '</table>'
 			. '</td></tr></table></body></html>';
 
@@ -487,6 +623,30 @@ final class Email_Service {
 		 * @param array  $context Rendered merge-tag context.
 		 */
 		return apply_filters( 'memberistic_email_html_body', $html, $subject, $context );
+	}
+
+	/**
+	 * Register the phpmailer_init hook once so branded HTML sends carry a
+	 * text/plain alternative (the original rendered template body).
+	 */
+	private static function register_mail_hooks() {
+		if ( self::$mail_hooks_registered ) {
+			return;
+		}
+		self::$mail_hooks_registered = true;
+		add_action( 'phpmailer_init', array( self::class, 'inject_alt_body' ) );
+	}
+
+	/**
+	 * phpmailer_init callback — attach the plain-text AltBody for the
+	 * message currently being dispatched.
+	 *
+	 * @param \PHPMailer\PHPMailer\PHPMailer $phpmailer Mailer instance.
+	 */
+	public static function inject_alt_body( $phpmailer ) {
+		if ( '' !== self::$alt_body && empty( $phpmailer->AltBody ) ) {
+			$phpmailer->AltBody = self::$alt_body;
+		}
 	}
 
 	/**

@@ -391,6 +391,10 @@ final class G2AB_Admin_Dashboard {
 		} elseif ( 'class' === $scope ) {
 			$where = "b.event_id IS NOT NULL AND e.category = 'ccw-class'";
 		}
+		// Same visibility policy as the KPIs above it: recent activity shows
+		// operational bookings only; failed/abandoned checkouts live on the
+		// Checkout Attempts screen.
+		$where .= ' AND ' . G2AB_Booking_Visibility::operational_sql( 'b' );
 		return $wpdb->get_results( $wpdb->prepare(
 			"SELECT b.id, b.customer_name, b.status, b.paid_amount, b.created_at, b.event_id,
 			        e.title AS event_title, e.category AS event_category, r.name AS resource_name

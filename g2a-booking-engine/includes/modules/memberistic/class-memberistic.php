@@ -115,8 +115,13 @@ final class G2AB_Module_Memberistic {
 	}
 
 	/**
-	 * Plan ids that the given user holds. Memberistic stores one active plan id in user meta;
-	 * we also check a "plans" multi-meta for sites that allow multiple plans per user.
+	 * Plan ids from the user's LIVE membership state.
+	 *
+	 * User meta (memberistic_active_plan_id / memberistic_plans) is written on
+	 * activation but never cleared on expiry or cancellation, so it must never
+	 * decide member status — an expired member would keep member pricing
+	 * forever. Resolve from the memberships table instead: only memberships in
+	 * an eligible live status count, and an expired renewal date disqualifies.
 	 */
 	public function get_user_plan_ids( $user_id ) {
 		$user_id = (int) $user_id;
@@ -124,21 +129,55 @@ final class G2AB_Module_Memberistic {
 
 		$ids = array();
 
-		// Primary: memberistic_active_plan_id (single).
-		$single = (int) get_user_meta( $user_id, 'memberistic_active_plan_id', true );
-		if ( $single > 0 ) $ids[] = $single;
+		if ( class_exists( '\\WordPressistic\\Memberistic\\Database\\Memberships_Repository' ) ) {
+			try {
+				$membership = \WordPressistic\Memberistic\Database\Memberships_Repository::get_by_user_id( $user_id );
+				if ( is_array( $membership ) && $this->membership_row_is_live( $membership ) ) {
+					$ids[] = (int) ( $membership['plan_id'] ?? 0 );
+				}
+			} catch ( \Throwable $e ) {
+				// fall through to the table path below.
+			}
+		}
 
-		// Secondary: memberistic_plans (multi).
-		$multi = get_user_meta( $user_id, 'memberistic_plans', true );
-		if ( is_array( $multi ) ) {
-			foreach ( $multi as $pid ) {
-				$pid = (int) $pid;
-				if ( $pid > 0 ) $ids[] = $pid;
+		if ( empty( $ids ) ) {
+			global $wpdb;
+			$table  = $wpdb->prefix . 'memberistic_memberships';
+			$exists = $wpdb->get_var( $wpdb->prepare( 'SHOW TABLES LIKE %s', $table ) );
+			if ( $exists === $table ) {
+				$rows = $wpdb->get_results( $wpdb->prepare(
+					"SELECT plan_id, status, renewal_date FROM {$table} WHERE primary_user_id = %d AND status IN ('active','comped')",
+					$user_id
+				), ARRAY_A );
+				foreach ( (array) $rows as $row ) {
+					if ( $this->membership_row_is_live( $row ) ) {
+						$ids[] = (int) $row['plan_id'];
+					}
+				}
 			}
 		}
 
 		$ids = array_values( array_unique( array_filter( $ids ) ) );
 		return apply_filters( 'g2ab_memberistic_user_plan_ids', $ids, $user_id );
+	}
+
+	/**
+	 * Live-status check for a membership row: eligible status and a renewal
+	 * date that has not passed (empty/zero = non-expiring).
+	 *
+	 * @param array $membership Membership row.
+	 * @return bool
+	 */
+	private function membership_row_is_live( array $membership ) {
+		if ( ! in_array( sanitize_key( (string) ( $membership['status'] ?? '' ) ), array( 'active', 'comped' ), true ) ) {
+			return false;
+		}
+		$renewal = (string) ( $membership['renewal_date'] ?? '' );
+		if ( '' === $renewal || 0 === strpos( $renewal, '0000-00-00' ) ) {
+			return true;
+		}
+		$end_of_day = strtotime( substr( $renewal, 0, 10 ) . ' 23:59:59' );
+		return ! $end_of_day || $end_of_day >= time();
 	}
 
 	/**

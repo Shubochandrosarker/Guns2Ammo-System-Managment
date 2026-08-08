@@ -1627,6 +1627,10 @@ final class Stripe_Service {
 				'payment_receipt',
 				array(
 					'amount'         => \WordPressistic\Memberistic\memberistic_format_price( $amount_paid, $currency ),
+					// Actual transaction amount — the receipt template renders
+					// {paid_amount} so partial/deposit charges never show the
+					// full plan value.
+					'paid_amount'    => \WordPressistic\Memberistic\memberistic_format_price( $amount_paid, $currency ),
 					'transaction_id' => $txn,
 					'payment_date'   => date_i18n( get_option( 'date_format' ) ),
 					'payment_method' => __( 'Card on file (Stripe)', 'memberistic' ),
@@ -1785,6 +1789,10 @@ final class Stripe_Service {
 				'payment_receipt',
 				array(
 					'amount'         => \WordPressistic\Memberistic\memberistic_format_price( $amount_total, $currency ),
+					// Actual transaction amount — the receipt template renders
+					// {paid_amount} so partial/deposit charges never show the
+					// full plan value.
+					'paid_amount'    => \WordPressistic\Memberistic\memberistic_format_price( $amount_total, $currency ),
 					'transaction_id' => $txn,
 					'payment_date'   => date_i18n( get_option( 'date_format' ) ),
 					'payment_method' => __( 'Card on file (Stripe)', 'memberistic' ),

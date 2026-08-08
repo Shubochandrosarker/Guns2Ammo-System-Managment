@@ -364,18 +364,31 @@ final class G2AB_Gateway_Fortis {
 
 		$refund_amount = isset( $tx['transaction_amount'] ) ? ( (int) $tx['transaction_amount'] ) / 100.0 : (float) $booking->paid_amount;
 
-		$wpdb->update( $bt, array( 'status' => 'refunded', 'updated_at' => current_time( 'mysql' ) ), array( 'id' => $booking->id ), array( '%s', '%s' ), array( '%d' ) );
+		// Partial-aware: a partial refund keeps the booking attending
+		// (partially_refunded); only a refund covering the full paid amount
+		// releases it to refunded. Ledger first so the transition invariant
+		// sees the refund evidence.
+		$is_full         = $refund_amount >= round( (float) $booking->paid_amount, 2 ) - 0.01 || (float) $booking->paid_amount <= 0;
+		$payment_status  = $is_full ? 'refunded' : 'partial_refund';
+		$booking_status  = $is_full ? 'refunded' : 'partially_refunded';
 
-		// Keep the payments ledger in sync — mirrors Stripe/PayPal's refund handling
-		// so revenue/reconciliation reports built off g2ab_payments don't overstate
-		// revenue for Fortis-paid bookings that were later refunded.
 		$pt = $wpdb->prefix . 'g2ab_payments';
 		$payment = $wpdb->get_row( $wpdb->prepare( "SELECT id FROM {$pt} WHERE booking_id = %d AND gateway = 'fortis' ORDER BY id DESC LIMIT 1", $booking->id ) );
 		if ( $payment ) {
 			$wpdb->update( $pt, array(
-				'status'        => 'refunded',
+				'status'        => $payment_status,
 				'refund_amount' => $refund_amount,
 			), array( 'id' => $payment->id ), array( '%s', '%f' ), array( '%d' ) );
+		}
+
+		if ( class_exists( 'G2AB_Booking_Transitions' ) ) {
+			G2AB_Booking_Transitions::transition( (int) $booking->id, $booking_status, array(
+				'source'     => 'gateway',
+				'reason'     => 'fortis_refund_webhook',
+				'payment_id' => $payment ? (int) $payment->id : 0,
+			) );
+		} else {
+			$wpdb->update( $bt, array( 'status' => $booking_status, 'updated_at' => current_time( 'mysql' ) ), array( 'id' => $booking->id ), array( '%s', '%s' ), array( '%d' ) );
 		}
 
 		$wpdb->insert( $wpdb->prefix . 'g2ab_logs', array(
@@ -385,8 +398,8 @@ final class G2AB_Gateway_Fortis {
 			'created_at' => current_time( 'mysql' ),
 		) );
 
-		do_action( 'g2ab_payment_refunded', $booking->id, $refund_amount );
-		return array( 'handled' => true, 'booking_id' => $booking->id, 'status' => 'refunded' );
+		do_action( 'g2ab_payment_refunded', $booking->id, $refund_amount, 'fortis', $tx );
+		return array( 'handled' => true, 'booking_id' => $booking->id, 'status' => $booking_status );
 	}
 
 	private function first_name( $full ) { $p = preg_split( '/\s+/', trim( (string) $full ) ); return $p[0] ?? ''; }

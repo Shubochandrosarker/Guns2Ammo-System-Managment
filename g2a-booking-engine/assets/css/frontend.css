@@ -24,6 +24,10 @@
 	--g2ab-radius-pill: 999px;
 	--g2ab-shadow:     0 30px 80px rgba(0,0,0,0.45);
 	--g2ab-font:       var(--font-body);
+	/* Status colors — centralised so no state style hardcodes a hex inline. */
+	--g2ab-danger:     #FF5577;
+	--g2ab-success:    #3DBE7B;
+	--g2ab-warn:       #E8A13C;
 
 	font-family: var(--g2ab-font);
 	color: var(--g2ab-text);
@@ -369,6 +373,7 @@
 	display: flex;
 	align-items: center;
 	justify-content: flex-end;
+	flex-wrap: wrap; /* survives 320px viewports and 200% zoom */
 	gap: 12px;
 	margin-top: auto;
 	padding-top: 12px;
@@ -458,8 +463,8 @@
 }
 
 .g2ab-form__error {
-	background: color-mix(in srgb, #FF5577 18%, var(--g2ab-surface2));
-	border: 1px solid color-mix(in srgb, #FF5577 50%, transparent);
+	background: color-mix(in srgb, var(--g2ab-danger) 18%, var(--g2ab-surface2));
+	border: 1px solid color-mix(in srgb, var(--g2ab-danger) 50%, transparent);
 	/* Text uses the normal (theme-flipping) ink token instead of a fixed
 	   light pink — the pink read fine on the dark surface it was designed
 	   against (~7.6:1) but on the light-mode surface the 18%-tinted bg is
@@ -471,6 +476,117 @@
 	padding: 10px 14px;
 	border-radius: calc(var(--g2ab-radius) - 6px);
 	font-size: 13px;
+}
+
+/* Checkout-hold / progress status region (role="status", aria-live). */
+.g2ab-form__status {
+	background: color-mix(in srgb, var(--g2ab-warn) 16%, var(--g2ab-surface2));
+	border: 1px solid color-mix(in srgb, var(--g2ab-warn) 45%, transparent);
+	color: var(--g2ab-text);
+	padding: 10px 14px;
+	border-radius: calc(var(--g2ab-radius) - 6px);
+	font-size: 13px;
+}
+
+/* Client-side validation marks the offending control. */
+.g2ab-input[aria-invalid="true"],
+.g2ab-form select.g2ab-input[aria-invalid="true"] {
+	border-color: var(--g2ab-danger);
+	box-shadow: 0 0 0 3px color-mix(in srgb, var(--g2ab-danger) 20%, transparent);
+}
+
+/* Neutral "log in to use your benefit" prompt — no member/email matching. */
+.g2ab-login-note {
+	margin: 0;
+	padding: 10px 14px;
+	background: var(--g2ab-surface2);
+	border: 1px dashed var(--g2ab-border);
+	border-radius: calc(var(--g2ab-radius) - 6px);
+	color: var(--g2ab-muted);
+	font-size: 13px;
+}
+.g2ab-login-note a {
+	color: var(--g2ab-primary);
+	font-weight: 600;
+	text-decoration: underline;
+}
+.g2ab-login-note__hint {
+	display: block;
+	margin-top: 2px;
+	font-size: 12px;
+}
+
+/* "Included with your membership" panel (aside). */
+.g2ab-included {
+	display: flex;
+	align-items: flex-start;
+	gap: 10px;
+	margin-top: 18px;
+	padding: 12px 14px;
+	background: color-mix(in srgb, var(--g2ab-success) 12%, var(--g2ab-surface2));
+	border: 1px solid color-mix(in srgb, var(--g2ab-success) 40%, transparent);
+	border-radius: calc(var(--g2ab-radius) - 6px);
+}
+.g2ab-included__mark {
+	color: var(--g2ab-success);
+	font-weight: 700;
+	flex-shrink: 0;
+	margin-top: 1px;
+}
+.g2ab-included__title {
+	margin: 0;
+	font-size: 13px;
+	font-weight: 600;
+	color: var(--g2ab-text);
+}
+.g2ab-included__due {
+	margin: 2px 0 0;
+	font-size: 12px;
+	color: var(--g2ab-muted);
+}
+
+/* Order summary (unit × qty, discount, total) — re-rendered by JS on
+   party-size changes. */
+.g2ab-order {
+	background: var(--g2ab-surface2);
+	border: 1px solid var(--g2ab-border);
+	border-radius: calc(var(--g2ab-radius) - 6px);
+	padding: 12px 14px;
+}
+.g2ab-order__title {
+	margin: 0 0 6px;
+	font-size: 11px;
+	font-weight: 700;
+	text-transform: uppercase;
+	letter-spacing: .08em;
+	color: var(--g2ab-muted);
+}
+.g2ab-order__row {
+	display: flex;
+	align-items: baseline;
+	justify-content: space-between;
+	gap: 12px;
+	padding: 4px 0;
+	font-size: 13px;
+	color: color-mix(in srgb, var(--g2ab-text) 92%, transparent);
+}
+.g2ab-order__row--discount {
+	color: var(--g2ab-success);
+}
+.g2ab-order__row--total {
+	border-top: 1px solid var(--g2ab-border);
+	margin-top: 4px;
+	padding-top: 8px;
+	font-weight: 700;
+	color: var(--g2ab-text);
+}
+.g2ab-order__amount {
+	font-weight: 700;
+}
+.g2ab-order__note {
+	margin: 8px 0 0;
+	font-size: 12px;
+	color: var(--g2ab-muted);
 }
 
 .g2ab-muted {
@@ -584,3 +700,112 @@
 	margin: 0 auto;
 }
 .g2ab-error p { margin: 0; color: var(--g2ab-muted, var(--color-silver)); }
+
+/* ===== Payment-return notice ============================================= */
+/* Rendered by frontend.js on ?g2ab_paid / ?g2ab_cancel returns. Lives
+   outside the widget wrapper, so it scopes its own design tokens (kept in
+   line with the dark/brass/ember brand). */
+.g2ab-return-notice {
+	--g2ab-n-surface: #26252C;
+	--g2ab-n-text:    #F7F7F9;
+	--g2ab-n-muted:   #A7A6AE;
+	--g2ab-n-border:  rgba(255, 255, 255, 0.14);
+	--g2ab-n-success: #C9A84C;
+	--g2ab-n-danger:  #FF5577;
+	--g2ab-n-accent:  #E8802F;
+
+	position: fixed;
+	top: 24px;
+	left: 50%;
+	transform: translateX(-50%);
+	z-index: 99999;
+	max-width: 480px;
+	width: calc(100% - 32px);
+	background: var(--g2ab-n-surface);
+	color: var(--g2ab-n-text);
+	border: 1px solid var(--g2ab-n-border);
+	border-radius: 14px;
+	padding: 18px 40px 18px 22px;
+	box-shadow: 0 20px 60px rgba(0, 0, 0, 0.4);
+	font-family: "Inter", "Segoe UI", sans-serif;
+	font-size: 14px;
+	line-height: 1.5;
+	transition: opacity .4s ease;
+}
+.g2ab-return-notice--success { border-color: var(--g2ab-n-success); }
+.g2ab-return-notice--error   { border-color: var(--g2ab-n-danger); }
+.g2ab-return-notice--info    { border-color: var(--g2ab-n-accent); }
+.g2ab-return-notice__title { display: block; }
+.g2ab-return-notice__body {
+	margin: 6px 0 0;
+	color: var(--g2ab-n-muted);
+}
+.g2ab-return-notice__code {
+	margin: 8px 0 0;
+	color: var(--g2ab-n-muted);
+}
+.g2ab-return-notice__code code {
+	background: rgba(255, 255, 255, 0.1);
+	padding: 2px 6px;
+	border-radius: 4px;
+	font-size: 12px;
+	color: var(--g2ab-n-text);
+}
+.g2ab-return-notice__actions {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 8px;
+	margin-top: 12px;
+}
+.g2ab-return-notice__btn {
+	appearance: none;
+	border: 0;
+	cursor: pointer;
+	background: var(--g2ab-n-accent);
+	color: #111;
+	font: inherit;
+	font-size: 13px;
+	font-weight: 700;
+	padding: 8px 16px;
+	border-radius: 8px;
+}
+.g2ab-return-notice__btn:hover { filter: brightness(1.08); }
+.g2ab-return-notice__close {
+	position: absolute;
+	top: 8px;
+	right: 8px;
+	appearance: none;
+	border: 0;
+	background: transparent;
+	color: var(--g2ab-n-muted);
+	font-size: 20px;
+	line-height: 1;
+	cursor: pointer;
+	padding: 4px 8px;
+}
+.g2ab-return-notice__close:hover { color: var(--g2ab-n-text); }
+
+/* ===== Small screens / high zoom ========================================= */
+/* 320px-wide viewports and 200% zoom must not overflow: no fixed widths,
+   wrapping footers, tighter paddings. */
+@media (max-width: 420px) {
+	.g2ab-booking { padding: 14px; border-radius: 12px; }
+	.g2ab-stage { min-height: 0; padding: 16px 14px; }
+	.g2ab-card { padding: 16px 14px; }
+	.g2ab-stage__summary { margin-right: 0; flex-basis: 100%; }
+	.g2ab-stage__foot .g2ab-btn { flex: 1 1 auto; }
+	.g2ab-slots { max-height: 260px; }
+	.g2ab-return-notice { top: 8px; left: 8px; right: 8px; transform: none; width: auto; }
+}
+
+/* ===== Reduced motion ==================================================== */
+/* Belt-and-braces on top of the targeted rules above: no animation or
+   transition anywhere in the widget when the visitor asked for less motion. */
+@media (prefers-reduced-motion: reduce) {
+	.g2ab-booking *,
+	.g2ab-return-notice,
+	.g2ab-return-notice * {
+		animation: none !important;
+		transition: none !important;
+	}
+}

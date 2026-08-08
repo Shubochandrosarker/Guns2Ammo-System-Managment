@@ -268,17 +268,22 @@ final class G2AB_Admin_Reports {
 			? G2AB_Booking_Visibility::operational_sql( 'b' )
 			: "( b.status IN ('confirmed','paid','completed') OR ( b.status = 'reserved' AND b.payment_mode = 'in_store' ) )";
 
+		// One pass over operational-OR-terminal rows: the cancelled/no-show/
+		// refunded columns can only be non-zero if those statuses are actually
+		// selected, while revenue columns still count operational rows only —
+		// pending/expired checkout holds never appear in either.
 		$rows = $wpdb->get_results( $wpdb->prepare(
 			"SELECT DATE_FORMAT(b.start_at, '%%Y-%%m') AS ym,
-			        COUNT(*) AS bookings,
-			        SUM(CASE WHEN b.status IN ('confirmed','paid','completed') THEN 1 ELSE 0 END) AS confirmed,
+			        SUM(CASE WHEN {$operational} THEN 1 ELSE 0 END) AS bookings,
+			        SUM(CASE WHEN b.status IN ('confirmed','paid','completed','partially_refunded') THEN 1 ELSE 0 END) AS confirmed,
 			        SUM(CASE WHEN b.status = 'cancelled' THEN 1 ELSE 0 END) AS cancelled,
 			        SUM(CASE WHEN b.status = 'no_show'   THEN 1 ELSE 0 END) AS no_show,
 			        SUM(CASE WHEN b.status = 'refunded'  THEN 1 ELSE 0 END) AS refunded,
-			        COALESCE(SUM(b.total_amount), 0) AS gross_revenue,
-			        COALESCE(SUM(b.paid_amount),  0) AS paid_revenue
+			        COALESCE(SUM(CASE WHEN {$operational} THEN b.total_amount ELSE 0 END), 0) AS gross_revenue,
+			        COALESCE(SUM(CASE WHEN {$operational} THEN b.paid_amount  ELSE 0 END), 0) AS paid_revenue
 			 FROM {$bt} b
-			 WHERE b.start_at BETWEEN %s AND %s AND {$operational}
+			 WHERE b.start_at BETWEEN %s AND %s
+			   AND ( {$operational} OR b.status IN ('cancelled','no_show','refunded') )
 			 GROUP BY ym
 			 ORDER BY ym ASC",
 			$from . ' 00:00:00', $to . ' 23:59:59'

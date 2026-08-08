@@ -124,6 +124,7 @@ final class G2AB_Plugin
 				if (class_exists('G2AB_Admin_Shortcodes'))         G2AB_Admin_Shortcodes::instance();
 				if (class_exists('G2AB_Admin_Range_Status'))       G2AB_Admin_Range_Status::instance();
 				if (class_exists('G2AB_Admin_Shooters'))           G2AB_Admin_Shooters::instance();
+				if (class_exists('G2AB_Admin_Range_Guests'))       G2AB_Admin_Range_Guests::instance();
 			}
 
 			if (! is_admin() && class_exists('G2AB_Frontend')) {
@@ -139,6 +140,12 @@ final class G2AB_Plugin
 
 			if (class_exists('G2AB_Gateway_Manager')) G2AB_Gateway_Manager::instance();
 			if (class_exists('G2AB_Seo')) G2AB_Seo::instance();
+			// Range Guest classification: paid non-member customers become a
+			// stable "range_guest" segment (user meta), never a membership.
+			if (class_exists('G2AB_Range_Guest_Service')) G2AB_Range_Guest_Service::register();
+			// Signed, purpose-bound action links used by email CTAs
+			// (?g2ab_action=pay|view|cancel|reschedule&g2ab_at=<token>).
+			if (class_exists('G2AB_Email_Actions')) G2AB_Email_Actions::register();
 
 			add_action('g2ab_payment_succeeded', array($this, 'mark_booking_customer_role'), 10, 1);
 			add_action('g2ab_booking_status_changed', array($this, 'maybe_mark_booking_customer_role_from_status'), 10, 2);

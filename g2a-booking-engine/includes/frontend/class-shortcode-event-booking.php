@@ -37,6 +37,44 @@ final class G2AB_Frontend_Shortcode_Event_Booking {
 	}
 
 	/**
+	 * Format an amount in the SITE currency (never a hardcoded '$').
+	 */
+	private function format_price( $amount ) {
+		if ( function_exists( 'g2ab_format_currency' ) ) {
+			return g2ab_format_currency( (float) $amount );
+		}
+		return '$' . number_format( (float) $amount, 2 );
+	}
+
+	/**
+	 * Currency prefix for client-side price rendering, derived from the same
+	 * map g2ab_format_currency() uses so PHP and JS agree.
+	 */
+	private function currency_prefix() {
+		if ( function_exists( 'g2ab_format_currency' ) ) {
+			$prefix = str_replace( number_format_i18n( 0, 2 ), '', g2ab_format_currency( 0 ) );
+			if ( '' !== $prefix ) {
+				return $prefix;
+			}
+		}
+		return '$';
+	}
+
+	/**
+	 * URL to return to after logging in — the page embedding this widget.
+	 */
+	private function current_page_url() {
+		if ( is_singular() ) {
+			$permalink = get_permalink();
+			if ( $permalink ) {
+				return $permalink;
+			}
+		}
+		$request_uri = isset( $_SERVER['REQUEST_URI'] ) ? sanitize_text_field( wp_unslash( $_SERVER['REQUEST_URI'] ) ) : '/';
+		return home_url( $request_uri );
+	}
+
+	/**
 	 * @param array $atts event (id|slug to preselect), theme, heading.
 	 */
 	public function render( $atts = array() ) {
@@ -96,17 +134,28 @@ final class G2AB_Frontend_Shortcode_Event_Booking {
 			'instance'   => $instance_id,
 			'preselect'  => $preselect ? (int) $preselect->id : 0,
 			'events'     => $events_payload,
+			'currency_prefix' => $this->currency_prefix(),
 			'i18n'       => array(
 				'loading'    => __( 'Loading dates…', 'g2a-booking' ),
 				'no_dates'   => __( 'No upcoming dates for this event.', 'g2a-booking' ),
 				'sold_out'   => __( 'Sold out', 'g2a-booking' ),
 				'left'       => __( 'left', 'g2a-booking' ),
+				'free'       => __( 'Free', 'g2a-booking' ),
 				'pick_event' => __( 'Choose an event to see dates.', 'g2a-booking' ),
 				'pick_date'  => __( 'Pick a date above to continue.', 'g2a-booking' ),
 				'submitting' => __( 'Reserving…', 'g2a-booking' ),
 				'failed'     => __( 'Could not complete your reservation. Please try again.', 'g2a-booking' ),
 				'waiver_req' => __( 'Please accept the waiver to continue.', 'g2a-booking' ),
 				'not_enough_seats' => __( 'Not enough seats left for this date. Please reduce the number of seats or pick another date.', 'g2a-booking' ),
+				'confirm_reservation' => __( 'Confirm reservation', 'g2a-booking' ),
+				/* translators: %s formatted total amount */
+				'pay_seat'        => __( 'Reserve seat — Pay %s', 'g2a-booking' ),
+				'invalid_email'   => __( 'Please enter a valid email address.', 'g2a-booking' ),
+				'required_fields' => __( 'Please fill in the highlighted required fields.', 'g2a-booking' ),
+				'checkout_hold'   => __( 'Checkout hold — payment required. Your seats are held for a short time while you complete secure checkout.', 'g2a-booking' ),
+				'redirecting'     => __( 'Redirecting to secure checkout…', 'g2a-booking' ),
+				'hold_note'       => __( 'Your seats are not confirmed until payment is completed.', 'g2a-booking' ),
+				'total_due'       => __( 'Total due today', 'g2a-booking' ),
 			),
 		);
 
@@ -139,7 +188,7 @@ final class G2AB_Frontend_Shortcode_Event_Booking {
 						$free  = ( (int) $preselect->is_free === 1 || (float) $preselect->price <= 0 );
 						?>
 						<div class="g2ab-evb__facts">
-							<span class="g2ab-evb__fact"><b><?php echo $free ? esc_html__( 'FREE', 'g2a-booking' ) : '$' . esc_html( number_format( (float) $preselect->price, 2 ) ); ?></b><small><?php esc_html_e( 'per seat', 'g2a-booking' ); ?></small></span>
+							<span class="g2ab-evb__fact"><b><?php echo $free ? esc_html__( 'FREE', 'g2a-booking' ) : esc_html( $this->format_price( (float) $preselect->price ) ); ?></b><small><?php esc_html_e( 'per seat', 'g2a-booking' ); ?></small></span>
 							<span class="g2ab-evb__fact"><b><?php echo (int) $dates; ?></b><small><?php echo esc_html( _n( 'date', 'dates', $dates, 'g2a-booking' ) ); ?></small></span>
 							<?php if ( $next ) : ?><span class="g2ab-evb__fact"><b><?php echo (int) $next->seats_left; ?></b><small><?php esc_html_e( 'seats left', 'g2a-booking' ); ?></small></span><?php endif; ?>
 						</div>
@@ -162,7 +211,7 @@ final class G2AB_Frontend_Shortcode_Event_Booking {
 				<?php endif; ?>
 
 				<div class="g2ab-evb__dates">
-					<p class="g2ab-evb__hint" data-evb-hint><?php echo $preselect ? esc_html__( 'Pick a date & time:', 'g2a-booking' ) : esc_html__( 'Choose an event to see dates.', 'g2a-booking' ); ?></p>
+					<p class="g2ab-evb__hint" data-evb-hint role="status" aria-live="polite"><?php echo $preselect ? esc_html__( 'Pick a date & time:', 'g2a-booking' ) : esc_html__( 'Choose an event to see dates.', 'g2a-booking' ); ?></p>
 					<div class="g2ab-evb__date-grid" data-evb-dates></div>
 				</div>
 			</section>
@@ -171,6 +220,12 @@ final class G2AB_Frontend_Shortcode_Event_Booking {
 			<section class="g2ab-evb__stage" data-evb-stage="details">
 				<button type="button" class="g2ab-evb__back" data-evb-back>‹ <?php esc_html_e( 'Back to dates', 'g2a-booking' ); ?></button>
 				<div class="g2ab-evb__summary" data-evb-summary></div>
+				<?php if ( ! is_user_logged_in() ) : ?>
+					<p class="g2ab-evb__login">
+						<?php esc_html_e( 'Already a member?', 'g2a-booking' ); ?>
+						<a href="<?php echo esc_url( wp_login_url( $this->current_page_url() ) ); ?>"><?php esc_html_e( 'Log in to use your benefit', 'g2a-booking' ); ?></a>
+					</p>
+				<?php endif; ?>
 				<form class="g2ab-evb__form" data-evb-form novalidate onsubmit="return false;">
 					<div class="g2ab-evb__field">
 						<label class="g2ab-evb__label"><?php esc_html_e( 'Full name', 'g2a-booking' ); ?> <span class="g2ab-evb__req">*</span></label>
@@ -187,14 +242,19 @@ final class G2AB_Frontend_Shortcode_Event_Booking {
 						</div>
 					</div>
 					<div class="g2ab-evb__field g2ab-evb__field--seats">
-						<label class="g2ab-evb__label"><?php esc_html_e( 'Number of seats', 'g2a-booking' ); ?></label>
-						<input type="number" class="g2ab-evb__input" name="seats" min="1" value="1" data-evb-seats />
+						<label class="g2ab-evb__label" for="<?php echo esc_attr( $instance_id ); ?>-seats"><?php esc_html_e( 'Number of seats', 'g2a-booking' ); ?></label>
+						<input type="number" id="<?php echo esc_attr( $instance_id ); ?>-seats" class="g2ab-evb__input" name="seats" min="1" value="1" data-evb-seats />
+					</div>
+					<div class="g2ab-evb__order" data-evb-order hidden>
+						<span class="g2ab-evb__order-line" data-evb-order-line></span>
+						<span class="g2ab-evb__order-total"><span data-evb-order-total-label><?php esc_html_e( 'Total due today', 'g2a-booking' ); ?></span> <b data-evb-order-total></b></span>
 					</div>
 					<label class="g2ab-evb__check" data-evb-waiver-wrap hidden>
 						<input type="checkbox" name="waiver_acceptance" value="1" data-evb-waiver />
 						<span><?php esc_html_e( 'I accept the range liability waiver and safety rules.', 'g2a-booking' ); ?></span>
 					</label>
-					<div class="g2ab-evb__error" data-evb-error hidden></div>
+					<div class="g2ab-evb__error" data-evb-error role="alert" hidden></div>
+					<div class="g2ab-evb__status" data-evb-status role="status" aria-live="polite" hidden></div>
 					<button type="submit" class="g2ab-evb__cta" data-evb-submit>
 						<span data-evb-submit-label><?php esc_html_e( 'RESERVE SEAT', 'g2a-booking' ); ?></span>
 					</button>
@@ -244,7 +304,7 @@ final class G2AB_Frontend_Shortcode_Event_Booking {
 	public function print_css() {
 		?>
 		<style id="g2ab-evb-styles">
-		.g2ab-evb{--evb-bg:#1A191E;--evb-surface:#26252C;--evb-surface2:#26252C;--evb-border:#2A323D;--evb-text:#F7F7F9;--evb-muted:#A7A6AE;--evb-orange:#E8802F;--evb-green:#2E9E54;--evb-head:#fff;background:var(--evb-surface);border:1px solid var(--evb-border);border-top:4px solid var(--evb-orange);border-radius:12px;padding:24px;max-width:640px;margin:24px auto;color:var(--evb-text);font-family:'Inter',system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;box-sizing:border-box;box-shadow:0 14px 40px rgba(0,0,0,.18);}
+		.g2ab-evb{--evb-bg:#1A191E;--evb-surface:#26252C;--evb-surface2:#26252C;--evb-border:#2A323D;--evb-text:#F7F7F9;--evb-muted:#A7A6AE;--evb-orange:#E8802F;--evb-green:#2E9E54;--evb-danger:#C62828;--evb-head:#fff;background:var(--evb-surface);border:1px solid var(--evb-border);border-top:4px solid var(--evb-orange);border-radius:12px;padding:24px;max-width:640px;margin:24px auto;color:var(--evb-text);font-family:'Inter',system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;box-sizing:border-box;box-shadow:0 14px 40px rgba(0,0,0,.18);}
 		.g2ab-evb--theme-light{--evb-bg:#FFFFFF;--evb-surface:#FFFFFF;--evb-surface2:#F4F6FA;--evb-border:#E3E8F0;--evb-text:#1C2533;--evb-muted:#697587;--evb-green:#1F9E54;--evb-head:#161B22;}
 		.g2ab-evb *{box-sizing:border-box;}
 		.g2ab-evb--empty{padding:26px;text-align:center;color:var(--evb-muted);}
@@ -277,7 +337,7 @@ final class G2AB_Frontend_Shortcode_Event_Booking {
 		.g2ab-evb__date-foot{display:flex;justify-content:space-between;align-items:center;margin-top:8px;font-size:11px;}
 		.g2ab-evb__date-seats{color:var(--evb-green);font-weight:700;}
 		.g2ab-evb__date-seats.is-low{color:var(--evb-orange);}
-		.g2ab-evb__date-seats.is-out{color:#C62828;}
+		.g2ab-evb__date-seats.is-out{color:var(--evb-danger);}
 		.g2ab-evb__date-price{color:var(--evb-orange);font-weight:700;}
 		.g2ab-evb__back{background:none;border:none;color:var(--evb-muted);cursor:pointer;font-size:13px;padding:0;margin-bottom:12px;}
 		.g2ab-evb__back:hover{color:var(--evb-orange);}
@@ -286,6 +346,12 @@ final class G2AB_Frontend_Shortcode_Event_Booking {
 		.g2ab-evb__check{display:flex;align-items:flex-start;gap:10px;font-size:13px;color:var(--evb-text);margin:6px 0 14px;cursor:pointer;line-height:1.4;}
 		.g2ab-evb__check input{margin-top:2px;}
 		.g2ab-evb__error{background:rgba(198,40,40,.15);border:1px solid rgba(198,40,40,.4);color:#F08A8A;border-radius:5px;padding:10px 12px;font-size:13px;margin-bottom:12px;}
+		.g2ab-evb__status{background:var(--evb-bg);border:1px solid var(--evb-orange);border-radius:5px;padding:10px 12px;font-size:13px;color:var(--evb-text);margin-bottom:12px;}
+		.g2ab-evb__login{margin:0 0 14px;padding:9px 12px;background:var(--evb-bg);border:1px dashed var(--evb-border);border-radius:5px;font-size:13px;color:var(--evb-muted);}
+		.g2ab-evb__login a{color:var(--evb-orange);font-weight:700;text-decoration:underline;}
+		.g2ab-evb__order{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:baseline;gap:6px 12px;background:var(--evb-bg);border:1px solid var(--evb-border);border-radius:5px;padding:10px 12px;margin:0 0 14px;font-size:13px;color:var(--evb-muted);}
+		.g2ab-evb__order-total b{color:var(--evb-orange);font-size:15px;}
+		.g2ab-evb__input[aria-invalid="true"]{border-color:var(--evb-danger);}
 		.g2ab-evb__cta{width:100%;background:var(--evb-orange);color:#111;border:2px solid var(--evb-orange);border-radius:5px;padding:14px 18px;font-family:'Inter','Segoe UI',system-ui,-apple-system,sans-serif;font-size:16px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;cursor:pointer;transition:all .15s ease;}
 		.g2ab-evb__cta:hover:not(:disabled){background:transparent;color:var(--evb-orange);}
 		.g2ab-evb__cta:disabled{opacity:.6;cursor:not-allowed;}
@@ -294,6 +360,10 @@ final class G2AB_Frontend_Shortcode_Event_Booking {
 		.g2ab-evb__done-title{margin:0 0 8px;color:var(--evb-head);font-family:'Inter','Segoe UI',system-ui,-apple-system,sans-serif;letter-spacing:.04em;font-size:24px;}
 		.g2ab-evb__done-msg{color:var(--evb-muted);font-size:14px;margin:0 0 10px;}
 		.g2ab-evb__done-id code{background:var(--evb-bg);padding:3px 8px;border-radius:4px;color:var(--evb-orange);}
+		@media (prefers-reduced-motion: reduce){
+			.g2ab-evb *{animation:none !important;transition:none !important;}
+			.g2ab-evb__date:hover:not(:disabled){transform:none;}
+		}
 		</style>
 		<?php
 	}
@@ -317,6 +387,20 @@ final class G2AB_Frontend_Shortcode_Event_Booking {
 
 			function headers(nonce){ var h = { 'Content-Type':'application/json', 'Accept':'application/json' }; if (nonce) h['X-WP-Nonce'] = nonce; return h; }
 			function pad(n){ return n<10 ? '0'+n : ''+n; }
+			// Site-currency formatter (prefix localised from PHP — no hardcoded '$').
+			function money(n){ return (cfg.currency_prefix || '$') + (Math.round(Number(n) * 100) / 100).toFixed(2); }
+			function priceLabel(o){ return o.is_free ? cfg.i18n.free : money(o.price); }
+			// Keep uuid → confirm_token so a ?g2ab_cancel return (no token in the
+			// URL) can still offer "Try payment again" via resume-payment.
+			function storePayCtx(uuid, token){
+				if (!uuid || !token) return;
+				try {
+					var raw = window.sessionStorage.getItem('g2abPayCtx');
+					var map = raw ? JSON.parse(raw) : {};
+					map[uuid] = { t: token, ts: Date.now() };
+					window.sessionStorage.setItem('g2abPayCtx', JSON.stringify(map));
+				} catch (e) { /* storage unavailable */ }
+			}
 			function fmtDate(sql){
 				var d = new Date(String(sql).replace(' ','T'));
 				if (isNaN(d.getTime())) return { day: sql, time: '' };
@@ -348,7 +432,7 @@ final class G2AB_Frontend_Shortcode_Event_Booking {
 						seat.textContent = o.sold_out ? cfg.i18n.sold_out : (o.seats_left + ' ' + cfg.i18n.left);
 					}
 					var price = btn.querySelector('.g2ab-evb__date-price');
-					if (price) price.textContent = o.price_label;
+					if (price) price.textContent = priceLabel(o);
 				}
 				goDetails(o, f);
 				document.dispatchEvent(new CustomEvent('g2ab:content-ready', { detail: { root: document } }));
@@ -367,13 +451,18 @@ final class G2AB_Frontend_Shortcode_Event_Booking {
 				});
 			}
 
+			// Monotonic request counter: a slow occurrences response for a
+			// PREVIOUS event selection must never overwrite the newer one.
+			var occReq = 0;
 			function loadOccurrences(){
 				var box = $('[data-evb-dates]'); var hint = $('[data-evb-hint]');
+				var seq = ++occReq;
 				if (!state.eventId) { box.innerHTML=''; if (hint){ hint.textContent = cfg.i18n.pick_event; } return; }
 				if (hint) hint.textContent = cfg.i18n.loading;
 				box.innerHTML = '';
 				fetchOccurrences()
 					.then(function(data){
+						if (seq !== occReq) return; // stale response — a newer selection won.
 						if (!data) { if (hint) hint.textContent = cfg.i18n.no_dates; return; }
 						state.requiresWaiver = !!(data.event && data.event.requires_waiver);
 						var occs = data.occurrences || [];
@@ -389,7 +478,7 @@ final class G2AB_Frontend_Shortcode_Event_Booking {
 							btn.innerHTML = '<span class="g2ab-evb__date-day">'+f.day+'</span>'
 								+ '<span class="g2ab-evb__date-time">'+f.time+'</span>'
 								+ '<span class="g2ab-evb__date-foot"><span class="g2ab-evb__date-seats '+seatCls+'">'+seatTxt+'</span>'
-								+ '<span class="g2ab-evb__date-price">'+o.price_label+'</span></span>';
+								+ '<span class="g2ab-evb__date-price">'+priceLabel(o)+'</span></span>';
 							if (!o.sold_out) {
 								btn.addEventListener('click', function(){
 									$$('.g2ab-evb__date').forEach(function(b){ b.classList.remove('is-selected'); });
@@ -401,14 +490,39 @@ final class G2AB_Frontend_Shortcode_Event_Booking {
 							box.appendChild(btn);
 						});
 					})
-					.catch(function(){ if (hint) hint.textContent = cfg.i18n.no_dates; });
+					.catch(function(){ if (seq !== occReq) return; if (hint) hint.textContent = cfg.i18n.no_dates; });
+			}
+
+			// Seats × unit-price recap + payment-aware CTA. Re-run whenever the
+			// seat count or the selected occurrence changes.
+			function updateOrder(){
+				var o = state.occ;
+				var box = $('[data-evb-order]');
+				var lbl = $('[data-evb-submit-label]');
+				if (!o) { if (box) box.hidden = true; return; }
+				var seatsEl = $('[data-evb-seats]');
+				var n = seatsEl ? parseInt(seatsEl.value, 10) : 1;
+				if (!(n > 0)) n = 1;
+				if (o.is_free) {
+					if (box) box.hidden = true;
+					if (lbl) lbl.textContent = cfg.i18n.confirm_reservation;
+					return;
+				}
+				var total = Number(o.price) * n;
+				var line = $('[data-evb-order-line]');
+				if (line) line.textContent = money(o.price) + ' × ' + n;
+				var tot = $('[data-evb-order-total]');
+				if (tot) tot.textContent = money(total);
+				if (box) box.hidden = false;
+				if (lbl) lbl.textContent = cfg.i18n.pay_seat.replace('%s', money(total));
 			}
 
 			function goDetails(o, f){
 				var sum = $('[data-evb-summary]');
-				if (sum) sum.innerHTML = '<strong>'+f.day+' · '+f.time+'</strong> — '+o.price_label+' '+ (o.is_free ? '' : '/ seat') +' · '+o.seats_left+' '+cfg.i18n.left;
+				if (sum) sum.innerHTML = '<strong>'+f.day+' · '+f.time+'</strong> — '+priceLabel(o)+' '+ (o.is_free ? '' : '/ seat') +' · '+o.seats_left+' '+cfg.i18n.left;
 				var wrap = $('[data-evb-waiver-wrap]'); if (wrap) wrap.hidden = !state.requiresWaiver;
 				var seats = $('[data-evb-seats]'); if (seats) { seats.max = o.seats_left; if (parseInt(seats.value,10) > o.seats_left) seats.value = o.seats_left; }
+				updateOrder();
 				showStage('details');
 			}
 
@@ -416,21 +530,54 @@ final class G2AB_Frontend_Shortcode_Event_Booking {
 			var sel = $('[data-evb-event]');
 			if (sel) sel.addEventListener('change', function(){ state.eventId = parseInt(sel.value,10) || 0; state.occ=null; loadOccurrences(); });
 
+			// Seat-count changes re-price the recap + CTA live.
+			var seatsInput = $('[data-evb-seats]');
+			if (seatsInput) ['change','input'].forEach(function(ev){ seatsInput.addEventListener(ev, updateOrder); });
+
 			// Back.
 			var back = $('[data-evb-back]'); if (back) back.addEventListener('click', function(){ showStage('pick'); });
+
+			// Client-side validation (required fields, email format). The server
+			// still re-validates everything; this only saves a round-trip and
+			// moves focus to the first offending control.
+			function validateDetails(form, err){
+				var firstBad = null; var badEmail = false;
+				$$('.g2ab-evb__input').forEach(function(el){
+					var bad = false;
+					if (el.required && !String(el.value || '').trim()) bad = true;
+					if (!bad && el.type === 'email' && String(el.value || '').trim()) {
+						bad = !/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(String(el.value).trim());
+						if (bad) badEmail = true;
+					}
+					if (bad) { el.setAttribute('aria-invalid','true'); if (!firstBad) firstBad = el; }
+					else el.removeAttribute('aria-invalid');
+				});
+				if (firstBad) {
+					if (err) { err.textContent = badEmail && firstBad.type === 'email' ? cfg.i18n.invalid_email : cfg.i18n.required_fields; err.hidden = false; }
+					try { firstBad.focus(); } catch (ex) { /* noop */ }
+					return false;
+				}
+				return true;
+			}
 
 			// Submit.
 			var form = $('[data-evb-form]');
 			if (form) form.addEventListener('submit', function(e){
 				e.preventDefault();
 				var err = $('[data-evb-error]'); var btn = $('[data-evb-submit]'); var lbl = $('[data-evb-submit-label]');
+				var statusBox = $('[data-evb-status]');
 				var origLbl = lbl ? lbl.textContent : '';
+				if (statusBox) { statusBox.hidden = true; statusBox.textContent = ''; }
 				if (!state.occ) { if (err){ err.textContent = cfg.i18n.pick_date; err.hidden=false; } return; }
+				if (!validateDetails(form, err)) return;
 				var fields = {};
 				new FormData(form).forEach(function(v,k){ fields[k]=v; });
 				var seats = parseInt(fields.seats||'1',10) || 1;
 				if (state.requiresWaiver && !fields.waiver_acceptance) {
-					if (err){ err.textContent = cfg.i18n.waiver_req; err.hidden=false; } return;
+					if (err){ err.textContent = cfg.i18n.waiver_req; err.hidden=false; }
+					var waiver = $('[data-evb-waiver]');
+					if (waiver) { try { waiver.focus(); } catch (ex) { /* noop */ } }
+					return;
 				}
 				if (err) err.hidden = true;
 				if (btn) btn.disabled = true; if (lbl) lbl.textContent = cfg.i18n.submitting;
@@ -454,7 +601,32 @@ final class G2AB_Frontend_Shortcode_Event_Booking {
 				}).then(function(res){
 					if (!res.ok || !res.body || !res.body.success) { throw new Error((res.body && res.body.message) || cfg.i18n.failed); }
 					var d = res.body.data || {};
-					if (d.redirect_url) { window.location.href = d.redirect_url; return; }
+					var isHold = !!d.payment_required || d.state === 'checkout_hold';
+					var isConfirmed = d.state === 'confirmed' || d.status === 'confirmed' || d.status === 'paid';
+					if (isHold) {
+						// Checkout hold — seats are NOT confirmed yet. Announce the
+						// hold, keep the confirm_token for a possible cancel return,
+						// and hand off to the gateway.
+						storePayCtx(d.uuid, d.confirm_token);
+						if (statusBox) {
+							statusBox.textContent = (d.message || cfg.i18n.checkout_hold) + ' ' + (d.redirect_url ? cfg.i18n.redirecting : cfg.i18n.hold_note);
+							statusBox.hidden = false;
+						}
+						if (d.redirect_url) {
+							window.setTimeout(function(){ window.location.href = d.redirect_url; }, 150);
+							return;
+						}
+						// No checkout URL (e.g. idempotent replay of a pending
+						// attempt): never show the confirmed panel.
+						if (btn) btn.disabled = false; if (lbl) lbl.textContent = origLbl;
+						return;
+					}
+					if (!isConfirmed) {
+						// Unknown/unpaid state — never render "Seat reserved!".
+						if (statusBox) { statusBox.textContent = d.message || cfg.i18n.hold_note; statusBox.hidden = false; }
+						if (btn) btn.disabled = false; if (lbl) lbl.textContent = origLbl;
+						return;
+					}
 					var m = $('[data-evb-done-msg]'); var u = $('[data-evb-done-uuid]');
 					if (m) m.textContent = d.message || '';
 					if (u) u.textContent = d.uuid || '';

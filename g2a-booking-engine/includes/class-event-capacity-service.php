@@ -328,7 +328,8 @@ final class G2AB_Event_Capacity_Service {
 			$result['reason'] = $status;
 			return apply_filters( 'g2ab_event_booking_consumes_seat', $result, $row, $now_mysql );
 		}
-		if ( in_array( $status, array( 'confirmed', 'paid' ), true ) ) {
+		if ( in_array( $status, array( 'confirmed', 'paid', 'partially_refunded' ), true ) ) {
+			// partially_refunded attendees are still attending — seat stays taken.
 			$result['consumes'] = true;
 			$result['reason']   = $status;
 			return apply_filters( 'g2ab_event_booking_consumes_seat', $result, $row, $now_mysql );

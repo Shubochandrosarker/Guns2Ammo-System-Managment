@@ -4,7 +4,7 @@ Tags: booking, reservation, scheduling, appointments, shooting range, firearms, 
 Requires at least: 6.2
 Tested up to: 6.5
 Requires PHP: 8.0
-Stable tag: 1.9.9.20
+Stable tag: 1.10.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -206,6 +206,20 @@ Yes. REST API at `/wp-json/g2a-booking/v1/` covers bookings, forms, calendar, fr
 7. Migration wizard — dry-run preview before live import.
 
 == Changelog ==
+
+= 1.10.0 =
+* SECURITY/POLICY: Public payable bookings must now prepay online — the public pay-at-store path is removed entirely, including the crafted `gateway=pay_in_store` bypass, the `/payment-methods` offline advertising, and the `g2ab_require_public_prepay` escape hatch. Pay-at-store remains for staff-created bookings only (front desk, phone, POS).
+* Only members whose plan includes lane time (Defender/Patriot/Guardian, active/comped — Memberistic Entitlement_Service via the new structured `g2ab_lane_entitlement` filter) reserve lanes for $0. Guest Pass and every other classification pays the full public price on every reservation. Linked/family members qualify through their own logged-in account.
+* A typed email address no longer reveals or exercises membership: the advisory membership hint and desk-rate routing are removed. Logged-out members log in to use their benefit.
+* Payable bookings are now explicit checkout HOLDS (`pending`, auto-expiring) — never on staff rosters, calendars, KPIs, exports, reminders or the front-desk list until payment verifies. New authoritative visibility predicate applied to every consumer; Checkout Attempts remains the diagnostics screen.
+* New central status transition service: explicit allowed-transition map; `paid` requires a matching successful payment-ledger entry; `confirmed` requires $0-with-reason or verified payment; refunded states require a gateway refund or an explicitly recorded offline refund (the bare "mark refunded" checkbox is gone). `partially_refunded` is now a first-class status (model, colors, blocking, admin UI).
+* Fail-closed checkout: when Stripe (or any gateway) cannot create a session, the hold is expired, inventory releases, and the customer gets a recoverable error — no operational booking, no "staff will contact you", no account provisioning from abandoned attempts.
+* Request idempotency now fingerprints every material value (actor scope, type, resource/occurrence, start, party size/seats, gateway, amount, currency). Changed values create a new request; retries of a dead attempt no longer replay it.
+* Removed unreachable legacy code in the Stripe gateway (create_intent / mark_booking_paid / mark_booking_refunded). PayPal ORDER.APPROVED now captures before marking paid; PayPal/Authnet use persistent claim-based webhook dedup; PayPal/Fortis refunds are partial-aware; PayPal refunds use the real payment currency; PayPal/Authnet fire the full paid side-effect sequence.
+* New Range Guest classification: paid non-member customers get a `range_guest` segment (user meta + first/last booking, paid count, lifetime amount) — never a Memberistic membership. New admin list + CSV export under G2A Booking → Range Guests.
+* Signed, purpose-bound email action links (complete payment / view / cancel / reschedule) with expiry and site-wide revocation; the complete-payment page safely mints a fresh Stripe session when the original expired (availability re-checked). The old `?g2ab_cancel=<uuid>` non-action link is no longer used in emails.
+* Reports: no-show KPI and monthly cancelled/no-show/refunded columns are no longer structurally zero; bookings CSV export can deliberately export non-operational buckets via the status filter.
+* New `g2ab_format_currency()` site-currency formatter replaces hardcoded `$` in new surfaces.
 
 = 1.9.9.20 =
 * Fixed members being charged the full walk-in rate: guest-form bookings resolved to no user at all, so no membership was ever found and every booking priced as a non-member.

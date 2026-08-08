@@ -199,6 +199,7 @@ function memberistic_clean_page_slug( $setting_key ) {
 		'failed_payment_page_id' => 'payment-failed',
 		'account_page_id'        => 'account',
 		'login_page_id'          => 'login',
+		'booking_page_id'        => 'book-a-lane',
 	);
 	$map = apply_filters( 'memberistic_clean_page_slugs', $map );
 	return isset( $map[ $setting_key ] ) ? $map[ $setting_key ] : '';

@@ -181,14 +181,99 @@ final class G2AB_REST_Bookings_Controller {
 		return hash( 'sha256', (string) $ip );
 	}
 
-	public function list_payment_methods() {
-		$out = array();
-		if ( class_exists( 'G2AB_Gateway_Manager' ) ) {
-			foreach ( G2AB_Gateway_Manager::instance()->available() as $id => $gw ) {
-				$out[] = array( 'id' => $id, 'label' => method_exists( $gw, 'label' ) ? $gw->label() : $id );
-			}
+	/**
+	 * Request idempotency fingerprint covering every material value.
+	 *
+	 * @param array $parts Actor scope + booking-shape values (see callers).
+	 * @return string sha256 hex.
+	 */
+	private function booking_idempotency_key( array $parts ) {
+		$parts['bucket'] = (int) floor( time() / 600 ); // bounds the replay window to ~10 minutes.
+		ksort( $parts );
+		$material = array();
+		foreach ( $parts as $key => $value ) {
+			$material[] = $key . '=' . (string) $value;
 		}
-		if ( empty( $out ) ) $out[] = array( 'id' => 'pay_in_store', 'label' => 'Pay In Store' );
+		return hash( 'sha256', implode( '|', $material ) );
+	}
+
+	/**
+	 * Fail a payable public booking CLOSED when checkout creation fails.
+	 *
+	 * The just-inserted hold is expired (slot released on the next
+	 * availability read since only blocking statuses count), the attempt is
+	 * logged for the diagnostics screen, and the caller gets a recoverable
+	 * error. No operational reservation, no account provisioning, no
+	 * "staff will contact you".
+	 *
+	 * @param int           $booking_id Booking id of the technical hold.
+	 * @param string        $gateway_id Gateway that failed.
+	 * @param WP_Error|null $error      Underlying error, if any.
+	 * @return WP_Error
+	 */
+	private function fail_closed_checkout( $booking_id, $gateway_id, $error = null ) {
+		global $wpdb;
+
+		$message = $error instanceof WP_Error ? $error->get_error_message() : __( 'Checkout session could not be created.', 'g2a-booking' );
+
+		$wpdb->insert( $wpdb->prefix . 'g2ab_logs', array(
+			'booking_id' => (int) $booking_id,
+			'event_type' => 'payment_intent_failed',
+			'severity'   => 'error',
+			'message'    => $message,
+			'context'    => wp_json_encode( array( 'gateway' => sanitize_key( (string) $gateway_id ), 'fail_closed' => true ) ),
+			'created_at' => current_time( 'mysql' ),
+		) );
+
+		if ( class_exists( 'G2AB_Booking_Transitions' ) ) {
+			G2AB_Booking_Transitions::transition( (int) $booking_id, 'expired', array(
+				'source' => 'system',
+				'reason' => 'checkout_creation_failed',
+			) );
+		} else {
+			$wpdb->update(
+				$wpdb->prefix . 'g2ab_bookings',
+				array( 'status' => 'expired', 'updated_at' => current_time( 'mysql' ) ),
+				array( 'id' => (int) $booking_id ),
+				array( '%s', '%s' ),
+				array( '%d' )
+			);
+		}
+
+		// Seats/slots release automatically: capacity is computed live from
+		// booking rows and an `expired` status no longer consumes inventory.
+
+		return new WP_Error(
+			'g2ab_checkout_unavailable',
+			__( 'We could not start secure checkout, so your reservation was not completed. No charge was made — please try again in a moment.', 'g2a-booking' ),
+			array( 'status' => 503, 'recoverable' => true )
+		);
+	}
+
+	/**
+	 * Context-aware gateway list.
+	 *
+	 * Public callers only ever see ONLINE gateways: a public payable booking
+	 * can never settle via pay-at-store/cash/manual, so advertising those here
+	 * would advertise an illegal option. Staff (manage capability) see the
+	 * full list for back-office tooling.
+	 */
+	public function list_payment_methods() {
+		$this->send_no_store_headers();
+
+		if ( current_user_can( 'manage_g2ab_bookings' ) && class_exists( 'G2AB_Gateway_Manager' ) ) {
+			$out = array();
+			foreach ( G2AB_Gateway_Manager::instance()->available() as $id => $gw ) {
+				$out[] = array(
+					'id'      => $id,
+					'label'   => method_exists( $gw, 'label' ) ? $gw->label() : $id,
+					'offline' => class_exists( 'G2AB_Checkout_Policy' ) && G2AB_Checkout_Policy::is_offline_gateway( $id ),
+				);
+			}
+			return rest_ensure_response( array( 'success' => true, 'data' => $out ) );
+		}
+
+		$out = class_exists( 'G2AB_Checkout_Policy' ) ? G2AB_Checkout_Policy::public_payment_methods() : array();
 		return rest_ensure_response( array( 'success' => true, 'data' => $out ) );
 	}
 
@@ -480,31 +565,14 @@ final class G2AB_REST_Bookings_Controller {
 		return (bool) apply_filters( 'g2ab_user_is_member', $is_member, $user_id, $booking_type, $customer_email );
 	}
 
-	/**
-	 * Advisory-only membership lookup for a typed email.
-	 *
-	 * Returns a hint that the person booking MAY hold a membership, so the
-	 * front desk can apply the member rate after checking ID at check-in. This
-	 * deliberately does NOT change the price or grant access — it can't, safely,
-	 * because a typed address proves nothing (audit C27). It exists so a
-	 * logged-out member is never silently charged the walk-in rate by card.
-	 *
-	 * @return array{matched:bool,label:string}
+	/*
+	 * NOTE: the old advisory_membership_hint() (typed-email → membership
+	 * lookup) is intentionally gone. A typed email must never reveal whether
+	 * it belongs to a member, and entitlement only ever comes from the
+	 * authenticated session via G2AB_Checkout_Policy::lane_entitlement().
+	 * Logged-out members log in to use their benefit — or pay the public
+	 * price like any guest.
 	 */
-	private function advisory_membership_hint( $customer_email ) {
-		$hint = array( 'matched' => false, 'label' => '' );
-
-		if ( ! is_email( $customer_email ) ) {
-			return $hint;
-		}
-
-		return (array) apply_filters( 'g2ab_advisory_membership_hint', $hint, $customer_email );
-	}
-
-	private function payment_modes_for_type( $booking_type ) {
-		$modes = array_filter( array_map( 'sanitize_key', array_map( 'trim', explode( ',', (string) $booking_type->payment_modes ) ) ) );
-		return $modes ? $modes : array( 'full', 'in_store' );
-	}
 
 	private function calculate_pricing( $booking_type, $party_size, $user_id, $customer_email = '' ) {
 		$party_size       = max( 1, (int) $party_size );
@@ -553,47 +621,12 @@ final class G2AB_REST_Bookings_Controller {
 		return $fallback ?: null;
 	}
 
-	/**
-	 * Optionally force a public (walk-in) booking onto Stripe.
-	 *
-	 * This used to be unconditional, which is why EVERY public lane booking
-	 * minted a Stripe Checkout Session up front — including for members and for
-	 * customers who never intended to pay online — leaving a long tail of
-	 * abandoned `open` attempts. Prepay is now opt-in per site via
-	 * `g2ab_require_public_prepay` (default off: reserve now, pay at the range),
-	 * and is always skipped when the booking still needs a front-desk rate
-	 * decision.
+	/*
+	 * NOTE: public_prepay_required() and prefer_stripe_for_public_payment()
+	 * are intentionally gone. Public payable bookings ALWAYS prepay online —
+	 * there is no site option that reopens the pay-at-store bypass, and
+	 * gateway policy lives in G2AB_Checkout_Policy.
 	 */
-	/**
-	 * Whether a public (walk-in) booking must be paid by card before the lane is
-	 * held. Off by default: reserve now, settle at the front desk.
-	 */
-	private function public_prepay_required( $booking_type ) {
-		return (bool) apply_filters(
-			'g2ab_require_public_prepay',
-			1 === (int) get_option( 'g2ab_require_public_prepay', 0 ),
-			$booking_type
-		);
-	}
-
-	private function prefer_stripe_for_public_payment( $gateway, $gateway_id, $booking_type, $needs_desk_rate = false ) {
-		if ( $gateway_id || ! class_exists( 'G2AB_Gateway_Manager' ) || ! empty( $booking_type->members_only ) ) {
-			return $gateway;
-		}
-		if ( $needs_desk_rate || ! $this->public_prepay_required( $booking_type ) ) {
-			return $gateway;
-		}
-		$mgr    = G2AB_Gateway_Manager::instance();
-		$stripe = $mgr->get( 'stripe' );
-		// Only prefer Stripe when it's actually configured and usable — otherwise we
-		// would hand a payable booking to a dead gateway and the customer hits
-		// "payment setup failed" with no way to pay. Fall back to the originally
-		// chosen gateway in that case.
-		if ( $stripe && ( ! method_exists( $stripe, 'is_available' ) || $stripe->is_available() ) ) {
-			return $stripe;
-		}
-		return $gateway;
-	}
 
 	private function split_customer_name( $customer_name ) {
 		$parts = preg_split( '/\s+/', trim( (string) $customer_name ) );
@@ -803,71 +836,42 @@ final class G2AB_REST_Bookings_Controller {
 		// Entitlement (member pricing / members-only) is resolved from the
 		// AUTHENTICATED session only — never from $user_id, which may have been
 		// matched from a typed email for attribution. See ensure_customer_user().
+		$entitlement     = class_exists( 'G2AB_Checkout_Policy' )
+			? G2AB_Checkout_Policy::lane_entitlement( $this->authenticated_user_id() )
+			: array( 'eligible' => false, 'reason' => 'no_policy', 'pricing_type' => 'public_full_price' );
 		$pricing         = $this->calculate_pricing( $booking_type, $party_size, $this->authenticated_user_id(), $customer_email );
 		$subtotal        = (float) $pricing['subtotal'];
 		$discount_amount = (float) $pricing['discount_amount'];
 		$total           = (float) $pricing['total'];
 
-		// A logged-out member typing their own address gets no automatic
-		// discount (it can't be trusted), but we must not silently charge them
-		// the walk-in rate by card either. Flag it and let the front desk settle
-		// the correct rate at check-in.
-		$membership_hint = $this->advisory_membership_hint( $customer_email );
-		$needs_desk_rate = empty( $pricing['membership_source'] ) && ! empty( $membership_hint['matched'] );
+		// ─── Central checkout policy ────────────────────────────────────────
+		// One authority decides: eligible member → $0 confirmed; everyone else
+		// pays the complete server-calculated price online. There is no desk
+		// settlement, no deposit, and no offline gateway on this public path —
+		// even for a crafted request.
+		if ( ! class_exists( 'G2AB_Checkout_Policy' ) ) {
+			return new WP_Error( 'g2ab_policy_missing', __( 'Booking is temporarily unavailable.', 'g2a-booking' ), array( 'status' => 503 ) );
+		}
+		$decision = G2AB_Checkout_Policy::resolve_lane( $booking_type, $pricing, $entitlement, $gateway_id );
+		if ( is_wp_error( $decision ) ) {
+			return $decision;
+		}
 
-		// ─── Gateway selection ──────────────────────────────────────────────
+		$payment_mode   = $decision['payment_mode'];
+		$due_now        = (float) $decision['amount_due'];
+		$initial_status = $decision['initial_status'];
+
 		$gateway = null;
-		if ( class_exists( 'G2AB_Gateway_Manager' ) ) {
-			$mgr = G2AB_Gateway_Manager::instance();
-			if ( $gateway_id ) {
-				$gateway = $mgr->get( $gateway_id );
-				if ( ! $gateway || ( method_exists( $gateway, 'is_available' ) && ! $gateway->is_available() ) ) {
-					return new WP_Error( 'g2ab_gateway_unavailable', __( 'Selected payment gateway is not available.', 'g2a-booking' ), array( 'status' => 503 ) );
-				}
+		if ( $due_now > 0 ) {
+			$gateway = G2AB_Checkout_Policy::pick_online_gateway( $booking_type, $gateway_id );
+			if ( is_wp_error( $gateway ) ) {
+				// Fail closed: no gateway → no reservation, no hold, no account.
+				return $gateway;
 			}
-			if ( ! $gateway ) {
-				$gateway = $mgr->pick_for_type( $booking_type );
-			}
-			$gateway = $this->prefer_stripe_for_public_payment( $gateway, $gateway_id, $booking_type, $needs_desk_rate );
 		}
-		$gateway_used_id = ( $gateway && method_exists( $gateway, 'id' ) ) ? $gateway->id() : 'pay_in_store';
-
-		$modes = $this->payment_modes_for_type( $booking_type );
-
-		// Walk-in lane types are frequently configured card-only, which is what
-		// forced every public booking through Stripe: with no `in_store` mode
-		// there was no other branch to fall into, so an abandoned form left an
-		// `open` checkout attempt behind. Unless the site explicitly requires
-		// prepay, a public booking may always settle at the front desk. The same
-		// applies when the email matched a membership we couldn't verify — that
-		// customer must reach the desk rather than be charged the walk-in rate.
-		$allow_desk_settlement = empty( $booking_type->members_only )
-			&& empty( $gateway_id )
-			&& ( $needs_desk_rate || ! $this->public_prepay_required( $booking_type ) );
-
-		if ( $allow_desk_settlement ) {
-			if ( ! in_array( 'in_store', $modes, true ) ) {
-				$modes[] = 'in_store';
-			}
-			$gateway_used_id = 'pay_in_store';
-		}
-
-		if ( $total <= 0 || ( in_array( 'free', $modes, true ) && $total <= 0 ) ) {
-			$payment_mode    = 'free';
-			$due_now         = 0.0;
-			$gateway_used_id = $total <= 0 ? 'free' : $gateway_used_id;
-		} elseif ( 'pay_in_store' === $gateway_used_id || ( in_array( 'in_store', $modes, true ) && empty( $gateway_id ) ) ) {
-			$payment_mode    = 'in_store';
-			$gateway_used_id = 'pay_in_store';
-			$due_now         = 0.0;
-		} elseif ( in_array( 'deposit', $modes, true ) && (float) $booking_type->deposit_amount > 0 ) {
-			$payment_mode = 'deposit';
-			$due_now      = min( $total, (float) $booking_type->deposit_amount );
-		} else {
-			$payment_mode = 'full';
-			$due_now      = $total;
-		}
-		$initial_status = ( $total <= 0 ) ? 'confirmed' : ( 'in_store' === $payment_mode ? 'reserved' : 'pending' );
+		$gateway_used_id = $due_now > 0 && $gateway && method_exists( $gateway, 'id' )
+			? $gateway->id()
+			: 'free';
 
 		$clean_fields = array();
 		foreach ( $fields as $k => $v ) {
@@ -884,23 +888,27 @@ final class G2AB_REST_Bookings_Controller {
 		$bookings_table = $wpdb->prefix . 'g2ab_bookings';
 
 		// ─── Idempotency key ────────────────────────────────────────────────
-		// A network retry or a double form-submit (slow response, impatient
-		// double-click) resubmits the exact same resource/type/time/customer —
-		// without this, each attempt was a fresh insert, so on a resource with
-		// spare capacity two submissions could both succeed as separate
-		// bookings (and, for a paid booking type, trigger two separate payment-
-		// gateway intent/charge creations). Deriving the key from the request
-		// content plus a coarse time bucket needs no client changes: retries of
-		// the SAME attempt land in the same bucket and collide on the unique
-		// idempotency_key index below; a deliberate new booking of the same
-		// slot made later (a different bucket) is never blocked.
-		$idempotency_key = hash( 'sha256', implode( '|', array(
-			$resource_id,
-			$booking_type_id,
-			$start_sql,
-			strtolower( $customer_email ),
-			(int) floor( time() / 600 ), // 10-minute bucket
-		) ) );
+		// A network retry or a double form-submit must return the ORIGINAL
+		// result instead of creating a second booking/charge. The fingerprint
+		// covers every material value of the request — actor scope, booking
+		// type, resource, start time, party size, gateway, server-calculated
+		// amount and currency — so a changed party size, time, resource or
+		// price is a NEW request, never a replay. The actor scope (user id for
+		// members, hashed client identity + email for guests) keys the attempt
+		// to the requester: a colliding server-derived key can never hand one
+		// customer another customer's booking. A coarse time bucket bounds the
+		// replay window; deliberate later re-bookings are never blocked.
+		$idempotency_key = $this->booking_idempotency_key( array(
+			'scope'      => $this->authenticated_user_id() ?: ( $this->rate_limit_identity() . '|' . strtolower( $customer_email ) ),
+			'kind'       => 'lane',
+			'type'       => $booking_type_id,
+			'resource'   => $resource_id,
+			'start'      => $start_sql,
+			'party_size' => $party_size,
+			'gateway'    => $gateway_used_id,
+			'amount'     => number_format( $due_now, 2, '.', '' ),
+			'currency'   => (string) get_option( 'g2ab_currency', 'USD' ),
+		) );
 
 		// ─── Race-safe + capacity-aware insert ──────────────────────────────
 		// One transaction, one FOR UPDATE load query, one INSERT. Concurrent
@@ -980,14 +988,22 @@ final class G2AB_REST_Bookings_Controller {
 					'level_id' => $pricing['membership_level_id'],
 					'percent'  => $pricing['member_discount_percent'],
 				),
-				// Advisory only — a typed email matched an active membership but
-				// the visitor wasn't logged in, so no discount was applied. The
-				// front desk verifies ID and settles the member rate at check-in.
-				'membership_hint' => array(
-					'matched'          => ! empty( $membership_hint['matched'] ),
-					'label'            => (string) ( $membership_hint['label'] ?? '' ),
-					'needs_desk_rate'  => (bool) $needs_desk_rate,
+				// Structured entitlement snapshot for audits: WHY this booking
+				// was $0 (or wasn't) at the moment it was created.
+				'entitlement'     => array(
+					'eligible'          => ! empty( $entitlement['eligible'] ),
+					'reason'            => (string) ( $entitlement['reason'] ?? '' ),
+					'plan_slug'         => (string) ( $entitlement['plan_slug'] ?? '' ),
+					'plan_name'         => (string) ( $entitlement['plan_name'] ?? '' ),
+					'membership_id'     => (int) ( $entitlement['membership_id'] ?? 0 ),
+					'membership_status' => (string) ( $entitlement['membership_status'] ?? '' ),
+					'pricing_type'      => (string) ( $entitlement['pricing_type'] ?? 'public_full_price' ),
+					'checked_at'        => (string) ( $entitlement['checked_at'] ?? $now_mysql ),
 				),
+				'zero_reason'     => (string) ( $decision['zero_reason'] ?? '' ),
+				'hold_expires_at' => 'pending' === $initial_status
+					? wp_date( 'Y-m-d H:i:s', current_time( 'timestamp' ) + ( G2AB_Checkout_Policy::hold_minutes() * MINUTE_IN_SECONDS ), wp_timezone() )
+					: '',
 			) ),
 			'waiver_signed'    => $waiver_ok ? 1 : 0,
 			'source'           => 'web',
@@ -1001,14 +1017,23 @@ final class G2AB_REST_Bookings_Controller {
 			// A duplicate idempotency_key means this exact request was already
 			// processed a moment ago (retry/double-submit) — return the booking
 			// that attempt created instead of erroring or creating a second one.
+			// A DEAD original (cancelled/expired/refunded) is not replayed:
+			// the retry is a genuinely new attempt and books fresh.
 			if ( false !== stripos( (string) $wpdb->last_error, 'idempotency_key' ) ) {
 				$wpdb->query( 'ROLLBACK' );
-				$existing_id = (int) $wpdb->get_var( $wpdb->prepare(
-					"SELECT id FROM {$bookings_table} WHERE idempotency_key = %s LIMIT 1",
+				$existing = $wpdb->get_row( $wpdb->prepare(
+					"SELECT id, status FROM {$bookings_table} WHERE idempotency_key = %s LIMIT 1",
 					$idempotency_key
 				) );
-				if ( $existing_id > 0 ) {
-					return $this->idempotent_replay_response( $existing_id );
+				if ( $existing && ! G2AB_Booking_Statuses::is_terminal( (string) $existing->status ) ) {
+					return $this->idempotent_replay_response( (int) $existing->id );
+				}
+				if ( $existing ) {
+					return new WP_Error(
+						'g2ab_retry_previous_attempt_closed',
+						__( 'Your previous attempt for this slot has expired or was cancelled. Please submit the booking again.', 'g2a-booking' ),
+						array( 'status' => 409, 'recoverable' => true )
+					);
 				}
 			}
 			$wpdb->query( 'ROLLBACK' );
@@ -1086,32 +1111,30 @@ final class G2AB_REST_Bookings_Controller {
 				? $gateway->create_intent( $booking_row, $due_now, array( 'confirm_token' => $confirm_token ) )
 				: $gateway->create_intent( $booking_row, $due_now );
 
-			if ( is_wp_error( $intent ) ) {
-				$wpdb->insert( $wpdb->prefix . 'g2ab_logs', array(
-					'booking_id' => $booking_id,
-					'event_type' => 'payment_intent_failed',
-					'severity'   => 'error',
-					'message'    => $intent->get_error_message(),
-					'context'    => wp_json_encode( array( 'gateway' => $gateway_used_id ) ),
-					'created_at' => current_time( 'mysql' ),
-				) );
-				$response['message'] = sprintf(
-					/* translators: %s error message */
-					__( 'Booking saved, but payment setup failed: %s. Staff will contact you.', 'g2a-booking' ),
-					$intent->get_error_message()
-				);
-			} elseif ( is_array( $intent ) ) {
-				$response['redirect_url'] = $intent['redirect_url'] ?? '';
-				$response['message']      = $intent['message'] ?? '';
-				$response['gateway_ref']  = $intent['gateway_ref'] ?? '';
+			if ( is_wp_error( $intent ) || ! is_array( $intent ) || empty( $intent['redirect_url'] ) ) {
+				// Fail closed: without a usable checkout URL there is no
+				// reservation. Release the technical hold, log the failure, and
+				// return a recoverable error — no operational booking, no
+				// "staff will contact you", no customer account.
+				return $this->fail_closed_checkout( $booking_id, $gateway_used_id, is_wp_error( $intent ) ? $intent : null );
 			}
-		} elseif ( $total <= 0 ) {
-			$response['message'] = __( 'Booking confirmed (no payment required).', 'g2a-booking' );
-			if ( function_exists( 'g2ab_provision_booking_customer_account' ) ) {
-				g2ab_provision_booking_customer_account( $booking_id );
-			}
+
+			$response['status']       = 'pending';
+			$response['state']        = 'checkout_hold';
+			$response['redirect_url'] = (string) $intent['redirect_url'];
+			$response['gateway_ref']  = (string) ( $intent['gateway_ref'] ?? '' );
+			$response['message']      = __( 'Payment required — your lane is held for a short time while you complete secure checkout.', 'g2a-booking' );
 		} else {
-			$response['message'] = __( 'Reservation received. Pay at the front desk on arrival.', 'g2a-booking' );
+			// $0 booking with a valid zero reason (eligible member lane or a
+			// genuinely free booking type) — this IS a confirmed reservation.
+			$response['state']   = 'confirmed';
+			$response['message'] = 'member_included' === ( $decision['zero_reason'] ?? '' ) && ! empty( $entitlement['plan_name'] )
+				? sprintf(
+					/* translators: %s plan name */
+					__( 'Reservation confirmed — included with your %s membership.', 'g2a-booking' ),
+					$entitlement['plan_name']
+				)
+				: __( 'Booking confirmed (no payment required).', 'g2a-booking' );
 			if ( function_exists( 'g2ab_provision_booking_customer_account' ) ) {
 				g2ab_provision_booking_customer_account( $booking_id );
 			}
@@ -1123,9 +1146,14 @@ final class G2AB_REST_Bookings_Controller {
 		// `class_exists` alone is unreliable — the module.php require_once loads
 		// the class file even when the addon is disabled, so check the addon
 		// registry directly.
+		// A confirmation email is only ever sent for a CONFIRMED booking. A
+		// pending checkout hold gets nothing until payment verifies (the
+		// email-automation module owns the paid/confirmed sequence).
 		$email_automation_active = class_exists( 'G2AB_Addon_Manager' )
 			&& G2AB_Addon_Manager::instance()->is_active( 'email_automation' );
-		if ( ! $email_automation_active && 1 === (int) get_option( 'g2ab_send_confirmation_email', 1 ) ) {
+		if ( ! $email_automation_active
+			&& 'confirmed' === $initial_status
+			&& 1 === (int) get_option( 'g2ab_send_confirmation_email', 1 ) ) {
 			$this->send_confirmation_email( $customer_email, $customer_name, $resource->name, $start_sql, $uuid );
 		}
 
@@ -1314,26 +1342,125 @@ final class G2AB_REST_Bookings_Controller {
 			 ORDER BY id DESC LIMIT 1",
 			(int) $booking->id
 		) );
-		if ( ! $payment ) {
-			return new WP_Error( 'g2ab_no_checkout_attempt', __( 'No checkout attempt is available for this booking.', 'g2a-booking' ), array( 'status' => 404 ) );
+
+		$url     = '';
+		$expires = 0;
+		if ( $payment ) {
+			$saved   = json_decode( (string) $payment->gateway_response, true );
+			$url     = is_array( $saved ) ? esc_url_raw( (string) ( $saved['url'] ?? '' ) ) : '';
+			$expires = ! empty( $payment->checkout_expires_at ) ? strtotime( (string) $payment->checkout_expires_at ) : 0;
 		}
-		$response = json_decode( (string) $payment->gateway_response, true );
-		$url      = is_array( $response ) ? esc_url_raw( (string) ( $response['url'] ?? '' ) ) : '';
-		$expires  = ! empty( $payment->checkout_expires_at ) ? strtotime( (string) $payment->checkout_expires_at ) : 0;
-		if ( ! $url || ( $expires && $expires <= time() + 60 ) ) {
-			return new WP_Error( 'g2ab_checkout_expired', __( 'The payment link has expired. Please contact staff for a fresh checkout link.', 'g2a-booking' ), array( 'status' => 410 ) );
+
+		// Stored session still usable → hand it back.
+		if ( $url && ( ! $expires || $expires > time() + 60 ) && 'pending' === (string) $booking->status ) {
+			return rest_ensure_response( array(
+				'success' => true,
+				'data'    => array(
+					'status'              => (string) $booking->status,
+					'payment_required'    => true,
+					'redirect_url'        => $url,
+					'checkout_session_id' => ! empty( $payment->checkout_session_id ) ? (string) $payment->checkout_session_id : (string) $payment->transaction_id,
+					'checkout_expires_at' => ! empty( $payment->checkout_expires_at ) ? (string) $payment->checkout_expires_at : '',
+				),
+			) );
+		}
+
+		// Session expired (or the hold itself expired): the token has already
+		// been validated above, so safely mint a FRESH checkout session instead
+		// of sending the customer to a dead URL — but only after re-checking
+		// that the inventory is still available.
+		$revived = $this->revive_and_recreate_checkout( $booking );
+		if ( is_wp_error( $revived ) ) {
+			return $revived;
 		}
 
 		return rest_ensure_response( array(
 			'success' => true,
 			'data'    => array(
-				'status'              => (string) $booking->status,
+				'status'              => 'pending',
 				'payment_required'    => true,
-				'redirect_url'        => $url,
-				'checkout_session_id' => ! empty( $payment->checkout_session_id ) ? (string) $payment->checkout_session_id : (string) $payment->transaction_id,
-				'checkout_expires_at' => ! empty( $payment->checkout_expires_at ) ? (string) $payment->checkout_expires_at : '',
+				'redirect_url'        => (string) $revived['redirect_url'],
+				'checkout_session_id' => (string) ( $revived['gateway_ref'] ?? '' ),
+				'checkout_expires_at' => '',
+				'resumed'             => true,
 			),
 		) );
+	}
+
+	/**
+	 * Re-check availability, revive an expired hold, and create a fresh
+	 * checkout session for a payable booking whose previous session died.
+	 *
+	 * @param object $booking Booking row.
+	 * @return array|WP_Error Intent array from the gateway.
+	 */
+	private function revive_and_recreate_checkout( $booking ) {
+		global $wpdb;
+
+		if ( ! in_array( (string) $booking->status, array( 'pending', 'expired' ), true ) ) {
+			return new WP_Error( 'g2ab_not_resumable', __( 'This booking can no longer be paid online.', 'g2a-booking' ), array( 'status' => 409 ) );
+		}
+		$due_now = round( (float) $booking->total_amount - (float) $booking->paid_amount, 2 );
+		if ( $due_now <= 0 ) {
+			return new WP_Error( 'g2ab_nothing_due', __( 'No payment is due for this booking.', 'g2a-booking' ), array( 'status' => 409 ) );
+		}
+		if ( G2AB_Events::timestamp( (string) $booking->start_at ) < time() ) {
+			return new WP_Error( 'g2ab_slot_past', __( 'This reservation time has already passed.', 'g2a-booking' ), array( 'status' => 410 ) );
+		}
+
+		// Inventory re-check: an expired hold released its slot/seats, so
+		// another customer may have taken them meanwhile.
+		if ( ! empty( $booking->event_occurrence_id ) ) {
+			if ( class_exists( 'G2AB_Event_Capacity_Service' )
+				&& ! G2AB_Event_Capacity_Service::can_reserve( (int) $booking->event_occurrence_id, max( 1, (int) $booking->party_size ) ) ) {
+				return new WP_Error( 'g2ab_seats_taken', __( 'Those seats are no longer available.', 'g2a-booking' ), array( 'status' => 409 ) );
+			}
+		} elseif ( ! empty( $booking->resource_id ) && 'expired' === (string) $booking->status ) {
+			$bt_table = $wpdb->prefix . 'g2ab_booking_types';
+			$load     = (int) $wpdb->get_var( $wpdb->prepare(
+				"SELECT COUNT(*) FROM {$wpdb->prefix}g2ab_bookings b
+				  WHERE b.resource_id = %d AND b.id <> %d
+				    AND b.status IN ('pending','reserved','confirmed','paid')
+				    AND b.start_at < %s AND b.end_at > %s",
+				(int) $booking->resource_id,
+				(int) $booking->id,
+				(string) $booking->end_at,
+				(string) $booking->start_at
+			) );
+			$capacity = (int) $wpdb->get_var( $wpdb->prepare(
+				"SELECT capacity FROM {$wpdb->prefix}g2ab_resources WHERE id = %d",
+				(int) $booking->resource_id
+			) );
+			if ( $load >= max( 1, $capacity ) ) {
+				return new WP_Error( 'g2ab_slot_taken', __( 'This time slot is no longer available.', 'g2a-booking' ), array( 'status' => 409 ) );
+			}
+		}
+
+		if ( 'expired' === (string) $booking->status && class_exists( 'G2AB_Booking_Transitions' ) ) {
+			$revive = G2AB_Booking_Transitions::transition( (int) $booking->id, 'pending', array(
+				'source' => 'system',
+				'reason' => 'payment_resumed',
+			) );
+			if ( is_wp_error( $revive ) ) {
+				return $revive;
+			}
+		}
+
+		$gateway = class_exists( 'G2AB_Checkout_Policy' )
+			? G2AB_Checkout_Policy::pick_online_gateway( null, 'stripe' )
+			: null;
+		if ( is_wp_error( $gateway ) || ! $gateway ) {
+			return is_wp_error( $gateway ) ? $gateway : new WP_Error( 'g2ab_no_online_gateway', __( 'Online payment is currently unavailable.', 'g2a-booking' ), array( 'status' => 503 ) );
+		}
+
+		$fresh  = $wpdb->get_row( $wpdb->prepare( "SELECT * FROM {$wpdb->prefix}g2ab_bookings WHERE id = %d", (int) $booking->id ) );
+		$intent = $gateway->create_intent( $fresh, $due_now );
+		if ( is_wp_error( $intent ) || ! is_array( $intent ) || empty( $intent['redirect_url'] ) ) {
+			return is_wp_error( $intent )
+				? $intent
+				: new WP_Error( 'g2ab_checkout_unavailable', __( 'We could not start secure checkout. Please try again in a moment.', 'g2a-booking' ), array( 'status' => 503 ) );
+		}
+		return $intent;
 	}
 
 	private function send_confirmation_email( $to, $name, $resource, $start_at, $uuid ) {
@@ -1546,32 +1673,31 @@ final class G2AB_REST_Bookings_Controller {
 		$capacity_total = (int) $occ->seats_total;
 
 		// ─── Gateway selection — paid events take payment NOW ───────────────
-		// Pick a real online gateway (prefers Stripe, then PayPal, then any
-		// available card gateway). Only when none is configured do we fall back
-		// to reserve-and-pay-at-the-desk.
-		$gateway         = ( $total > 0 ) ? $this->pick_online_gateway_for_event( $bt, $gateway_id ) : null;
+		// A paid event is a non-operational checkout hold until full payment
+		// verifies. There is NO public pay-at-store fallback: if no online
+		// gateway is usable (or the requested one is offline/unavailable), the
+		// request fails closed and no seats are held.
+		if ( $total > 0 && class_exists( 'G2AB_Checkout_Policy' ) && G2AB_Checkout_Policy::is_offline_gateway( $gateway_id ) ) {
+			return new WP_Error( 'g2ab_gateway_not_allowed', __( 'This event requires secure online payment.', 'g2a-booking' ), array( 'status' => 400 ) );
+		}
+		$gateway = ( $total > 0 ) ? $this->pick_online_gateway_for_event( $bt, $gateway_id ) : null;
 		if ( is_wp_error( $gateway ) ) {
 			return $gateway;
 		}
-		if ( $total > 0 && ! $gateway && 1 !== (int) get_option( 'g2ab_allow_event_pay_in_store_fallback', 0 ) ) {
-			return new WP_Error( 'g2ab_no_online_gateway', __( 'Online payment is currently unavailable for this event.', 'g2a-booking' ), array( 'status' => 503 ) );
+		if ( $total > 0 && ! $gateway ) {
+			return new WP_Error( 'g2ab_no_online_gateway', __( 'Online payment is currently unavailable for this event. No seats were reserved — please try again shortly.', 'g2a-booking' ), array( 'status' => 503 ) );
 		}
-		$gateway_used_id = ( $gateway && method_exists( $gateway, 'id' ) ) ? $gateway->id() : 'pay_in_store';
 
 		if ( $total <= 0 ) {
 			$payment_mode    = 'free';
 			$due_now         = 0.0;
 			$gateway_used_id = 'free';
 			$initial_status  = 'confirmed';
-		} elseif ( $gateway && method_exists( $gateway, 'create_intent' ) ) {
-			$payment_mode   = 'full';
-			$due_now        = $total;
-			$initial_status = 'pending';
 		} else {
-			$payment_mode    = 'in_store';
-			$gateway_used_id = 'pay_in_store';
-			$due_now         = 0.0;
-			$initial_status  = 'reserved';
+			$payment_mode    = 'full';
+			$due_now         = $total;
+			$initial_status  = 'pending';
+			$gateway_used_id = method_exists( $gateway, 'id' ) ? $gateway->id() : 'stripe';
 		}
 
 		$clean_fields = array();
@@ -1588,15 +1714,19 @@ final class G2AB_REST_Bookings_Controller {
 			$hold_expires_at = wp_date( 'Y-m-d H:i:s', current_time( 'timestamp' ) + ( max( 1, $hold_minutes ) * MINUTE_IN_SECONDS ), wp_timezone() );
 		}
 
-		// See create_booking() for why this exists: a retry/double-submit of
-		// the same seat request must not create a second reservation (and, for
-		// a paid event, a second payment-gateway intent).
-		$idempotency_key = hash( 'sha256', implode( '|', array(
-			'event',
-			$occurrence_id,
-			strtolower( $customer_email ),
-			(int) floor( time() / 600 ),
-		) ) );
+		// See create_booking() for the fingerprint contract: every material
+		// value participates, so a changed seat count or gateway is a NEW
+		// request while an exact retry replays the original.
+		$idempotency_key = $this->booking_idempotency_key( array(
+			'scope'    => get_current_user_id() ?: ( $this->rate_limit_identity() . '|' . strtolower( $customer_email ) ),
+			'kind'     => 'event',
+			'occurrence' => $occurrence_id,
+			'start'    => $start_sql,
+			'seats'    => $seats,
+			'gateway'  => $gateway_used_id,
+			'amount'   => number_format( $due_now, 2, '.', '' ),
+			'currency' => (string) get_option( 'g2ab_currency', 'USD' ),
+		) );
 
 		// ─── Race-safe seat reservation ─────────────────────────────────────
 		$booking_data = array(
@@ -1702,27 +1832,29 @@ final class G2AB_REST_Bookings_Controller {
 			$intent      = ( 'stripe' === $gateway_used_id )
 				? $gateway->create_intent( $booking_row, $due_now, array( 'confirm_token' => $confirm_token ) )
 				: $gateway->create_intent( $booking_row, $due_now );
-			if ( is_wp_error( $intent ) ) {
-				$response['message'] = sprintf( __( 'Reservation saved, but payment setup failed: %s. Staff will contact you.', 'g2a-booking' ), $intent->get_error_message() );
-			} elseif ( is_array( $intent ) ) {
-				$response['redirect_url'] = $intent['redirect_url'] ?? '';
-				$response['message']      = $intent['message'] ?? '';
+			if ( is_wp_error( $intent ) || ! is_array( $intent ) || empty( $intent['redirect_url'] ) ) {
+				// Fail closed — the expired hold releases its seats.
+				return $this->fail_closed_checkout( $booking_id, $gateway_used_id, is_wp_error( $intent ) ? $intent : null );
 			}
-		} elseif ( $total <= 0 ) {
-			$response['message'] = __( 'Seat reserved — no payment required. See you there!', 'g2a-booking' );
-			if ( function_exists( 'g2ab_provision_booking_customer_account' ) ) {
-				g2ab_provision_booking_customer_account( $booking_id );
-			}
+			$response['status']       = 'pending';
+			$response['state']        = 'checkout_hold';
+			$response['redirect_url'] = (string) $intent['redirect_url'];
+			$response['message']      = __( 'Payment required — your seats are held for a short time while you complete secure checkout.', 'g2a-booking' );
 		} else {
-			$response['message'] = __( 'Seat reserved. Pay at the front desk on arrival.', 'g2a-booking' );
+			$response['state']   = 'confirmed';
+			$response['message'] = __( 'Seat reserved — no payment required. See you there!', 'g2a-booking' );
 			if ( function_exists( 'g2ab_provision_booking_customer_account' ) ) {
 				g2ab_provision_booking_customer_account( $booking_id );
 			}
 		}
 
+		// Confirmation email only for CONFIRMED (free) event seats — a paid
+		// event stays silent until the webhook verifies payment.
 		$email_automation_active = class_exists( 'G2AB_Addon_Manager' )
 			&& G2AB_Addon_Manager::instance()->is_active( 'email_automation' );
-		if ( ! $email_automation_active && 1 === (int) get_option( 'g2ab_send_confirmation_email', 1 ) ) {
+		if ( ! $email_automation_active
+			&& 'confirmed' === $initial_status
+			&& 1 === (int) get_option( 'g2ab_send_confirmation_email', 1 ) ) {
 			$this->send_confirmation_email( $customer_email, $customer_name, $event->title, $start_sql, $uuid );
 		}
 
