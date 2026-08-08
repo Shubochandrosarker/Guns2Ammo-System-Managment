@@ -218,7 +218,7 @@ final class G2AB_Admin_Booking_Types_Crud {
 							<label class="g2ab-bt__check">
 								<input type="checkbox" name="members_only" value="1" <?php checked( 1, (int) ( $row->members_only ?? 0 ) ); ?> />
 								<?php
-								/* translators: %s integration name (PMPro / Memberistic) */
+								/* translators: %s membership integration name (Memberistic) */
 								printf( esc_html__( 'Members-only (%s)', 'g2a-booking' ), esc_html( $membership_integration ) );
 								?>
 							</label>
@@ -227,7 +227,7 @@ final class G2AB_Admin_Booking_Types_Crud {
 						<input type="hidden" name="members_only" value="<?php echo (int) ( $row->members_only ?? 0 ); ?>" />
 						<div class="g2ab-bt__field">
 							<small style="display:block;color:#A7A6AE;font-size:12px;">
-								<?php esc_html_e( 'Tip: activate the PMPro Memberships or Memberistic addon to gate this booking type to members only.', 'g2a-booking' ); ?>
+								<?php esc_html_e( 'Tip: activate Memberistic to gate this booking type to members only.', 'g2a-booking' ); ?>
 							</small>
 						</div>
 					<?php endif; ?>
@@ -362,16 +362,16 @@ final class G2AB_Admin_Booking_Types_Crud {
 
 	/**
 	 * Return the active membership integration label, or '' when none is active.
-	 * Used to hide members-only controls from the booking type editor when neither
-	 * PMPro nor Memberistic is wired up.
+	 * Used to hide members-only controls from the booking type editor when no
+	 * membership authority is wired up.
+	 *
+	 * Memberistic is detected by its actual presence (its public entitlement
+	 * helper), not merely by the addon toggle — the toggle only controls the
+	 * booking engine's own discount module, while entitlement always comes
+	 * from Memberistic itself.
 	 */
 	private function detect_membership_integration() {
-		$active_modules = (array) get_option( 'g2ab_addons_active', array() );
-
-		if ( in_array( 'pmpro_memberships', $active_modules, true ) && ( defined( 'PMPRO_VERSION' ) || function_exists( 'pmpro_hasMembershipLevel' ) ) ) {
-			return 'PMPro';
-		}
-		if ( in_array( 'memberistic', $active_modules, true ) ) {
+		if ( function_exists( 'memberistic_user_has_active_membership' ) || defined( 'MEMBERISTIC_VERSION' ) ) {
 			return 'Memberistic';
 		}
 		// Filter for custom integrations.

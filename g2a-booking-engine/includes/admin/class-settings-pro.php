@@ -253,9 +253,37 @@ final class G2AB_Admin_Settings_Pro {
 					<?php foreach ( self::GATEWAYS as $key => $g ) printf( '<option value="%1$s" %2$s>%3$s</option>', esc_attr( $key ), selected( get_option( 'g2ab_payment_gateway_default', 'pay_in_store' ), $key, false ), esc_html( $g['label'] ) ); ?>
 				</select>
 				<p class="g2ab-set__desc" style="margin-top:16px;">
-					<?php esc_html_e( 'Public payment policy is fixed: only members whose plan includes lane time reserve for $0; everyone else pays the full price online before the lane is held. Pay-at-store is reserved for staff-created bookings (front desk, phone, POS) and is never offered to public web checkouts.', 'g2a-booking' ); ?>
+					<?php esc_html_e( 'Members whose plan includes lane time always reserve for $0. Everyone else follows the non-member policy below. Paid events always require verified online payment and ignore these options.', 'g2a-booking' ); ?>
 				</p>
-				<button class="g2ab-set__btn g2ab-set__btn--primary" type="submit"><?php esc_html_e( 'SAVE DEFAULT', 'g2a-booking' ); ?></button>
+
+				<h3 style="margin:22px 0 6px;"><?php esc_html_e( 'NON-MEMBER PAYMENT POLICY', 'g2a-booking' ); ?></h3>
+				<p style="margin:0 0 6px;">
+					<label class="g2ab-set__check">
+						<input type="checkbox" name="g2ab_require_nonmember_payment" value="1" <?php checked( 1, (int) get_option( 'g2ab_require_nonmember_payment', 1 ) ); ?> />
+						<?php esc_html_e( 'Require online payment for non-members (recommended)', 'g2a-booking' ); ?>
+					</label>
+				</p>
+				<p class="g2ab-set__desc">
+					<?php esc_html_e( 'On by default: a non-member must complete secure online checkout before the lane is held. The reservation stays a pending-payment hold until the payment is verified.', 'g2a-booking' ); ?>
+				</p>
+				<p style="margin:14px 0 6px;">
+					<label class="g2ab-set__check">
+						<input type="checkbox" name="g2ab_allow_nonmember_front_desk" value="1" <?php checked( 1, (int) get_option( 'g2ab_allow_nonmember_front_desk', 0 ) ); ?> />
+						<?php esc_html_e( 'Allow non-members to pay at the front desk', 'g2a-booking' ); ?>
+					</label>
+				</p>
+				<p class="g2ab-set__desc">
+					<?php esc_html_e( 'Off by default, and only takes effect when the option above is unchecked. Enabling it lets a public web booking be held without payment and settled at the desk.', 'g2a-booking' ); ?>
+				</p>
+				<p style="margin:14px 0 6px;">
+					<label><?php esc_html_e( 'Pending-payment hold expiry (minutes)', 'g2a-booking' ); ?></label><br />
+					<input type="number" min="1" max="1440" name="g2ab_reservation_hold_minutes" value="<?php echo esc_attr( (int) get_option( 'g2ab_reservation_hold_minutes', 15 ) ); ?>" style="width:120px;" />
+				</p>
+				<p class="g2ab-set__desc">
+					<?php esc_html_e( 'How long an unpaid checkout hold blocks the slot before it expires and the inventory is released.', 'g2a-booking' ); ?>
+				</p>
+
+				<button class="g2ab-set__btn g2ab-set__btn--primary" type="submit"><?php esc_html_e( 'SAVE PAYMENT POLICY', 'g2a-booking' ); ?></button>
 			</form>
 		</div>
 		<?php
@@ -641,6 +669,10 @@ final class G2AB_Admin_Settings_Pro {
 				update_option( $k, $val );
 			} elseif ( in_array( $k, array( 'g2ab_booking_page_url' ), true ) ) {
 				update_option( $k, esc_url_raw( wp_unslash( $v ) ) );
+			} elseif ( 'g2ab_reservation_hold_minutes' === $k ) {
+				// Bounded integer: a zero/negative hold would disable expiry
+				// entirely and leave unpaid holds blocking inventory forever.
+				update_option( $k, max( 1, min( 1440, absint( wp_unslash( $v ) ) ) ) );
 			} elseif ( strpos( $k, '_message' ) !== false || strpos( $k, '_body' ) !== false ) {
 				update_option( $k, wp_kses_post( wp_unslash( $v ) ) );
 			} elseif ( is_array( $v ) ) {
@@ -661,8 +693,13 @@ final class G2AB_Admin_Settings_Pro {
 				$bools[] = 'g2ab_' . $gw . '_enabled';
 				$bools[] = 'g2ab_' . $gw . '_test_mode';
 			}
-			// NOTE: the retired g2ab_require_public_prepay toggle is gone —
-			// public payable bookings always prepay online by policy.
+			// The default-gateway sub-form carries the non-member payment
+			// policy. Both toggles default to the SAFE answer (require
+			// payment on, front-desk off) — see G2AB_Checkout_Policy.
+			if ( 'default' === $gw ) {
+				$bools[] = 'g2ab_require_nonmember_payment';
+				$bools[] = 'g2ab_allow_nonmember_front_desk';
+			}
 		} elseif ( 'notifications' === $tab ) {
 			$bools = array( 'g2ab_send_confirmation_email', 'g2ab_send_reminder_email', 'g2ab_sms_enabled' );
 		} elseif ( 'danger' === $tab ) {

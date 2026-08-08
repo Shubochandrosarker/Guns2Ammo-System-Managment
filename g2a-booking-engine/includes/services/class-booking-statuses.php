@@ -34,6 +34,7 @@ final class G2AB_Booking_Statuses {
 	const NO_SHOW            = 'no_show';
 	const REFUNDED           = 'refunded';
 	const PARTIALLY_REFUNDED = 'partially_refunded';
+	const PAYMENT_FAILED     = 'payment_failed';
 	const EXPIRED            = 'expired';
 
 	/**
@@ -52,8 +53,29 @@ final class G2AB_Booking_Statuses {
 			self::NO_SHOW            => __( 'No Show',   'g2a-booking' ),
 			self::REFUNDED           => __( 'Refunded',  'g2a-booking' ),
 			self::PARTIALLY_REFUNDED => __( 'Partially Refunded', 'g2a-booking' ),
+			self::PAYMENT_FAILED     => __( 'Payment Failed', 'g2a-booking' ),
 			self::EXPIRED            => __( 'Expired',   'g2a-booking' ),
 		);
+	}
+
+	/**
+	 * Customer/staff-facing label that names the PAYMENT state explicitly.
+	 *
+	 * `pending` is stored for historical compatibility but always means
+	 * "checkout hold, payment required" — never a confirmed reservation — so
+	 * every human-facing surface says so.
+	 *
+	 * @param string $status Status slug.
+	 * @return string
+	 */
+	public static function payment_label( $status ) {
+		$map = array(
+			self::PENDING        => __( 'Pending Payment', 'g2a-booking' ),
+			self::PAYMENT_FAILED => __( 'Payment Failed', 'g2a-booking' ),
+			self::EXPIRED        => __( 'Expired (unpaid)', 'g2a-booking' ),
+		);
+		$all = self::all();
+		return $map[ (string) $status ] ?? ( $all[ (string) $status ] ?? ucwords( str_replace( '_', ' ', (string) $status ) ) );
 	}
 
 	/**
@@ -69,6 +91,16 @@ final class G2AB_Booking_Statuses {
 	 */
 	public static function terminal() {
 		return array( self::COMPLETED, self::CANCELLED, self::NO_SHOW, self::REFUNDED, self::EXPIRED );
+	}
+
+	/**
+	 * Statuses that mean "payment is required and has not succeeded".
+	 * These never occupy an operational roster.
+	 *
+	 * @return string[]
+	 */
+	public static function unpaid() {
+		return array( self::PENDING, self::PAYMENT_FAILED, self::EXPIRED );
 	}
 
 	public static function is_valid( $status ) {
@@ -106,6 +138,7 @@ final class G2AB_Booking_Statuses {
 			self::NO_SHOW            => '#C62828', // red
 			self::REFUNDED           => '#7C3AED', // purple
 			self::PARTIALLY_REFUNDED => '#6D28D9', // deep purple — still attending, money partially returned
+			self::PAYMENT_FAILED     => '#B91C1C', // dark red — payment attempted and declined
 			self::EXPIRED            => '#92400E', // brown
 		);
 		return $map[ (string) $status ] ?? '#6B7280';

@@ -47,6 +47,40 @@ final class G2AB_Checkout_Policy {
 	}
 
 	/**
+	 * Must a non-member pay online before the reservation is confirmed?
+	 *
+	 * ON by default and the safe answer. Turning it off is an explicit,
+	 * audited business decision (Settings → Payments) that re-opens
+	 * pay-at-the-desk reservations for public lane bookings.
+	 *
+	 * @return bool
+	 */
+	public static function require_payment_for_non_members() {
+		return (bool) apply_filters(
+			'g2ab_require_payment_for_non_members',
+			1 === (int) get_option( 'g2ab_require_nonmember_payment', 1 )
+		);
+	}
+
+	/**
+	 * May a PUBLIC non-member settle a lane booking at the front desk?
+	 *
+	 * OFF by default. Only an explicit admin opt-in allows it, and it never
+	 * applies to paid events (those always require verified online payment).
+	 *
+	 * @return bool
+	 */
+	public static function allow_non_member_front_desk() {
+		if ( self::require_payment_for_non_members() ) {
+			return false;
+		}
+		return (bool) apply_filters(
+			'g2ab_allow_non_member_front_desk',
+			1 === (int) get_option( 'g2ab_allow_nonmember_front_desk', 0 )
+		);
+	}
+
+	/**
 	 * Structured lane entitlement for an AUTHENTICATED user id.
 	 *
 	 * The membership plugin overrides the seed through `g2ab_lane_entitlement`.
@@ -137,12 +171,26 @@ final class G2AB_Checkout_Policy {
 			);
 		}
 
-		// ── Public payable: online gateway only, full amount, checkout hold ──
+		// ── Public payable ────────────────────────────────────────────────────
+		// Front-desk settlement is only reachable when an admin has explicitly
+		// disabled "require payment for non-members" AND enabled the
+		// front-desk option. Both default to the safe answer, so the normal
+		// path below is: online gateway only, full amount, checkout hold.
 		if ( self::is_offline_gateway( $requested_gateway ) ) {
-			return new WP_Error(
-				'g2ab_gateway_not_allowed',
-				__( 'This reservation requires secure online payment.', 'g2a-booking' ),
-				array( 'status' => 400 )
+			if ( ! self::allow_non_member_front_desk() ) {
+				return new WP_Error(
+					'g2ab_gateway_not_allowed',
+					__( 'This reservation requires secure online payment.', 'g2a-booking' ),
+					array( 'status' => 400 )
+				);
+			}
+			return array(
+				'amount_due'     => 0.0,
+				'payment_mode'   => 'in_store',
+				'gateway_policy' => 'pay_in_store',
+				'initial_status' => 'reserved',
+				'zero_reason'    => 'admin_enabled_front_desk',
+				'entitlement'    => $entitlement,
 			);
 		}
 

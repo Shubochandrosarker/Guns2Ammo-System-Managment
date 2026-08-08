@@ -531,22 +531,26 @@ final class G2AB_REST_Bookings_Controller {
 	}
 
 	/**
-	 * Single source of truth for "is this user an active paid member?"
+	 * Is this user an active member for booking purposes?
+	 *
+	 * Memberistic is the ONLY membership authority: it answers through
+	 * memberistic_user_has_active_membership() (live status + plan + renewal
+	 * date). We deliberately do NOT read the memberistic_active_plan_id user
+	 * meta — it is written on activation but never cleared on expiry or
+	 * cancellation, so trusting it would keep a lapsed member on member
+	 * pricing and members-only access.
+	 *
+	 * When Memberistic is unavailable the answer is NO for everyone except
+	 * staff with the manage capability: failing closed keeps members-only
+	 * inventory and member pricing locked rather than opening them up.
 	 */
 	private function is_active_member( $user_id ) {
 		if ( ! $user_id ) {
 			return false;
 		}
-		if ( function_exists( 'pmpro_hasMembershipLevel' ) ) {
-			return (bool) pmpro_hasMembershipLevel( null, $user_id );
+		if ( function_exists( 'memberistic_user_has_active_membership' ) ) {
+			return (bool) memberistic_user_has_active_membership( $user_id );
 		}
-		// Memberistic answers authoritatively via the g2ab_user_is_member filter
-		// (it checks live membership status + renewal date). We deliberately do NOT
-		// trust the memberistic_active_plan_id user-meta here: it is written on
-		// activation but NOT cleared on expiry/cancellation, so trusting it would
-		// keep an expired member on member pricing and members-only access. This
-		// method only SEEDS the filter; Memberistic (or PMPro above) supplies the
-		// real answer. Staff with the manage capability can always book.
 		return user_can( $user_id, 'manage_g2ab_bookings' );
 	}
 

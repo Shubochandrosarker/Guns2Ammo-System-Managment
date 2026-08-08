@@ -87,6 +87,75 @@ if ( ! function_exists( 'memberistic_user_has_membership' ) ) {
 	}
 }
 
+if ( ! function_exists( 'memberistic_get_membership_status' ) ) {
+	/**
+	 * Structured membership status for a user. The canonical public lookup —
+	 * other plugins must use this instead of reading membership tables or the
+	 * stale `memberistic_active_plan_id` user meta directly.
+	 *
+	 * @param int $user_id WP user id.
+	 * @return array See Membership_Service::get_user_membership_status().
+	 */
+	function memberistic_get_membership_status( $user_id ) {
+		return \WordPressistic\Memberistic\Membership_Service::get_user_membership_status( $user_id );
+	}
+}
+
+if ( ! function_exists( 'memberistic_user_has_active_membership' ) ) {
+	/**
+	 * True when the user holds a LIVE membership (active/comped, not expired).
+	 *
+	 * Unlike memberistic_user_has_membership(), this excludes trials and
+	 * lapsed rows, so it is the correct check for gating benefits.
+	 *
+	 * @param int    $user_id   WP user id.
+	 * @param string $plan_slug Optional plan slug to require.
+	 * @return bool
+	 */
+	function memberistic_user_has_active_membership( $user_id, $plan_slug = '' ) {
+		return \WordPressistic\Memberistic\Membership_Service::user_has_active_plan( $user_id, $plan_slug );
+	}
+}
+
+if ( ! function_exists( 'memberistic_can_user_book' ) ) {
+	/**
+	 * Entitlement decision for the booking engine: may this authenticated
+	 * user reserve using a membership benefit (i.e. without paying)?
+	 *
+	 * @param int   $user_id         WP user id.
+	 * @param array $booking_context Optional booking context.
+	 * @return bool
+	 */
+	function memberistic_can_user_book( $user_id, $booking_context = array() ) {
+		return \WordPressistic\Memberistic\Membership_Service::can_book_lane( $user_id, $booking_context );
+	}
+}
+
+if ( ! function_exists( 'memberistic_booking_requires_payment' ) ) {
+	/**
+	 * True when the booking must be paid online before it can be confirmed.
+	 *
+	 * @param int   $user_id         WP user id.
+	 * @param array $booking_context Optional booking context.
+	 * @return bool
+	 */
+	function memberistic_booking_requires_payment( $user_id, $booking_context = array() ) {
+		return \WordPressistic\Memberistic\Membership_Service::requires_payment_for_booking( $user_id, $booking_context );
+	}
+}
+
+if ( ! function_exists( 'memberistic_is_guest_user' ) ) {
+	/**
+	 * True when the user holds no live membership (guest / range customer).
+	 *
+	 * @param int $user_id WP user id.
+	 * @return bool
+	 */
+	function memberistic_is_guest_user( $user_id ) {
+		return \WordPressistic\Memberistic\Membership_Service::is_guest_user( $user_id );
+	}
+}
+
 if ( ! function_exists( 'memberistic_waiver_on_file' ) ) {
 	/**
 	 * Public lookup: the current waiver-on-file for a person, by email (then

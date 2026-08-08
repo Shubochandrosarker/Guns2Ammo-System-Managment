@@ -4,7 +4,7 @@ Tags: booking, reservation, scheduling, appointments, shooting range, firearms, 
 Requires at least: 6.2
 Tested up to: 6.5
 Requires PHP: 8.0
-Stable tag: 1.10.0
+Stable tag: 1.11.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -33,7 +33,7 @@ So instead of shipping a booking widget and stopping, this plugin ships a comple
 * A reservation-hold cron that automatically frees abandoned bookings.
 * An email automation engine with lifecycle templates, branded HTML, and a 5-minute reminder cron with dedupe.
 * A signed-token PDF invoice generator that fires on every successful payment.
-* Membership rules that respect Paid Memberships Pro and Memberistic levels (members-only booking types, percent discounts, free credits).
+* Membership rules driven by Memberistic — the single membership authority (members-only booking types, percent discounts, free credits).
 * A front-desk terminal for the desk laptop — today's roster, instant search, check-in, waiver verification, on-the-spot payment collection, printable receipts.
 * A FullCalendar admin view with drag-to-reschedule and quick actions.
 * Customer-facing reschedule + cancel pages, signed-token protected.
@@ -84,7 +84,7 @@ Everything is stored in custom database tables (not post-meta), every gateway fi
 
 **Memberships**
 
-* Paid Memberships Pro and Memberistic integration modules, can run side by side.
+* Memberistic is the single source of truth for membership status, plans and booking entitlement.
 * Detects logged-in member level, with a DB fallback if the level helper functions aren't available.
 * Per-level percent discount rules — applied to all booking types or a selected list.
 * Members-only booking types with a configurable upgrade / login message for non-members.
@@ -142,7 +142,7 @@ Everything is stored in custom database tables (not post-meta), every gateway fi
 
 * Core booking engine, REST API, admin UI, frontend booking form.
 * 6 built-in payment gateways (Pay-In-Store, Stripe, PayPal, Fortis, Authorize.net, WooCommerce Bridge).
-* 8 auto-discovered feature modules (Email Automation, PDF Invoices, Migration Tool, PMPro Memberships, Memberistic, Verifyistic / Waiver hooks, WooCommerce Bridge, AI Auto-Reply).
+* 8 auto-discovered feature modules (Email Automation, PDF Invoices, Migration Tool, Memberistic, Verifyistic / Waiver hooks, WooCommerce Bridge, AI Auto-Reply).
 * SEO landing-page templates and JSON-LD schema.
 * 6 example shooting-range lanes seeded on activation.
 * A custom `Range Member` role for tracked customers.
@@ -181,7 +181,7 @@ Yes. Set the booking type's `capacity_mode` to `party_size` and the engine will 
 
 = Can members get discounts? =
 
-Yes. The PMPro and Memberistic addons detect the logged-in user's level and apply configurable per-level percent discounts. 100% = free booking.
+Yes. The Memberistic addon detects the logged-in member's live plan and applies configurable per-plan percent discounts. 100% = free booking.
 
 = How do I import bookings from another plugin? =
 
@@ -206,6 +206,19 @@ Yes. REST API at `/wp-json/g2a-booking/v1/` covers bookings, forms, calendar, fr
 7. Migration wizard — dry-run preview before live import.
 
 == Changelog ==
+
+= 1.11.0 =
+* BREAKING: Paid Memberships Pro support is removed entirely. Memberistic is now the single source of truth for membership status, plans and booking entitlement. PMPro can be deactivated and deleted — there is no fallback, bridge or compatibility layer. See docs/PMPRO-REMOVAL.md.
+* Removed the `pmpro-memberships` module (level detection, members-only gating, discount rules) and the dead `G2AB_Integration_PMPro` bootstrap that referenced a class which never shipped.
+* Fixed PMPro silently winning every entitlement decision on sites running both plugins: `is_active_member()` and the members-only frontend gate called `pmpro_hasMembershipLevel()` ahead of Memberistic.
+* Fixed the members-only frontend gate trusting the `memberistic_active_plan_id` user meta, which is written on activation but never cleared on expiry or cancellation — a lapsed member kept members-only access indefinitely. Membership state now always comes from Memberistic's live lookup.
+* Entitlement now fails CLOSED when Memberistic is unavailable: members-only inventory and member pricing lock down instead of opening up (staff with `manage_g2ab_bookings` excepted).
+* The bundled Memberistic discount module no longer queries membership tables itself — it asks Memberistic via `memberistic_get_membership_status()`, so there is exactly one rulebook.
+* NEW status `payment_failed`: a declined payment is now distinct from an expired hold. It releases the slot, never appears on an operational roster, shows on the Checkout Attempts screen, and is retryable through the resume-payment flow.
+* WooCommerce order sync rewritten to route every status change through the central transition service (allowed-transition map, payment-evidence invariants, previous status in hooks, audit log). The payment-ledger row is now written first and idempotently keyed on the order, so repeated `processing`→`completed` hooks or replayed webhooks cannot double-insert payments, double-confirm bookings or double-send emails. Adds `pending`/`on-hold` handling, `failed` → `payment_failed`, and partial-refund awareness.
+* WooCommerce-paid bookings now run the full paid side-effect sequence (account provisioning, Range Guest classification, confirmation email) that previously only native gateways fired.
+* NEW admin settings (Settings → Payments): "Require online payment for non-members" (default ON) and "Allow non-members to pay at the front desk" (default OFF, and only effective when the first is off). Pending-payment hold expiry is now editable and bounded to 1–1440 minutes.
+* Default payment gateway for new installs is now Stripe rather than Pay In Store.
 
 = 1.10.0 =
 * SECURITY/POLICY: Public payable bookings must now prepay online — the public pay-at-store path is removed entirely, including the crafted `gateway=pay_in_store` bypass, the `/payment-methods` offline advertising, and the `g2ab_require_public_prepay` escape hatch. Pay-at-store remains for staff-created bookings only (front desk, phone, POS).

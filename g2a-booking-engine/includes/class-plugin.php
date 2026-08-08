@@ -150,8 +150,9 @@ final class G2AB_Plugin
 			add_action('g2ab_payment_succeeded', array($this, 'mark_booking_customer_role'), 10, 1);
 			add_action('g2ab_booking_status_changed', array($this, 'maybe_mark_booking_customer_role_from_status'), 10, 2);
 
+			// Memberistic is the single membership authority; no other
+			// membership plugin is booted or supported here.
 			if (! $safe_mode) {
-				if (defined('PMPRO_VERSION') && class_exists('G2AB_Integration_PMPro')) G2AB_Integration_PMPro::instance();
 				if (class_exists('WooCommerce') && class_exists('G2AB_Integration_WooCommerce')) G2AB_Integration_WooCommerce::instance();
 			}
 
