@@ -26,6 +26,7 @@ final class G2AB_Activator {
 		update_option( 'g2ab_plugin_version', G2AB_VERSION );
 
 		self::set_default_options();
+		self::retire_removed_options();
 		self::register_roles_and_caps();
 		self::seed_initial_data();
 		self::merge_default_active_modules();
@@ -34,6 +35,32 @@ final class G2AB_Activator {
 		set_transient( 'g2ab_activation_redirect', 1, 30 );
 		flush_rewrite_rules();
 		do_action( 'g2ab_activated' );
+	}
+
+	/**
+	 * Delete option rows for settings that no longer exist.
+	 *
+	 * Retired in 1.12.0 with the public front-desk override. Nothing reads
+	 * these any more, so leaving them would be inert — but a stale
+	 * `g2ab_allow_nonmember_front_desk = 1` row on a site that had once
+	 * enabled the override is exactly the kind of leftover that looks
+	 * authoritative to whoever reads the options table next. Removing them
+	 * makes "a non-member always pays online" true in the database as well as
+	 * in the code.
+	 *
+	 * @since 1.12.0
+	 * @return void
+	 */
+	private static function retire_removed_options() {
+		$retired = array(
+			'g2ab_require_nonmember_payment',
+			'g2ab_allow_nonmember_front_desk',
+			// Retired earlier, when the public prepay toggle was replaced.
+			'g2ab_require_public_prepay',
+		);
+		foreach ( $retired as $option ) {
+			delete_option( $option );
+		}
 	}
 
 	/**
@@ -82,11 +109,11 @@ final class G2AB_Activator {
 			// exists only for staff-created bookings and is never a public
 			// default; the retired event pay-in-store fallback option is gone.
 			'g2ab_payment_gateway_default'  => 'stripe',
-			// Non-member payment policy — safe defaults. Require online
-			// payment; never offer public front-desk settlement unless an
-			// admin explicitly turns both of these around.
-			'g2ab_require_nonmember_payment'  => 1,
-			'g2ab_allow_nonmember_front_desk' => 0,
+			// The non-member payment policy is a fixed rule in
+			// G2AB_Checkout_Policy, not an option — there is deliberately no
+			// seed here. The retired `g2ab_require_nonmember_payment` and
+			// `g2ab_allow_nonmember_front_desk` rows are deleted by
+			// retire_removed_options() so a stale value can never be read.
 			'g2ab_stripe_enabled'           => 0,
 			'g2ab_stripe_test_mode'         => 1,
 			'g2ab_stripe_publishable_key'   => '',

@@ -18,7 +18,7 @@ automation, agents, model connections, and the BridGistic command bridge.
 ## Run locally
 
 ```bash
-cd dashboard-app
+cd apps/dashboard-app
 npm install
 cp .env.example .env
 npm run dev

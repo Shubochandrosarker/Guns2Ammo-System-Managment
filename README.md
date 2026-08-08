@@ -38,10 +38,16 @@ every membership decision, so Memberistic must be active first:
 | Order | Package | Version |
 | --- | --- | --- |
 | 1 | `memberistic-membership-solutions-1.20.0.zip` | 1.20.0 |
-| 2 | `g2a-booking-engine-1.11.0.zip` | 1.11.0 |
+| 2 | `g2a-booking-engine-1.12.0.zip` | 1.12.0 |
 | 3 | `g2a-pos-core-3.4.0.zip` | 3.4.0 |
 | 4 | `advanced-ffl-checkout`, `verifyistic`, `formistic`, `messageistic`, `g2a-theme-control` | see VERSIONS.md |
-| 5 | `guns2ammo-1.27.14.zip` (theme) | 1.27.14 |
+| 5 | `g2a-business-api-0.4.3.zip` | 0.4.3 |
+| 6 | `guns2ammo-1.27.14.zip` (theme) | 1.27.14 |
+
+`g2a-business-api` serves the staff dashboard at **app.guns2ammo.com** and must
+be installed before the dashboard SPA is deployed — the app has no other
+backend. Deploy order and the same-origin session contract are in
+[DEPLOYMENT.md](DEPLOYMENT.md).
 
 **Do not install** `archives/plugins/guns2ammo-waiver-manager` — it is retired,
 superseded by Memberistic's waiver system, and self-disables if activated.

@@ -1,50 +1,117 @@
 #!/usr/bin/env bash
-# Rebuild all theme + plugin release zips from the tracked source dirs.
-# Output: root-level zips (overwrite the existing ones) + a versioned theme
-# archive under dist/ named from style.css's Version: header.
+# Rebuild every installable plugin/theme ZIP into dist/.
 #
-# Usage: ./scripts/build-release-zips.sh
+# Output: dist/<component>-<version>.zip, versioned from the component's own
+# header (plugin "Version:" header, theme style.css). Each archive has the
+# component directory at its ROOT, which is what WordPress requires:
+#
+#     g2a-booking-engine/g2a-booking-engine.php     correct
+#     plugins/g2a-booking-engine/...                installs a "plugins" folder
+#
+# Builds are production-clean: development tooling is excluded, runtime
+# dependencies are kept (g2a-pos-core needs vendor/ for FPDI/FPDF receipt PDFs;
+# the booking engine needs assets/vendor/ for FullCalendar and qrcode). See
+# dist/README.md.
+#
+# Usage: scripts/build-release-zips.sh [component ...]
+#        With no arguments, builds everything.
 set -euo pipefail
 
 ROOT="$( cd "$( dirname "${BASH_SOURCE[0]}" )/.." && pwd )"
 cd "$ROOT"
 
-# Extract the theme's declared version from style.css for the release archive
-# filename. Falls back to "dev" if the header isn't found.
-theme_version="$( awk '/^Version:/ { print $2; exit }' themes/guns2ammo/style.css 2>/dev/null || echo dev )"
-theme_version="${theme_version:-dev}"
+command -v zip >/dev/null || { echo "FATAL: 'zip' is not installed." >&2; exit 2; }
 
-mkdir -p dist
+OUT="$ROOT/dist"
+mkdir -p "$OUT"
 
-echo "→ Packaging theme as guns2ammo (version $theme_version)"
-# Remove the old archive first so files deleted from the source tree don't
-# survive inside the zip (zip -r only adds/updates entries, never prunes).
-rm -f "WPistic-Theme-For-G2A-Version-1.8.9.zip"
-zip -rq "WPistic-Theme-For-G2A-Version-1.8.9.zip" themes/guns2ammo \
-    -x "*/.DS_Store" "*/.git/*" "*/node_modules/*"
-cp "WPistic-Theme-For-G2A-Version-1.8.9.zip" \
-    "dist/WPistic-Theme-For-G2A-Version-${theme_version}.zip"
+# Development-only paths. Kept deliberately narrow: anything not listed here
+# ships, so a new runtime directory is included by default rather than silently
+# dropped from a release.
+EXCLUDES=(
+  '*/.git/*' '*/.github/*' '*/.DS_Store'
+  '*/node_modules/*' '*/tests/*' '*/.phpunit.cache/*'
+  '*/phpunit.xml' '*/phpunit.xml.dist'
+  '*/composer.json' '*/composer.lock'
+  '*/package.json' '*/package-lock.json'
+  '*/.gitignore' '*/.gitattributes' '*/.editorconfig'
+  '*/phpcs.xml' '*/phpcs.xml.dist' '*/.eslintrc*'
+)
 
-for plugin in plugins/g2a-booking-engine plugins/g2a-theme-control plugins/memberistic-membership-solutions plugins/verifyistic plugins/messageistic plugins/g2a-pos-core plugins/advanced-ffl-checkout plugins/formistic; do
-  if [ -d "$plugin" ]; then
-    # Read the version WordPress itself will display, from the plugin header.
-    version="$( grep -m1 -h '^ \* Version:' "$plugin"/*.php 2>/dev/null | sed 's/.*Version: *//' | tr -d ' \r' )"
-    version="${version:-dev}"
-
-    echo "→ Packaging $plugin ($version)"
-    rm -f "${plugin}.zip"
-    zip -rq "${plugin}.zip" "$plugin" -x "*/.DS_Store" "*/.git/*" "*/node_modules/*"
-
-    # Also drop a versioned copy in releases/. Previously only the THEME got
-    # one, so dist/ silently fell behind the source: g2a-booking-engine
-    # sat at 1.9.9.19 while the source was on .20, and — worse — a
-    # g2a-pos-core-3.4.0.zip existed whose contents predated several fixes
-    # landed under that same version number. A stale artefact carrying the
-    # right version string is undetectable at install time.
-    cp "$(basename "${plugin}").zip" "dist/$(basename "${plugin}")-${version}.zip"
+# Read the version a component declares for itself.
+#   plugin -> the "Version:" line in the file carrying "Plugin Name:"
+#   theme  -> the "Version:" line in style.css
+component_version() {
+  local dir="$1" f v=''
+  if [ -f "$dir/style.css" ] && grep -q '^[[:space:]]*Theme Name:' "$dir/style.css" 2>/dev/null; then
+    v="$( grep -m1 -oP '^\s*Version:\s*\K[0-9][0-9a-zA-Z.\-]*' "$dir/style.css" || true )"
+  else
+    for f in "$dir"/*.php; do
+      [ -f "$f" ] || continue
+      grep -q '^[[:space:]]*\*[[:space:]]*Plugin Name:' "$f" || continue
+      v="$( grep -m1 -oP '^\s*\*\s*Version:\s*\K[0-9][0-9a-zA-Z.\-]*' "$f" || true )"
+      break
+    done
   fi
+  printf '%s' "$v"
+}
+
+build_one() {
+  local path="$1"                 # e.g. plugins/g2a-booking-engine
+  local parent name version zipfile
+  parent="$( dirname "$path" )"   # plugins
+  name="$( basename "$path" )"    # g2a-booking-engine
+
+  version="$( component_version "$path" )"
+  if [ -z "$version" ]; then
+    echo "FAIL: $path declares no version — refusing to build an unversioned artifact." >&2
+    return 1
+  fi
+
+  zipfile="$OUT/${name}-${version}.zip"
+
+  # Remove first: `zip -r` adds and updates entries but never prunes, so
+  # rebuilding over an existing archive keeps files that were deleted from the
+  # source tree. A stale artifact carrying the right version string is
+  # undetectable at install time.
+  rm -f "$zipfile"
+
+  # Zip from the PARENT directory so the archive root is the component folder.
+  ( cd "$parent" && zip -rq "$zipfile" "$name" -x "${EXCLUDES[@]}" )
+
+  # An archive whose root is not exactly the component directory will not
+  # install. Verify rather than assume.
+  local roots
+  roots="$( unzip -Z1 "$zipfile" | cut -d/ -f1 | sort -u )"
+  if [ "$roots" != "$name" ]; then
+    echo "FAIL: $zipfile root is '$roots', expected '$name'." >&2
+    return 1
+  fi
+
+  printf '  built  %-46s %s\n' "$(basename "$zipfile")" "$( du -h "$zipfile" | cut -f1 )"
+}
+
+targets=()
+if [ "$#" -gt 0 ]; then
+  for arg in "$@"; do targets+=( "$arg" ); done
+else
+  for d in plugins/*/; do targets+=( "${d%/}" ); done
+  for d in themes/*/; do targets+=( "${d%/}" ); done
+fi
+
+fail=0
+for t in "${targets[@]}"; do
+  if [ ! -d "$t" ]; then
+    echo "FAIL: $t does not exist." >&2
+    fail=1
+    continue
+  fi
+  build_one "$t" || fail=1
 done
 
 echo
-echo "Built:"
-ls -la *.zip dist/
+if [ "$fail" -ne 0 ]; then
+  echo "RESULT: one or more components failed to build."
+  exit 1
+fi
+echo "Built $( ls -1 "$OUT"/*.zip | wc -l ) archives into dist/."

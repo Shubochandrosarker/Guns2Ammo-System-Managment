@@ -40,6 +40,11 @@ jobs:
       MONO_REF: ${{ github.head_ref || github.ref_name }}
       # Optional PAT for private standalone repos; public repos clone anonymously.
       SYNC_TOKEN: ${{ secrets.PLUGIN_SYNC_TOKEN }}
+      # Everything except a pull request opened from a fork. Fork PRs cannot
+      # see repository secrets at all, so a missing token there is expected
+      # rather than a misconfiguration; anywhere else it means this check
+      # would silently verify nothing.
+      FAIL_CLOSED: ${{ github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository }}
     steps:
       - uses: actions/checkout@v4
 
@@ -61,13 +66,28 @@ jobs:
               cat /tmp/clone_err.log
               exit 1
             fi
-            # No token configured and an anonymous clone failed — most
-            # likely the standalone repo is private. This check can't run
-            # without read access; skip it informationally rather than
-            # failing on missing infrastructure it can't self-provision. A
-            # repo admin can add a PLUGIN_SYNC_TOKEN secret (a PAT with read
-            # access to both standalone repos) to make this fully enforcing.
-            echo "::warning::Could not clone $url anonymously (likely private). Add a PLUGIN_SYNC_TOKEN repo secret to enable sync verification. Skipping this run."
+            # No token configured and an anonymous clone failed — most likely
+            # the standalone repo is private.
+            #
+            # This check cannot run without read access. What it must NOT do is
+            # report success: a green "Monorepo plugin copies match standalone
+            # repos" that never compared anything is worse than a red one,
+            # because it is indistinguishable from a real pass on the branch
+            # protection screen.
+            #
+            # So: fail closed on the trunk and on release branches, where a
+            # divergence would actually ship. Tolerate it only on a fork PR,
+            # where secrets are unavailable by design and the contributor has
+            # no way to provision them — that run is re-verified on the
+            # internal branch before merge.
+            if [ "$FAIL_CLOSED" = "true" ]; then
+              echo "::error::Could not clone $url anonymously (likely private) and no PLUGIN_SYNC_TOKEN is configured."
+              echo "::error::Plugin sync cannot be verified on '$MONO_REF', so this check fails rather than passing unverified."
+              echo "::error::Fix: add a PLUGIN_SYNC_TOKEN repo secret — a fine-grained PAT with read-only Contents access to g2a-booking-engine and memberistic-membership-solutions."
+              cat /tmp/clone_err.log
+              exit 1
+            fi
+            echo "::warning::Could not clone $url anonymously and no PLUGIN_SYNC_TOKEN is set. Skipping on this fork PR; the check is enforced on internal branches."
             cat /tmp/clone_err.log
             return 1
           }

@@ -42,7 +42,7 @@ Memberistic; nothing makes its own membership assumptions.
 
 ---
 
-## 2. Booking (G2A Booking Engine 1.11.0)
+## 2. Booking (G2A Booking Engine 1.12.0)
 
 **Booking types & inventory**
 - Lane bookings, classes, instructor sessions, events with occurrences
@@ -56,7 +56,7 @@ Memberistic; nothing makes its own membership assumptions.
 - Everyone else pays the **full server-calculated price online** before the lane is held
 - Public deposits and public pay-at-store are not permitted
 - Offline gateways (`pay_in_store`, cash, terminal, comp, manual) are rejected on public payable endpoints — even for a crafted request
-- Front-desk settlement for non-members requires an explicit **double admin opt-in**, both defaulting to the safe answer
+- **No admin override exists.** There is no setting, filter or capability that lets a public non-member hold a lane without paying; desk settlement lives only in the capability-gated staff endpoint, which records who took the booking
 - Fail-closed: if checkout can't be created, no reservation, no account, no email — recoverable error instead
 
 **Booking states**
@@ -113,7 +113,7 @@ Memberistic; nothing makes its own membership assumptions.
 | **formistic** 2.1.1 | Form builder for public site forms with submissions |
 | **messageistic** 0.8.1 | Transactional messaging / SMS bridge |
 | **g2a-theme-control** 1.0.1 | Theme presentation toggles |
-| **g2a-business-api** | Internal business API surface |
+| **g2a-business-api** 0.4.3 | REST backend for the staff dashboard at app.guns2ammo.com — server-managed sessions (HttpOnly cookie + CSRF header), analytics aggregation across WooCommerce, bookings and Memberistic |
 | **guns2ammo** theme 1.27.14 | Public site, Elementor-compatible, SEO redirects, structured data |
 | **dashboard-app** | Staff/owner dashboard |
 | **g2a-chat-worker** + **cloudflare-rag-worker** | Site chat with retrieval-backed answers |
@@ -136,9 +136,10 @@ Memberistic; nothing makes its own membership assumptions.
 | Gate | Scope |
 | --- | --- |
 | `no-pmpro` | Whole repo — fails on any Paid Memberships Pro dependency |
-| `plugin-sync` | Monorepo plugin copies vs standalone repos, byte-identical |
+| `plugin-sync` | Monorepo plugin copies vs standalone repos, byte-identical — **fails closed** if it cannot clone and compare |
+| `plugin-versions` | Every plugin header version matches its runtime version constant |
 | PHP lint | Every PHP file, PHP 8.1 + 8.3 |
-| PHPUnit | 68 booking-engine tests, 38 Memberistic tests |
+| PHPUnit | 67 booking-engine tests, 38 Memberistic tests |
 | JS syntax | All plugin assets |
 | PHPCS PSR-12 | New service classes (advisory) |
 | Composer validate | POS, business API, messageistic |

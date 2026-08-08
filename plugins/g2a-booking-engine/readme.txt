@@ -4,7 +4,7 @@ Tags: booking, reservation, scheduling, appointments, shooting range, firearms, 
 Requires at least: 6.2
 Tested up to: 6.5
 Requires PHP: 8.0
-Stable tag: 1.11.0
+Stable tag: 1.12.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -206,6 +206,12 @@ Yes. REST API at `/wp-json/g2a-booking/v1/` covers bookings, forms, calendar, fr
 7. Migration wizard — dry-run preview before live import.
 
 == Changelog ==
+
+= 1.12.0 =
+* BREAKING: the public front-desk override is removed. A non-member can no longer obtain a lane reservation without verified online payment under any configuration. The `g2ab_require_nonmember_payment` and `g2ab_allow_nonmember_front_desk` settings are gone, along with the `g2ab_require_payment_for_non_members` and `g2ab_allow_non_member_front_desk` filters. Their option rows are deleted on activation so a stale value cannot be read.
+* Staff keep full desk settlement. Bookings → Add Booking (POST /admin/bookings) still accepts in_store, cash, card_terminal and admin_comp; it requires the `manage_g2ab_bookings` capability plus a verified nonce, and records the staff member who took the booking.
+* Removed the unreachable `G2AB_Gateway_Manager::pick_for_type()` and its private `allowed_ids_for_type()` helper. Nothing called either, and the dead method defaulted to `pay_in_store` when `g2ab_payment_gateway_default` was unset — wiring it up would have handed an offline gateway to a public booking.
+* Fixed the default-gateway readers falling back to `pay_in_store` when the option row was absent, which contradicted the activator's `stripe` seed on sites upgraded rather than freshly activated. All readers now fall back to `stripe`.
 
 = 1.11.0 =
 * BREAKING: Paid Memberships Pro support is removed entirely. Memberistic is now the single source of truth for membership status, plans and booking entitlement. PMPro can be deactivated and deleted — there is no fallback, bridge or compatibility layer. See docs/PMPRO-REMOVAL.md.

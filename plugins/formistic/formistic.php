@@ -31,7 +31,7 @@ if (! defined('ABSPATH')) {
  * WPISTIC_FORMISTIC_URL        — URL to plugin directory (trailing slash).
  * WPISTIC_FORMISTIC_BASENAME   — Plugin basename (folder/file.php) for hooks.
  */
-define('WPISTIC_FORMISTIC_VERSION', '2.1.0');
+define('WPISTIC_FORMISTIC_VERSION', '2.1.1');
 define('WPISTIC_FORMISTIC_DB_VERSION', '1.3.0');
 define('WPISTIC_FORMISTIC_FILE', __FILE__);
 define('WPISTIC_FORMISTIC_PATH', plugin_dir_path(__FILE__));
