@@ -74,7 +74,7 @@ jobs:
       matrix:
         # This repo is a monorepo of WordPress plugins; only these
         # subprojects carry a composer.json (there is none at the root).
-        project: [ g2a-business-api, g2a-pos-core, messageistic ]
+        project: [ plugins/g2a-business-api, plugins/g2a-pos-core, plugins/messageistic ]
     defaults:
       run:
         working-directory: ${{ matrix.project }}
