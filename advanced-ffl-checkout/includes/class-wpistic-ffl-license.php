@@ -24,7 +24,7 @@
  *
  * Original plan this implements:
  *   - Connects to https://wordpressistic.com/wp-json/wpistic-licenses/v1/activate
- *   - User flow: PMPro membership purchase → license key in member profile
+ *   - User flow: membership purchase → license key in member profile
  *   - Plugin stores license key + cached entitlements (7-day grace if API unreachable)
  *   - Weekly revalidation cron
  *

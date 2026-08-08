@@ -4,7 +4,6 @@ namespace G2A\POS\Integrations;
 
 use G2A\POS\Integrations\Membership\MemberisticProvider;
 use G2A\POS\Integrations\Membership\MemberPressProvider;
-use G2A\POS\Integrations\Membership\PmproProvider;
 use G2A\POS\Integrations\Membership\Provider;
 use G2A\POS\Integrations\Membership\UserMetaProvider;
 use G2A\POS\Integrations\Membership\WooMembershipsProvider;
@@ -17,8 +16,14 @@ use G2A\POS\Integrations\Membership\WooMembershipsProvider;
  *      — if the host theme/plugin (WPistic) returns a non-null array, use it.
  *      Same for 'g2a_pos_membership_bookings'.
  *   2. Adapter pinned via option g2a_pos_membership_provider (slug).
- *   3. Auto-detect: try Memberistic → WooCommerce Memberships → PMPro
+ *   3. Auto-detect: try Memberistic → WooCommerce Memberships
  *      → MemberPress → custom user-meta map.
+ *
+ * Memberistic is the single membership authority for this system. The legacy
+ * third-party membership adapter was removed because it read that plugin's
+ * tables directly, so a misconfigured Memberistic install could silently fall
+ * through to stale membership data at the counter. The booking engine's
+ * docs/ folder carries the full removal rationale.
  *
  * Detection results are cached per-request.
  */
@@ -34,7 +39,6 @@ final class RangeMembership {
 			self::$providers = array(
 				'memberistic'    => new MemberisticProvider(),
 				'wc_memberships' => new WooMembershipsProvider(),
-				'pmpro'          => new PmproProvider(),
 				'memberpress'    => new MemberPressProvider(),
 				'user_meta'      => new UserMetaProvider(),
 			);
