@@ -22,12 +22,12 @@ on:
     # This repo is private on a personal account, so Actions minutes are
     # metered — only spend them when the dashboard actually changed.
     paths:
-      - 'dashboard-app/**'
+      - 'apps/dashboard-app/**'
       - '.github/workflows/dashboard.yml'
   pull_request:
     branches: [ "main" ]
     paths:
-      - 'dashboard-app/**'
+      - 'apps/dashboard-app/**'
       - '.github/workflows/dashboard.yml'
   workflow_dispatch:
 
@@ -40,7 +40,7 @@ permissions:
 
 defaults:
   run:
-    working-directory: dashboard-app
+    working-directory: apps/dashboard-app
 
 jobs:
   build:
@@ -55,7 +55,7 @@ jobs:
         with:
           node-version: '20'
           cache: npm
-          cache-dependency-path: dashboard-app/package-lock.json
+          cache-dependency-path: apps/dashboard-app/package-lock.json
 
       # `npm ci` (not `npm install`): it fails when package.json and the
       # lockfile disagree, which is exactly what CI should catch. deploy.sh
