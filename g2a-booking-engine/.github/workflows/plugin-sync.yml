@@ -1,0 +1,91 @@
+name: Plugin Sync
+
+# Verifies this standalone plugin repo is byte-identical to its embedded copy
+# in the Guns2Ammo-System-Managment monorepo (g2a-booking-engine/ subfolder).
+#
+# Branch selection tolerates either side being ahead: an optional workflow
+# input picks the monorepo branch to compare against; by default the monorepo
+# branch with the SAME NAME as this repo's ref is used when it exists,
+# otherwise the monorepo's default branch.
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+    inputs:
+      compare_ref:
+        description: >-
+          Branch of the MONOREPO to compare against (default: this repo's
+          branch name when it exists there, else the monorepo default branch)
+        required: false
+        default: ''
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  verify-sync:
+    name: Standalone tree matches monorepo copy
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      PLUGIN_DIR: g2a-booking-engine
+      COMPARE_REF: ${{ github.event.inputs.compare_ref || '' }}
+      THIS_REF: ${{ github.head_ref || github.ref_name }}
+      # Optional PAT for a private monorepo; public repos clone anonymously.
+      SYNC_TOKEN: ${{ secrets.PLUGIN_SYNC_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Clone monorepo
+        run: |
+          set -e
+          auth=()
+          if [ -n "$SYNC_TOKEN" ]; then
+            auth=(-c "http.https://github.com/.extraheader=AUTHORIZATION: basic $(printf 'x-access-token:%s' "$SYNC_TOKEN" | base64 -w0)")
+          fi
+          git "${auth[@]}" clone --quiet https://github.com/Shubochandrosarker/Guns2Ammo-System-Managment /tmp/monorepo
+
+      - name: Select monorepo comparison branch
+        run: |
+          set -e
+          if [ -n "$COMPARE_REF" ] && git -C /tmp/monorepo rev-parse -q --verify "origin/$COMPARE_REF" >/dev/null; then
+            ref="$COMPARE_REF"
+          elif git -C /tmp/monorepo rev-parse -q --verify "origin/$THIS_REF" >/dev/null; then
+            ref="$THIS_REF"
+          else
+            ref="$(git -C /tmp/monorepo symbolic-ref --short refs/remotes/origin/HEAD | sed 's|^origin/||')"
+          fi
+          echo "monorepo -> $ref"
+          git -C /tmp/monorepo checkout --quiet "$ref"
+
+      - name: Compare plugin trees
+        run: |
+          set -u
+          if [ ! -d "/tmp/monorepo/$PLUGIN_DIR" ]; then
+            echo "::error::Monorepo has no $PLUGIN_DIR/ directory on the compared branch."
+            exit 1
+          fi
+          report="$(mktemp)"
+          if diff -r \
+              --exclude=.git --exclude=.gitattributes --exclude=.gitignore \
+              --exclude=.github --exclude=tests --exclude=vendor \
+              --exclude=node_modules --exclude=composer.json \
+              --exclude=composer.lock --exclude=phpunit.xml \
+              --exclude=.phpunit.cache \
+              "/tmp/monorepo/$PLUGIN_DIR" . > "$report" 2>&1; then
+            echo "OK: standalone tree is identical to the monorepo copy."
+          else
+            echo "::error::Plugin trees have DIVERGED between this repo and the monorepo copy."
+            echo "Divergent files:"
+            awk '
+              /^diff /         { print "  differs:  " $(NF-1) }
+              /^Only in /      { print "  " $0 }
+              /^Binary files / { print "  " $0 }
+            ' "$report"
+            exit 1
+          fi

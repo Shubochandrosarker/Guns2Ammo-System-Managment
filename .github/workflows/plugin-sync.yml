@@ -1,0 +1,79 @@
+name: Plugin Sync
+
+# Verifies that the monorepo's embedded plugin copies are byte-identical to
+# the standalone plugin repos:
+#   g2a-booking-engine/                <-> Shubochandrosarker/g2a-booking-engine
+#   memberistic-membership-solutions/  <-> Shubochandrosarker/memberistic-membership-solutions
+#
+# Branch selection tolerates the standalone repos being ahead: an optional
+# workflow input picks the standalone branch to compare against; by default
+# the standalone repo's branch with the SAME NAME as the monorepo ref is used
+# when it exists, otherwise the standalone repo's default branch.
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+    inputs:
+      compare_ref:
+        description: >-
+          Branch of the STANDALONE repos to compare against (default: the
+          monorepo's branch name when it exists there, else their default
+          branch)
+        required: false
+        default: ''
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  verify-sync:
+    name: Monorepo plugin copies match standalone repos
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      COMPARE_REF: ${{ github.event.inputs.compare_ref || '' }}
+      MONO_REF: ${{ github.head_ref || github.ref_name }}
+      # Optional PAT for private standalone repos; public repos clone anonymously.
+      SYNC_TOKEN: ${{ secrets.PLUGIN_SYNC_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Clone standalone plugin repos
+        run: |
+          set -e
+          auth=()
+          if [ -n "$SYNC_TOKEN" ]; then
+            auth=(-c "http.https://github.com/.extraheader=AUTHORIZATION: basic $(printf 'x-access-token:%s' "$SYNC_TOKEN" | base64 -w0)")
+          fi
+          git "${auth[@]}" clone --quiet https://github.com/Shubochandrosarker/g2a-booking-engine /tmp/standalone/g2a-booking-engine
+          git "${auth[@]}" clone --quiet https://github.com/Shubochandrosarker/memberistic-membership-solutions /tmp/standalone/memberistic-membership-solutions
+
+      - name: Select comparison branch per standalone repo
+        run: |
+          set -e
+          pick_ref() {
+            local clone="$1"
+            if [ -n "$COMPARE_REF" ] && git -C "$clone" rev-parse -q --verify "origin/$COMPARE_REF" >/dev/null; then
+              echo "$COMPARE_REF"; return
+            fi
+            if git -C "$clone" rev-parse -q --verify "origin/$MONO_REF" >/dev/null; then
+              echo "$MONO_REF"; return
+            fi
+            git -C "$clone" symbolic-ref --short refs/remotes/origin/HEAD | sed 's|^origin/||'
+          }
+          for clone in /tmp/standalone/g2a-booking-engine /tmp/standalone/memberistic-membership-solutions; do
+            ref="$(pick_ref "$clone")"
+            echo "$clone -> $ref"
+            git -C "$clone" checkout --quiet "$ref"
+          done
+
+      - name: Compare plugin trees
+        run: |
+          bash bin/check-plugin-sync.sh \
+            /tmp/standalone/g2a-booking-engine \
+            /tmp/standalone/memberistic-membership-solutions
