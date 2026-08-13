@@ -46,6 +46,30 @@ final class People_Repository {
 			return false;
 		}
 
+		// G2A-CRIT-004: email must identify at most one person row, or
+		// get_by_email() (waiver-import stamping, the booking-engine
+		// by-email fallback, ...) silently resolves to whichever duplicate
+		// happens to have the highest id. This is the sole insertion entry
+		// point (every caller — Stripe checkout, staff walk-in, corporate
+		// invite, CSV import, the REST admin/self-service endpoints — goes
+		// through create()), so checking here covers all of them at once.
+		if ( ! empty( $data['email'] ) ) {
+			$existing = self::get_by_email( $data['email'] );
+			if ( is_array( $existing ) ) {
+				/**
+				 * Fires when create() is asked to insert a person whose
+				 * email already belongs to an existing row. No new row is
+				 * inserted; the existing person's id is returned instead.
+				 *
+				 * @param int   $person_id      The existing (reused) person id.
+				 * @param array $attempted_data The data create() was called with.
+				 */
+				do_action( 'memberistic_person_dedup_reused', (int) $existing['id'], $data );
+
+				return (int) $existing['id'];
+			}
+		}
+
 		$data['created_at'] = current_time( 'mysql' );
 
 		$inserted = $wpdb->insert( self::table(), $data, memberistic_db_formats( $data ) );
@@ -103,6 +127,137 @@ final class People_Repository {
 
 		$row = $wpdb->get_row( $wpdb->prepare( 'SELECT * FROM ' . self::table() . ' WHERE email = %s ORDER BY id DESC LIMIT 1', $email ), ARRAY_A );
 		return $row ?: null;
+	}
+
+	/**
+	 * Normalize empty-string emails to NULL, then collapse duplicate emails
+	 * to a single canonical row — the highest id, matching get_by_email()'s
+	 * existing "most recent wins" read behavior, so this makes explicit
+	 * what was already the de facto answer rather than changing it. Every
+	 * row that loses keeps its person record and every other field; only
+	 * its email is cleared (never deleted, never merged), and the change
+	 * is logged to the Activity Repository against that person so staff
+	 * can review and manually re-add the email if it was not actually a
+	 * duplicate.
+	 *
+	 * Dry-run by default. Shared by the 1.12.0 migration (which applies it
+	 * automatically ahead of adding the UNIQUE index) and
+	 * `wp memberistic people-dedupe-audit`, so there is exactly one place
+	 * this logic lives.
+	 *
+	 * @param bool $apply      Actually write changes. Default false (report only).
+	 * @param int  $batch_size Duplicate-email groups written per DB transaction.
+	 * @return array{normalized_empty:int,duplicate_groups:int,rows_cleared:int,groups:array}
+	 */
+	public static function dedupe_by_email( $apply = false, $batch_size = 200 ) {
+		global $wpdb;
+		$table = self::table();
+
+		$report = array(
+			'normalized_empty' => 0,
+			'duplicate_groups' => 0,
+			'rows_cleared'     => 0,
+			'groups'           => array(),
+		);
+
+		// '' is not NULL — a UNIQUE index would treat every no-email row as
+		// a collision with every other no-email row. Normalizing first
+		// never loses data: an empty string carries no information a NULL
+		// doesn't already carry.
+		// phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+		$empty_count                 = (int) $wpdb->get_var( "SELECT COUNT(*) FROM {$table} WHERE email = ''" );
+		$report['normalized_empty']  = $empty_count;
+		if ( $apply && $empty_count > 0 ) {
+			// phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+			$wpdb->query( "UPDATE {$table} SET email = NULL, updated_at = '" . esc_sql( current_time( 'mysql' ) ) . "' WHERE email = ''" );
+		}
+
+		// phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+		$duplicate_emails = $wpdb->get_col( "SELECT email FROM {$table} WHERE email IS NOT NULL AND email <> '' GROUP BY email HAVING COUNT(*) > 1" );
+
+		$batch = array();
+		foreach ( (array) $duplicate_emails as $email ) {
+			$rows = $wpdb->get_results( $wpdb->prepare( "SELECT id FROM {$table} WHERE email = %s ORDER BY id DESC", $email ), ARRAY_A );
+			if ( count( $rows ) < 2 ) {
+				continue;
+			}
+			$keep_id     = (int) $rows[0]['id'];
+			$cleared_ids = array_map( 'intval', array_column( array_slice( $rows, 1 ), 'id' ) );
+
+			++$report['duplicate_groups'];
+			$report['rows_cleared'] += count( $cleared_ids );
+			$report['groups'][]      = array(
+				'email'       => $email,
+				'keep_id'     => $keep_id,
+				'cleared_ids' => $cleared_ids,
+			);
+
+			if ( $apply ) {
+				$batch[] = array(
+					'email'       => $email,
+					'keep_id'     => $keep_id,
+					'cleared_ids' => $cleared_ids,
+				);
+				if ( count( $batch ) >= max( 1, (int) $batch_size ) ) {
+					self::apply_dedupe_batch( $batch );
+					$batch = array();
+				}
+			}
+		}
+		if ( $apply && $batch ) {
+			self::apply_dedupe_batch( $batch );
+		}
+
+		return $report;
+	}
+
+	/**
+	 * Write one batch of dedupe_by_email() results inside a transaction —
+	 * clear the losing rows' email and log each clear individually so the
+	 * Activity feed shows exactly what happened per person, not just a
+	 * batch summary.
+	 *
+	 * @param array<int, array{email:string,keep_id:int,cleared_ids:int[]}> $batch
+	 */
+	private static function apply_dedupe_batch( array $batch ) {
+		global $wpdb;
+		$table = self::table();
+		$now   = current_time( 'mysql' );
+
+		$wpdb->query( 'START TRANSACTION' );
+		try {
+			foreach ( $batch as $group ) {
+				foreach ( $group['cleared_ids'] as $id ) {
+					$wpdb->update(
+						$table,
+						array(
+							'email'      => null,
+							'updated_at' => $now,
+						),
+						array( 'id' => $id ),
+						array( '%s', '%s' ),
+						array( '%d' )
+					);
+					Activity_Repository::log(
+						array(
+							'person_id'     => $id,
+							'activity_type' => 'person_email_deduped',
+							'title'         => __( 'Duplicate email cleared', 'memberistic' ),
+							'description'   => sprintf(
+								/* translators: 1: email address, 2: person id kept as the canonical record */
+								__( 'This person previously shared the email "%1$s" with person #%2$d. #%2$d was kept as the canonical record for that email (memberistic_people.email is now unique); this record\'s email was cleared so lookups by email resolve unambiguously. No other field was changed — re-add the email here if this was not actually a duplicate.', 'memberistic' ),
+								$group['email'],
+								$group['keep_id']
+							),
+						)
+					);
+				}
+			}
+			$wpdb->query( 'COMMIT' );
+		} catch ( \Throwable $e ) {
+			$wpdb->query( 'ROLLBACK' );
+			throw $e;
+		}
 	}
 
 	public static function count_active_by_membership( $membership_id ) {

@@ -50,11 +50,14 @@ final class Plugin {
 			'includes/database/class-people-repository.php',
 			'includes/database/class-payments-repository.php',
 			'includes/database/class-activity-repository.php',
+			'includes/database/class-discount-codes-repository.php',
+			'includes/database/class-discount-redemptions-repository.php',
 			'includes/database/class-checkins-repository.php',
 			'includes/database/class-notes-repository.php',
 			'includes/database/class-email-logs-repository.php',
 			'includes/emails/class-email-service.php',
 			'includes/integrations/class-integrations-registry.php',
+			'includes/discounts/class-discount-code-service.php',
 			'includes/integrations/class-entitlement-service.php',
 			'includes/integrations/class-booking-engine.php',
 			'includes/integrations/class-woocommerce-bridge.php',
@@ -67,7 +70,9 @@ final class Plugin {
 			'includes/payments/class-stripe-service.php',
 			'includes/cli/class-stripe-recovery-command.php',
 			'includes/cli/class-guest-pass-audit-command.php',
+			'includes/cli/class-people-dedupe-command.php',
 			'includes/admin/class-admin-menu.php',
+			'includes/admin/class-discount-codes-page.php',
 			'includes/admin/class-dashboard-page.php',
 			'includes/admin/class-members-page.php',
 			'includes/admin/class-payments-page.php',
@@ -111,6 +116,7 @@ final class Plugin {
 		add_action( 'init', array( Payments\Stripe_Service::class, 'maybe_handle_public_checkout_request' ) );
 		CLI\Stripe_Recovery_Command::register();
 		CLI\Guest_Pass_Audit_Command::register();
+		CLI\People_Dedupe_Command::register();
 		add_action( 'init', array( Payments\Stripe_Service::class, 'maybe_handle_billing_portal_request' ) );
 		// Propagate WordPress-side cancellations to Stripe so the
 		// subscription actually stops billing — previously a cancel on the
@@ -123,6 +129,8 @@ final class Plugin {
 		add_action( 'admin_notices', array( Payments\Stripe_Service::class, 'render_webhook_health_notice' ) );
 		add_action( 'admin_init', array( Payments\Stripe_Service::class, 'handle_webhook_notice_dismissal' ) );
 		add_action( 'admin_menu', array( Admin\Admin_Menu::class, 'register' ) );
+		add_action( 'admin_post_memberistic_save_discount_code', array( Admin\Discount_Codes_Page::class, 'handle_save' ) );
+		add_action( 'admin_post_memberistic_toggle_discount_code', array( Admin\Discount_Codes_Page::class, 'handle_toggle' ) );
 		add_action( 'admin_init', array( Installer::class, 'maybe_upgrade' ) );
 		add_action( 'admin_init', array( Admin\Settings_Page::class, 'register_settings' ) );
 		add_action( 'admin_init', array( Admin\Settings_Page::class, 'handle_actions' ) );

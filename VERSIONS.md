@@ -3,15 +3,15 @@
 Current shipping versions of every component in this repository.
 Installable builds of each row live in [`dist/`](dist/).
 
-_Last updated: 8 August 2026._
+_Last updated: 13 August 2026._
 
 ## WordPress plugins — `plugins/`
 
 | Component | Version | Purpose | Install order |
 | --- | --- | --- | --- |
-| **memberistic-membership-solutions** | **1.20.0** | Membership authority — plans, members, entitlement, waivers, corporate groups, Stripe billing | 1 |
+| **memberistic-membership-solutions** | **1.21.0** | Membership authority — plans, members, entitlement, waivers, corporate groups, Stripe billing, discount codes | 1 |
 | **g2a-booking-engine** | **1.12.0** | Lane/class/event bookings, payments, front desk, calendar, email automation | 2 |
-| **g2a-pos-core** | **3.4.0** | Point of sale — counter checkout, membership lookup, receipts, inventory | 3 |
+| **g2a-pos-core** | **3.5.0** | Point of sale — counter checkout, membership lookup, receipts, inventory | 3 |
 | advanced-ffl-checkout | 1.21.1 | FFL transfer workflow + dealer portal | 4 |
 | verifyistic | 1.4.7 | ID / age verification and check-in QR verification | 4 |
 | formistic | 2.1.1 | Form builder used by public site forms | 4 |

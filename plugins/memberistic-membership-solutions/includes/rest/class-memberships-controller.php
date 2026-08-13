@@ -1086,6 +1086,28 @@ final class Memberships_Controller extends REST_Controller {
 		}
 
 		if ( null !== $new_status && $new_status !== (string) $existing['status'] ) {
+			// G2A-CRIT-001: this generic PATCH path used to call
+			// change_status('cancelled') directly, with no remote-first
+			// gate — so PATCH {"status":"cancelled"} could flip the
+			// membership to cancelled locally even when Stripe still
+			// failed to stop billing. Mirror the dedicated
+			// POST /memberships/{id}/cancel endpoint exactly: Stripe
+			// first, local status second.
+			if ( 'cancelled' === $new_status ) {
+				$remote = \WordPressistic\Memberistic\Payments\Stripe_Service::cancel_remote_first( $id );
+				$force  = rest_sanitize_boolean( $params['force'] ?? false );
+				if ( is_wp_error( $remote ) && ! $force ) {
+					return new \WP_Error(
+						'memberistic_stripe_cancel_failed',
+						sprintf(
+							/* translators: %s = Stripe error message */
+							__( 'The membership was NOT cancelled: Stripe could not stop the subscription (%s). A retry is queued and will finish the cancellation automatically once Stripe confirms. To cancel locally anyway (billing may continue until a retry succeeds), repeat with force=true.', 'memberistic' ),
+							$remote->get_error_message()
+						),
+						array( 'status' => 502 )
+					);
+				}
+			}
 			\WordPressistic\Memberistic\Database\Memberships_Repository::change_status( $id, $new_status );
 		}
 

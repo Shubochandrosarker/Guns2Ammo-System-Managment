@@ -128,6 +128,15 @@ final class Integrations_Registry {
 				'available' => static function () { return defined( 'WPISTIC_FFL_VERSION' ); },
 				'dep_label' => __( 'Install & activate the Advanced FFL Checkout plugin to use this.', 'memberistic' ),
 			),
+			'discount_codes'   => array(
+				'name'      => __( 'Discount Codes', 'memberistic' ),
+				'desc'      => __( 'Coupon codes for a percent or fixed discount on membership plan checkout — plan/cycle restrictions, total and per-customer usage limits, expiry, and a full redemption log. Manage codes below.', 'memberistic' ),
+				'icon'      => '%',
+				'setting'   => 'integration_discount_codes_enabled',
+				'default'   => 'no',
+				'available' => static function () { return \WordPressistic\Memberistic\Payments\Stripe_Service::is_enabled(); },
+				'dep_label' => __( 'Enable and configure the Stripe Checkout integration first — discount codes apply through Stripe at membership checkout.', 'memberistic' ),
+			),
 		);
 
 		$coming = array(

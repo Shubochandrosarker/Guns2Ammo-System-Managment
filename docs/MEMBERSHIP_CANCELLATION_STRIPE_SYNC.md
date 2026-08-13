@@ -53,6 +53,32 @@ but the **operation order was unsafe for a financial action**:
   where the refund has already happened so the local cancel must proceed) —
   it now queues the same retry machinery on failure instead of only logging.
 
+## Update — 2026-08-13 (G2A-CRIT-004 follow-up audit)
+
+A repo audit re-checked this fix against the two call sites the original
+audit named as still bypassing `cancel_remote_first()`, per
+`docs/audit-2026-07-full-business-system/improvement-backlog.json`
+(`G2A-CRIT-001`). Both are now gated:
+
+- **Generic REST `PATCH /memberships/{id}`** (`Memberships_Controller::
+  update_item()`) previously routed a `{"status":"cancelled"}` body straight
+  to `change_status()` with no remote-first check at all — the members app
+  or any capability-holding API caller could hit this path to cancel a
+  membership locally while Stripe kept billing, bypassing the dedicated
+  `/cancel` endpoint's protection entirely. It now runs the identical
+  `cancel_remote_first()` check (with the same `force=true` override) before
+  flipping status, whenever the incoming status change is `cancelled`.
+- **`WooCommerce_Bridge::sync_refunded_order()`** now calls
+  `cancel_remote_first()` explicitly before `change_status('cancelled')`,
+  instead of relying only on the post-hoc hook firing after the fact. The
+  refund has already happened in WooCommerce by the time this runs, so the
+  local cancel still always proceeds regardless of the Stripe result (that
+  part of the design was already correct) — the change removes a redundant
+  duplicate Stripe API call in the same request and makes the intent
+  explicit instead of an implicit hook side effect.
+
+Every cancel path in the plugin now goes through the same gate.
+
 ## What still needs live verification on production
 
 1. **Stripe webhook configuration** — the inbound sync only works if the

@@ -98,6 +98,19 @@ final class WooCommerce_Bridge {
 			return;
 		}
 
+		// G2A-CRIT-001: this used to call change_status('cancelled')
+		// directly with no attempt at the Stripe side at all — a
+		// membership billed through both a linked WooCommerce order AND a
+		// Stripe subscription would show cancelled here while Stripe kept
+		// billing, with only the post-hoc safety-net hook (which still
+		// fires below, via change_status()) as a backstop. The refund/
+		// cancellation in WooCommerce has already happened by the time
+		// this runs, so unlike the customer-initiated cancel flow there is
+		// nothing to hold back on here — but attempting the Stripe cancel
+		// FIRST still matters: on failure it's logged and a retry is
+		// queued immediately instead of only after local status flips.
+		\WordPressistic\Memberistic\Payments\Stripe_Service::cancel_remote_first( $membership_id );
+
 		Memberships_Repository::change_status( $membership_id, 'cancelled' );
 
 		Activity_Repository::log(
