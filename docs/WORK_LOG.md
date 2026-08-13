@@ -6,6 +6,49 @@ zip + a PR commit; the section title links to the headline change.
 
 ---
 
+## Memberistic 1.21.0 / POS Core 3.5.0 — August 13, 2026
+
+**Headline:** repo audit follow-through — closed the two remaining
+critical defects from the July 2026 full-system audit
+(`docs/audit-2026-07-full-business-system/`) that were still open, plus a
+new Discount Codes addon.
+
+- **G2A-CRIT-001 (payment correctness) — closed.** The Stripe-first
+  cancellation fix from `docs/MEMBERSHIP_CANCELLATION_STRIPE_SYNC.md` had
+  two call sites still bypassing it: the generic `PATCH /memberships/{id}`
+  REST endpoint, and `WooCommerce_Bridge::sync_refunded_order()`. Both now
+  route through `Stripe_Service::cancel_remote_first()` like every other
+  cancel path.
+- **G2A-CRIT-004 (data integrity) — closed.** `memberistic_people.email`
+  is now enforced unique. `People_Repository::create()` checks for an
+  existing person by email before inserting (the sole insertion entry
+  point, covering all 12 call sites at once). A new migration
+  (`1.12.0`) non-destructively dedupes existing duplicate rows (keeps the
+  highest id, clears — never deletes — the losing rows' email, logs every
+  change) before converting the index to `UNIQUE`. `wp memberistic
+  people-dedupe-audit` exposes the same dedupe as a dry-run-by-default CLI
+  command for a pre-upgrade preview.
+- **G2A-CRIT-003 (g2a-pos-core) — closed.** `VendorProductPromoter` now
+  applies a wholesaler category's mapped WooCommerce category at promote
+  time — previously the `wc_category_id` column existed but nothing ever
+  wrote OR read it. Both gaps fixed: the Vendor Categories admin screen
+  and REST endpoint now save the mapping, and promotion applies it via
+  `wp_set_object_terms()` (best-effort, matches the image-mirroring
+  pattern — never aborts the promotion).
+- **New: Discount Codes addon** (Integrations tab, toggle: *Discount
+  Codes*). Staff create percent/fixed coupon codes for membership plan
+  checkout — scoped to specific plans and/or billing cycle, an active
+  window, total and per-customer usage limits, and a duration (first
+  cycle only / N months / forever) backed by a real Stripe Coupon +
+  Promotion Code so recurring-discount duration is Stripe-confirmed, not
+  hand-rolled. Full redemption log per code (who/when/plan/before/after
+  amount), recorded only from the Stripe-confirmed webhook — idempotent
+  per checkout session, matching the plugin's existing "verified payment
+  evidence only" rule. New tables: `memberistic_discount_codes`,
+  `memberistic_discount_redemptions` (migration `1.13.0`).
+
+---
+
 ## Theme 1.24.0 / Booking 1.13.0 / Memberistic 1.45.0 / Messageistic 0.5.1 / POS Core 3.0.1 — CURRENT (June 11, 2026)
 
 **Headline:** guest lane-booking fix (the bad-review bug), Integrations

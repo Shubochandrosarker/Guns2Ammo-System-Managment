@@ -59,7 +59,73 @@ final class Migrations {
 			'1.9.0' => array( self::class, 'migrate_1_9_0' ),
 			'1.10.0' => array( self::class, 'migrate_1_10_0' ),
 			'1.11.0' => array( self::class, 'migrate_1_11_0' ),
+			'1.12.0' => array( self::class, 'migrate_1_12_0' ),
+			'1.13.0' => array( self::class, 'migrate_1_13_0' ),
 		);
+	}
+
+	/**
+	 * 1.13.0 — discount-code tables (memberistic_discount_codes,
+	 * memberistic_discount_redemptions). Re-runs dbDelta() so existing
+	 * installs gain the two new tables idempotently.
+	 */
+	public static function migrate_1_13_0() {
+		Schema::create_tables();
+		return true;
+	}
+
+	/**
+	 * 1.12.0 — memberistic_people.email becomes globally unique
+	 * (G2A-CRIT-004: no uniqueness enforcement meant get_by_email() could
+	 * silently resolve to the wrong duplicate person).
+	 *
+	 * Runs the same non-destructive dedupe that
+	 * `wp memberistic people-dedupe-audit --apply` exposes for a manual
+	 * preview ahead of an upgrade, then converts the existing plain index
+	 * to UNIQUE. dbDelta() cannot reliably change an existing index's
+	 * uniqueness just by re-declaring it in Schema (it adds missing
+	 * indexes; it does not reliably alter one already present under the
+	 * same name), so the conversion is done directly here, and only after
+	 * the dedupe has run so it can't fail on real duplicate data.
+	 */
+	public static function migrate_1_12_0() {
+		global $wpdb;
+
+		$table = $wpdb->prefix . 'memberistic_people';
+
+		if ( class_exists( '\WordPressistic\Memberistic\Database\People_Repository' ) ) {
+			\WordPressistic\Memberistic\Database\People_Repository::dedupe_by_email( true );
+		}
+
+		$is_unique = (int) $wpdb->get_var(
+			$wpdb->prepare(
+				"SELECT COUNT(1) FROM information_schema.statistics WHERE table_schema = DATABASE() AND table_name = %s AND index_name = 'email' AND non_unique = 0",
+				$table
+			)
+		);
+
+		if ( 0 === $is_unique ) {
+			$has_index = (int) $wpdb->get_var(
+				$wpdb->prepare(
+					"SELECT COUNT(1) FROM information_schema.statistics WHERE table_schema = DATABASE() AND table_name = %s AND index_name = 'email'",
+					$table
+				)
+			);
+			$table_esc = esc_sql( $table );
+			if ( $has_index > 0 ) {
+				$wpdb->query( "ALTER TABLE `{$table_esc}` DROP INDEX `email`" ); // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+			}
+			$wpdb->query( "ALTER TABLE `{$table_esc}` ADD UNIQUE INDEX `email` (`email`)" ); // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+
+			if ( $wpdb->last_error ) {
+				// Should be unreachable after dedupe_by_email(true) — but
+				// never leave the DB version bumped past a failed ALTER;
+				// this migration will simply retry on the next admin_init.
+				return false;
+			}
+		}
+
+		return true;
 	}
 
 	/**

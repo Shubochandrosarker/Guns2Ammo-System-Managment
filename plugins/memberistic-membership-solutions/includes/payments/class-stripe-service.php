@@ -727,6 +727,24 @@ final class Stripe_Service {
 			$billing_cycle = 'monthly';
 		}
 
+		// Discount code (optional). Validated entirely against Memberistic's
+		// own rules before Stripe is contacted — see Discount_Code_Service
+		// for why plan/cycle scoping can't be delegated to Stripe here.
+		$discount_code_raw = isset( $_POST['discount_code'] ) ? sanitize_text_field( wp_unslash( $_POST['discount_code'] ) ) : '';
+		$discount           = null;
+		if ( '' !== $discount_code_raw && class_exists( '\\WordPressistic\\Memberistic\\Discounts\\Discount_Code_Service' ) ) {
+			$validated = \WordPressistic\Memberistic\Discounts\Discount_Code_Service::validate_for_checkout( $discount_code_raw, $plan, $billing_cycle, $email );
+			if ( empty( $validated['ok'] ) ) {
+				self::checkout_error(
+					'memberistic_checkout_invalid_discount_code',
+					( $validated['message'] ?? __( 'That discount code is not valid. No payment was taken.', 'memberistic' ) ) . ' ' . __( 'No payment was taken.', 'memberistic' ),
+					400,
+					__( 'Invalid discount code', 'memberistic' )
+				);
+			}
+			$discount = $validated['code'];
+		}
+
 		$user_id = self::resolve_checkout_user( $email, $full_name );
 
 		// Re-entrance guard: a refresh, back-button, or double-click on the
@@ -795,7 +813,7 @@ final class Stripe_Service {
 			)
 		);
 
-		$session = self::create_checkout_session( $membership_id, $plan, $billing_cycle, $email );
+		$session = self::create_checkout_session( $membership_id, $plan, $billing_cycle, $email, $discount );
 
 		if ( is_wp_error( $session ) ) {
 			self::record_manual_review( 'checkout_session_create_failed', $membership_id, array( 'message' => $session->get_error_message() ) );
@@ -1130,7 +1148,7 @@ final class Stripe_Service {
 		return array( 'state' => 'active', 'title' => __( 'Membership Active', 'memberistic' ), 'message' => __( 'Your payment is confirmed and your membership is active.', 'memberistic' ) );
 	}
 
-	public static function create_checkout_session( $membership_id, $plan, $billing_cycle, $email ) {
+	public static function create_checkout_session( $membership_id, $plan, $billing_cycle, $email, $discount = null ) {
 		$amount   = 'annual' === $billing_cycle ? (float) $plan['annual_price'] : (float) $plan['monthly_price'];
 		$interval = 'annual' === $billing_cycle ? 'year' : 'month';
 
@@ -1170,11 +1188,22 @@ final class Stripe_Service {
 			'subscription_data[metadata][billing_cycle]'=> $billing_cycle,
 		);
 
+		$idempotency_suffix = '';
+		if ( is_array( $discount ) && ! empty( $discount['stripe_promotion_code_id'] ) ) {
+			// Attached explicitly (never allow_promotion_codes) so a
+			// customer can't apply a DIFFERENT active code than the one
+			// Discount_Code_Service::validate_for_checkout() already
+			// approved for this specific plan/cycle.
+			$payload['discounts[0][promotion_code]'] = $discount['stripe_promotion_code_id'];
+			$payload['metadata[discount_code_id]']   = $discount['id'];
+			$idempotency_suffix                      = '_' . sanitize_key( (string) $discount['id'] );
+		}
+
 		$session = self::request(
 			'POST',
 			'/checkout/sessions',
 			$payload,
-			array( 'Idempotency-Key' => 'memberistic_checkout_' . absint( $membership_id ) . '_' . sanitize_key( $billing_cycle ) . '_' . md5( strtolower( (string) $email ) ) )
+			array( 'Idempotency-Key' => 'memberistic_checkout_' . absint( $membership_id ) . '_' . sanitize_key( $billing_cycle ) . '_' . md5( strtolower( (string) $email ) ) . $idempotency_suffix )
 		);
 
 		if ( ! is_wp_error( $session ) && ! empty( $session['id'] ) ) {
@@ -1798,6 +1827,33 @@ final class Stripe_Service {
 					'payment_method' => __( 'Card on file (Stripe)', 'memberistic' ),
 				)
 			);
+		}
+
+		// Discount code redemption — recorded here, and only here, so it is
+		// backed by the same verified-payment evidence ($paid, checked
+		// above) as everything else this method writes. Idempotent per
+		// checkout session id inside record_redemption(), so a webhook
+		// retry can't double-count.
+		$discount_code_id = ! empty( $metadata['discount_code_id'] ) ? absint( $metadata['discount_code_id'] ) : 0;
+		if ( $discount_code_id && class_exists( '\\WordPressistic\\Memberistic\\Database\\Discount_Codes_Repository' ) ) {
+			$discount_code = \WordPressistic\Memberistic\Database\Discount_Codes_Repository::get( $discount_code_id );
+			if ( $discount_code ) {
+				$plan_price = 'annual' === $billing_cycle ? (float) $plan['annual_price'] : (float) $plan['monthly_price'];
+				\WordPressistic\Memberistic\Discounts\Discount_Code_Service::record_redemption(
+					$discount_code,
+					array(
+						'membership_id'              => $membership_id,
+						'plan_id'                    => (int) $plan['id'],
+						'email'                      => $email,
+						'billing_cycle'              => $billing_cycle,
+						'amount_before'              => $plan_price,
+						'amount_after'               => $amount_total,
+						'amount_discounted'          => max( 0, $plan_price - $amount_total ),
+						'currency'                   => ! empty( $session['currency'] ) ? strtoupper( $session['currency'] ) : 'USD',
+						'stripe_checkout_session_id' => $session_id,
+					)
+				);
+			}
 		}
 
 		do_action( 'memberistic_membership_activated', $membership_id );

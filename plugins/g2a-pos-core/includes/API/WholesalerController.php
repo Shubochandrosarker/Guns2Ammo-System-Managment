@@ -103,14 +103,20 @@ final class WholesalerController {
 		if ( $id <= 0 ) {
 			return new WP_Error( 'invalid_category', 'Invalid category id', array( 'status' => 400 ) );
 		}
-		$repo->setFlags(
-			$id,
-			array(
-				'import_enabled'   => (int) (bool) $req->get_param( 'import_enabled' ),
-				'dropship_enabled' => (int) (bool) $req->get_param( 'dropship_enabled' ),
-				'markup_percent'   => $req->get_param( 'markup_percent' ) !== null ? (float) $req->get_param( 'markup_percent' ) : null,
-			)
+		$flags = array(
+			'import_enabled'   => (int) (bool) $req->get_param( 'import_enabled' ),
+			'dropship_enabled' => (int) (bool) $req->get_param( 'dropship_enabled' ),
+			'markup_percent'   => $req->get_param( 'markup_percent' ) !== null ? (float) $req->get_param( 'markup_percent' ) : null,
 		);
+		// G2A-CRIT-003: wc_category_id is the mapping VendorProductPromoter
+		// applies at promote time — only touch it when the caller actually
+		// sends it, so existing integrations that don't know about this
+		// field yet can't accidentally null out a mapping on every save.
+		if ( $req->get_param( 'wc_category_id' ) !== null ) {
+			$wcCategoryId          = (int) $req->get_param( 'wc_category_id' );
+			$flags['wc_category_id'] = $wcCategoryId > 0 ? $wcCategoryId : null;
+		}
+		$repo->setFlags( $id, $flags );
 		return new WP_REST_Response( array( 'ok' => true ) );
 	}
 
@@ -609,9 +615,10 @@ final class WholesalerController {
 				$wholesalerId,
 				$sku,
 				array(
-					'publish'    => ! empty( $body['publish'] ),
-					'markup_pct' => isset( $body['markup_pct'] ) ? (float) $body['markup_pct'] : null,
-					'sell_price' => isset( $body['sell_price'] ) ? (float) $body['sell_price'] : null,
+					'publish'        => ! empty( $body['publish'] ),
+					'markup_pct'     => isset( $body['markup_pct'] ) ? (float) $body['markup_pct'] : null,
+					'sell_price'     => isset( $body['sell_price'] ) ? (float) $body['sell_price'] : null,
+					'wc_category_id' => isset( $body['wc_category_id'] ) ? (int) $body['wc_category_id'] : null,
 				)
 			);
 		} catch ( \Throwable $e ) {

@@ -5,7 +5,7 @@ What the system does, grouped by domain. Versions for every component are in
 
 ---
 
-## 1. Membership (Memberistic 1.20.0)
+## 1. Membership (Memberistic 1.21.0)
 
 **The single membership authority.** Everything else in the system asks
 Memberistic; nothing makes its own membership assumptions.
@@ -33,8 +33,14 @@ Memberistic; nothing makes its own membership assumptions.
 
 **Billing**
 - Stripe subscriptions, checkout, billing portal, webhook-driven activation
-- WordPress-side cancellation propagates to Stripe (with retry + admin visibility)
+- WordPress-side cancellation propagates to Stripe (with retry + admin visibility); every cancel path — the members app, the generic membership PATCH endpoint, and the WooCommerce refund bridge — goes through the same Stripe-first gate
 - Payment history, receipts, failed-payment recovery
+
+**Discount codes** — Integrations tab addon (toggle: Discount Codes)
+- Staff create/manage coupon codes entirely in wp-admin — percent or fixed amount off, restricted to specific plans and/or a billing cycle, an active window, and total + per-customer (by email) redemption limits
+- Applies for the first billing cycle only, a set number of months, or every renewal forever — enforced by a real Stripe Coupon + Promotion Code created automatically behind each active code, so recurring-discount duration is Stripe-confirmed, not hand-rolled
+- Plan/cycle/usage-limit checks run against Memberistic's own data before Stripe is ever contacted; a code only reaches the customer's Checkout Session once already validated
+- Full redemption log per code (who, when, plan, before/after amount) recorded only from the Stripe-confirmed `checkout.session.completed` webhook — idempotent per checkout session, matching the plugin's "verified payment evidence only" rule everywhere else
 
 **Waivers** — e-sign for members, guests and kiosk stations; minors; generated PDFs; versioned waiver text with re-consent; expiry and renewal reminders; waiver archive with import
 
