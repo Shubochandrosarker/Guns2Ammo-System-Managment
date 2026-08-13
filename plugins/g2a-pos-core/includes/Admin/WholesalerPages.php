@@ -331,11 +331,16 @@ final class WholesalerPages
         if (isset($_POST['g2a_cat_save']) && check_admin_referer('g2a_pos_categories')) {
             $flags = (array) ($_POST['flags'] ?? []);
             foreach ($flags as $catId => $row) {
+                $wcCategoryId = isset($row['wc_category_id']) ? (int) $row['wc_category_id'] : 0;
                 $catRepo->setFlags((int) $catId, [
                     'import_enabled' => isset($row['import_enabled']) ? 1 : 0,
                     'dropship_enabled' => isset($row['dropship_enabled']) ? 1 : 0,
                     'markup_percent' => isset($row['markup_percent']) && $row['markup_percent'] !== '' ? (float) $row['markup_percent'] : null,
                     'display_label' => sanitize_text_field((string) ($row['display_label'] ?? '')),
+                    // G2A-CRIT-003: this is the only place in the codebase that
+                    // ever writes wc_category_id — VendorProductPromoter reads
+                    // it at promote time and applies it via wp_set_object_terms.
+                    'wc_category_id' => $wcCategoryId > 0 ? $wcCategoryId : null,
                 ]);
             }
             echo '<div class="notice notice-success"><p>Category settings updated.</p></div>';
@@ -352,13 +357,19 @@ final class WholesalerPages
         submit_button('Switch', 'secondary', '', false);
         echo '</form>';
 
-        echo '<p><em>Toggle which vendor categories should be allowed to import into the store and to allow drop-shipping. Use markup % to apply a default sell-price uplift over the wholesale cost when promoting a vendor item into a WooCommerce product.</em></p>';
+        echo '<p><em>Toggle which vendor categories should be allowed to import into the store and to allow drop-shipping. Use markup % to apply a default sell-price uplift over the wholesale cost when promoting a vendor item into a WooCommerce product. Map a WooCommerce category so every product promoted from this vendor category is filed under it automatically — leave "— none —" and promoted products land with no category, same as today.</em></p>';
+
+        $wcCategories = taxonomy_exists('product_cat') ? get_terms(['taxonomy' => 'product_cat', 'hide_empty' => false]) : [];
+        if (!is_array($wcCategories)) {
+            $wcCategories = [];
+        }
 
         echo '<form method="post">';
         wp_nonce_field('g2a_pos_categories');
-        echo '<table class="widefat striped"><thead><tr><th>Vendor Category</th><th>Type</th><th>Display Label</th><th>Import?</th><th>Drop-Ship?</th><th>Markup %</th><th>Products</th></tr></thead><tbody>';
+        echo '<table class="widefat striped"><thead><tr><th>Vendor Category</th><th>Type</th><th>Display Label</th><th>Import?</th><th>Drop-Ship?</th><th>Markup %</th><th>WooCommerce Category</th><th>Products</th></tr></thead><tbody>';
         foreach ($rows as $r) {
             $id = (int) $r['id'];
+            $mappedWcCategoryId = (int) ($r['wc_category_id'] ?? 0);
             echo '<tr>';
             echo '<td><code>' . esc_html((string) $r['vendor_category']) . '</code></td>';
             echo '<td>' . esc_html((string) ($r['item_type'] ?? '')) . '</td>';
@@ -366,11 +377,16 @@ final class WholesalerPages
             echo '<td><input type="checkbox" name="flags[' . $id . '][import_enabled]" value="1"' . checked((int) $r['import_enabled'], 1, false) . '></td>';
             echo '<td><input type="checkbox" name="flags[' . $id . '][dropship_enabled]" value="1"' . checked((int) $r['dropship_enabled'], 1, false) . '></td>';
             echo '<td><input type="number" step="0.01" name="flags[' . $id . '][markup_percent]" value="' . esc_attr((string) ($r['markup_percent'] ?? '')) . '" style="width:80px"></td>';
+            echo '<td><select name="flags[' . $id . '][wc_category_id]"><option value="0">— none —</option>';
+            foreach ($wcCategories as $term) {
+                echo '<option value="' . esc_attr((string) $term->term_id) . '"' . selected($mappedWcCategoryId, (int) $term->term_id, false) . '>' . esc_html($term->name) . '</option>';
+            }
+            echo '</select></td>';
             echo '<td>' . esc_html((string) $r['product_count']) . '</td>';
             echo '</tr>';
         }
         if (!$rows) {
-            echo '<tr><td colspan="7">No categories yet. Run a catalog import to discover categories.</td></tr>';
+            echo '<tr><td colspan="8">No categories yet. Run a catalog import to discover categories.</td></tr>';
         }
         echo '</tbody></table>';
         echo '<p class="submit"><button class="button button-primary" name="g2a_cat_save" value="1">Save Category Settings</button></p>';
