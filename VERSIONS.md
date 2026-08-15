@@ -3,7 +3,7 @@
 Current shipping versions of every component in this repository.
 Installable builds of each row live in [`dist/`](dist/).
 
-_Last updated: 13 August 2026._
+_Last updated: 15 August 2026._
 
 ## WordPress plugins — `plugins/`
 
@@ -27,7 +27,7 @@ decision. POS reads membership state from Memberistic too.
 
 | Component | Version | Purpose |
 | --- | --- | --- |
-| guns2ammo | 1.27.14 | Public site theme (Elementor-compatible) |
+| guns2ammo | 1.28.0 | Public site theme (Elementor-compatible) |
 
 ## Applications & workers — `apps/`
 

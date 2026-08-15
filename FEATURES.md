@@ -120,7 +120,7 @@ Memberistic; nothing makes its own membership assumptions.
 | **messageistic** 0.8.1 | Transactional messaging / SMS bridge |
 | **g2a-theme-control** 1.0.1 | Theme presentation toggles |
 | **g2a-business-api** 0.4.3 | REST backend for the staff dashboard at app.guns2ammo.com — server-managed sessions (HttpOnly cookie + CSRF header), analytics aggregation across WooCommerce, bookings and Memberistic |
-| **guns2ammo** theme 1.27.14 | Public site, Elementor-compatible, SEO redirects, structured data |
+| **guns2ammo** theme 1.28.0 | Public site, Elementor-compatible, SEO redirects, structured data |
 | **dashboard-app** | Staff/owner dashboard |
 | **g2a-chat-worker** + **cloudflare-rag-worker** | Site chat with retrieval-backed answers |
 

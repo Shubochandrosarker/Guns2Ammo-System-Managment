@@ -183,10 +183,31 @@ add_action( 'wp_head', function () {
  * ------------------------------------------------------------------ */
 remove_action( 'woocommerce_before_shop_loop_item_title', 'woocommerce_template_loop_product_thumbnail', 10 );
 add_action( 'woocommerce_before_shop_loop_item_title', function () {
+	global $product;
 	echo '<div class="product-thumb">';
+	// "New" flag on cards, same 30-day rule the single-product gallery uses.
+	if ( function_exists( 'g2a_sp_is_new' ) && g2a_sp_is_new( $product ) ) {
+		echo '<span class="g2a-badge g2a-badge--new">' . esc_html__( 'New', 'guns2ammo' ) . '</span>';
+	}
 	echo woocommerce_get_product_thumbnail( 'woocommerce_thumbnail' );
 	echo '</div>';
 }, 10 );
+
+/* Review count beside the loop star rating — the stars alone don't tell a
+ * shopper whether they're looking at 2 opinions or 200. Sits at priority 6 so
+ * it lands right after woocommerce_template_loop_rating (5) and inside the
+ * .product-info wrapper opened above. */
+add_action( 'woocommerce_after_shop_loop_item_title', function () {
+	global $product;
+	if ( ! $product instanceof WC_Product ) {
+		return;
+	}
+	$count = (int) $product->get_rating_count();
+	if ( $count < 1 || ! wc_review_ratings_enabled() ) {
+		return;
+	}
+	echo '<span class="g2a-rating-count">(' . esc_html( number_format_i18n( $count ) ) . ')</span>';
+}, 6 );
 
 add_action( 'woocommerce_before_shop_loop_item_title', function () {
 	echo '<div class="product-info">';
@@ -223,7 +244,17 @@ add_action( 'woocommerce_after_shop_loop_item', function () {
 		echo '<a class="btn btn-brass btn-sm" href="' . esc_url( $product->get_permalink() ) . '">' . esc_html__( 'View Product', 'guns2ammo' ) . '</a>';
 	}
 
-	echo '<button type="button" class="btn btn-ghost btn-sm quick-view" data-quickview=\'' . esc_attr( $qv ) . '\'>' . esc_html__( 'Quick View', 'guns2ammo' ) . '</button>';
+	/* In the single-product related grid four cards share the row, so the
+	 * secondary action collapses to an icon button. The accessible name is
+	 * kept on the button itself — never dropped. */
+	$in_related = function_exists( 'g2a_sp_in_related' ) && g2a_sp_in_related();
+	if ( $in_related ) {
+		echo '<button type="button" class="btn btn-ghost btn-sm quick-view is-icon" aria-label="' . esc_attr__( 'Quick View', 'guns2ammo' ) . '" title="' . esc_attr__( 'Quick View', 'guns2ammo' ) . '" data-quickview=\'' . esc_attr( $qv ) . '\'>'
+			. ( function_exists( 'g2a_sp_icon' ) ? g2a_sp_icon( 'cart' ) : '' )
+			. '</button>';
+	} else {
+		echo '<button type="button" class="btn btn-ghost btn-sm quick-view" data-quickview=\'' . esc_attr( $qv ) . '\'>' . esc_html__( 'Quick View', 'guns2ammo' ) . '</button>';
+	}
 	echo '</div>';
 }, 10 );
 

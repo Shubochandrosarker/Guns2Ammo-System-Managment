@@ -2,6 +2,11 @@
 /**
  * WooCommerce Single Product Template
  *
+ * Thin wrapper only. The page's structure comes from inc/single-product.php
+ * (summary stack + tabs), the gallery and tab template overrides in
+ * woocommerce/single-product/, and assets/css/single-product.css — all of
+ * which are loaded from functions.php on product requests.
+ *
  * @package guns2ammo
  */
 if ( ! defined( 'ABSPATH' ) ) {
@@ -10,24 +15,6 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 get_header( 'shop' );
 ?>
-<style>
-.g2a-single { padding: 110px 24px 72px; }
-.g2a-single .wrap { max-width: 1280px; margin: 0 auto; }
-.g2a-single .woocommerce-breadcrumb {
-	font-family: var(--font-mono);
-	font-size: 11px;
-	letter-spacing: 0.22em;
-	text-transform: uppercase;
-	color: var(--color-silver);
-	margin: 0 0 22px;
-}
-.g2a-single .woocommerce-breadcrumb a { color: var(--color-silver); text-decoration: none; }
-.g2a-single .woocommerce-breadcrumb a:hover { color: var(--color-brass-bright); }
-.g2a-single .woocommerce-breadcrumb .delimiter { margin: 0 8px; color: var(--color-hairline-bright); }
-@media (max-width: 768px) {
-	.g2a-single { padding: 96px 16px 56px; }
-}
-</style>
 <section class="g2a-single">
 	<div class="wrap woocommerce single-product">
 		<?php do_action( 'woocommerce_before_main_content' ); ?>

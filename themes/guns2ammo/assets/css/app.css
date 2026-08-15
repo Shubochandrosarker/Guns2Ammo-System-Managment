@@ -543,56 +543,6 @@ body.g2a-noscroll {
   grid-column: 1 / -1;
 }
 
-.single-product .g2a-single .wrap {
-  width: min(1180px, calc(100vw - 48px));
-  box-sizing: border-box;
-}
-
-.single-product div.product {
-  align-items: start;
-}
-
-.single-product div.product div.images {
-  max-width: 560px;
-}
-
-.single-product div.product div.images .woocommerce-product-gallery__wrapper {
-  display: block !important;
-}
-
-.single-product div.product div.images .woocommerce-product-gallery__image {
-  display: block;
-  width: 100%;
-}
-
-.single-product div.product div.images img {
-  display: block;
-  max-height: 620px;
-  width: 100% !important;
-  height: auto !important;
-  object-fit: contain;
-}
-
-.single-product .related.products ul.products,
-.single-product .upsells.products ul.products,
-.single-product div.product .related.products ul.products,
-.single-product div.product .upsells.products ul.products {
-  display: grid !important;
-  grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
-  gap: 18px !important;
-}
-
-.single-product .related.products ul.products li.product,
-.single-product .upsells.products ul.products li.product,
-.single-product div.product .related.products ul.products li.product,
-.single-product div.product .upsells.products ul.products li.product {
-  width: auto !important;
-  min-width: 0 !important;
-  max-width: none !important;
-  margin: 0 !important;
-  float: none !important;
-}
-
 @media (max-width: 1100px) {
   .woocommerce-checkout form.checkout {
     grid-template-columns: 1fr;
@@ -619,13 +569,6 @@ body.g2a-noscroll {
 
   .woocommerce-cart .cart-collaterals .cart_totals {
     grid-column: 1;
-  }
-
-  .single-product .related.products ul.products,
-  .single-product .upsells.products ul.products,
-  .single-product div.product .related.products ul.products,
-  .single-product div.product .upsells.products ul.products {
-    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
   }
 }
 
@@ -654,28 +597,6 @@ body.g2a-noscroll {
   .woocommerce-cart table.cart td.actions button[name="update_cart"] {
     width: 100% !important;
     margin: 0 !important;
-  }
-
-  .single-product .g2a-single {
-    padding-left: 16px !important;
-    padding-right: 16px !important;
-  }
-
-  .single-product .g2a-single .wrap {
-    width: 100%;
-  }
-
-  .single-product div.product div.images {
-    max-width: none;
-  }
-}
-
-@media (max-width: 520px) {
-  .single-product .related.products ul.products,
-  .single-product .upsells.products ul.products,
-  .single-product div.product .related.products ul.products,
-  .single-product div.product .upsells.products ul.products {
-    grid-template-columns: 1fr !important;
   }
 }
 
