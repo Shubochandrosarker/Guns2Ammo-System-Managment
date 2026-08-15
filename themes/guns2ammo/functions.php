@@ -7,7 +7,7 @@
 
 if ( ! defined( 'ABSPATH' ) ) exit;
 
-define( 'G2A_VERSION', '1.27.5' );
+define( 'G2A_VERSION', '1.28.0' );
 define( 'G2A_DIR', get_stylesheet_directory() );
 define( 'G2A_URI', get_stylesheet_directory_uri() );
 
@@ -17,9 +17,12 @@ add_action( 'after_setup_theme', function () {
 	add_theme_support( 'post-thumbnails' );
 	add_theme_support( 'html5', [ 'search-form', 'comment-form', 'comment-list', 'gallery', 'caption', 'script', 'style' ] );
 	add_theme_support( 'woocommerce' );
-	add_theme_support( 'wc-product-gallery-zoom' );
-	add_theme_support( 'wc-product-gallery-lightbox' );
-	add_theme_support( 'wc-product-gallery-slider' );
+	/* The product gallery is the theme's own (see
+	 * woocommerce/single-product/product-image.php + assets/js/single-product.js):
+	 * a vertical thumbnail rail with its own lightbox. Declaring the stock
+	 * gallery supports here would load FlexSlider, jQuery-zoom and PhotoSwipe
+	 * on every product page purely to have them fight our markup — roughly
+	 * 60KB of script for features we already ship. */
 
 	register_nav_menus( [
 		'primary' => __( 'Primary Navigation', 'guns2ammo' ),
@@ -101,6 +104,13 @@ add_action( 'wp_enqueue_scripts', function () {
 		wp_enqueue_style( 'g2a-book-a-lane', G2A_URI . '/assets/css/book-a-lane.css', [ 'g2a-app' ], G2A_VERSION );
 	}
 
+	// Single-product page: its own stylesheet + behaviour, loaded nowhere else.
+	// Depends on g2a-wc-fixes so it is the last word on the product screen.
+	if ( function_exists( 'is_product' ) && is_product() ) {
+		wp_enqueue_style( 'g2a-single-product', G2A_URI . '/assets/css/single-product.css', [ 'g2a-wc-fixes' ], G2A_VERSION );
+		wp_enqueue_script( 'g2a-single-product', G2A_URI . '/assets/js/single-product.js', [], G2A_VERSION, true );
+	}
+
 	wp_enqueue_script( 'g2a-chrome', G2A_URI . '/assets/js/chrome.js', [], G2A_VERSION, true );
 }, 20 );
 
@@ -111,7 +121,7 @@ add_action( 'wp_enqueue_scripts', function () {
    order with other deferred scripts. Real-world TTI win of
    ~100-250ms on cold-cache loads. */
 add_filter( 'script_loader_tag', function ( $tag, $handle ) {
-	if ( 'g2a-chrome' === $handle ) {
+	if ( in_array( $handle, [ 'g2a-chrome', 'g2a-single-product' ], true ) ) {
 		return str_replace( ' src=', ' defer src=', $tag );
 	}
 	return $tag;
@@ -142,6 +152,9 @@ require_once G2A_DIR . '/inc/seo.php';
 
 /* ---------- WooCommerce tweaks ---------- */
 require_once G2A_DIR . '/inc/woocommerce.php';
+
+/* ---------- Single-product page (layout, gallery data, tabs) ---------- */
+require_once G2A_DIR . '/inc/single-product.php';
 
 /* ---------- Customizer image fields (light) ---------- */
 require_once G2A_DIR . '/inc/customizer.php';

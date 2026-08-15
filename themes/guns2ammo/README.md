@@ -178,11 +178,60 @@ The Arizona CCW page now uses the descriptive slug `arizona-ccw-certification`
 slugs so internal links resolve. The full slug  template  URL mapping for
 every custom page is listed in the sections above.
 
+## Single product page
+
+Rebuilt in 1.28.0. The screen is owned by three files — `inc/single-product.php`
+(behaviour), `assets/css/single-product.css` (presentation, enqueued only on
+product requests) and `assets/js/single-product.js` — plus the template
+overrides in `woocommerce/single-product/`. **Do not add `.single-product`
+rules to `tokens.css`, `app.css` or `wc-fixes.css`**; that is exactly the drift
+this rebuild removed.
+
+Layout: gallery with a vertical thumbnail rail and click-to-zoom lightbox on
+the left; title, brand, SKU, price, stock/FFL badges, quantity stepper,
+add-to-cart, wishlist and a trust row on the right; a vertical tab card below;
+then the related-products grid.
+
+**Gallery.** Theme-owned, so the stock `wc-product-gallery-*` theme supports
+are deliberately not registered — no FlexSlider, jQuery-zoom or PhotoSwipe is
+loaded. Thumbnails come from the product's gallery images in order.
+
+**Tabs are driven by how the description is written.** The description is split
+on its `<h2>` headings and each section is routed to a tab:
+
+| Heading matches | Goes to |
+| --- | --- |
+| `…Specifications` | **Specifications** tab (above the WooCommerce attributes table) |
+| `Common Questions` / `FAQs` | **FAQs** tab, rendered as an accordion |
+| anything else | **Description** tab |
+
+Inside a questions section, each `<h3>` (or a paragraph that is entirely bold)
+starts a new question and everything after it is its answer. A description with
+no `<h2>`s is left completely alone — it all stays in Description. A questions
+section with no recognisable Q&A pairs stays in Description rather than being
+dropped.
+
+**Shipping & Returns** is generated, not authored: firearms (products flagged
+`_wpistic_ffl_required` by Advanced FFL Checkout) get the FFL-transfer and
+final-sale copy, everything else gets the 14-day accessories window. The trust
+row under the buy box switches on the same flag, so a firearm never advertises
+direct shipping or easy returns.
+
+**Wishlist** is a browser-local save-for-later (`localStorage`). It hides itself
+automatically if a real wishlist plugin (YITH, TI, WPC) is activated, and can be
+switched off with the `g2a_single_product_show_wishlist` filter.
+
+Other filters: `g2a_new_product_days` (default 30) controls the "New" badge on
+the gallery and shop cards; `g2a_brand_taxonomies` controls where the brand line
+looks for a value.
+
 ## Performance
 
 - Dequeues Storefront parent CSS, WP block-library, classic-theme styles, jQuery Migrate.
 - Removes `wp_generator`, RSD/WLW links, oEmbed discovery, REST head link.
-- `g2a-chrome.js` deferred via `script_loader_tag` filter.
+- `g2a-chrome.js` and `g2a-single-product.js` deferred via `script_loader_tag` filter.
+- Product pages no longer load FlexSlider, jQuery-zoom or PhotoSwipe (~60KB of
+  script) — the theme ships its own gallery instead.
 - Fonts loaded once with `display=swap`, `preconnect` + `dns-prefetch` for `fonts.gstatic.com`.
 - Native `loading="lazy"` + IntersectionObserver reveal-on-scroll.
 - Brand preloader (logo + brass sweep) before first paint; auto-dismisses on `load` with a 4s safety net.
@@ -199,11 +248,19 @@ guns2ammo/
  inc/
     seo.php                Meta + JSON-LD (Rank Math / Yoast aware)
     woocommerce.php        Shop loop overrides, Product schema
+    single-product.php     Product page: summary stack, tabs, brand/FFL facts
     customizer.php         Business info + social fields
+ woocommerce/
+    single-product.php     Page wrapper + sticky buy bar
+    single-product/        Gallery + vertical tabs template overrides
+    archive-product.php    Shop / category archive
+    cart|checkout|myaccount
  assets/
     css/tokens.css         Full design tokens + components
     css/app.css            Preloader, lazy-fade, reveal
+    css/single-product.css Product page (product requests only)
     js/chrome.js           Behaviors only (nav, profile, live status, modal, countdown)
+    js/single-product.js   Gallery rail, lightbox, qty stepper, wishlist
  template-parts/
     nav.php
     mobile-drawer.php
