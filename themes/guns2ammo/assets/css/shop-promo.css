@@ -1,0 +1,638 @@
+/* ============================================================================
+   GUNS 2 AMMO — SHOP PROMO BANNER + LIVE COUNTDOWN
+
+   Campaign panel at the top of the shop and product-category archives.
+   Loaded only on those screens (see functions.php).
+
+   The panel is deliberately dark in BOTH themes. It is a piece of campaign
+   artwork, not a content surface, so it reads on the `--ink-on-media` token
+   family — the same set the photographic heroes use, which is defined to stay
+   light in light mode precisely because it sits on a fixed-dark ground.
+
+   Structure
+     1. Panel shell
+     2. Copy column (eyebrow, headline, subline, CTA)
+     3. Countdown (rolling digits)
+     4. Artwork (membership card + seal)
+     5. Perk row
+     6. Responsive
+   ========================================================================= */
+
+/* ------------------------------------------------------------- 1. SHELL */
+
+.g2a-promo {
+	--promo-ink: var(--ink-on-media);
+	--promo-ink-dim: var(--ink-on-media-dim);
+	--promo-accent: var(--ember-on-media);
+	--promo-ground: #0e0d11;
+
+	position: relative;
+	margin: 0 0 28px;
+	padding: 40px 44px 30px;
+	border: 1px solid rgba(255, 255, 255, 0.09);
+	border-radius: 16px;
+	overflow: hidden;
+	color: var(--promo-ink);
+	background:
+		radial-gradient(120% 130% at 78% 22%, rgba(232, 128, 47, 0.13), transparent 58%),
+		radial-gradient(90% 120% at 4% 0%, rgba(255, 255, 255, 0.06), transparent 60%),
+		var(--promo-ground);
+	box-sizing: border-box;
+}
+
+/* Faint diagonal tooling texture — keeps a large flat black panel from
+   looking like an unstyled box without adding an image request. */
+.g2a-promo::before {
+	content: "";
+	position: absolute;
+	inset: 0;
+	pointer-events: none;
+	opacity: 0.5;
+	background-image: repeating-linear-gradient(
+		135deg,
+		rgba(255, 255, 255, 0.022) 0 2px,
+		transparent 2px 9px
+	);
+}
+
+.g2a-promo__inner {
+	position: relative;
+	display: grid;
+	grid-template-columns: minmax(0, 1.05fr) minmax(0, 0.95fr);
+	grid-template-areas:
+		"copy art"
+		"perks perks";
+	gap: 26px 40px;
+	align-items: center;
+}
+
+/* -------------------------------------------------------------- 2. COPY */
+
+.g2a-promo__copy {
+	grid-area: copy;
+	min-width: 0;
+}
+
+.g2a-promo__eyebrow {
+	display: flex;
+	align-items: center;
+	gap: 10px;
+	margin: 0 0 16px;
+	font-family: var(--font-mono);
+	font-size: 11px;
+	font-weight: 700;
+	letter-spacing: 0.26em;
+	text-transform: uppercase;
+	color: var(--promo-accent);
+}
+
+.g2a-promo__eyebrow .g2a-icon {
+	width: 17px;
+	height: 17px;
+	flex: 0 0 auto;
+}
+
+.g2a-promo__rule {
+	flex: 1 1 auto;
+	max-width: 90px;
+	height: 1px;
+	background: linear-gradient(90deg, rgba(232, 128, 47, 0.6), transparent);
+}
+
+.g2a-promo__title {
+	margin: 0 0 14px;
+	font-family: var(--font-display);
+	font-weight: 400;
+	line-height: 0.92;
+	letter-spacing: 0.02em;
+	text-transform: uppercase;
+	color: var(--promo-ink);
+}
+
+.g2a-promo__lead,
+.g2a-promo__tail {
+	display: block;
+	font-size: clamp(24px, 2.9vw, 40px);
+}
+
+.g2a-promo__highlight {
+	display: block;
+	margin: 2px 0;
+	font-size: clamp(56px, 8.4vw, 118px);
+	line-height: 0.85;
+	color: var(--promo-accent);
+	/* Worn-metal wash over the numerals, so "30% OFF" reads as artwork
+	   rather than flat orange type. */
+	background-image:
+		linear-gradient(178deg, #f59a4a 6%, var(--promo-accent) 46%, #b45a17 100%),
+		repeating-linear-gradient(96deg, rgba(0, 0, 0, 0.24) 0 2px, transparent 2px 7px);
+	background-clip: text;
+	-webkit-background-clip: text;
+	color: transparent;
+}
+
+.g2a-promo__sub {
+	position: relative;
+	margin: 0 0 22px;
+	padding-left: 14px;
+	font-family: var(--font-ui);
+	font-size: clamp(14px, 1.2vw, 16px);
+	line-height: 1.5;
+	color: var(--promo-ink-dim);
+}
+
+.g2a-promo__sub::before {
+	content: "";
+	position: absolute;
+	left: 0;
+	top: 3px;
+	bottom: 3px;
+	width: 3px;
+	border-radius: 2px;
+	background: var(--promo-accent);
+}
+
+.g2a-promo__cta {
+	display: inline-flex;
+	align-items: center;
+	gap: 10px;
+	padding: 15px 34px;
+	border: 0;
+	border-radius: 8px;
+	background: var(--promo-accent);
+	color: #fff;
+	font-family: var(--font-condensed);
+	font-weight: 600;
+	font-size: 15px;
+	letter-spacing: 0.16em;
+	text-transform: uppercase;
+	text-decoration: none;
+	box-shadow: 0 10px 26px -14px rgba(232, 128, 47, 0.9);
+	transition: background 220ms var(--ease-std), transform 200ms var(--ease-out), box-shadow 220ms var(--ease-std);
+}
+
+.g2a-promo__cta .g2a-icon {
+	width: 17px;
+	height: 17px;
+	transition: transform 260ms var(--ease-out);
+}
+
+.g2a-promo__cta:hover {
+	background: #f08a36;
+	color: #fff;
+	transform: translateY(-2px);
+	box-shadow: 0 16px 32px -14px rgba(232, 128, 47, 1);
+}
+
+.g2a-promo__cta:hover .g2a-icon {
+	transform: translateX(3px);
+}
+
+/* --------------------------------------------------------- 3. COUNTDOWN */
+
+.g2a-promo__countdown {
+	margin: 0 0 24px;
+}
+
+.g2a-count__label {
+	display: block;
+	margin: 0 0 10px;
+	font-family: var(--font-mono);
+	font-size: 10px;
+	font-weight: 700;
+	letter-spacing: 0.26em;
+	text-transform: uppercase;
+	color: var(--promo-ink-dim);
+}
+
+.g2a-count__units {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 10px;
+}
+
+.g2a-count__unit {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	gap: 7px;
+	min-width: 68px;
+	padding: 12px 10px 10px;
+	border: 1px solid rgba(232, 128, 47, 0.32);
+	border-radius: 10px;
+	background: rgba(255, 255, 255, 0.035);
+	transition: border-color 300ms var(--ease-std);
+}
+
+.g2a-count__value {
+	display: flex;
+	gap: 1px;
+}
+
+/* One rolling digit cell. Height is locked to the line box so the outgoing
+   and incoming glyphs can travel exactly one cell without resizing the
+   layout mid-roll. */
+.g2a-count__digit {
+	position: relative;
+	display: block;
+	width: 0.62em;
+	height: 1em;
+	overflow: hidden;
+	font-family: var(--font-display);
+	font-size: 34px;
+	line-height: 1;
+	color: var(--promo-ink);
+	font-variant-numeric: tabular-nums;
+}
+
+.g2a-count__cur,
+.g2a-count__next {
+	position: absolute;
+	inset: 0;
+	display: grid;
+	place-items: center;
+}
+
+/* The incoming glyph waits one cell below until its digit changes. */
+.g2a-count__next {
+	transform: translateY(100%);
+}
+
+.g2a-count__digit.is-rolling .g2a-count__cur {
+	animation: g2a-roll-out 420ms var(--ease-out) forwards;
+}
+
+.g2a-count__digit.is-rolling .g2a-count__next {
+	animation: g2a-roll-in 420ms var(--ease-out) forwards;
+}
+
+@keyframes g2a-roll-out {
+	to {
+		transform: translateY(-100%);
+		opacity: 0;
+	}
+}
+
+@keyframes g2a-roll-in {
+	from {
+		transform: translateY(100%);
+		opacity: 0;
+	}
+	to {
+		transform: translateY(0);
+		opacity: 1;
+	}
+}
+
+.g2a-count__unit-label {
+	font-family: var(--font-mono);
+	font-size: 9px;
+	letter-spacing: 0.18em;
+	text-transform: uppercase;
+	color: var(--promo-ink-dim);
+}
+
+/* Final hour: the frame breathes so the deadline registers peripherally. */
+.g2a-count.is-urgent .g2a-count__unit {
+	border-color: rgba(232, 128, 47, 0.85);
+	animation: g2a-count-pulse 1.9s var(--ease-std) infinite;
+}
+
+@keyframes g2a-count-pulse {
+	0%, 100% { box-shadow: 0 0 0 0 rgba(232, 128, 47, 0); }
+	50%      { box-shadow: 0 0 0 4px rgba(232, 128, 47, 0.13); }
+}
+
+.g2a-count__ended {
+	display: none;
+	font-family: var(--font-condensed);
+	font-weight: 600;
+	font-size: 15px;
+	letter-spacing: 0.12em;
+	text-transform: uppercase;
+	color: var(--promo-ink-dim);
+}
+
+.g2a-count.is-ended .g2a-count__units,
+.g2a-count.is-ended .g2a-count__label {
+	display: none;
+}
+
+.g2a-count.is-ended .g2a-count__ended {
+	display: block;
+}
+
+/* ----------------------------------------------------------- 4. ARTWORK */
+
+.g2a-promo__art {
+	position: relative;
+	grid-area: art;
+	display: grid;
+	place-items: center;
+	min-width: 0;
+	padding: 8px 30px 8px 8px;
+}
+
+.g2a-promo__artwork {
+	display: block;
+	width: 100%;
+	max-width: 520px;
+	height: auto;
+	border-radius: 14px;
+}
+
+/* Drawn membership card — the default when no artwork is uploaded. */
+.g2a-promo__card {
+	position: relative;
+	width: min(430px, 100%);
+	aspect-ratio: 1.62;
+	padding: 28px 30px;
+	border: 1px solid rgba(255, 255, 255, 0.13);
+	border-radius: 18px;
+	background:
+		radial-gradient(120% 120% at 82% 12%, rgba(255, 255, 255, 0.07), transparent 55%),
+		linear-gradient(150deg, #232228 0%, #131217 62%, #0d0c10 100%);
+	box-shadow: 0 30px 60px -34px rgba(0, 0, 0, 0.95);
+	display: flex;
+	flex-direction: column;
+	justify-content: space-between;
+	box-sizing: border-box;
+	transform: rotate(-1.4deg);
+	transition: transform 500ms var(--ease-out);
+}
+
+.g2a-promo:hover .g2a-promo__card {
+	transform: rotate(-1.4deg) translateY(-5px);
+}
+
+/* Oversized watermark of the brand glyph, bled off the card's right edge. */
+.g2a-promo__card::after {
+	content: "G";
+	position: absolute;
+	right: -12px;
+	bottom: -34px;
+	font-family: var(--font-display);
+	font-size: 190px;
+	line-height: 1;
+	color: rgba(255, 255, 255, 0.032);
+	pointer-events: none;
+}
+
+.g2a-promo__card-head {
+	display: flex;
+	align-items: center;
+	gap: 13px;
+	min-width: 0;
+}
+
+.g2a-promo__card-names {
+	display: flex;
+	flex-direction: column;
+	gap: 6px;
+	min-width: 0;
+}
+
+.g2a-promo__card-glyph {
+	display: grid;
+	place-items: center;
+	flex: 0 0 auto;
+	width: 40px;
+	height: 40px;
+	border-radius: 9px;
+	background: var(--promo-accent);
+	color: #111014;
+	font-family: var(--font-display);
+	font-size: 26px;
+	line-height: 1;
+}
+
+.g2a-promo__card-brand {
+	font-family: var(--font-display);
+	font-size: clamp(19px, 2vw, 27px);
+	letter-spacing: 0.05em;
+	text-transform: uppercase;
+	color: var(--promo-ink);
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
+/* Tier name sits under the wordmark, flanked by hairlines — the engraved
+   look the reference card uses. */
+.g2a-promo__card-tier {
+	display: flex;
+	align-items: center;
+	gap: 10px;
+	font-family: var(--font-mono);
+	font-size: 11px;
+	letter-spacing: 0.42em;
+	text-transform: uppercase;
+	color: var(--promo-accent);
+}
+
+.g2a-promo__card-tier::before,
+.g2a-promo__card-tier::after {
+	content: "";
+	flex: 1 1 auto;
+	height: 1px;
+	background: rgba(232, 128, 47, 0.4);
+}
+
+.g2a-promo__card-note {
+	padding-top: 15px;
+	border-top: 1px solid rgba(232, 128, 47, 0.28);
+	font-family: var(--font-mono);
+	font-size: 11px;
+	line-height: 1.7;
+	letter-spacing: 0.12em;
+	text-transform: uppercase;
+	color: var(--promo-ink-dim);
+}
+
+/* Round "member exclusive / best value" seal. */
+.g2a-promo__seal {
+	position: absolute;
+	top: -6px;
+	right: 0;
+	display: grid;
+	place-items: center;
+	gap: 1px;
+	width: 108px;
+	height: 108px;
+	padding: 12px;
+	border: 1px solid rgba(232, 128, 47, 0.55);
+	border-radius: 50%;
+	background: rgba(14, 13, 17, 0.94);
+	box-sizing: border-box;
+	text-align: center;
+}
+
+.g2a-promo__seal::before {
+	content: "";
+	position: absolute;
+	inset: 5px;
+	border: 1px dashed rgba(232, 128, 47, 0.32);
+	border-radius: 50%;
+}
+
+.g2a-promo__seal-top,
+.g2a-promo__seal-bottom {
+	font-family: var(--font-mono);
+	font-size: 7.5px;
+	font-weight: 700;
+	letter-spacing: 0.16em;
+	text-transform: uppercase;
+	line-height: 1.25;
+	color: var(--promo-accent);
+}
+
+.g2a-promo__seal-star {
+	font-size: 17px;
+	line-height: 1;
+	color: var(--promo-accent);
+}
+
+/* ---------------------------------------------------------- 5. PERK ROW */
+
+.g2a-promo__perks {
+	grid-area: perks;
+	display: grid;
+	grid-template-columns: repeat(4, minmax(0, 1fr));
+	gap: 14px 24px;
+	margin: 6px 0 0;
+	padding: 22px 0 0;
+	border-top: 1px solid rgba(255, 255, 255, 0.08);
+	list-style: none;
+}
+
+.g2a-promo__perk {
+	display: flex;
+	align-items: center;
+	gap: 11px;
+	margin: 0;
+	font-family: var(--font-mono);
+	font-size: 10.5px;
+	font-weight: 700;
+	line-height: 1.4;
+	letter-spacing: 0.16em;
+	text-transform: uppercase;
+	color: var(--promo-ink-dim);
+}
+
+.g2a-promo__perk .g2a-icon {
+	width: 21px;
+	height: 21px;
+	flex: 0 0 auto;
+	color: var(--promo-accent);
+}
+
+/* -------------------------------------------------------- 6. RESPONSIVE */
+
+@media (max-width: 1080px) {
+	.g2a-promo {
+		padding: 34px 30px 26px;
+	}
+
+	.g2a-promo__inner {
+		gap: 22px 28px;
+	}
+
+	.g2a-promo__art {
+		padding-right: 22px;
+	}
+
+	.g2a-promo__seal {
+		width: 88px;
+		height: 88px;
+		padding: 9px;
+	}
+}
+
+@media (max-width: 860px) {
+	.g2a-promo__inner {
+		grid-template-columns: minmax(0, 1fr);
+		grid-template-areas:
+			"copy"
+			"art"
+			"perks";
+	}
+
+	.g2a-promo__art {
+		justify-items: start;
+		padding: 4px 0;
+	}
+
+	.g2a-promo__card {
+		width: min(400px, 100%);
+	}
+
+	.g2a-promo__seal {
+		right: 4px;
+	}
+
+	.g2a-promo__perks {
+		grid-template-columns: repeat(2, minmax(0, 1fr));
+	}
+}
+
+@media (max-width: 560px) {
+	.g2a-promo {
+		padding: 26px 18px 22px;
+		border-radius: 12px;
+	}
+
+	.g2a-promo__cta {
+		justify-content: center;
+		width: 100%;
+	}
+
+	.g2a-count__unit {
+		flex: 1 1 0;
+		min-width: 0;
+		padding: 10px 4px 8px;
+	}
+
+	.g2a-count__units {
+		gap: 7px;
+	}
+
+	.g2a-count__digit {
+		font-size: 27px;
+	}
+
+	.g2a-promo__seal {
+		width: 74px;
+		height: 74px;
+		padding: 7px;
+	}
+
+	.g2a-promo__seal-top,
+	.g2a-promo__seal-bottom {
+		font-size: 6.5px;
+		letter-spacing: 0.1em;
+	}
+
+	.g2a-promo__perks {
+		grid-template-columns: minmax(0, 1fr);
+		gap: 12px;
+	}
+}
+
+/* Motion is decoration here — the countdown still counts without it. */
+@media (prefers-reduced-motion: reduce) {
+	.g2a-count__digit.is-rolling .g2a-count__cur,
+	.g2a-count__digit.is-rolling .g2a-count__next,
+	.g2a-count.is-urgent .g2a-count__unit {
+		animation: none;
+	}
+
+	.g2a-count__next {
+		display: none;
+	}
+
+	.g2a-promo__cta,
+	.g2a-promo__card,
+	.g2a-promo__cta .g2a-icon {
+		transition: none;
+	}
+}

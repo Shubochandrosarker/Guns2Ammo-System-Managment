@@ -27,7 +27,7 @@ decision. POS reads membership state from Memberistic too.
 
 | Component | Version | Purpose |
 | --- | --- | --- |
-| guns2ammo | 1.28.0 | Public site theme (Elementor-compatible) |
+| guns2ammo | 1.29.0 | Public site theme (Elementor-compatible) |
 
 ## Applications & workers — `apps/`
 

@@ -905,6 +905,11 @@ function g2a_sp_icon( $name ) {
 		'chevron-up'    => '<path d="m6 15 6-6 6 6"/>',
 		'chevron-down'  => '<path d="m6 9 6 6 6-6"/>',
 		'chevron-right' => '<path d="m9 6 6 6-6 6"/>',
+		// Shop promo banner (inc/shop-promo.php).
+		'target'        => '<circle cx="12" cy="12" r="7"/><circle cx="12" cy="12" r="2.6"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/>',
+		'tag'           => '<path d="M4 4h7l9 9-7 7-9-9z"/><circle cx="8.2" cy="8.2" r="1.4"/>',
+		'calendar'      => '<rect x="4" y="5" width="16" height="16" rx="2"/><path d="M4 10h16M9 3v4M15 3v4"/>',
+		'double-right'  => '<path d="m6 6 6 6-6 6"/><path d="m13 6 6 6-6 6"/>',
 	);
 
 	if ( ! isset( $paths[ $name ] ) ) {

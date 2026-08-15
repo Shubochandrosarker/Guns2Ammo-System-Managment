@@ -84,7 +84,7 @@
 
 .single-product div.product {
 	display: grid;
-	grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr);
+	grid-template-columns: minmax(0, 1.02fr) minmax(0, 1fr);
 	gap: 40px;
 	align-items: start;
 	margin: 0;
@@ -95,12 +95,23 @@
 	content: none;
 }
 
+/* WooCommerce core's woocommerce-layout.css ships
+ *   .woocommerce div.product div.images  { float: left;  width: 48% }
+ *   .woocommerce div.product div.summary { float: right; width: 48% }
+ * at specificity (0,3,2). The theme does not dequeue that stylesheet, so
+ * both columns were rendering at 48% of their grid cell — the gallery card
+ * came out roughly half the width it should be, and the title wrapped early.
+ * These selectors match that specificity and !important the two layout
+ * properties, so the fix holds whatever order the stylesheets load in. */
+.single-product div.product div.images,
+.single-product div.product div.summary,
 .single-product div.product > .images,
 .single-product div.product > .summary {
-	width: 100%;
+	width: 100% !important;
+	max-width: none !important;
 	min-width: 0;
-	float: none;
-	margin: 0;
+	float: none !important;
+	margin: 0 !important;
 }
 
 .single-product div.product .woocommerce-tabs,
@@ -215,11 +226,16 @@
 	overflow: hidden;
 }
 
-.g2a-gallery__image {
+/* Fill the frame at any source aspect ratio. WooCommerce core sets
+ * `div.images img { width: 100%; height: auto }`, which overflows the frame
+ * for a portrait shot — object-fit needs both dimensions pinned to letterbox
+ * instead of crop. Matching (0,3,2) + !important for the same reason as the
+ * column widths above. */
+.single-product div.product div.images img.g2a-gallery__image {
+	width: 100% !important;
+	height: 100% !important;
 	max-width: 100%;
 	max-height: 100%;
-	width: auto;
-	height: auto;
 	object-fit: contain;
 	display: block;
 	cursor: zoom-in;
