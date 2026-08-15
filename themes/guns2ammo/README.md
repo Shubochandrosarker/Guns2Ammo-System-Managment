@@ -225,11 +225,52 @@ Other filters: `g2a_new_product_days` (default 30) controls the "New" badge on
 the gallery and shop cards; `g2a_brand_taxonomies` controls where the brand line
 looks for a value.
 
+## Shop promo banner + live countdown
+
+Added in 1.29.0. A campaign panel at the top of the shop and product-category
+archives — offer headline, supporting copy, call to action, perk row, and a
+real-time animated countdown. Files: `inc/shop-promo.php`,
+`assets/css/shop-promo.css`, `assets/js/shop-promo.js`.
+
+**Everything is edited in Customizer → "Guns 2 Ammo — Shop Promo Banner"** —
+running a new campaign never needs a code change. Tick *Show the banner*, set
+the copy, and set *Offer ends* to start the countdown. Leave the end date empty
+to run the banner with no timer.
+
+Behaviour worth knowing:
+
+- **The deadline is absolute.** The date is entered in the site's own timezone
+  and resolved server-side to a UNIX timestamp, so a page served from a
+  full-page cache still counts down to the right moment instead of restarting
+  from whenever the HTML was generated. It also means the store's Arizona
+  deadline is not silently interpreted as UTC.
+- **First page only**, so the banner is a landing statement rather than
+  something repeated on page 7 of the catalogue.
+- **It replaces the product-sale strip while it is live.** `inc/woocommerce.php`
+  renders its own "Special Offer" countdown at the top of the shop, driven by
+  whichever product sale ends soonest; two stacked countdowns is one too many.
+  Filter `g2a_promo_replaces_sale_strip` to keep both.
+- **When the offer expires** the countdown swaps to "This offer has ended", and
+  the whole banner hides if *Hide the whole banner once the offer ends* is
+  ticked (it is by default).
+- **The artwork is optional.** With no image uploaded the theme draws the
+  membership card in CSS; upload one to replace it.
+- The panel is deliberately dark in both light and dark mode — it reads on the
+  `--ink-on-media` token family, same as the photographic heroes.
+
+Countdown animation: each digit is a two-layer cell, so only digits that
+actually change roll over. Ticks are aligned to the wall clock (no drift),
+pause while the tab is hidden, and the frame pulses in the final hour.
+`prefers-reduced-motion` swaps digits instantly and the count keeps working.
+
+Filters: `g2a_promo_is_active`, `g2a_promo_show_on_screen`,
+`g2a_promo_replaces_sale_strip`.
+
 ## Performance
 
 - Dequeues Storefront parent CSS, WP block-library, classic-theme styles, jQuery Migrate.
 - Removes `wp_generator`, RSD/WLW links, oEmbed discovery, REST head link.
-- `g2a-chrome.js` and `g2a-single-product.js` deferred via `script_loader_tag` filter.
+- `g2a-chrome.js`, `g2a-single-product.js` and `g2a-shop-promo.js` deferred via `script_loader_tag` filter.
 - Product pages no longer load FlexSlider, jQuery-zoom or PhotoSwipe (~60KB of
   script) — the theme ships its own gallery instead.
 - Fonts loaded once with `display=swap`, `preconnect` + `dns-prefetch` for `fonts.gstatic.com`.
@@ -249,6 +290,7 @@ guns2ammo/
     seo.php                Meta + JSON-LD (Rank Math / Yoast aware)
     woocommerce.php        Shop loop overrides, Product schema
     single-product.php     Product page: summary stack, tabs, brand/FFL facts
+    shop-promo.php         Shop campaign banner + offer countdown (Customizer)
     customizer.php         Business info + social fields
  woocommerce/
     single-product.php     Page wrapper + sticky buy bar
@@ -259,8 +301,10 @@ guns2ammo/
     css/tokens.css         Full design tokens + components
     css/app.css            Preloader, lazy-fade, reveal
     css/single-product.css Product page (product requests only)
+    css/shop-promo.css     Shop campaign banner (shop archives only)
     js/chrome.js           Behaviors only (nav, profile, live status, modal, countdown)
     js/single-product.js   Gallery rail, lightbox, qty stepper, wishlist
+    js/shop-promo.js       Rolling-digit offer countdown
  template-parts/
     nav.php
     mobile-drawer.php

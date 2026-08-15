@@ -7,7 +7,7 @@
 
 if ( ! defined( 'ABSPATH' ) ) exit;
 
-define( 'G2A_VERSION', '1.28.0' );
+define( 'G2A_VERSION', '1.29.0' );
 define( 'G2A_DIR', get_stylesheet_directory() );
 define( 'G2A_URI', get_stylesheet_directory_uri() );
 
@@ -111,6 +111,15 @@ add_action( 'wp_enqueue_scripts', function () {
 		wp_enqueue_script( 'g2a-single-product', G2A_URI . '/assets/js/single-product.js', [], G2A_VERSION, true );
 	}
 
+	// Shop promo banner — only on the screens that actually render it, and
+	// only while a campaign is live, so a disabled banner costs nothing.
+	if ( function_exists( 'g2a_promo_is_shop_screen' ) && g2a_promo_is_shop_screen() && g2a_promo_is_active() ) {
+		wp_enqueue_style( 'g2a-shop-promo', G2A_URI . '/assets/css/shop-promo.css', [ 'g2a-wc-fixes' ], G2A_VERSION );
+		if ( g2a_promo_deadline() > time() ) {
+			wp_enqueue_script( 'g2a-shop-promo', G2A_URI . '/assets/js/shop-promo.js', [], G2A_VERSION, true );
+		}
+	}
+
 	wp_enqueue_script( 'g2a-chrome', G2A_URI . '/assets/js/chrome.js', [], G2A_VERSION, true );
 }, 20 );
 
@@ -121,7 +130,7 @@ add_action( 'wp_enqueue_scripts', function () {
    order with other deferred scripts. Real-world TTI win of
    ~100-250ms on cold-cache loads. */
 add_filter( 'script_loader_tag', function ( $tag, $handle ) {
-	if ( in_array( $handle, [ 'g2a-chrome', 'g2a-single-product' ], true ) ) {
+	if ( in_array( $handle, [ 'g2a-chrome', 'g2a-single-product', 'g2a-shop-promo' ], true ) ) {
 		return str_replace( ' src=', ' defer src=', $tag );
 	}
 	return $tag;
@@ -155,6 +164,9 @@ require_once G2A_DIR . '/inc/woocommerce.php';
 
 /* ---------- Single-product page (layout, gallery data, tabs) ---------- */
 require_once G2A_DIR . '/inc/single-product.php';
+
+/* ---------- Shop promo banner + live offer countdown ---------- */
+require_once G2A_DIR . '/inc/shop-promo.php';
 
 /* ---------- Customizer image fields (light) ---------- */
 require_once G2A_DIR . '/inc/customizer.php';
