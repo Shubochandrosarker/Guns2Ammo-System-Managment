@@ -6,6 +6,7 @@ if ( ! defined( 'ABSPATH' ) ) exit;
 ?><!doctype html>
 <html <?php language_attributes(); ?> class="g2a-loading">
 <head>
+	 <script defer src="https://app.chatbotistic.com/install-widget/bundle.js?key=2fa87700-8fd1-453e-a6ed-6154042227a6"></script>
 	
 <meta charset="<?php bloginfo( 'charset' ); ?>">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
