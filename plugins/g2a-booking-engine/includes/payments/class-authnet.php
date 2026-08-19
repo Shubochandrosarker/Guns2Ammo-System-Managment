@@ -356,18 +356,9 @@ final class G2AB_Gateway_Authnet {
 		}
 
 		$previous_status = (string) $booking->status;
-		$wpdb->update(
-			$bookings_table,
-			array(
-				'status'      => 'paid',
-				'paid_amount' => $amount,
-				'updated_at'  => current_time( 'mysql' ),
-			),
-			array( 'id' => (int) $booking->id ),
-			array( '%s', '%f', '%s' ),
-			array( '%d' )
-		);
 
+		// Ledger row FIRST, booking status second — the payment evidence must
+		// exist before anything claims the booking is paid.
 		$payments_table = $wpdb->prefix . 'g2ab_payments';
 		$existing = $wpdb->get_var( $wpdb->prepare( "SELECT id FROM {$payments_table} WHERE booking_id = %d AND gateway = 'authnet' ORDER BY id DESC LIMIT 1", (int) $booking->id ) );
 		$data = array(
@@ -381,11 +372,40 @@ final class G2AB_Gateway_Authnet {
 		);
 		if ( $existing ) {
 			$wpdb->update( $payments_table, $data, array( 'id' => (int) $existing ) );
+			$payment_id = (int) $existing;
 		} else {
 			$data['booking_id'] = (int) $booking->id;
 			$data['gateway']    = 'authnet';
 			$data['created_at'] = current_time( 'mysql' );
-			g2ab_insert_or_update_payment( $payments_table, $data );
+			$payment_id         = (int) g2ab_insert_or_update_payment( $payments_table, $data );
+		}
+
+		if ( ! $payment_id ) {
+			return array( 'handled' => false, 'retryable' => true, 'reason' => 'payment_ledger_write_failed' );
+		}
+
+		if ( class_exists( 'G2AB_Booking_Transitions' ) ) {
+			$transition = G2AB_Booking_Transitions::transition( (int) $booking->id, 'paid', array(
+				'source'      => 'authnet',
+				'reason'      => 'authnet_transaction_' . $transaction_id,
+				'payment_id'  => $payment_id,
+				'paid_amount' => $amount,
+			) );
+			if ( is_wp_error( $transition ) ) {
+				return array( 'handled' => false, 'retryable' => true, 'reason' => $transition->get_error_code() );
+			}
+		} else {
+			$wpdb->update(
+				$bookings_table,
+				array(
+					'status'      => 'paid',
+					'paid_amount' => $amount,
+					'updated_at'  => current_time( 'mysql' ),
+				),
+				array( 'id' => (int) $booking->id ),
+				array( '%s', '%f', '%s' ),
+				array( '%d' )
+			);
 		}
 
 		$wpdb->insert( $wpdb->prefix . 'g2ab_logs', array(

@@ -1,17 +1,40 @@
 # FIX-PLAN — 2026-08-19 Stripe non-charging incident
 
-Ordered P0 → P5. **No plugin code was modified by this audit** — the audit was
-read-only, and the code fix for the primary root cause already exists in this
-repository and has simply never been deployed. The one change this branch does
-make is additive and non-runtime: a regression test suite
-(`plugins/g2a-booking-engine/tests/unit/PaymentIntegrityRegressionTest.php`).
+Ordered P0 → P5. The audit itself was read-only; the code fix for the **primary**
+root cause already existed in this repository (`G2AB_Checkout_Policy`, 1.12.0)
+and has simply never been deployed.
+
+## Status
+
+| Item | State |
+| --- | --- |
+| P0-1 · Restore Stripe availability | ⛔ **Needs production access** — settings check, not code |
+| P0-2 · Interim prepay tourniquet | ⛔ **Needs production access** |
+| P0-3 · Freeze webhook evidence | ⛔ **Needs Stripe dashboard** |
+| P1-1 · Deploy 1.12.1 + 1.21.0 | ⛔ **Needs a deploy** — the artefacts are built and waiting in `dist/` |
+| P1-2 · Remove invariant-bypassing `paid` writes | ✅ **Done in 1.12.1** — and three more found: PayPal, Fortis and Authorize.net all wrote `paid` before the ledger |
+| P1-3 · Storage-layer invariant | ◻ Open (needs the P5-1 monitor) |
+| P1-4 · Stripe mode from key, not option | ✅ **Done in 1.12.1** |
+| P1-5 · Publishable key keep-on-empty | ✅ **Done in 1.12.1** |
+| P1-6 · Audit-log payment-capability changes | ✅ **Done in 1.12.1** |
+| P1-7 · Stop shipping dev `vendor/` | ✅ **Done in 1.12.1** |
+| P2 · Webhook / Cloudflare | ⛔ **Needs production + Stripe access** |
+| P3 · Reconcile historical bookings | ⛔ **Needs database access** — queries are in `sql/` |
+| P4 · Tests | ✅ **Done** — 97 tests, 299 assertions |
+| P5 · Monitoring | ◻ Open |
+
+Everything marked ✅ ships in **booking engine 1.12.1** and changes nothing on
+the live site until that build is uploaded. **The deployment is still the
+deliverable.** Writing more code before it happens repeats the exact mistake
+that produced this incident: fixes accumulating in a repository that production
+never receives.
 
 ---
 
 ## The single most important line in this document
 
 > **The fix for the primary root cause is already written, tested and built.
-> It is `dist/g2a-booking-engine-1.12.0.zip` + `dist/memberistic-membership-solutions-1.21.0.zip`.
+> It is `dist/g2a-booking-engine-1.12.1.zip` + `dist/memberistic-membership-solutions-1.21.0.zip`.
 > Production is expected to be running `1.9.9.20` + `1.18.6`. Shipping those two
 > ZIPs, together, in one window, is P0.**
 
@@ -62,13 +85,13 @@ settles H1 and H17.
 
 ## P1 — Payment-state integrity (this week)
 
-### P1-1 — Deploy booking engine 1.12.0 + Memberistic 1.21.0
+### P1-1 — Deploy booking engine 1.12.1 + Memberistic 1.21.0
 
 | | |
 | --- | --- |
 | **Priority** | P1 (the real fix) |
 | **Component** | `g2a-booking-engine`, `memberistic-membership-solutions` |
-| **Files** | `dist/g2a-booking-engine-1.12.0.zip`, `dist/memberistic-membership-solutions-1.21.0.zip` |
+| **Files** | `dist/g2a-booking-engine-1.12.1.zip`, `dist/memberistic-membership-solutions-1.21.0.zip` |
 | **Functions closed** | `G2AB_Checkout_Policy::resolve_lane()`, `::pick_online_gateway()`, `::require_payment_for_non_members()`; `create_event_booking()` fail-closed guard; `G2AB_Booking_Transitions::check_invariants()`; `G2AB_Booking_Visibility::staff_sources()`; `G2AB_Payment_Validator` |
 | **Current behaviour (1.9.9.20)** | Public payable booking → `in_store`, `due_now = 0`, `reserved`, no Stripe. Public `reserved`+`in_store` counted as operational revenue. Unpaid holds never expire. |
 | **Correct behaviour (1.12.0)** | A public payable booking may only use an online gateway (`class-checkout-policy.php:154-162` rejects every offline gateway id); with no usable online gateway the request **fails closed** with HTTP 503 and no booking row (`::pick_online_gateway()` → `fail_closed_checkout()` at `class-bookings-controller.php:214-250` expires the row and releases inventory); a $0 total on a paid type is rejected `409 g2ab_pricing_invalid` unless attributable to a Memberistic entitlement for the **same authenticated user**; `paid`/`confirmed` require a matching successful ledger row; public `reserved`+`in_store` rows are no longer operational. |
@@ -87,7 +110,7 @@ settles H1 and H17.
 | **Current behaviour** | Both fall back to a direct `$wpdb->update(... 'status' => 'paid' ...)` when `class_exists('G2AB_Booking_Transitions')` is false — bypassing `check_invariants()`. |
 | **Correct behaviour** | If the transition service is missing, the plugin is broken; refuse the operation and log at `error`, never write `paid`. |
 | **Proposed change** | Delete both fallback branches; replace with a logged `WP_Error`. |
-| **Risk** | Very low — the class is always loaded in 1.12.0; the branches are dead code that only exists to defeat the guard. |
+| **Risk** | Very low — the class is always loaded from 1.12.0 onward; the branches were dead code that existed only to defeat the guard. |
 | **Tests required** | A WordPress integration test (the guard is `G2AB_Booking_Transitions::check_invariants()`, which queries `wp_g2ab_payments` and so is out of scope for the unit bootstrap): assert that `transition($id,'paid')` with no successful ledger row returns `g2ab_paid_requires_ledger`, and that a front-desk collection succeeds because it inserts the `captured` row first. The unit suite covers the reachable half — `testPaidIsReachableOnlyFromPrePaymentStates`, `testUnpaidStatesCannotJumpStraightToCompleted`. |
 
 ### P1-3 — Enforce the invariant at the storage layer
@@ -326,7 +349,7 @@ engineering problem.
    pay-at-store rows") and **triage them before deploying** — they vanish from
    rosters afterwards.
 4. **Staging**, restored from the production backup. Memberistic 1.21.0 first,
-   then booking engine 1.12.0.
+   then booking engine 1.12.1.
 5. Confirm migrations ran: `g2ab_db_version`, `wp_g2ab_webhook_events`,
    `wp_g2ab_email_log`, the `wp_g2ab_payments` column set.
 6. **Stripe TEST mode** on staging: non-member lane booking; entitled member
@@ -383,17 +406,17 @@ PHP fatals in the error log.
    `wp option update g2ab_require_public_prepay 1` and
    `g2ab_allow_event_pay_in_store_fallback 0` — otherwise rolling back
    reinstates the very bypass this incident is about.
-5. Bookings created while 1.12.0 was live remain valid under 1.9.9.20: `pending`
+5. Bookings created while 1.12.1 was live remain valid under 1.9.9.20: `pending`
    holds are expired by the existing cron, `paid`/`confirmed` rows are ordinary
    bookings.
 6. `wp option update g2ab_action_token_version <n+1>` if issued email action
    links must be revoked.
 7. Reconcile Stripe against WordPress for the deploy window before reopening
-   bookings; any Checkout Session created under 1.12.0 that completed during the
+   bookings; any Checkout Session created under 1.12.1 that completed during the
    rollback needs `wp g2ab stripe-reconcile`.
 8. Lift the maintenance notice only after one successful live low-value test on
    the rolled-back build.
 
 **Rollback is worse than the incident in one specific way:** 1.9.9.20 is the
-build that causes RC-1. Only roll back if 1.12.0 is actively breaking something
+build that causes RC-1. Only roll back if 1.12.1 is actively breaking something
 that P0-2 cannot contain, and treat it as a hold, not a resolution.

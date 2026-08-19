@@ -19,6 +19,7 @@
       <directory suffix=".php">includes/services</directory>
       <file>includes/class-booking-visibility.php</file>
       <file>includes/class-payment-validator.php</file>
+      <file>includes/payments/class-stripe.php</file>
     </include>
   </source>
 </phpunit>

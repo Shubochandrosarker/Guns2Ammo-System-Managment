@@ -624,24 +624,118 @@ final class PaymentIntegrityRegressionTest extends TestCase {
 	}
 
 	/**
-	 * CF-5: g2ab_stripe_test_mode DEFAULTS TO 1. On a site that never explicitly
-	 * saved it, a genuine LIVE payment is rejected — money taken, booking not
-	 * updated. This test documents the trap so the P1-4 fix has a failing
-	 * reference point.
+	 * CF-5, fixed in 1.12.1. `g2ab_stripe_test_mode` defaults to 1, so a site
+	 * that never explicitly saved the payments screen used to reject every
+	 * genuine LIVE payment as an environment mismatch — money taken, booking
+	 * left unpaid. The configured key's prefix is now authoritative.
 	 */
-	public function testUnsetTestModeOptionRejectsGenuineLivePayments(): void {
+	public function testLivePaymentIsAcceptedWhenTheKeyIsLiveAndTheOptionWasNeverSaved(): void {
 		// Deliberately do NOT set g2ab_stripe_test_mode — reproduce a fresh site.
+		update_option( 'g2ab_stripe_secret_key', 'sk_live_ExampleKeyValue' );
+
 		$result = G2AB_Payment_Validator::validate_stripe_checkout_session(
 			$this->stripeSession(),
 			$this->paidBooking(),
 			$this->paymentAttempt()
 		);
 
-		$this->assertTrue(
-			is_wp_error( $result ),
-			'Documented trap (FIX-PLAN P1-4): with g2ab_stripe_test_mode unset, live sessions are refused.'
+		$this->assertIsArray(
+			$result,
+			'A live session paid with a live key must validate even when the test-mode option was never saved.'
 		);
+	}
+
+	/**
+	 * When the key cannot answer (no key, or a restricted `rk_` key) we fall
+	 * back to the option — which defaults to TEST. Refusing is the correct
+	 * outcome there: an undeterminable environment must fail closed.
+	 */
+	public function testUndeterminableEnvironmentStillFailsClosed(): void {
+		update_option( 'g2ab_stripe_secret_key', '' );
+
+		$result = G2AB_Payment_Validator::validate_stripe_checkout_session(
+			$this->stripeSession(),
+			$this->paidBooking(),
+			$this->paymentAttempt()
+		);
+
+		$this->assertTrue( is_wp_error( $result ) );
 		$this->assertSame( 'g2ab_payment_mode_mismatch', $result->get_error_code() );
+	}
+
+	/* ═════════ P1-4 · Stripe environment is read from the key, not an option ═════════ */
+
+	public function testKeyModeIsDerivedFromTheSecretKeyPrefix(): void {
+		update_option( 'g2ab_stripe_secret_key', 'sk_live_ExampleKeyValue' );
+		$this->assertSame( 'live', G2AB_Gateway_Stripe::key_mode() );
+		$this->assertFalse( G2AB_Gateway_Stripe::is_test_mode() );
+
+		update_option( 'g2ab_stripe_secret_key', 'sk_test_ExampleKeyValue' );
+		$this->assertSame( 'test', G2AB_Gateway_Stripe::key_mode() );
+		$this->assertTrue( G2AB_Gateway_Stripe::is_test_mode() );
+	}
+
+	public function testKeyModeFallsBackToTheOptionWhenThePrefixIsUnrecognised(): void {
+		update_option( 'g2ab_stripe_secret_key', 'rk_live_RestrictedKey' );
+
+		$this->assertSame( '', G2AB_Gateway_Stripe::key_mode() );
+
+		update_option( 'g2ab_stripe_test_mode', 0 );
+		$this->assertFalse( G2AB_Gateway_Stripe::is_test_mode() );
+
+		update_option( 'g2ab_stripe_test_mode', 1 );
+		$this->assertTrue( G2AB_Gateway_Stripe::is_test_mode() );
+	}
+
+	public function testTheKeyPrefixOverridesAContradictoryOption(): void {
+		update_option( 'g2ab_stripe_secret_key', 'sk_live_ExampleKeyValue' );
+		update_option( 'g2ab_stripe_test_mode', 1 );   // stale/never-saved default
+
+		$this->assertFalse(
+			G2AB_Gateway_Stripe::is_test_mode(),
+			'A live key means live mode however the option is set.'
+		);
+		$this->assertTrue( G2AB_Gateway_Stripe::mode_option_disagrees_with_key() );
+	}
+
+	public function testNoDisagreementIsReportedWhenTheOptionMatchesTheKey(): void {
+		update_option( 'g2ab_stripe_secret_key', 'sk_live_ExampleKeyValue' );
+		update_option( 'g2ab_stripe_test_mode', 0 );
+		$this->assertFalse( G2AB_Gateway_Stripe::mode_option_disagrees_with_key() );
+
+		update_option( 'g2ab_stripe_secret_key', 'sk_test_ExampleKeyValue' );
+		update_option( 'g2ab_stripe_test_mode', 1 );
+		$this->assertFalse( G2AB_Gateway_Stripe::mode_option_disagrees_with_key() );
+	}
+
+	public function testNoDisagreementIsReportedWhenTheKeyCannotAnswer(): void {
+		update_option( 'g2ab_stripe_secret_key', '' );
+		update_option( 'g2ab_stripe_test_mode', 1 );
+
+		$this->assertFalse(
+			G2AB_Gateway_Stripe::mode_option_disagrees_with_key(),
+			'An unreadable key is not a disagreement — do not nag with an unactionable notice.'
+		);
+	}
+
+	/* ═════════ P1-6 · every switch that can stop the money is audited ═════════ */
+
+	public function testEveryPaymentCapabilitySwitchIsWatched(): void {
+		$watched = g2ab_payment_capability_options();
+
+		foreach ( array(
+			'g2ab_addons_active',          // removing 'stripe' unregisters the gateway
+			'g2ab_stripe_enabled',         // is_available() reads this
+			'g2ab_stripe_secret_key',      // is_available() reads this
+			'g2ab_stripe_test_mode',       // decides which Stripe account transacts
+			'g2ab_payment_gateway_default',
+		) as $option ) {
+			$this->assertContains(
+				$option,
+				$watched,
+				"Changing '{$option}' can stop the site collecting money and must leave an audit record."
+			);
+		}
 	}
 
 	/* ═════════ Invariant 2 · booking state eligibility ═════════ */

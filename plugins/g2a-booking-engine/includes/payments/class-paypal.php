@@ -333,8 +333,10 @@ final class G2AB_Gateway_Paypal {
 
 		$previous_status = (string) $booking->status;
 
-		$wpdb->update( $bt, array( 'status' => 'paid', 'paid_amount' => $amount, 'updated_at' => current_time( 'mysql' ) ), array( 'id' => $booking->id ), array( '%s', '%f', '%s' ), array( '%d' ) );
-
+		// Ledger row FIRST, booking status second. The old order wrote `paid`
+		// before any payment evidence existed, so a failure between the two
+		// left a booking claiming money that nothing recorded. Mirrors the
+		// Stripe and WooCommerce paths.
 		$pt = $wpdb->prefix . 'g2ab_payments';
 		// Match by capture_id when present; otherwise update the latest pending row.
 		$existing = $capture_id
@@ -351,8 +353,9 @@ final class G2AB_Gateway_Paypal {
 				'gateway_response' => wp_json_encode( $res ),
 				'processed_at' => current_time( 'mysql' ),
 			), array( 'id' => $existing ), array( '%s', '%s', '%f', '%s', '%s' ), array( '%d' ) );
+			$payment_id = (int) $existing;
 		} else {
-			g2ab_insert_or_update_payment( $pt, array(
+			$payment_id = (int) g2ab_insert_or_update_payment( $pt, array(
 				'booking_id' => (int) $booking->id,
 				'gateway' => 'paypal',
 				'transaction_id' => $capture_id,
@@ -364,6 +367,26 @@ final class G2AB_Gateway_Paypal {
 				'processed_at' => current_time( 'mysql' ),
 				'created_at' => current_time( 'mysql' ),
 			), array( '%d', '%s', '%s', '%f', '%s', '%s', '%s', '%s', '%s', '%s' ) );
+		}
+
+		if ( ! $payment_id ) {
+			return array( 'handled' => false, 'retryable' => true, 'reason' => 'payment_ledger_write_failed' );
+		}
+
+		// The transition service re-checks that a successful ledger entry for
+		// the right amount and currency exists before it will write `paid`.
+		if ( class_exists( 'G2AB_Booking_Transitions' ) ) {
+			$transition = G2AB_Booking_Transitions::transition( (int) $booking->id, 'paid', array(
+				'source'      => 'paypal',
+				'reason'      => 'paypal_capture_' . $capture_id,
+				'payment_id'  => $payment_id,
+				'paid_amount' => $amount,
+			) );
+			if ( is_wp_error( $transition ) ) {
+				return array( 'handled' => false, 'retryable' => true, 'reason' => $transition->get_error_code() );
+			}
+		} else {
+			$wpdb->update( $bt, array( 'status' => 'paid', 'paid_amount' => $amount, 'updated_at' => current_time( 'mysql' ) ), array( 'id' => $booking->id ), array( '%s', '%f', '%s' ), array( '%d' ) );
 		}
 
 		$wpdb->insert( $wpdb->prefix . 'g2ab_logs', array(

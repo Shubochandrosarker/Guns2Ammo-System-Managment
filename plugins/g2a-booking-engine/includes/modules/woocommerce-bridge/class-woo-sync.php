@@ -114,12 +114,25 @@ class G2AB_Woo_Sync {
 				return;
 			}
 		} else {
-			$wpdb->update(
-				$bk,
-				array( 'status' => 'paid', 'paid_amount' => $amount, 'updated_at' => current_time( 'mysql' ) ),
-				array( 'id' => $booking_id ),
-				array( '%s', '%f', '%s' ), array( '%d' )
-			);
+			// No transition service means the plugin is not fully loaded. The
+			// old fallback wrote `paid` straight to the row, bypassing the
+			// payment-evidence invariant — the one guard that makes a paid
+			// booking mean money was collected. Refuse instead: an order that
+			// cannot be recorded safely is a support ticket, never a silent
+			// state change.
+			$wpdb->insert( $wpdb->prefix . 'g2ab_logs', array(
+				'booking_id' => (int) $booking_id,
+				'event_type' => 'payment_transition_unavailable',
+				'severity'   => 'error',
+				'message'    => 'G2AB_Booking_Transitions missing; refused to mark booking paid from WooCommerce order ' . (int) $order_id,
+				'context'    => wp_json_encode( array( 'wc_order_id' => (int) $order_id, 'payment_id' => $payment_id ) ),
+				'created_at' => current_time( 'mysql' ),
+			) );
+			$order->add_order_note( sprintf(
+				'G2A booking #%d was NOT marked paid: the booking engine\'s transition service is unavailable, so payment state could not be verified. The payment is recorded on the ledger — settle the booking from Front Desk once the plugin is healthy.',
+				$booking_id
+			) );
+			return;
 		}
 
 		// Full paid side-effect sequence (account provisioning, Range Guest

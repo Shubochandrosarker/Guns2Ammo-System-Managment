@@ -817,3 +817,115 @@ function g2ab_invoice_signing_secret() {
 	}
 	return $secret;
 }
+
+/**
+ * Options whose value decides whether the site can take money online.
+ *
+ * Changing any of these silently converts payable bookings into free
+ * reservations on every build before 1.10.0, and disables online checkout on
+ * every build after it. The 2026-08-19 incident ran for thirty days partly
+ * because flipping one of them left no trace anywhere.
+ *
+ * @since 1.12.1
+ * @return string[]
+ */
+function g2ab_payment_capability_options() {
+	return array(
+		'g2ab_addons_active',
+		'g2ab_stripe_enabled',
+		'g2ab_stripe_test_mode',
+		'g2ab_stripe_secret_key',
+		'g2ab_stripe_publishable_key',
+		'g2ab_stripe_webhook_secret',
+		'g2ab_paypal_enabled',
+		'g2ab_fortis_enabled',
+		'g2ab_authnet_enabled',
+		'g2ab_payment_gateway_default',
+	);
+}
+
+/**
+ * Record a change to a payment-capability option.
+ *
+ * Secret VALUES are never written to the log — only whether a value is now
+ * present, and how long it is. For `g2ab_addons_active` the payment-relevant
+ * membership delta is recorded, not the whole array.
+ *
+ * @since 1.12.1
+ * @param string $option Option name.
+ * @param mixed  $before Value before the change.
+ * @param mixed  $after  Value after the change.
+ * @return void
+ */
+function g2ab_log_payment_capability_change( $option, $before, $after ) {
+	global $wpdb;
+
+	$option = sanitize_key( (string) $option );
+	if ( ! in_array( $option, g2ab_payment_capability_options(), true ) ) {
+		return;
+	}
+
+	$describe = static function ( $value ) use ( $option ) {
+		if ( false !== strpos( $option, '_secret' ) || false !== strpos( $option, '_key' ) ) {
+			$value = (string) $value;
+			return '' === $value ? 'unset' : 'set(len=' . strlen( $value ) . ')';
+		}
+		if ( is_array( $value ) ) {
+			$payment_addons = array_values( array_intersect(
+				array_map( 'sanitize_key', $value ),
+				array( 'stripe', 'paypal', 'fortis', 'authnet', 'woocommerce', 'pay_in_store' )
+			) );
+			sort( $payment_addons );
+			return implode( ',', $payment_addons );
+		}
+		return sanitize_text_field( (string) $value );
+	};
+
+	$from = $describe( $before );
+	$to   = $describe( $after );
+	if ( $from === $to ) {
+		return;
+	}
+
+	// A change that removes the site's ability to charge online is the one an
+	// operator most needs to find later, so it is logged louder.
+	$online_lost = ( 'g2ab_stripe_enabled' === $option && '1' === $from && '1' !== $to )
+		|| ( 'g2ab_addons_active' === $option && false !== strpos( $from, 'stripe' ) && false === strpos( $to, 'stripe' ) )
+		|| ( 'g2ab_stripe_secret_key' === $option && 'unset' === $to );
+
+	$wpdb->insert( $wpdb->prefix . 'g2ab_logs', array(
+		'user_id'    => get_current_user_id() ?: null,
+		'event_type' => 'payment_capability_changed',
+		'severity'   => $online_lost ? 'error' : 'warning',
+		'message'    => sprintf( '%s: %s -> %s', $option, $from, $to ),
+		'context'    => wp_json_encode( array(
+			'option'      => $option,
+			'from'        => $from,
+			'to'          => $to,
+			'online_lost' => (bool) $online_lost,
+		) ),
+		'ip_address' => function_exists( 'g2ab_get_client_ip' ) ? g2ab_get_client_ip() : '',
+		'created_at' => current_time( 'mysql' ),
+	) );
+}
+
+/**
+ * Watch every payment-capability option for the life of the request.
+ *
+ * Hooks `update_option_{$name}` / `add_option_{$name}` so a change is recorded
+ * no matter which screen, REST route or WP-CLI command made it — the settings
+ * form is not the only writer.
+ *
+ * @since 1.12.1
+ * @return void
+ */
+function g2ab_watch_payment_capability_options() {
+	foreach ( g2ab_payment_capability_options() as $option ) {
+		add_action( 'update_option_' . $option, static function ( $before, $after ) use ( $option ) {
+			g2ab_log_payment_capability_change( $option, $before, $after );
+		}, 10, 2 );
+		add_action( 'add_option_' . $option, static function ( $name, $value ) use ( $option ) {
+			g2ab_log_payment_capability_change( $option, '', $value );
+		}, 10, 2 );
+	}
+}

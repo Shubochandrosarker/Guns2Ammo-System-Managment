@@ -350,7 +350,7 @@ touch booking payments and cannot alter booking Stripe config.
 | Component | Repository version | Build in `dist/` |
 | --- | --- | --- |
 | memberistic-membership-solutions | 1.21.0 | ✔ |
-| **g2a-booking-engine** | **1.12.0** | ✔ |
+| **g2a-booking-engine** | **1.12.1** | ✔ |
 | g2a-pos-core | 3.5.0 | ✔ |
 | advanced-ffl-checkout | 1.21.1 | ✔ |
 | verifyistic | 1.4.7 | ✔ |
@@ -411,7 +411,7 @@ compared against the same file extracted from the candidate ZIP.
 
 | Component | GitHub version | Production version | Same code? | Risk |
 | --- | --- | --- | --- | --- |
-| g2a-booking-engine | 1.12.0 | ❓ (expect 1.9.9.20) | ❓ | **CRITICAL** — the entire Stripe bypass |
+| g2a-booking-engine | 1.12.1 | ❓ (expect 1.9.9.20) | ❓ | **CRITICAL** — the entire Stripe bypass |
 | memberistic-membership-solutions | 1.21.0 | ❓ (expect 1.18.6) | ❓ | **HIGH** — entitlement service absent < 1.19.0 |
 | g2a-pos-core | 3.5.0 | ❓ | ❓ | LOW — isolated |
 | advanced-ffl-checkout | 1.21.1 | ❓ | ❓ | LOW |
@@ -975,7 +975,7 @@ Run in this order; the first three take under a minute and decide everything.
 | # | Check | Command |
 | --- | --- | --- |
 | V1 | Deployed versions | `wp plugin list --fields=name,status,version` |
-| V2 | Code identity of the decisive file | `sha256sum wp-content/plugins/g2a-booking-engine/includes/rest/class-bookings-controller.php` and compare against the same file extracted from `archives/releases-legacy/g2a-booking-engine-1.9.9.20.zip` and `dist/g2a-booking-engine-1.12.0.zip` |
+| V2 | Code identity of the decisive file | `sha256sum wp-content/plugins/g2a-booking-engine/includes/rest/class-bookings-controller.php` and compare against the same file extracted from `archives/releases-legacy/g2a-booking-engine-1.9.9.20.zip` and `dist/g2a-booking-engine-1.12.1.zip` |
 | V3 | Does the fix exist on disk at all? | `ls wp-content/plugins/g2a-booking-engine/includes/services/class-checkout-policy.php` — **absent ⇒ production predates 1.12.0 ⇒ the bypass is live** |
 
 **Database:**

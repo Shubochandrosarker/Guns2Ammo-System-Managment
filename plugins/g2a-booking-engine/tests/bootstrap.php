@@ -289,11 +289,15 @@ function is_wp_error( $thing ) {
 
 define( 'G2AB_TESTS_PLUGIN_DIR', dirname( __DIR__ ) . '/' );
 
+// Pure helpers (option lists, token hashing, CIDR maths). Nothing here runs
+// at load time; the DB-touching helpers are simply never called by a unit test.
+require_once G2AB_TESTS_PLUGIN_DIR . 'includes/helpers/functions.php';
 require_once G2AB_TESTS_PLUGIN_DIR . 'includes/services/class-booking-statuses.php';
 require_once G2AB_TESTS_PLUGIN_DIR . 'includes/services/class-booking-transitions.php';
 require_once G2AB_TESTS_PLUGIN_DIR . 'includes/services/class-checkout-policy.php';
 require_once G2AB_TESTS_PLUGIN_DIR . 'includes/class-booking-visibility.php';
 require_once G2AB_TESTS_PLUGIN_DIR . 'includes/class-payment-validator.php';
+require_once G2AB_TESTS_PLUGIN_DIR . 'includes/payments/class-stripe.php';
 require_once G2AB_TESTS_PLUGIN_DIR . 'includes/services/class-email-actions.php';
 // Parsed only for its class definition: IdempotencyFingerprintTest reflects
 // on the private booking_idempotency_key() contract. No route registration

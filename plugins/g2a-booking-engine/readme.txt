@@ -4,7 +4,7 @@ Tags: booking, reservation, scheduling, appointments, shooting range, firearms, 
 Requires at least: 6.2
 Tested up to: 6.5
 Requires PHP: 8.0
-Stable tag: 1.12.0
+Stable tag: 1.12.1
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -206,6 +206,17 @@ Yes. REST API at `/wp-json/g2a-booking/v1/` covers bookings, forms, calendar, fr
 7. Migration wizard — dry-run preview before live import.
 
 == Changelog ==
+
+= 1.12.1 =
+* Payment-state integrity hardening following the 2026-08-19 Stripe incident audit (docs/incident-2026-08-19-stripe-not-charging/).
+* The PayPal, Fortis and Authorize.net webhook handlers wrote `status = paid` to the booking row BEFORE writing any payment evidence, and Fortis only ever updated a pre-existing ledger row - so a capture with no prior attempt row produced a paid booking with no evidence at all. All three now write the ledger row first and advance the status through the transition service, which re-checks the evidence and refuses otherwise.
+* Removed the last two code paths that could write `status = paid` without payment evidence. The WooCommerce order sync and the front-desk collection service both fell back to a direct row update when `G2AB_Booking_Transitions` was absent, bypassing the ledger invariant. Both now refuse the status advance and log `payment_transition_unavailable` at severity `error`; the desk payment and the WooCommerce ledger row are still recorded, so nothing is lost from the audit trail.
+* Stripe test/live mode is now derived from the configured secret key's prefix instead of the `g2ab_stripe_test_mode` option, which defaults to TEST. A site that never explicitly saved the payments screen while holding a live key rejected every genuine live payment as `g2ab_payment_mode_mismatch` - the customer was charged and the booking stayed unpaid. Adds `G2AB_Gateway_Stripe::key_mode()`, `::is_test_mode()` and `::mode_option_disagrees_with_key()`.
+* NEW admin notice when online payment is misconfigured: the stored test-mode flag disagreeing with the configured key, or no usable online gateway at all. Both conditions previously produced silent revenue loss with nothing shown anywhere.
+* NEW audit trail for payment-capability changes. Toggling the Stripe add-on, clearing `g2ab_stripe_enabled`, swapping keys or changing the default gateway now writes a `payment_capability_changed` log row with the acting user, at severity `error` when the change removes the site's ability to charge online. Secret values are never written to the log - only whether a value is present and its length. Hooked on `update_option_*` so changes made over REST, WP-CLI or by another plugin are recorded too.
+* `g2ab_stripe_publishable_key` is now treated as keep-on-empty when saving settings. Its name matched the generic `_key` branch, so an empty submit wiped it - and a blank publishable key makes the settings screen report Stripe as unconfigured while the gateway is actually available, a mixed signal that invites switching Stripe off.
+* Release packaging no longer ships the plugin's dev-only root `vendor/`. The PDF-invoice module require_once's `vendor/autoload.php` when present, so a `composer install` left on disk before a build would have loaded PHPUnit on a live site. `assets/vendor/` (FullCalendar, qrcode) is unaffected.
+* Adds a 39-case payment-integrity regression suite covering the five business invariants, the fail-closed gateway contract, and every Stripe session-validation rejection path.
 
 = 1.12.0 =
 * BREAKING: the public front-desk override is removed. A non-member can no longer obtain a lane reservation without verified online payment under any configuration. The `g2ab_require_nonmember_payment` and `g2ab_allow_nonmember_front_desk` settings are gone, along with the `g2ab_require_payment_for_non_members` and `g2ab_allow_non_member_front_desk` filters. Their option rows are deleted on activation so a stale value cannot be read.

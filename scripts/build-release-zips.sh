@@ -36,6 +36,15 @@ EXCLUDES=(
   '*/package.json' '*/package-lock.json'
   '*/.gitignore' '*/.gitattributes' '*/.editorconfig'
   '*/phpcs.xml' '*/phpcs.xml.dist' '*/.eslintrc*'
+  # The booking engine has NO Composer runtime dependency — its root vendor/
+  # only ever holds PHPUnit from `composer install`. It must not ship: the
+  # PDF-invoice module require_once's G2AB_PATH . 'vendor/autoload.php' when
+  # the file exists (includes/modules/pdf-invoices/class-invoice-engine.php),
+  # so a dev install left on disk would load PHPUnit on a live site. Scoped to
+  # this one component because POS genuinely ships vendor/ (FPDI/FPDF), and
+  # deliberately NOT matching the booking engine's assets/vendor/, which holds
+  # FullCalendar and qrcode and must keep shipping.
+  'g2a-booking-engine/vendor/*'
 )
 
 # Read the version a component declares for itself.

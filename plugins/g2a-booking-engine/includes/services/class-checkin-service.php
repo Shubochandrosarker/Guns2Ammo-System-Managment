@@ -190,27 +190,32 @@ final class G2AB_Checkin_Service {
 		$total_due  = (float) $booking->total_amount;
 		$new_status = $booking->status;
 		if ( $total_due > 0 && $new_paid >= $total_due && in_array( $booking->status, array( 'pending', 'reserved', 'confirmed' ), true ) ) {
-			$transition = class_exists( 'G2AB_Booking_Transitions' )
-				? G2AB_Booking_Transitions::transition( (int) $booking_id, 'paid', array(
+			// The transition service is the ONLY writer of `paid`. The old
+			// fallback flipped the row directly when the class was missing,
+			// which is the one code path that could produce a paid booking
+			// with no verified evidence. The desk payment stays on the ledger
+			// either way; only the status advance is withheld.
+			if ( ! class_exists( 'G2AB_Booking_Transitions' ) ) {
+				$wpdb->insert( $wpdb->prefix . 'g2ab_logs', array(
+					'booking_id' => (int) $booking_id,
+					'user_id'    => $user_id ?: null,
+					'event_type' => 'payment_transition_unavailable',
+					'severity'   => 'error',
+					'message'    => 'G2AB_Booking_Transitions missing; desk payment recorded but booking not advanced to paid.',
+					'context'    => wp_json_encode( array( 'amount' => $amount, 'method' => $method ) ),
+					'created_at' => $now,
+				) );
+			} else {
+				$transition = G2AB_Booking_Transitions::transition( (int) $booking_id, 'paid', array(
 					'source'      => 'frontdesk',
 					'actor_id'    => (int) $user_id,
 					'reason'      => 'desk_payment_' . $method,
 					'paid_amount' => $new_paid,
-				) )
-				: null;
-			if ( null === $transition || ! is_wp_error( $transition ) ) {
-				$new_status = 'paid';
-				if ( null === $transition ) {
-					$wpdb->update(
-						$wpdb->prefix . 'g2ab_bookings',
-						array( 'status' => 'paid', 'updated_at' => $now ),
-						array( 'id' => (int) $booking_id ),
-						array( '%s', '%s' ),
-						array( '%d' )
-					);
-					do_action( 'g2ab_booking_status_changed', (int) $booking_id, 'paid', $booking->status );
+				) );
+				if ( ! is_wp_error( $transition ) ) {
+					$new_status = 'paid';
+					do_action( 'g2ab_booking_paid', (int) $booking_id, array( 'amount' => $amount, 'method' => $method ) );
 				}
-				do_action( 'g2ab_booking_paid', (int) $booking_id, array( 'amount' => $amount, 'method' => $method ) );
 			}
 		}
 

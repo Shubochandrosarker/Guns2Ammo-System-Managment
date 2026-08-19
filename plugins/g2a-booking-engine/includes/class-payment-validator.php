@@ -123,7 +123,14 @@ final class G2AB_Payment_Validator {
 			return new WP_Error( 'g2ab_payment_amount_mismatch', __( 'Payment amount mismatch.', 'g2a-booking' ), array( 'status' => 409, 'permanent' => true ) );
 		}
 
-		$test_mode = 1 === (int) get_option( 'g2ab_stripe_test_mode', 1 );
+		// Which environment are we in? The configured key's prefix is
+		// authoritative — `g2ab_stripe_test_mode` defaults to 1, so a site that
+		// never saved the payments screen would reject every genuine LIVE
+		// payment here (money taken, booking left unpaid). Fall back to the
+		// option only when the key cannot answer.
+		$test_mode = class_exists( 'G2AB_Gateway_Stripe' )
+			? G2AB_Gateway_Stripe::is_test_mode()
+			: 1 === (int) get_option( 'g2ab_stripe_test_mode', 1 );
 		if ( isset( $session['livemode'] ) && (bool) $session['livemode'] === $test_mode ) {
 			return new WP_Error( 'g2ab_payment_mode_mismatch', __( 'Stripe environment mismatch.', 'g2a-booking' ), array( 'status' => 409, 'permanent' => true ) );
 		}

@@ -29,6 +29,14 @@ final class G2AB_Plugin
 		add_action('admin_init', array($this, 'maybe_redirect_after_activation'));
 		add_action('template_redirect', array($this, 'send_sensitive_page_cache_headers'), 0);
 		add_action('admin_notices', array($this, 'render_webhook_health_notice'));
+		add_action('admin_notices', array($this, 'render_payment_capability_notice'));
+
+		// Audit trail for the switches that decide whether the site can charge
+		// at all. Registered here rather than in the settings screen so a
+		// change made over REST, WP-CLI or by another plugin is recorded too.
+		if (function_exists('g2ab_watch_payment_capability_options')) {
+			g2ab_watch_payment_capability_options();
+		}
 		add_filter('plugin_action_links_' . G2AB_BASENAME, array($this, 'plugin_action_links'));
 		add_filter('cron_schedules', array($this, 'register_cron_intervals'));
 
@@ -240,6 +248,65 @@ final class G2AB_Plugin
 			'<div class="notice notice-warning"><p><strong>%1$s</strong> %2$s</p></div>',
 			esc_html__('G2A Booking webhook health:', 'g2a-booking'),
 			esc_html(implode(' ', $warnings))
+		);
+	}
+
+	/**
+	 * Warn when the site's ability to charge online is compromised.
+	 *
+	 * Two conditions, both of which produced silent revenue loss in the
+	 * 2026-08-19 incident and neither of which surfaced anywhere:
+	 *
+	 *   1. The stored test-mode flag disagrees with the configured key. That
+	 *      flag defaults to TEST, so a site that never saved the payments
+	 *      screen rejects every genuine live payment as an environment
+	 *      mismatch — the customer is charged and the booking stays unpaid.
+	 *   2. No online gateway is usable at all. Before 1.10.0 that quietly
+	 *      turned payable bookings into free pay-at-store reservations; from
+	 *      1.10.0 it correctly fails checkout closed — which is safe, but only
+	 *      if somebody is told.
+	 *
+	 * @since 1.12.1
+	 * @return void
+	 */
+	public function render_payment_capability_notice()
+	{
+		if (! current_user_can('manage_options')) {
+			return;
+		}
+
+		$problems = array();
+
+		if (
+			class_exists('G2AB_Gateway_Stripe')
+			&& G2AB_Gateway_Stripe::mode_option_disagrees_with_key()
+		) {
+			$problems[] = 'live' === G2AB_Gateway_Stripe::key_mode()
+				? __('Stripe holds a LIVE secret key but this site is flagged as test mode. Real payments will be rejected as an environment mismatch — customers would be charged without their booking being confirmed. Untick "Test mode" under Settings → Payments → Stripe.', 'g2a-booking')
+				: __('Stripe holds a TEST secret key but this site is flagged as live mode. No real money can be collected. Replace the key with your live key under Settings → Payments → Stripe.', 'g2a-booking');
+		}
+
+		$has_online_gateway = false;
+		if (class_exists('G2AB_Gateway_Manager') && class_exists('G2AB_Checkout_Policy')) {
+			foreach (G2AB_Gateway_Manager::instance()->available() as $id => $gateway) {
+				if (! G2AB_Checkout_Policy::is_offline_gateway($id) && method_exists($gateway, 'create_intent')) {
+					$has_online_gateway = true;
+					break;
+				}
+			}
+			if (! $has_online_gateway) {
+				$problems[] = __('No online payment gateway is currently usable, so every booking that requires payment will be refused. Check that the Stripe add-on is active (Settings → Add-ons), that Stripe is enabled, and that its secret key is present.', 'g2a-booking');
+			}
+		}
+
+		if (! $problems) {
+			return;
+		}
+
+		printf(
+			'<div class="notice notice-error"><p><strong>%1$s</strong></p><ul style="list-style:disc;margin-left:20px;"><li>%2$s</li></ul></div>',
+			esc_html__('G2A Booking — online payment is not configured correctly:', 'g2a-booking'),
+			implode('</li><li>', array_map('esc_html', $problems))
 		);
 	}
 

@@ -37,6 +37,68 @@ final class G2AB_Gateway_Stripe {
 		return (string) get_option( 'g2ab_stripe_webhook_secret', '' );
 	}
 
+	/**
+	 * The environment the CONFIGURED KEY actually belongs to.
+	 *
+	 * `g2ab_stripe_test_mode` defaults to 1, so a site that never explicitly
+	 * saved the payments screen claims to be in test mode while holding a live
+	 * key. Every genuine live payment then fails validation as
+	 * `g2ab_payment_mode_mismatch`: money taken, booking never updated. The key
+	 * prefix is authoritative because Stripe issues it — the option is only
+	 * consulted when the prefix cannot be read (a restricted `rk_` key, or a
+	 * key supplied through some future mechanism).
+	 *
+	 * @since 1.12.1
+	 * @return string 'live', 'test', or '' when undeterminable from the key.
+	 */
+	public static function key_mode() {
+		$key = defined( 'G2AB_STRIPE_SECRET' ) && G2AB_STRIPE_SECRET
+			? (string) G2AB_STRIPE_SECRET
+			: (string) get_option( 'g2ab_stripe_secret_key', '' );
+
+		if ( 0 === strpos( $key, 'sk_live_' ) ) {
+			return 'live';
+		}
+		if ( 0 === strpos( $key, 'sk_test_' ) ) {
+			return 'test';
+		}
+		return '';
+	}
+
+	/**
+	 * Is this site transacting against Stripe TEST mode?
+	 *
+	 * Key prefix wins; the stored option is the fallback only.
+	 *
+	 * @since 1.12.1
+	 * @return bool
+	 */
+	public static function is_test_mode() {
+		$mode = self::key_mode();
+		if ( '' !== $mode ) {
+			return 'test' === $mode;
+		}
+		return 1 === (int) get_option( 'g2ab_stripe_test_mode', 1 );
+	}
+
+	/**
+	 * Does the stored test-mode flag disagree with the configured key?
+	 *
+	 * Surfaced as an admin notice (G2AB_Plugin) so the discrepancy is repaired
+	 * before it silently rejects real payments.
+	 *
+	 * @since 1.12.1
+	 * @return bool
+	 */
+	public static function mode_option_disagrees_with_key() {
+		$mode = self::key_mode();
+		if ( '' === $mode ) {
+			return false;
+		}
+		$option_says_test = 1 === (int) get_option( 'g2ab_stripe_test_mode', 1 );
+		return $option_says_test !== ( 'test' === $mode );
+	}
+
 	private function payment_table_columns() {
 		global $wpdb;
 		$table = $wpdb->prefix . 'g2ab_payments';

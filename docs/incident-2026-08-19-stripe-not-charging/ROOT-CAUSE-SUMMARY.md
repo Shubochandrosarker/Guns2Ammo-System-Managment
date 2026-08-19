@@ -106,7 +106,7 @@ Four independent surfaces asserted success without payment evidence:
 ## Immediate fix
 
 **Deploy the already-written fix that is sitting in this repository and has
-never reached production: `g2a-booking-engine 1.12.0` + `memberistic 1.21.0`
+never reached production: `g2a-booking-engine 1.12.1` + `memberistic 1.21.0`
 (`dist/`).** `G2AB_Checkout_Policy` (1.12.0) removes the public pay-at-store
 path entirely, fails closed with HTTP 503 when no online gateway is available,
 and `G2AB_Booking_Transitions::check_invariants()` refuses `paid`/`confirmed`
@@ -117,7 +117,7 @@ converts every payable booking to a free reservation on any build before 1.10.0.
 
 ## Permanent fix
 
-1. Ship 1.12.0/1.21.0 through the staging → Stripe-test → live-low-value
+1. Ship 1.12.1/1.21.0 through the staging → Stripe-test → live-low-value
    sequence in `FIX-PLAN.md`.
 2. Add the payment-integrity monitor, the Stripe-inactivity monitor and the
    daily WordPress↔Stripe reconciliation described in `FIX-PLAN.md` §P5 — this

@@ -51,6 +51,12 @@ final class G2AB_Admin_Settings_Pro {
 	const SECRET_OPTIONS = array(
 		'g2ab_stripe_secret_key',
 		'g2ab_stripe_webhook_secret',
+		// Not secret, but its name matches the generic `_key` branch in
+		// handle_save(), so an empty submit used to WIPE it. A blank
+		// publishable key makes gateway_is_configured() report Stripe as
+		// unconfigured (:307) even while is_available() is true — the kind of
+		// mixed signal that invites an operator to switch Stripe off.
+		'g2ab_stripe_publishable_key',
 		'g2ab_paypal_secret',
 		'g2ab_fortis_user_api_key',
 		'g2ab_fortis_hmac_secret',

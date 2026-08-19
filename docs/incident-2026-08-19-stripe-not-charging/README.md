@@ -30,7 +30,7 @@ gateway is unusable — and, from build `1.9.9.20` (2026-07-31), it does so
 unconditionally. Four separate surfaces then report the booking as confirmed
 and count its full price as revenue.
 
-The fix already exists in this repository (`g2a-booking-engine 1.12.0` +
+The fix already exists in this repository (`g2a-booking-engine 1.12.1` +
 `memberistic 1.21.0`, both in `dist/`) and has never been deployed.
 
 ## Do not

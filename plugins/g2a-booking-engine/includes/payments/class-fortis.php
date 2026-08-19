@@ -313,12 +313,12 @@ final class G2AB_Gateway_Fortis {
 			return array( 'handled' => false, 'reason' => 'amount_mismatch', 'paid' => $amount, 'expected' => (float) $booking->total_amount );
 		}
 
-		$updated = $wpdb->update( $bt, array( 'status' => 'paid', 'paid_amount' => $amount, 'updated_at' => current_time( 'mysql' ) ), array( 'id' => $booking->id ), array( '%s', '%f', '%s' ), array( '%d' ) );
-		if ( false === $updated ) {
-			return array( 'handled' => false, 'retryable' => true, 'reason' => 'booking_update_failed' );
-		}
-
-		$pt = $wpdb->prefix . 'g2ab_payments';
+		// Ledger row FIRST, booking status second. The old order wrote `paid`
+		// before the ledger and then only updated a PRE-EXISTING row — so a
+		// capture with no prior attempt row produced a paid booking with no
+		// payment evidence at all, exactly the state the release-verification
+		// query is meant to prove impossible.
+		$pt       = $wpdb->prefix . 'g2ab_payments';
 		$existing = $wpdb->get_var( $wpdb->prepare( "SELECT id FROM {$pt} WHERE booking_id = %d AND gateway = 'fortis' ORDER BY id DESC LIMIT 1", $booking->id ) );
 		if ( $existing ) {
 			$wpdb->update( $pt, array(
@@ -328,6 +328,41 @@ final class G2AB_Gateway_Fortis {
 				'gateway_response' => wp_json_encode( $tx ),
 				'processed_at' => current_time( 'mysql' ),
 			), array( 'id' => $existing ), array( '%s', '%s', '%f', '%s', '%s' ), array( '%d' ) );
+			$payment_id = (int) $existing;
+		} else {
+			$payment_id = (int) g2ab_insert_or_update_payment( $pt, array(
+				'booking_id'       => (int) $booking->id,
+				'gateway'          => 'fortis',
+				'transaction_id'   => $tx_id,
+				'amount'           => $amount,
+				'currency'         => (string) ( $booking->currency ?: 'USD' ),
+				'status'           => 'succeeded',
+				'payment_method'   => 'card',
+				'gateway_response' => wp_json_encode( $tx ),
+				'processed_at'     => current_time( 'mysql' ),
+				'created_at'       => current_time( 'mysql' ),
+			), array( '%d', '%s', '%s', '%f', '%s', '%s', '%s', '%s', '%s', '%s' ) );
+		}
+
+		if ( ! $payment_id ) {
+			return array( 'handled' => false, 'retryable' => true, 'reason' => 'payment_ledger_write_failed' );
+		}
+
+		if ( class_exists( 'G2AB_Booking_Transitions' ) ) {
+			$transition = G2AB_Booking_Transitions::transition( (int) $booking->id, 'paid', array(
+				'source'      => 'fortis',
+				'reason'      => 'fortis_transaction_' . $tx_id,
+				'payment_id'  => $payment_id,
+				'paid_amount' => $amount,
+			) );
+			if ( is_wp_error( $transition ) ) {
+				return array( 'handled' => false, 'retryable' => true, 'reason' => $transition->get_error_code() );
+			}
+		} else {
+			$updated = $wpdb->update( $bt, array( 'status' => 'paid', 'paid_amount' => $amount, 'updated_at' => current_time( 'mysql' ) ), array( 'id' => $booking->id ), array( '%s', '%f', '%s' ), array( '%d' ) );
+			if ( false === $updated ) {
+				return array( 'handled' => false, 'retryable' => true, 'reason' => 'booking_update_failed' );
+			}
 		}
 
 		$wpdb->insert( $wpdb->prefix . 'g2ab_logs', array(
