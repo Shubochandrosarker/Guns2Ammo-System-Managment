@@ -36,3 +36,12 @@ g2a-pos-core/vendor/composer/autoload_files.php
 # stale duplicates (see 635b5fa) — ignore instead of re-tracking them.
 /*.zip
 !/Images_For_Includeing_on_design.zip
+
+# Booking-engine dev tooling (PHPUnit only; the plugin has no Composer runtime
+# dependency). Must NEVER be committed or left on disk when building release
+# ZIPs: scripts/build-release-zips.sh deliberately keeps vendor/ (POS needs it),
+# and the PDF-invoice module require_once's G2AB_PATH . 'vendor/autoload.php'
+# when it exists — so a stray dev vendor/ would ship PHPUnit into production.
+# Run `composer install` to test, then remove it.
+plugins/g2a-booking-engine/vendor/
+plugins/g2a-booking-engine/.phpunit.cache/

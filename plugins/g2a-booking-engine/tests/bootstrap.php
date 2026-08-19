@@ -293,6 +293,7 @@ require_once G2AB_TESTS_PLUGIN_DIR . 'includes/services/class-booking-statuses.p
 require_once G2AB_TESTS_PLUGIN_DIR . 'includes/services/class-booking-transitions.php';
 require_once G2AB_TESTS_PLUGIN_DIR . 'includes/services/class-checkout-policy.php';
 require_once G2AB_TESTS_PLUGIN_DIR . 'includes/class-booking-visibility.php';
+require_once G2AB_TESTS_PLUGIN_DIR . 'includes/class-payment-validator.php';
 require_once G2AB_TESTS_PLUGIN_DIR . 'includes/services/class-email-actions.php';
 // Parsed only for its class definition: IdempotencyFingerprintTest reflects
 // on the private booking_idempotency_key() contract. No route registration
