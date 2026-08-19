@@ -1,0 +1,24 @@
+booking_id,booking_uuid,booking_type,customer,booking_created,service_date,expected_amount,local_amount,payment_mode,local_status,local_payment_status,stripe_checkout_session,stripe_payment_intent,stripe_charge,stripe_status,stripe_amount,classification,action_required
+# NO PRODUCTION DATA IS PRESENT IN THIS FILE.,,,,,,,,,,,,,,,,,
+# Network egress to guns2ammo.com is blocked from the audit environment and no,,,,,,,,,,,,,,,,,
+# database or Stripe credential is in scope. Inventing rows here would be,,,,,,,,,,,,,,,,,
+# fabricated evidence in a financial incident. The rows below marked EXAMPLE are,,,,,,,,,,,,,,,,,
+# illustrative shapes only - delete them before use.,,,,,,,,,,,,,,,,,
+# ,,,,,,,,,,,,,,,,,
+# TO POPULATE (read-only):,,,,,,,,,,,,,,,,,
+#   1. wp db query --skip-column-names < sql/08-reconciliation-export.sql | tr '\t' ',' >> payment-reconciliation-2026-08-19.csv,,,,,,,,,,,,,,,,,
+#   2. Stripe dashboard - Payments - Export - 2026-07-15 to today - include,,,,,,,,,,,,,,,,,
+#      client_reference_id metadata.booking_uuid payment_intent charge amount status,,,,,,,,,,,,,,,,,
+#   3. Join Stripe rows on booking_uuid == client_reference_id and fill the five stripe_* columns.,,,,,,,,,,,,,,,,,
+#   4. Re-derive classification where a Stripe row exists that the SQL could not see,,,,,,,,,,,,,,,,,
+#      (STRIPE_PAID_LOCAL_NOT_UPDATED / STRIPE_SESSION_UNPAID / WRONG_AMOUNT).,,,,,,,,,,,,,,,,,
+# ,,,,,,,,,,,,,,,,,
+# NEVER add card numbers PAN last4 Stripe secret keys or unmasked customer email to this file.,,,,,,,,,,,,,,,,,
+# ,,,,,,,,,,,,,,,,,
+EXAMPLE-1,00000000-0000-0000-0000-00000000e001,Basic Lane,a***@g***.com,2026-07-22 14:03:11,2026-07-24 10:00:00,25.00,25.00,in_store,reserved,none,,,,,,MISSING_STRIPE_SESSION,CONTACT_CUSTOMER_COLLECT_AT_DESK_DO_NOT_AUTO_CHARGE
+EXAMPLE-2,00000000-0000-0000-0000-00000000e002,CCW Course,b***@y***.com,2026-08-02 09:41:52,2026-08-16 09:00:00,150.00,150.00,in_store,reserved,none,,,,,,MISSING_STRIPE_SESSION,CONTACT_CUSTOMER_COLLECT_AT_DESK_DO_NOT_AUTO_CHARGE
+EXAMPLE-3,00000000-0000-0000-0000-00000000e003,Basic Lane,c***@o***.com,2026-07-18 16:20:00,2026-07-19 11:00:00,25.00,25.00,full,paid,succeeded,cs_live_XXXXXXXX,pi_XXXXXXXX,ch_XXXXXXXX,succeeded,25.00,OK_PAID,NONE
+EXAMPLE-4,00000000-0000-0000-0000-00000000e004,Member Lane,d***@i***.com,2026-08-05 08:12:00,2026-08-06 09:00:00,0.00,0.00,free,confirmed,none,,,,,,OK_MEMBER_FREE,NONE
+EXAMPLE-5,00000000-0000-0000-0000-00000000e005,Basic Lane,e***@h***.com,2026-08-07 19:55:00,2026-08-09 15:00:00,25.00,25.00,full,expired,none,cs_live_XXXXXXXX,,,expired,,ABANDONED_CHECKOUT,NONE_EXPIRE_HOLD
+EXAMPLE-6,00000000-0000-0000-0000-00000000e006,Basic Lane,f***@g***.com,2026-08-10 12:00:00,2026-08-11 10:00:00,25.00,25.00,full,reserved,none,cs_live_XXXXXXXX,pi_XXXXXXXX,ch_XXXXXXXX,succeeded,25.00,STRIPE_PAID_LOCAL_NOT_UPDATED,REPLAY_WEBHOOK_OR_WP_G2AB_STRIPE_RECONCILE
+EXAMPLE-7,00000000-0000-0000-0000-00000000e007,Front Desk Walk-in,g***@a***.com,2026-08-11 10:05:00,2026-08-11 10:05:00,25.00,25.00,in_store,reserved,none,,,,,,PAY_IN_STORE,NONE

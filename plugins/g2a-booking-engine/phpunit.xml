@@ -18,6 +18,7 @@
     <include>
       <directory suffix=".php">includes/services</directory>
       <file>includes/class-booking-visibility.php</file>
+      <file>includes/class-payment-validator.php</file>
     </include>
   </source>
 </phpunit>
