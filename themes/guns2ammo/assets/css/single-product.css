@@ -1587,3 +1587,225 @@ a.g2a-ident__value:hover {
 		padding: 12px 16px;
 	}
 }
+
+/* ═══════════════════════════════════════════════════════════════════════
+   TRY AT RANGE  +  ROTATING CONFIDENCE STRIP
+   Added for the referral / product-page work. Tokens only, no raw hex.
+   ═══════════════════════════════════════════════════════════════════════ */
+
+/* ── Try At Range ──────────────────────────────────────────────────────
+   Renders at priority 34, directly beneath Add to Cart. Restrained on
+   purpose: a jittery block next to a $1,400 pistol reads as a scam, and
+   calm reads as competent. Three animations, all subtle, all with a
+   reduced-motion branch. */
+
+.g2a-tar {
+  position: relative;
+  overflow: hidden;
+  margin: var(--space-md) 0;
+  padding: var(--space-lg);
+  border-radius: 10px;
+  background: var(--color-surface-1);
+  border: 1px solid var(--color-hairline);
+  transform: scale(1);
+}
+
+/* 1. Ambient sweep — traverses the panel over 6s, linear, peaking at .10
+      opacity. Barely there by design. */
+.g2a-tar__sweep {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(
+    120deg,
+    transparent 0%,
+    var(--color-page-glow-a) 50%,
+    transparent 100%
+  );
+  background-size: 250% 100%;
+  animation: g2a-tar-sweep 6s linear infinite;
+}
+
+@keyframes g2a-tar-sweep {
+  from { background-position: 150% 0; }
+  to   { background-position: -150% 0; }
+}
+
+/* 2. Entrance pulse — fires ONCE per page load on first scroll-into-view.
+      Never loops. The class is added by single-product.js. */
+.g2a-tar.is-seen {
+  animation: g2a-tar-pulse 700ms var(--ease-out) 1;
+}
+
+@keyframes g2a-tar-pulse {
+  0%   { transform: scale(1);     border-color: var(--color-hairline); }
+  50%  { transform: scale(1.012); border-color: var(--color-brass-bright); }
+  100% { transform: scale(1);     border-color: var(--color-hairline); }
+}
+
+.g2a-tar__body {
+  position: relative;
+  display: flex;
+  gap: var(--space-md);
+  align-items: flex-start;
+}
+
+/* 3. Icon drift — ±2px vertically over 4s. */
+.g2a-tar__icon {
+  flex: 0 0 auto;
+  color: var(--color-brass);
+  animation: g2a-tar-drift 4s var(--ease-std) infinite;
+}
+
+@keyframes g2a-tar-drift {
+  0%, 100% { transform: translateY(-2px); }
+  50%      { transform: translateY(2px); }
+}
+
+.g2a-tar__h {
+  margin: 0 0 6px;
+  font-family: var(--font-display);
+  font-size: 22px;
+  line-height: 1.15;
+  color: var(--color-white);
+}
+
+.g2a-tar__p {
+  margin: 0;
+  font-family: var(--font-body);
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--color-fog);
+}
+
+.g2a-tar__foot {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+  flex-wrap: wrap;
+  margin-top: var(--space-md);
+}
+
+/* Filled ember button. --color-ink, NEVER white. Brass and ember are only
+ * darkened for light mode, never lightened — they stay mid-tone — so dark
+ * ink measures ~5:1 on them in BOTH modes while white measures ~3.8:1 and
+ * fails WCAG AA. That failure has already shipped on this site once, on the
+ * nav profile CTA, the booking-engine day/slot chips and Verifyistic's
+ * "Yes I'm 21+" button. Do not "fix" this to white. */
+.g2a-tar__cta {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 40px;
+  padding: 10px 22px;
+  border-radius: 6px;
+  text-decoration: none;
+  font-family: var(--font-condensed);
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+  background: var(--color-ember);
+  color: var(--color-ink);
+  transition: background 200ms var(--ease-out), transform 200ms var(--ease-out), box-shadow 200ms var(--ease-out);
+}
+
+.g2a-tar__cta:hover,
+.g2a-tar__cta:focus {
+  background: var(--color-ember-dim);
+  color: var(--color-ink);
+  transform: translateY(-1px);
+  /* The spec's 0 6px 18px rgba(ember, .25). color-mix keeps it derived
+     from the token, so it darkens with ember in light mode instead of
+     staying a hard-coded dark-mode orange. The fallback is the faint
+     page-glow token for engines without color-mix. */
+  box-shadow: 0 6px 18px var(--color-page-glow-b);
+  box-shadow: 0 6px 18px color-mix(in srgb, var(--color-ember) 25%, transparent);
+}
+
+.g2a-tar__cta:focus-visible {
+  outline: 2px solid var(--color-brass-bright);
+  outline-offset: 2px;
+}
+
+.g2a-tar__meta {
+  font-family: var(--font-condensed);
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: .06em;
+  color: var(--color-silver);
+}
+
+/* Mobile: full width, tighter padding, taller CTA. Sweep and drift stop —
+   only the one-time border flash survives — so the block stays quiet and
+   never pushes Add to Cart below the fold. */
+@media (max-width: 768px) {
+  .g2a-tar { padding: var(--space-md); }
+  .g2a-tar__h { font-size: 18px; }
+  .g2a-tar__sweep { animation: none; }
+  .g2a-tar__icon { animation: none; }
+
+  .g2a-tar__foot { gap: var(--space-sm); }
+
+  .g2a-tar__cta {
+    width: 100%;
+    min-height: 48px;
+  }
+}
+
+/* Reduced motion: all three animations off, border sits statically on
+   brass so the panel still reads as the highlighted block it is. */
+@media (prefers-reduced-motion: reduce) {
+  .g2a-tar { border-color: var(--color-brass); }
+  .g2a-tar.is-seen { animation: none; }
+  .g2a-tar__sweep { animation: none; opacity: 0; }
+  .g2a-tar__icon { animation: none; }
+  .g2a-tar__cta { transition: none; }
+  .g2a-tar__cta:hover,
+  .g2a-tar__cta:focus { transform: none; box-shadow: none; }
+}
+
+/* ── Rotating confidence strip ─────────────────────────────────────────
+   Replaces the old "Free FFL Transfer" badge. Every claim is true: no
+   stock counters, no "12 people viewing", no invented urgency. */
+
+.g2a-confidence {
+  position: relative;
+  display: inline-grid;
+}
+
+/* All claims occupy the same grid cell so the strip never changes width
+   mid-rotation and nothing around it moves. */
+.g2a-confidence__item {
+  grid-area: 1 / 1;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-family: var(--font-condensed);
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: .04em;
+  color: var(--color-silver);
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 400ms var(--ease-std);
+}
+
+.g2a-confidence__item svg,
+.g2a-confidence__item .g2a-ico { color: var(--color-brass); }
+
+.g2a-confidence__item.is-active {
+  opacity: 1;
+  visibility: visible;
+}
+
+/* With no JS the first item stays visible on its own: it is server-rendered
+   carrying .is-active, so the strip reads as a single static claim rather
+   than an empty gap. Nothing extra is needed here. */
+
+@media (prefers-reduced-motion: reduce) {
+  /* Rotation is stopped in JS; this makes the still state instant rather
+     than cross-fading once on load. */
+  .g2a-confidence__item { transition: none; }
+}

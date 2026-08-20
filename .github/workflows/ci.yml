@@ -54,7 +54,7 @@ jobs:
       fail-fast: false
       matrix:
         php-version: ['8.1', '8.3']
-        plugin: [plugins/g2a-booking-engine, plugins/memberistic-membership-solutions]
+        plugin: [plugins/g2a-booking-engine, plugins/memberistic-membership-solutions, plugins/g2a-referrals]
     steps:
       - uses: actions/checkout@v4
 
@@ -68,7 +68,7 @@ jobs:
         run: find ${{ matrix.plugin }} -name '*.php' -not -path '*/vendor/*' -not -path '*/node_modules/*' -print0 | xargs -0 -n1 php -l
 
   js-lint:
-    name: JS syntax check (both plugins)
+    name: JS syntax check (plugin + theme assets)
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -86,7 +86,35 @@ jobs:
             found=1
             echo "checking $f"
             node --check "$f"
-          done < <(find plugins/g2a-booking-engine/assets plugins/memberistic-membership-solutions/assets -name '*.js' -not -path '*/node_modules/*' -print0 2>/dev/null)
+          done < <(find plugins/g2a-booking-engine/assets plugins/memberistic-membership-solutions/assets plugins/g2a-referrals/assets themes/guns2ammo/assets/js -name '*.js' -not -path '*/node_modules/*' -print0 2>/dev/null)
           if [ "$found" -eq 0 ]; then
             echo "no JS files found — nothing to check"
           fi
+
+  referrals-tests:
+    name: G2A Referrals unit tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: plugins/g2a-referrals
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.1'
+          coverage: none
+
+      - name: Validate composer.json
+        run: composer validate --strict --no-check-publish
+
+      - name: Install dependencies
+        run: composer install --prefer-dist --no-progress
+
+      # These guard rules that fail quietly and expensively: a Guest Pass
+      # consumed on an already-free booking, a reward granted twice by a
+      # webhook retry, offers stacking that should not stack.
+      - name: PHPUnit
+        run: composer run-script test

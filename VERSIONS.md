@@ -3,13 +3,13 @@
 Current shipping versions of every component in this repository.
 Installable builds of each row live in [`dist/`](dist/).
 
-_Last updated: 15 August 2026._
+_Last updated: 20 August 2026._
 
 ## WordPress plugins — `plugins/`
 
 | Component | Version | Purpose | Install order |
 | --- | --- | --- | --- |
-| **memberistic-membership-solutions** | **1.21.0** | Membership authority — plans, members, entitlement, waivers, corporate groups, Stripe billing, discount codes | 1 |
+| **memberistic-membership-solutions** | **1.22.0** | Membership authority — plans, members, entitlement, waivers, corporate groups, Stripe billing, discount codes | 1 |
 | **g2a-booking-engine** | **1.12.0** | Lane/class/event bookings, payments, front desk, calendar, email automation | 2 |
 | **g2a-pos-core** | **3.5.0** | Point of sale — counter checkout, membership lookup, receipts, inventory | 3 |
 | advanced-ffl-checkout | 1.21.1 | FFL transfer workflow + dealer portal | 4 |
@@ -18,16 +18,24 @@ _Last updated: 15 August 2026._
 | messageistic | 0.8.1 | Transactional messaging / SMS bridge | 4 |
 | g2a-theme-control | 1.0.1 | Theme-level toggles and presentation control | 4 |
 | g2a-business-api | 0.4.3 | Internal business API surface | 4 |
+| g2a-referrals | 1.0.0 | Membership referral rewards — codes, ledger, Guest Pass redemption | 4 |
 
 **Install order matters for the first three.** Memberistic must be active before the
 booking engine, because the booking engine asks Memberistic for every entitlement
 decision. POS reads membership state from Memberistic too.
 
+`g2a-referrals` needs both Memberistic (it qualifies rewards off confirmed
+membership payments and contributes its dashboard tab through Memberistic's
+`memberistic_account_tabs` filter, added in 1.22.0) and the booking engine
+(Guest Pass redemption hooks `g2ab_booking_pricing` at priority 12, after
+Memberistic's 11). It degrades quietly if either is inactive rather than
+fataling.
+
 ## Theme — `themes/`
 
 | Component | Version | Purpose |
 | --- | --- | --- |
-| guns2ammo | 1.29.0 | Public site theme (Elementor-compatible) |
+| guns2ammo | 1.30.0 | Public site theme (Elementor-compatible) |
 
 ## Applications & workers — `apps/`
 

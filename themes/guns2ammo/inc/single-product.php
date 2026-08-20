@@ -393,6 +393,10 @@ add_action(
 		// Stock / FFL badges sit under the price.
 		add_action( 'woocommerce_single_product_summary', 'g2a_sp_render_status', 12 );
 		// Save-for-later, then the trust row, below the add-to-cart form.
+		// Priority 34: directly beneath the Add to Cart form (30) and above
+		// the wishlist (35).
+		add_action( 'woocommerce_single_product_summary', 'g2a_sp_render_try_at_range', 34 );
+
 		add_action( 'woocommerce_single_product_summary', 'g2a_sp_render_wishlist', 35 );
 		add_action( 'woocommerce_single_product_summary', 'g2a_sp_render_trust', 40 );
 		// Categories / tags (SKU is already in the identity line).
@@ -489,14 +493,166 @@ function g2a_sp_render_status() {
 		esc_html( $stock_text )
 	);
 
-	if ( g2a_sp_is_ffl( $product ) ) {
-		printf(
-			'<span class="g2a-status__item">%1$s<span>%2$s</span></span>',
-			g2a_sp_icon( 'transfer' ), // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- static inline SVG.
-			esc_html__( 'Free FFL Transfer', 'guns2ammo' )
+	g2a_sp_render_confidence_strip();
+
+	echo '</div>';
+}
+
+/**
+ * Claims that rotate in place of the old "Free FFL Transfer" badge.
+ *
+ * Every line here is verifiably true. No stock counters, no "12 people
+ * viewing", no invented urgency: this is a firearms retailer, and a claim
+ * that turns out to be theatre costs more trust than the click it buys.
+ *
+ * @return array[] Each: [ 'icon' => icon name, 'text' => claim ].
+ */
+function g2a_sp_confidence_claims() {
+	$product = g2a_sp_product();
+	$claims  = array();
+
+	// Only claim pickup availability when the product is genuinely in
+	// stock. A rotating strip that says "ready for pickup" over an
+	// out-of-stock product is the exact kind of small lie that costs a
+	// firearms retailer a customer.
+	if ( $product && $product->is_in_stock() ) {
+		$claims[] = array(
+			'icon' => 'store',
+			'text' => __( 'In Stock — ready for pickup in Mesa', 'guns2ammo' ),
 		);
 	}
-	echo '</div>';
+
+	$claims = array_merge(
+		$claims,
+		array(
+			array(
+				// 4.7 stars from 500 Google reviews — the same figure the
+				// footer has carried for months.
+				'icon' => 'check',
+				'text' => __( '4.7★ from 500 Google reviews', 'guns2ammo' ),
+			),
+			array(
+				'icon' => 'shield',
+				'text' => __( 'NRA-certified instructors on site', 'guns2ammo' ),
+			),
+			array(
+				'icon' => 'transfer',
+				'text' => __( 'Serving Mesa since 2014', 'guns2ammo' ),
+			),
+		)
+	);
+
+	/**
+	 * Filter the rotating confidence claims.
+	 *
+	 * Anything added here must be factually true.
+	 *
+	 * @param array[] $claims Claims.
+	 */
+	return (array) apply_filters( 'g2a_sp_confidence_claims', $claims );
+}
+
+/**
+ * The rotating strip itself.
+ *
+ * All four claims are printed. CSS shows only the first until the script
+ * takes over, so with JavaScript off — or with reduced motion — a visitor
+ * still sees claim one, statically and legibly, rather than an empty gap.
+ *
+ * @return void
+ */
+function g2a_sp_render_confidence_strip() {
+	$claims = g2a_sp_confidence_claims();
+
+	if ( ! $claims ) {
+		return;
+	}
+
+	echo '<span class="g2a-status__item g2a-confidence" data-g2a-confidence>';
+
+	foreach ( array_values( $claims ) as $index => $claim ) {
+		printf(
+			'<span class="g2a-confidence__item%1$s" data-g2a-confidence-item%2$s>%3$s<span>%4$s</span></span>',
+			esc_attr( 0 === $index ? ' is-active' : '' ),
+			0 === $index ? '' : ' aria-hidden="true"',
+			g2a_sp_icon( (string) $claim['icon'] ), // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- static inline SVG.
+			esc_html( (string) $claim['text'] )
+		);
+	}
+
+	echo '</span>';
+}
+
+/**
+ * "Try At Range" — rent this exact model before buying it.
+ *
+ * Renders only for FFL products. You cannot try a holster, and offering to
+ * rent one makes the whole block read as boilerplate.
+ *
+ * @return void
+ */
+function g2a_sp_render_try_at_range() {
+	$product = g2a_sp_product();
+
+	if ( ! $product || ! g2a_sp_is_ffl( $product ) ) {
+		return;
+	}
+
+	// The referral plugin owns this block's copy and its on/off switch.
+	if ( function_exists( 'g2ar_setting' ) && 'yes' !== g2ar_setting( 'try_at_range_enabled', 'yes' ) ) {
+		return;
+	}
+
+	$heading = function_exists( 'g2ar_setting' )
+		? (string) g2ar_setting( 'try_at_range_heading', __( 'Shoot it before you buy it', 'guns2ammo' ) )
+		: __( 'Shoot it before you buy it', 'guns2ammo' );
+
+	/*
+	 * "We'll put your lane fee toward the purchase" is a COMMERCIAL PROMISE
+	 * — the range would owe that credit to anyone who books off the back of
+	 * this block. It stays off until the owner has said yes in writing, and
+	 * the safe line runs instead. Flip it in Referrals → Settings.
+	 */
+	$fee_credit = function_exists( 'g2ar_setting' ) && 'yes' === g2ar_setting( 'try_at_range_fee_credit', 'no' );
+
+	if ( function_exists( 'g2ar_setting' ) ) {
+		$body = $fee_credit
+			? (string) g2ar_setting( 'try_at_range_body_credit', '' )
+			: (string) g2ar_setting( 'try_at_range_body_safe', '' );
+	} else {
+		$body = __( 'Rent this exact model on our indoor range. See how it shoots before you commit.', 'guns2ammo' );
+	}
+
+	$cta  = function_exists( 'g2ar_setting' )
+		? (string) g2ar_setting( 'try_at_range_cta', __( 'Book a Lane', 'guns2ammo' ) )
+		: __( 'Book a Lane', 'guns2ammo' );
+	$meta = function_exists( 'g2ar_setting' )
+		? (string) g2ar_setting( 'try_at_range_meta', __( 'From $20/hour · Mesa, AZ', 'guns2ammo' ) )
+		: __( 'From $20/hour · Mesa, AZ', 'guns2ammo' );
+
+	$url = add_query_arg( 'rental_interest', (int) $product->get_id(), home_url( '/book-a-lane/' ) );
+	?>
+	<div class="g2a-tar" data-g2a-tar>
+		<span class="g2a-tar__sweep" aria-hidden="true"></span>
+		<div class="g2a-tar__body">
+			<span class="g2a-tar__icon" aria-hidden="true">
+				<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" focusable="false">
+					<circle cx="12" cy="12" r="8"></circle>
+					<circle cx="12" cy="12" r="3"></circle>
+					<path d="M12 1v3M12 20v3M1 12h3M20 12h3"></path>
+				</svg>
+			</span>
+			<div class="g2a-tar__text">
+				<h3 class="g2a-tar__h"><?php echo esc_html( $heading ); ?></h3>
+				<p class="g2a-tar__p"><?php echo esc_html( $body ); ?></p>
+			</div>
+		</div>
+		<div class="g2a-tar__foot">
+			<a class="g2a-tar__cta" href="<?php echo esc_url( $url ); ?>"><?php echo esc_html( $cta ); ?></a>
+			<span class="g2a-tar__meta"><?php echo esc_html( $meta ); ?></span>
+		</div>
+	</div>
+	<?php
 }
 
 /**

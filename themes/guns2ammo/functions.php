@@ -7,7 +7,7 @@
 
 if ( ! defined( 'ABSPATH' ) ) exit;
 
-define( 'G2A_VERSION', '1.29.0' );
+define( 'G2A_VERSION', '1.30.0' );
 define( 'G2A_DIR', get_stylesheet_directory() );
 define( 'G2A_URI', get_stylesheet_directory_uri() );
 
@@ -130,7 +130,7 @@ add_action( 'wp_enqueue_scripts', function () {
    order with other deferred scripts. Real-world TTI win of
    ~100-250ms on cold-cache loads. */
 add_filter( 'script_loader_tag', function ( $tag, $handle ) {
-	if ( in_array( $handle, [ 'g2a-chrome', 'g2a-single-product', 'g2a-shop-promo' ], true ) ) {
+	if ( in_array( $handle, [ 'g2a-chrome', 'g2a-single-product', 'g2a-shop-promo', 'g2a-referral-banner' ], true ) ) {
 		return str_replace( ' src=', ' defer src=', $tag );
 	}
 	return $tag;
@@ -167,6 +167,11 @@ require_once G2A_DIR . '/inc/single-product.php';
 
 /* ---------- Shop promo banner + live offer countdown ---------- */
 require_once G2A_DIR . '/inc/shop-promo.php';
+
+/* Referral / membership promotional banner. Renders as an empty,
+   height-reserved placeholder and is filled per visitor from the
+   g2a-referrals REST endpoint, so AirLift never caches a member variant. */
+require_once G2A_DIR . '/inc/referral-banner.php';
 
 /* ---------- Customizer image fields (light) ---------- */
 require_once G2A_DIR . '/inc/customizer.php';

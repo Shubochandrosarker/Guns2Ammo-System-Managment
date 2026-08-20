@@ -45,3 +45,9 @@ g2a-pos-core/vendor/composer/autoload_files.php
 # Run `composer install` to test, then remove it.
 plugins/g2a-booking-engine/vendor/
 plugins/g2a-booking-engine/.phpunit.cache/
+
+# G2A Referrals dev dependencies (unit tests only — the plugin has no
+# Composer runtime dependencies, so a vendor/ in the release ZIP would
+# ship PHPUnit into production).
+plugins/g2a-referrals/vendor/
+plugins/g2a-referrals/.phpunit.cache/

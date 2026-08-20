@@ -1,0 +1,184 @@
+/* Top promotional banner — member vs non-member.
+ *
+ * The markup ships EMPTY (see inc/referral-banner.php): AirLift caches the
+ * page, so a member variant baked into the HTML would be served to every
+ * anonymous visitor behind it. The height is reserved here so filling the
+ * banner in from /wp-json/g2ar/v1/context never shifts the page.
+ *
+ * Every colour is a token from tokens.css — no raw hex. The theme's light
+ * mode works by redefining those tokens on html[data-theme="light"], so a
+ * hard-coded colour would be the one element that fails to flip. */
+
+.g2a-refbanner {
+  /* Reserved height: no layout shift when the fetch lands. */
+  min-height: 40px;
+  display: flex;
+  align-items: center;
+  position: relative;
+  overflow: hidden;
+  background: linear-gradient(90deg, var(--color-surface-1), var(--color-surface-2));
+  border-bottom: 1px solid var(--color-hairline);
+  padding: 0 var(--space-md);
+  font-family: var(--font-ui);
+  font-size: 14px;
+  color: var(--color-fog);
+}
+
+/* Left accent rule. --color-brass auto-darkens in light mode. */
+.g2a-refbanner::before {
+  content: "";
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 3px;
+  background: var(--color-brass);
+}
+
+/* A slow shimmer travels the accent rule every 6s. Nothing else on the
+ * banner moves — a bar of animated colour next to a $1,400 pistol reads as
+ * a scam, and restraint reads as competence. */
+.g2a-refbanner::after {
+  content: "";
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 3px;
+  background: var(--color-brass-bright);
+  opacity: 0;
+  animation: g2a-refbanner-shimmer 6s var(--ease-out) infinite;
+}
+
+@keyframes g2a-refbanner-shimmer {
+  0%, 100% { opacity: 0; transform: translateY(-100%); }
+  10%      { opacity: .35; }
+  20%      { opacity: 0; transform: translateY(100%); }
+}
+
+.g2a-refbanner__inner {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  flex-wrap: wrap;
+  width: 100%;
+  max-width: 1240px;
+  margin: 0 auto;
+  padding-left: var(--space-sm);
+}
+
+.g2a-refbanner__lead {
+  font-family: var(--font-condensed);
+  font-weight: 600;
+  color: var(--color-white);
+  letter-spacing: .02em;
+}
+
+.g2a-refbanner__code {
+  font-family: var(--font-mono);
+  letter-spacing: .1em;
+  color: var(--color-white);
+  background: var(--color-smoke);
+  border: 1px solid var(--color-hairline);
+  border-radius: 4px;
+  padding: 2px 8px;
+  font-size: 13px;
+}
+
+/* Inline text CTA. Ember auto-darkens in light mode, so the token works in
+ * both without a fork. */
+.g2a-refbanner__cta {
+  color: var(--color-ember);
+  font-family: var(--font-condensed);
+  font-weight: 600;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  background: none;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+  font-size: 14px;
+}
+
+.g2a-refbanner__cta:hover { color: var(--color-ember-dim); }
+
+.g2a-refbanner__copy {
+  font-family: var(--font-condensed);
+  text-transform: uppercase;
+  letter-spacing: .06em;
+  font-size: 11px;
+  padding: 3px 10px;
+  border-radius: 4px;
+  cursor: pointer;
+  border: 0;
+  /* Filled brass. --color-ink, NOT white: brass and ember are only
+   * darkened for light mode, never lightened, so dark ink measures ~5:1
+   * against them in both modes where white measures ~3.8:1 and fails
+   * WCAG AA. That exact failure already shipped on this site once (nav
+   * profile CTA, booking day/slot chips, Verifyistic's 21+ button). */
+  background: var(--color-brass);
+  color: var(--color-ink);
+}
+
+.g2a-refbanner__copy.is-copied { background: var(--color-active); color: var(--color-ink); }
+
+.g2a-refbanner__dismiss {
+  margin-left: auto;
+  background: none;
+  border: 0;
+  cursor: pointer;
+  color: var(--color-silver);
+  font-size: 18px;
+  line-height: 1;
+  padding: 4px 8px;
+}
+
+.g2a-refbanner__dismiss:hover { color: var(--color-white); }
+
+.g2a-refbanner a:focus-visible,
+.g2a-refbanner button:focus-visible {
+  outline: 2px solid var(--color-brass-bright);
+  outline-offset: 2px;
+}
+
+/* Dismissed for the cookie's lifetime. */
+.g2a-refbanner.is-dismissed { display: none; }
+
+/* Mobile: two lines allowed, CTA goes full width and clears the 44px
+ * touch target, shimmer off. */
+@media (max-width: 600px) {
+  .g2a-refbanner {
+    min-height: 56px;
+    padding: var(--space-sm) var(--space-sm);
+  }
+
+  .g2a-refbanner::after { animation: none; opacity: 0; }
+
+  .g2a-refbanner__inner {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 6px;
+  }
+
+  .g2a-refbanner__cta {
+    display: block;
+    width: 100%;
+    min-height: 44px;
+    line-height: 44px;
+    text-align: center;
+    text-decoration: none;
+    border-radius: 6px;
+    background: var(--color-ember);
+    color: var(--color-ink);
+  }
+
+  .g2a-refbanner__cta:hover { background: var(--color-ember-dim); color: var(--color-ink); }
+
+  .g2a-refbanner__dismiss {
+    position: absolute;
+    top: 4px;
+    right: 4px;
+    margin-left: 0;
+  }
+}
+
+/* Reduced motion: shimmer off, accent rule static. */
+@media (prefers-reduced-motion: reduce) {
+  .g2a-refbanner::after { animation: none; opacity: 0; }
+}

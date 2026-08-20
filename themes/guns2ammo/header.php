@@ -118,4 +118,12 @@ $g2a_uri = G2A_URI;
 <?php get_template_part( 'template-parts/nav' ); ?>
 <?php get_template_part( 'template-parts/mobile-drawer' ); ?>
 
+<?php
+/**
+ * Directly under the site header, above the page content and any
+ * WooCommerce breadcrumb. Full-bleed slot for site-wide notices.
+ */
+do_action( 'g2a_after_header' );
+?>
+
 <main id="g2a-main">
