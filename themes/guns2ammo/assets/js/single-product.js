@@ -6,6 +6,8 @@
  *   2. Lightbox     click-to-zoom overlay with keyboard navigation
  *   3. Quantity     − / + stepper around the WooCommerce qty input
  *   4. Wishlist     save-for-later backed by localStorage
+ *   5. Try At Range one-time entrance pulse on scroll-into-view
+ *   6. Confidence   rotating claims strip under the price
  *
  * Everything degrades: with the script blocked the stage still shows the
  * featured image, each thumbnail is a plain link to its full-size file, the
@@ -283,6 +285,99 @@
 		});
 	}
 
+	/* ---------------------------------------------------------------- *
+	 * 5. Try At Range — entrance pulse
+	 *
+	 * A single border flash the first time the panel scrolls into view,
+	 * and never again. Deliberately not a loop: a block that keeps pulsing
+	 * next to a $1,400 pistol reads as a scam, and calm reads as competent.
+	 * The ambient sweep and the icon drift are pure CSS.
+	 * ---------------------------------------------------------------- */
+
+	function initTryAtRange(panel) {
+		if (prefersReducedMotion()) {
+			return;
+		}
+
+		if (typeof window.IntersectionObserver !== 'function') {
+			// No observer: show the still state rather than firing blind.
+			return;
+		}
+
+		var observer = new IntersectionObserver(function (entries) {
+			entries.forEach(function (entry) {
+				if (!entry.isIntersecting) {
+					return;
+				}
+
+				entry.target.classList.add('is-seen');
+				// Once per page load. Disconnecting here is what makes that
+				// true even if the customer scrolls back past it.
+				observer.disconnect();
+			});
+		}, { threshold: 0.4 });
+
+		observer.observe(panel);
+	}
+
+	/* ---------------------------------------------------------------- *
+	 * 6. Confidence strip
+	 *
+	 * Cross-fades between claims every 4s. With the script blocked, or
+	 * with reduced motion, the first claim stays up statically — it is
+	 * server-rendered already carrying .is-active.
+	 * ---------------------------------------------------------------- */
+
+	function initConfidence(strip) {
+		var items = strip.querySelectorAll('[data-g2a-confidence-item]');
+
+		if (items.length < 2 || prefersReducedMotion()) {
+			return;
+		}
+
+		var index = 0;
+		var timer = null;
+
+		function advance() {
+			items[index].classList.remove('is-active');
+			items[index].setAttribute('aria-hidden', 'true');
+
+			index = (index + 1) % items.length;
+
+			items[index].classList.add('is-active');
+			items[index].removeAttribute('aria-hidden');
+		}
+
+		function start() {
+			if (!timer) {
+				timer = window.setInterval(advance, 4000);
+			}
+		}
+
+		function stop() {
+			if (timer) {
+				window.clearInterval(timer);
+				timer = null;
+			}
+		}
+
+		// A strip rotating in a background tab is animation nobody sees.
+		document.addEventListener('visibilitychange', function () {
+			if (document.hidden) {
+				stop();
+			} else {
+				start();
+			}
+		});
+
+		start();
+	}
+
+	function prefersReducedMotion() {
+		return typeof window.matchMedia === 'function' &&
+			window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+	}
+
 	/* ---------------------------------------------------------------- */
 
 	function boot() {
@@ -293,6 +388,9 @@
 		if (product) {
 			initQuantity(product);
 		}
+
+		Array.prototype.forEach.call(document.querySelectorAll('[data-g2a-tar]'), initTryAtRange);
+		Array.prototype.forEach.call(document.querySelectorAll('[data-g2a-confidence]'), initConfidence);
 	}
 
 	if (document.readyState === 'loading') {

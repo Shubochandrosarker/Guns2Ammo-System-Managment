@@ -1,0 +1,267 @@
+/* G2A Referrals — member dashboard Rewards tab.
+ *
+ * Every colour here is a theme token from assets/css/tokens.css. No raw hex
+ * values: the theme's light mode is driven entirely by redefining those
+ * tokens on html[data-theme="light"], so a hard-coded colour would be the
+ * one thing on the page that does not flip.
+ *
+ * tokens.css is enqueued site-wide from the theme's functions.php, so it is
+ * a hard dependency here rather than something to hedge against with a
+ * hard-coded fallback colour. */
+
+.g2ar-rw {
+  --g2ar-radius: 10px;
+  color: var(--color-fog);
+  font-family: var(--font-body, inherit);
+}
+
+/* ── Hero: the code itself ─────────────────────────────────────────── */
+
+.g2ar-rw__hero {
+  background: var(--color-surface-2);
+  border: 1px solid var(--color-brass);
+  border-radius: var(--g2ar-radius);
+  padding: var(--space-lg, 24px);
+  margin-bottom: var(--space-lg, 24px);
+}
+
+.g2ar-rw__eyebrow {
+  font-family: var(--font-condensed, inherit);
+  font-size: 11px;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  color: var(--color-silver);
+  margin: 0 0 var(--space-sm, 8px);
+}
+
+.g2ar-rw__coderow {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md, 16px);
+  flex-wrap: wrap;
+}
+
+.g2ar-rw__code {
+  font-family: var(--font-mono, monospace);
+  letter-spacing: .12em;
+  font-size: 24px;
+  color: var(--color-white);
+}
+
+/* Filled brass button. --color-ink, never white: brass is only DARKENED for
+ * light mode, never lightened, so dark ink measures ~5:1 against it in both
+ * modes while white measures ~3.8:1 and fails WCAG AA. That failure has
+ * already shipped on this site once. */
+.g2ar-rw__copy {
+  font-family: var(--font-condensed, inherit);
+  text-transform: uppercase;
+  letter-spacing: .06em;
+  font-size: 12px;
+  padding: 8px 16px;
+  min-height: 36px;
+  border: 0;
+  border-radius: 6px;
+  cursor: pointer;
+  background: var(--color-brass);
+  color: var(--color-ink);
+  transition: background 200ms var(--ease-out, ease);
+}
+
+.g2ar-rw__copy:hover { background: var(--color-brass-bright); }
+
+.g2ar-rw__copy.is-copied {
+  background: var(--color-active);
+  color: var(--color-ink);
+}
+
+.g2ar-rw__link {
+  margin: var(--space-sm, 8px) 0 0;
+  font-size: 13px;
+  color: var(--color-silver);
+  word-break: break-all;
+}
+
+.g2ar-rw__share {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-sm, 8px);
+  margin-top: var(--space-md, 16px);
+}
+
+.g2ar-rw__sharebtn {
+  font-family: var(--font-condensed, inherit);
+  text-transform: uppercase;
+  letter-spacing: .06em;
+  font-size: 12px;
+  padding: 8px 14px;
+  min-height: 40px;
+  display: inline-flex;
+  align-items: center;
+  border-radius: 6px;
+  cursor: pointer;
+  text-decoration: none;
+  background: transparent;
+  border: 1px solid var(--color-hairline);
+  color: var(--color-fog);
+  transition: border-color 200ms var(--ease-out, ease), color 200ms var(--ease-out, ease);
+}
+
+.g2ar-rw__sharebtn:hover {
+  border-color: var(--color-brass);
+  color: var(--color-white);
+}
+
+.g2ar-rw__qr { margin-top: var(--space-md, 16px); }
+.g2ar-rw__qr img {
+  max-width: 200px;
+  height: auto;
+  border-radius: 6px;
+  background: var(--color-white);
+  padding: var(--space-sm, 8px);
+}
+
+/* ── Tiles and funnel ──────────────────────────────────────────────── */
+
+.g2ar-rw__tiles,
+.g2ar-rw__funnel {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--space-md, 16px);
+  margin-bottom: var(--space-lg, 24px);
+}
+
+.g2ar-rw__tile,
+.g2ar-rw__step {
+  background: var(--color-gunmetal);
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--g2ar-radius);
+  padding: var(--space-md, 16px);
+  transition: border-color 200ms var(--ease-out, ease), transform 200ms var(--ease-out, ease);
+}
+
+.g2ar-rw__tile:hover,
+.g2ar-rw__step:hover {
+  border-color: var(--color-hairline-bright);
+  transform: translateY(-2px);
+}
+
+.g2ar-rw__num {
+  display: block;
+  font-family: var(--font-display, inherit);
+  font-size: 32px;
+  line-height: 1.1;
+  color: var(--color-brass);
+}
+
+.g2ar-rw__label {
+  display: block;
+  margin-top: 4px;
+  font-family: var(--font-condensed, inherit);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: .08em;
+  color: var(--color-silver);
+}
+
+.g2ar-rw__cap {
+  font-size: 13px;
+  color: var(--color-silver);
+  margin: 0 0 var(--space-lg, 24px);
+}
+
+/* ── Lists ─────────────────────────────────────────────────────────── */
+
+.g2ar-rw__h {
+  font-family: var(--font-display, inherit);
+  font-size: 20px;
+  color: var(--color-white);
+  margin: var(--space-lg, 24px) 0 var(--space-md, 16px);
+}
+
+.g2ar-rw__list { list-style: none; margin: 0; padding: 0; }
+
+.g2ar-rw__row {
+  display: grid;
+  grid-template-columns: 1.4fr 1fr auto;
+  gap: var(--space-md, 16px);
+  align-items: center;
+  padding: var(--space-md, 16px) 0;
+  border-bottom: 1px solid var(--color-hairline);
+  font-size: 14px;
+}
+
+.g2ar-rw__who { color: var(--color-white); }
+.g2ar-rw__when,
+.g2ar-rw__note { color: var(--color-silver); }
+
+.g2ar-rw__badge {
+  font-family: var(--font-condensed, inherit);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: .06em;
+  padding: 4px 10px;
+  border-radius: 999px;
+  border: 1px solid currentColor;
+  white-space: nowrap;
+}
+
+/* Colour never carries the meaning on its own — each badge always prints
+ * its status word too, so the tab is readable without colour vision. */
+.g2ar-rw__badge.is-pending   { color: var(--color-silver); }
+.g2ar-rw__badge.is-qualified { color: var(--color-brass); }
+.g2ar-rw__badge.is-rewarded  { color: var(--color-active); }
+.g2ar-rw__badge.is-rejected  { color: var(--color-silver); }
+.g2ar-rw__badge.is-reversed  { color: var(--color-ember); }
+
+.g2ar-rw__empty,
+.g2ar-rw__terms {
+  font-size: 13px;
+  color: var(--color-silver);
+}
+
+.g2ar-rw__terms {
+  margin-top: var(--space-lg, 24px);
+  padding-top: var(--space-md, 16px);
+  border-top: 1px solid var(--color-hairline);
+}
+
+/* ── Focus ─────────────────────────────────────────────────────────── */
+
+.g2ar-rw a:focus-visible,
+.g2ar-rw button:focus-visible {
+  outline: 2px solid var(--color-brass-bright);
+  outline-offset: 2px;
+}
+
+/* ── Mobile: tiles stack 2-up then 1-up; rows become stacked cards
+ *    rather than a horizontally scrolling table. ───────────────────── */
+
+@media (max-width: 600px) {
+  .g2ar-rw__tiles,
+  .g2ar-rw__funnel { grid-template-columns: repeat(2, 1fr); }
+
+  .g2ar-rw__row {
+    grid-template-columns: 1fr;
+    gap: 4px;
+  }
+
+  .g2ar-rw__badge { justify-self: start; }
+  .g2ar-rw__code { font-size: 20px; }
+  .g2ar-rw__copy,
+  .g2ar-rw__sharebtn { min-height: 44px; }
+}
+
+@media (max-width: 420px) {
+  .g2ar-rw__tiles,
+  .g2ar-rw__funnel { grid-template-columns: 1fr; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .g2ar-rw__tile,
+  .g2ar-rw__step,
+  .g2ar-rw__copy,
+  .g2ar-rw__sharebtn { transition: none; }
+
+  .g2ar-rw__tile:hover,
+  .g2ar-rw__step:hover { transform: none; }
+}

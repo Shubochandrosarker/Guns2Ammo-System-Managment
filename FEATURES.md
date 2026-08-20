@@ -5,7 +5,7 @@ What the system does, grouped by domain. Versions for every component are in
 
 ---
 
-## 1. Membership (Memberistic 1.21.0)
+## 1. Membership (Memberistic 1.22.0)
 
 **The single membership authority.** Everything else in the system asks
 Memberistic; nothing makes its own membership assumptions.
@@ -119,10 +119,44 @@ Memberistic; nothing makes its own membership assumptions.
 | **formistic** 2.1.1 | Form builder for public site forms with submissions |
 | **messageistic** 0.8.1 | Transactional messaging / SMS bridge |
 | **g2a-theme-control** 1.0.1 | Theme presentation toggles |
+| **g2a-referrals** 1.0.0 | Membership referral rewards — Crockford codes, first-touch attribution, append-only reward ledger, Guest Pass redemption on lane bookings, refund reversal, member Rewards tab, front-desk lookup, hash-chained audit |
 | **g2a-business-api** 0.4.3 | REST backend for the staff dashboard at app.guns2ammo.com — server-managed sessions (HttpOnly cookie + CSRF header), analytics aggregation across WooCommerce, bookings and Memberistic |
-| **guns2ammo** theme 1.29.0 | Public site, Elementor-compatible, SEO redirects, structured data |
+| **guns2ammo** theme 1.30.0 | Public site, Elementor-compatible, SEO redirects, structured data |
 | **dashboard-app** | Staff/owner dashboard |
 | **g2a-chat-worker** + **cloudflare-rag-worker** | Site chat with retrieval-backed answers |
+
+---
+
+## 4b. Referral rewards (G2A Referrals 1.0.0)
+
+**The model.** A referred friend who buys any membership gets +1 month on
+their first term; the referrer earns a Guest Pass worth one free lane hour.
+Time rather than cash, because 69% of members buy annual — a 20% cash
+discount would cost $60–130 of revenue per referral, while an extra month
+costs an empty lane. Every value, window and piece of customer-facing copy
+is editable in Referrals → Settings.
+
+| Area | Behaviour |
+| --- | --- |
+| Codes | `G2A-XXXXXX`, Crockford base32 (no I/L/O/U) so staff can read one aloud at the counter; DB-enforced uniqueness with retry |
+| Attribution | `?ref=` sets a 90-day first-touch cookie; visits stored against a salted `visitor_hash`, never a raw IP |
+| Qualification | Rewards fire on the friend's **confirmed membership payment**, never on signup; `UNIQUE (friend_membership_id)` makes a webhook retry a no-op |
+| Ledger | Append-only. Balance is always `SUM(amount)`; there is no mutable balance column. Reversals and expiries write negative rows and nothing is ever deleted |
+| Guest Pass redemption | Opt-in per booking, hooked at priority 12 (after Memberistic's 11). **Never consumed when the booking total is already $0** — members already get lane time free, and burning a reward on a free booking is the worst bug this feature could ship |
+| Expiry | Guest Passes expire after 90 days by default, swept nightly in bounded batches |
+| Caps | 5 rewarded referrals per member per month by default; a capped referral is recorded and audited, not silently dropped |
+| Fraud | Self-referral blocked on user id, email, device fingerprint and payment instrument; volume thresholds flag for review rather than auto-reject |
+| Reversal | Refund, dispute or cancellation inside a 14-day hold window reverses both sides, via Memberistic's existing Stripe webhook rather than a second endpoint |
+| Stacking | Best single offer wins, never combined, with a configurable price floor |
+| Privacy | The referrer sees "Sarah M. — joined 12 Aug — Rewarded" and never the friend's email, phone, plan price or purchases |
+| Admin | Overview with outstanding reward liability in dollars, referrers, conversions, rewards, front-desk code lookup, hash-chain-verifiable audit log |
+
+**Product page (theme 1.30.0).** A cache-safe promotional banner (empty
+reserved placeholder hydrated from `/wp-json/g2ar/v1/context`, so AirLift
+never caches a member variant), a "Try At Range" block on FFL products at
+priority 34, and a rotating confidence strip replacing the old "Free FFL
+Transfer" badge — every claim in it factually true, with no stock counters
+or invented urgency.
 
 ---
 
@@ -145,7 +179,7 @@ Memberistic; nothing makes its own membership assumptions.
 | `plugin-sync` | Monorepo plugin copies vs standalone repos, byte-identical — **fails closed** if it cannot clone and compare |
 | `plugin-versions` | Every plugin header version matches its runtime version constant |
 | PHP lint | Every PHP file, PHP 8.1 + 8.3 |
-| PHPUnit | 67 booking-engine tests, 38 Memberistic tests |
+| PHPUnit | 67 booking-engine tests, 38 Memberistic tests, 63 referrals tests |
 | JS syntax | All plugin assets |
 | PHPCS PSR-12 | New service classes (advisory) |
 | Composer validate | POS, business API, messageistic |
