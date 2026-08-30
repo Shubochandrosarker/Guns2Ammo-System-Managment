@@ -61,30 +61,10 @@ function g2a_robots_body() {
 	$lines[] = 'Allow: /';
 	$lines[] = '';
 	$lines[] = '# Account / cart / admin — never useful for SEO.';
-	foreach ( array(
-		'/wp-admin/',
-		'/wp-login.php',
-		'/wp-json/',
-		'/xmlrpc.php',
-		'/?s=',
-		'/cart/',
-		'/checkout/',
-		'/my-account/',
-		'/account/',
-		'/login/',
-		'/g2a-members-login/',
-		'/g2a-admin-login/',
-		'/memberistic-account/',
-		'/memberistic-checkout/',
-		'/membership-checkout/',
-		'/thank-you/',
-		'/payment-failed/',
-		'/staff-dashboard/',
-		'/?add-to-cart=',
-		'/?remove_item=',
-		'/wp-content/uploads/wc-logs/',
-		'/wp-content/uploads/woocommerce_uploads/',
-	) as $path ) {
+	$private_paths = function_exists( 'g2a_private_robots_paths' )
+		? g2a_private_robots_paths()
+		: array( '/wp-admin/', '/wp-login.php', '/account/', '/checkout/', '/cart/', '/login/' );
+	foreach ( $private_paths as $path ) {
 		$lines[] = 'Disallow: ' . $path;
 	}
 	$lines[] = 'Allow: /wp-admin/admin-ajax.php';
@@ -117,11 +97,10 @@ function g2a_robots_body() {
 		$lines[] = '';
 		$lines[] = 'User-agent: ' . $bot;
 		$lines[] = 'Allow: /';
-		$lines[] = 'Disallow: /wp-admin/';
-		$lines[] = 'Disallow: /account/';
-		$lines[] = 'Disallow: /checkout/';
-		$lines[] = 'Disallow: /cart/';
-		$lines[] = 'Disallow: /login/';
+		foreach ( $private_paths as $path ) {
+			$lines[] = 'Disallow: ' . $path;
+		}
+		$lines[] = 'Allow: /wp-admin/admin-ajax.php';
 	}
 
 	$lines[] = '';

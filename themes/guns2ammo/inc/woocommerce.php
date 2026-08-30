@@ -60,63 +60,10 @@ function g2a_seo_product_return_policy( WC_Product $product ) {
 	];
 }
 
-/**
- * Real shippingDetails from the store's actual configured WooCommerce
- * shipping zones — not a fabricated flat number. Firearms never ship
- * direct-to-consumer (FFL transfer or in-store pickup only, per
- * Terms & Conditions), so they intentionally get no shippingDetails at
- * all rather than a misleading one. Delivery/handling time estimates
- * are omitted because the store has no real transit-time data to
- * report — same "never fabricated" rule this file already applies to
- * aggregateRating below.
- */
-function g2a_seo_product_shipping_details() {
-	static $details = null;
-	if ( null !== $details ) {
-		return $details;
-	}
-	$details = false;
-
-	if ( ! class_exists( 'WC_Shipping_Zones' ) ) {
-		return $details;
-	}
-
-	$cost = null;
-	foreach ( WC_Shipping_Zones::get_zones() as $zone_data ) {
-		foreach ( (array) ( $zone_data['shipping_methods'] ?? [] ) as $method ) {
-			if ( ! $method->is_enabled() ) {
-				continue;
-			}
-			if ( 'free_shipping' === $method->id ) {
-				$cost = 0.0;
-				break 2;
-			}
-			if ( 'flat_rate' === $method->id && null === $cost ) {
-				$cost = (float) $method->get_option( 'cost' );
-			}
-		}
-	}
-	if ( null === $cost ) {
-		return $details;
-	}
-
-	$countries = function_exists( 'WC' ) && WC()->countries
-		? array_keys( (array) WC()->countries->get_allowed_countries() )
-		: [ 'US' ];
-
-	$details = [
-		'@type'               => 'OfferShippingDetails',
-		'shippingRate'        => [
-			'@type'    => 'MonetaryAmount',
-			'value'    => $cost,
-			'currency' => get_woocommerce_currency(),
-		],
-		'shippingDestination' => array_map( function ( $country ) {
-			return [ '@type' => 'DefinedRegion', 'addressCountry' => $country ];
-		}, $countries ?: [ 'US' ] ),
-	];
-	return $details;
-}
+/* WooCommerce and the theme must not emit competing Product/Breadcrumb nodes.
+ * The theme owns both graphs and builds them from the visible catalogue data. */
+add_filter( 'woocommerce_structured_data_product', '__return_empty_array', 99 );
+add_filter( 'woocommerce_structured_data_breadcrumblist', '__return_empty_array', 99 );
 
 add_action( 'wp_head', function () {
 	if ( ! function_exists( 'is_product' ) || ! is_product() ) {
@@ -129,38 +76,67 @@ add_action( 'wp_head', function () {
 	if ( ! $product instanceof WC_Product ) {
 		return;
 	}
-
-	$is_firearm = 'yes' === get_post_meta( $product->get_id(), '_wpistic_ffl_required', true );
-
-	$offer = [
-		'@type'                  => 'Offer',
-		'priceCurrency'          => get_woocommerce_currency(),
-		'price'                  => $product->get_price(),
-		'priceValidUntil'        => gmdate( 'Y-m-d', strtotime( '+90 days' ) ),
-		'availability'           => $product->is_in_stock() ? 'https://schema.org/InStock' : 'https://schema.org/OutOfStock',
-		'url'                    => get_permalink( $product->get_id() ),
-		'hasMerchantReturnPolicy'=> g2a_seo_product_return_policy( $product ),
-	];
-
-	if ( ! $is_firearm ) {
-		$shipping = g2a_seo_product_shipping_details();
-		if ( $shipping ) {
-			$offer['shippingDetails'] = $shipping;
-		}
+	// Keep schema, robots and XML eligibility on one quality gate.
+	if ( '1' !== (string) get_post_meta( $product->get_id(), '_g2a_indexable', true ) ) {
+		return;
 	}
+
+	$permalink   = get_permalink( $product->get_id() );
+	$price       = $product->get_price();
+	$description = wp_strip_all_tags( $product->get_short_description() ?: $product->get_description() );
+	$image       = $product->get_image_id() ? wp_get_attachment_url( $product->get_image_id() ) : '';
 
 	$ld = [
 		'@context'    => 'https://schema.org',
 		'@type'       => 'Product',
+		'@id'         => $permalink . '#product',
+		'url'         => $permalink,
 		'name'        => $product->get_name(),
-		'sku'         => $product->get_sku(),
-		'description' => wp_strip_all_tags( $product->get_short_description() ?: $product->get_description() ),
-		'image'       => $product->get_image_id()
-			? wp_get_attachment_url( $product->get_image_id() )
-			: ( function_exists( 'wc_placeholder_img_src' ) ? wc_placeholder_img_src( 'woocommerce_single' ) : '' ),
-		'brand'       => [ '@type' => 'Brand', 'name' => get_bloginfo( 'name' ) ],
-		'offers'      => $offer,
 	];
+	if ( $product->get_sku() ) {
+		$ld['sku'] = $product->get_sku();
+	}
+	if ( $description ) {
+		$ld['description'] = $description;
+	}
+	if ( $image ) {
+		$ld['image'] = [ $image ];
+	}
+
+	// A rolling "90 days from render" date is not a real price expiry, so
+	// priceValidUntil is intentionally omitted. Emit an Offer only with a real
+	// numeric catalogue price.
+	if ( '' !== $price && is_numeric( $price ) ) {
+		$ld['offers'] = [
+			'@type'                   => 'Offer',
+			'priceCurrency'           => get_woocommerce_currency(),
+			'price'                   => wc_format_decimal( $price, wc_get_price_decimals() ),
+			'availability'            => $product->is_in_stock() ? 'https://schema.org/InStock' : 'https://schema.org/OutOfStock',
+			'url'                     => $permalink,
+			'hasMerchantReturnPolicy' => g2a_seo_product_return_policy( $product ),
+		];
+	}
+
+	// Use the catalogue taxonomy as the manufacturer source. If it is absent,
+	// omit brand instead of incorrectly labelling Guns 2 Ammo as manufacturer.
+	$g2a_brands = wp_get_post_terms( $product->get_id(), 'product_brand', [ 'fields' => 'names' ] );
+	if ( ! is_wp_error( $g2a_brands ) && ! empty( $g2a_brands ) ) {
+		$ld['brand'] = [ '@type' => 'Brand', 'name' => $g2a_brands[0] ];
+	}
+
+	// UPC is rendered in the same product specification table. Do not assert
+	// that a store SKU is an MPN; those identifiers are not interchangeable.
+	if ( preg_match( '#<th[^>]*scope="row"[^>]*>\s*UPC\s*</th>\s*<td[^>]*>(.*?)</td>#si', (string) $product->get_description(), $g2a_m ) ) {
+		$g2a_upc = preg_replace( '/\D+/', '', wp_strip_all_tags( $g2a_m[1] ) );
+		if ( in_array( strlen( $g2a_upc ), [ 12, 13, 14 ], true ) ) {
+			$ld[ 'gtin' . strlen( $g2a_upc ) ] = $g2a_upc;
+		}
+	}
+
+	$g2a_cats = wp_get_post_terms( $product->get_id(), 'product_cat', [ 'fields' => 'names' ] );
+	if ( ! is_wp_error( $g2a_cats ) && ! empty( $g2a_cats ) ) {
+		$ld['category'] = implode( ' > ', array_reverse( $g2a_cats ) );
+	}
 
 	if ( $product->get_review_count() > 0 ) {
 		$ld['aggregateRating'] = [

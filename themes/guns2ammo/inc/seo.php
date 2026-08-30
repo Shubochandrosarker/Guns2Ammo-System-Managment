@@ -41,6 +41,89 @@ function g2a_seo_page_meta_map() {
 		// Single source of truth for membership pricing — see inc/pricing.php.
 		$g2a_seo_from_price = function_exists( 'g2a_plan_price_from_fmt' ) ? g2a_plan_price_from_fmt() : '$29.99';
 		$map = [
+			// Commerce and long-form landing pages that otherwise fall through
+			// to generic archive text or an abruptly truncated content excerpt.
+			// Avoid inventory counts in evergreen metadata: catalogue totals move.
+			'/brands/' => [
+				'title' => 'Firearm, Ammunition & Gear Brands | Guns 2 Ammo',
+				'desc'  => 'Browse firearms, ammunition, optics and accessories by manufacturer at Guns 2 Ammo. Eligible firearm orders ship to a licensed FFL where legally permitted.',
+			],
+			'/collections/' => [
+				'title' => 'Shop Firearms, Ammo & Accessories by Collection | G2A',
+				'desc'  => 'Browse handguns, rifles, ammunition, magazines and accessories by collection. Shop online or arrange lawful pickup at Guns 2 Ammo in Mesa, Arizona.',
+			],
+			'/collections/handguns/' => [
+				'title' => 'Handguns for Sale — Pistols & Revolvers | Guns 2 Ammo',
+				'desc'  => 'Browse carry pistols, duty handguns and revolvers. Eligible firearm orders ship to a licensed FFL where legally permitted, or arrange pickup in Mesa, AZ.',
+			],
+			'/collections/rifles/' => [
+				'title' => 'Rifles for Sale — Carbines & Bolt-Action Rifles | G2A',
+				'desc'  => 'Browse carbines and bolt-action rifles from trusted manufacturers. Eligible orders ship to a licensed FFL where legally permitted, or arrange Mesa pickup.',
+			],
+			'/collections/magazines/' => [
+				'title' => 'Firearm Magazines — OEM & Aftermarket | Guns 2 Ammo',
+				'desc'  => 'Shop OEM and aftermarket firearm magazines for range, carry and duty use. Availability and shipping depend on product details and applicable local law.',
+			],
+			'/collections/ammunition/' => [
+				'title' => 'Ammunition for Sale — Range & Defense Loads | G2A',
+				'desc'  => 'Shop factory-new range ammunition, defense loads and bulk cases. In-store availability and shipping are subject to product details and applicable law.',
+			],
+			'/arizona-ccw-laws-2026/' => [
+				'title' => 'Arizona CCW Laws 2026 — Constitutional Carry Explained',
+				'desc'  => 'Understand Arizona constitutional carry, permit eligibility, the application process and restricted locations. Verify current requirements with official sources.',
+			],
+			'/arizona-ccw-syllabus/' => [
+				'title' => 'Arizona CCW Class Syllabus — Course Topics | Guns 2 Ammo',
+				'desc'  => 'See the Arizona CCW course topics: firearm safety, applicable Arizona law, reciprocity and what certification does and does not authorize.',
+			],
+			'/training/handgun-course/' => [
+				'title' => 'Basic Handgun Course in Mesa, AZ | Guns 2 Ammo',
+				'desc'  => 'A patient, small-group course for first-time shooters and anyone rebuilding handgun fundamentals, with hands-on instruction at our Mesa indoor range.',
+			],
+			'/training/church-security/' => [
+				'title' => 'Church Security Training in Mesa, AZ | Guns 2 Ammo',
+				'desc'  => 'Training for church safety teams covering coordination, de-escalation, medical readiness and practical ways to protect a congregation responsibly.',
+			],
+			'/training/refuse-to-be-a-victim/' => [
+				'title' => 'Refuse To Be A Victim Seminar — Mesa, AZ | G2A',
+				'desc'  => 'A non-firearm personal-safety seminar covering situational awareness, risk reduction and practical safety habits for home, travel and online activity.',
+			],
+			'/training/rifle-fundamentals/' => [
+				'title' => 'Rifle Fundamentals Training in Mesa, AZ | Guns 2 Ammo',
+				'desc'  => 'Learn safe rifle handling, zeroing, marksmanship positions and reload fundamentals with guided instruction at our indoor range in Mesa, Arizona.',
+			],
+			'/training/womens-intro/' => [
+				'title' => "Women's Intro to Firearms — Mesa, AZ | Guns 2 Ammo",
+				'desc'  => 'A supportive small-group introduction with clear safety fundamentals and hands-on coaching at a comfortable pace in Mesa, Arizona.',
+			],
+			'/training/youth-firearm-safety/' => [
+				'title' => 'Youth Firearm Safety Class — Mesa, AZ | Guns 2 Ammo',
+				'desc'  => 'An age-appropriate safety class teaching young people to stop, not touch, leave the area and tell an adult. A parent or guardian attends throughout.',
+			],
+			'/expert-fitment/' => [
+				'title' => 'Expert Handgun Fitment — Try Before You Buy | G2A',
+				'desc'  => 'Compare grip fit, trigger reach and slide operation, then test suitable rental options on our indoor range before choosing a handgun. Mesa, Arizona.',
+			],
+			'/compliance/' => [
+				'title' => 'FFL Transfers & Federal Compliance | Guns 2 Ammo Mesa',
+				'desc'  => 'Learn how incoming firearm transfers, dealer documentation, Form 4473 and required background checks are handled at Guns 2 Ammo in Mesa, Arizona.',
+			],
+			'/local-pickup/' => [
+				'title' => 'Local Pickup in Mesa, AZ — Order Online | Guns 2 Ammo',
+				'desc'  => 'Choose local pickup for eligible online orders. We will notify you when the order is ready and explain the identification or transfer steps that apply.',
+			],
+			'/transfer-request/' => [
+				'title' => 'Start an FFL Transfer Request | Guns 2 Ammo Mesa, AZ',
+				'desc'  => 'Provide the details for an incoming firearm so Guns 2 Ammo can coordinate required dealer documentation and the lawful in-store transfer process.',
+			],
+			'/want-to-ship-your-firearm/' => [
+				'title' => 'Ship a Firearm to Our Mesa, AZ FFL | Guns 2 Ammo',
+				'desc'  => 'See what your seller needs, where to send an eligible firearm and how to begin the required transfer process with Guns 2 Ammo in Mesa, Arizona.',
+			],
+			'/shop/' => [
+				'title' => 'Firearms, Ammo & Accessories for Sale | Guns 2 Ammo',
+				'desc'  => 'Shop firearms, ammunition, optics, magazines and accessories. Eligible firearm orders ship to a licensed FFL where legally permitted, or arrange Mesa pickup.',
+			],
 			'/' => [
 				'title' => 'Indoor Shooting Range & Gun Store in Mesa, AZ | Guns 2 Ammo',
 				'desc'  => 'Mesa\'s 6-lane climate-controlled indoor shooting range, FFL gun store & NRA-certified training. Lanes from $20/hr, CCW classes & full-auto rentals. Book online.',
@@ -236,6 +319,14 @@ add_action( 'init', function () {
  * active these filters/options simply no-op.
  * ============================================================ */
 add_action( 'init', 'g2a_seo_disable_rankmath_overlap', 20 );
+
+// Internal optimization scores are editorial tooling, not visitor content.
+// Disable the Rank Math frontend badge and its promotional backlink at source.
+add_filter( 'rank_math/show_score', '__return_false', PHP_INT_MAX );
+add_filter( 'rank_math/frontend/seo_score/html', '__return_empty_string', PHP_INT_MAX );
+add_filter( 'rank_math/frontend/seo_score/backlink', '__return_empty_string', PHP_INT_MAX );
+add_filter( 'rank_math/frontend/remove_credit_notice', '__return_true', PHP_INT_MAX );
+
 function g2a_seo_disable_rankmath_overlap() {
 	if ( ! defined( 'RANK_MATH_VERSION' ) && ! class_exists( 'RankMath' ) ) {
 		return;
@@ -258,6 +349,59 @@ function g2a_seo_disable_rankmath_overlap() {
 	add_filter( 'rank_math/frontend/breadcrumb/enable', '__return_false', 99 );
 }
 
+/**
+ * Visible WordPress byline for an article.
+ *
+ * Use display_name rather than login/user_nicename so metadata never exposes
+ * an account identifier that is not already presented to readers.
+ *
+ * @param WP_Post|int|null $post Post object or ID.
+ * @return string
+ */
+function g2a_article_author_name( $post = null ) {
+	$post = get_post( $post );
+	if ( ! $post instanceof WP_Post ) {
+		return '';
+	}
+	return trim( (string) get_the_author_meta( 'display_name', (int) $post->post_author ) );
+}
+
+/**
+ * Schema author that matches the byline rendered by single.php.
+ *
+ * Brand/team bylines resolve to the canonical business entity. Named people
+ * become Person nodes; an author URL is included only when the user explicitly
+ * configured a public profile URL.
+ *
+ * @param WP_Post|int|null $post Post object or ID.
+ * @return array<string, string>
+ */
+function g2a_article_author_schema( $post = null ) {
+	$post = get_post( $post );
+	if ( ! $post instanceof WP_Post ) {
+		return [ '@id' => home_url( '/#organization' ) ];
+	}
+	$name = g2a_article_author_name( $post );
+	if ( '' === $name ) {
+		return [ '@id' => home_url( '/#organization' ) ];
+	}
+
+	if ( preg_match( '/^(guns\s*2\s*ammo|guns2ammo|g2a|g2a\s+(staff|team)|editorial\s+team)$/i', $name ) ) {
+		return [ '@id' => home_url( '/#organization' ) ];
+	}
+
+	$author = [
+		'@type' => 'Person',
+		'@id'   => home_url( '/#author-' . (int) $post->post_author ),
+		'name'  => $name,
+	];
+	$url = esc_url_raw( (string) get_the_author_meta( 'user_url', (int) $post->post_author ) );
+	if ( $url ) {
+		$author['url'] = $url;
+	}
+	return $author;
+}
+
 /* ---------- Basic meta + OG + canonical ----------
  * Always run our own basic meta block. Title / description /
  * keywords still come from RankMath via the title-tag + the
@@ -270,6 +414,15 @@ add_action( 'wp_head', function () {
 	$title = wp_get_document_title();
 	$desc  = g2a_seo_description();
 	$url   = g2a_current_url();
+
+	// A post may be reachable through more than one category path. WordPress's
+	// permalink is the canonical content URL; the request path is not.
+	if ( is_singular() && ! is_front_page() && ! is_paged() ) {
+		$g2a_true_url = get_permalink( get_queried_object_id() );
+		if ( $g2a_true_url ) {
+			$url = $g2a_true_url;
+		}
+	}
 	$site  = get_bloginfo( 'name' );
 	$image = g2a_seo_image();
 
@@ -281,9 +434,14 @@ add_action( 'wp_head', function () {
 	if ( $desc && ! g2a_seo_plugin_active() ) {
 		echo '<meta name="description" content="' . esc_attr( $desc ) . '">' . "\n";
 	}
-	// Author is always the brand — never a personal developer/admin name.
-	echo '<meta name="author" content="Guns 2 Ammo">' . "\n";
-	echo '<link rel="canonical" href="' . esc_url( $url ) . '">' . "\n";
+	$author_name = is_singular( 'post' ) ? g2a_article_author_name( get_queried_object() ) : '';
+	$author_name = $author_name ?: 'Guns 2 Ammo';
+	echo '<meta name="author" content="' . esc_attr( $author_name ) . '">' . "\n";
+	// Search and 404 responses are noindex and have no meaningful canonical
+	// content URL. In particular, /?s=query must never canonicalize to home.
+	if ( ! is_search() && ! is_404() ) {
+		echo '<link rel="canonical" href="' . esc_url( $url ) . '">' . "\n";
+	}
 	echo '<meta property="og:type" content="' . ( is_singular( 'post' ) ? 'article' : 'website' ) . '">' . "\n";
 	echo '<meta property="og:locale" content="' . esc_attr( get_locale() ) . '">' . "\n";
 	echo '<meta property="og:site_name" content="' . esc_attr( $site ) . '">' . "\n";
@@ -378,18 +536,21 @@ function g2a_seo_image_dimensions( $url ) {
 
 /* ---------- JSON-LD: always-on LocalBusiness on every page ---------- */
 add_action( 'wp_head', function () {
-	// All values pulled from the centralized business-info module
-	// so the schema can never disagree with the visible page
-	// content (NAP, hours, rating, review count). aggregateRating
-	// is emitted ONLY when a real, admin-verified count + rating
-	// exist — never fabricated.
+	// All business facts come from the same module used by visible templates.
 	$biz = function_exists( 'g2a_biz' ) ? g2a_biz() : array();
 
-	// Single source of truth for membership pricing — see inc/pricing.php.
-	$g2a_has_pricing_helper = function_exists( 'g2a_plan_price' );
-	$g2a_defender_price = $g2a_has_pricing_helper ? g2a_plan_price( 'defender', 'monthly' ) : 29.99;
-	$g2a_patriot_price  = $g2a_has_pricing_helper ? g2a_plan_price( 'patriot', 'monthly' ) : 39.99;
-	$g2a_guardian_price = $g2a_has_pricing_helper ? g2a_plan_price( 'guardian', 'monthly' ) : 59.99;
+	$g2a_logo_id       = (int) get_theme_mod( 'custom_logo' );
+	$g2a_business_logo = $g2a_logo_id ? wp_get_attachment_image_url( $g2a_logo_id, 'full' ) : '';
+	$g2a_business_logo = $g2a_business_logo ?: ( function_exists( 'g2a_asset' ) ? g2a_asset( 'img/guns2ammo-logo.png' ) : '' );
+	$g2a_business_img  = get_theme_mod( 'g2a_og_image', '' );
+	$g2a_business_img  = $g2a_business_img ?: ( function_exists( 'g2a_asset' ) ? g2a_asset( 'img/guns2ammo-storefront-sign-mesa.jpg' ) : $g2a_business_logo );
+	$g2a_phone         = trim( (string) ( $biz['phone'] ?? '' ) );
+	$g2a_same_as       = array_values( array_filter( [
+		$biz['social']['fb'] ?? '',
+		$biz['social']['ig'] ?? '',
+		$biz['social']['x']  ?? '',
+		$biz['social']['yt'] ?? '',
+	] ) );
 
 	$day_names = [ 0 => 'Sunday', 1 => 'Monday', 2 => 'Tuesday', 3 => 'Wednesday', 4 => 'Thursday', 5 => 'Friday', 6 => 'Saturday' ];
 	$hours_spec = [];
@@ -410,18 +571,12 @@ add_action( 'wp_head', function () {
 	$ld = [
 		'@context' => 'https://schema.org',
 		'@type'    => [ 'LocalBusiness', 'SportsActivityLocation', 'Store' ],
-		// Same @id as inc/aeo.php's Organization node — this is the richer
-		// LocalBusiness view of the SAME real-world entity (hours, geo,
-		// offers), not a second, disconnected business. Sharing the @id
-		// lets search engines resolve every reference to one node instead
-		// of two unlinked ones.
+		// Canonical entity node referenced by WebSite, Article and Event schema.
 		'@id'      => home_url( '/#organization' ),
 		'name'     => $biz['name'] ?? get_bloginfo( 'name' ),
-		'image'    => g2a_seo_image() ?: home_url( '/wp-content/uploads/g2a-storefront.jpg' ),
 		'url'      => home_url( '/' ),
-		'telephone' => $biz['phone'] ?? '',
+		'description' => 'Guns 2 Ammo is a Mesa, Arizona indoor shooting range, FFL-licensed firearm store, and NRA-certified training facility offering firearm sales, CCW training, transfers, and range memberships.',
 		'priceRange' => '$$',
-		'foundingDate' => (string) ( $biz['founded_year'] ?? '' ),
 		'address'  => [
 			'@type'           => 'PostalAddress',
 			'streetAddress'   => $biz['addr1'] ?? '',
@@ -435,7 +590,6 @@ add_action( 'wp_head', function () {
 			'latitude'  => (float) ( $biz['lat'] ?? 33.4152 ),
 			'longitude' => (float) ( $biz['lng'] ?? -111.7066 ),
 		],
-		'openingHoursSpecification' => $hours_spec,
 		/* Local SEO  the East Valley communities Guns 2 Ammo serves. */
 		'areaServed' => array_map(
 			function ( $city ) {
@@ -451,41 +605,53 @@ add_action( 'wp_head', function () {
 			'FFL firearm transfers', 'Firearm sales', 'Buying used firearms', 'NRA firearms training',
 			'Machine gun shooting experience', 'Range membership',
 		],
-		'slogan' => $biz['slogan'] ?? "Mesa's most-trusted indoor range, FFL firearm store, and NRA-certified training facility.",
-		/* Membership plans surfaced for AI answer engines and rich results. */
-		'hasOfferCatalog' => [
-			'@type' => 'OfferCatalog',
-			'name'  => 'Guns 2 Ammo Range Memberships',
-			'itemListElement' => [
-				[ '@type' => 'Offer', 'name' => 'Defender Membership', 'description' => 'Individual range membership for one person.', 'price' => number_format( $g2a_defender_price, 2, '.', '' ), 'priceCurrency' => 'USD', 'url' => home_url( '/memberships/' ) ],
-				[ '@type' => 'Offer', 'name' => 'Patriot Membership',  'description' => 'Two-person range membership with linked member profiles.', 'price' => number_format( $g2a_patriot_price, 2, '.', '' ), 'priceCurrency' => 'USD', 'url' => home_url( '/memberships/' ) ],
-				[ '@type' => 'Offer', 'name' => 'Guardian Membership', 'description' => 'Four-person range membership for families and groups.', 'price' => number_format( $g2a_guardian_price, 2, '.', '' ), 'priceCurrency' => 'USD', 'url' => home_url( '/memberships/' ) ],
-			],
-		],
-		'sameAs' => array_values( array_filter( [
-			$biz['social']['fb'] ?? '',
-			$biz['social']['ig'] ?? '',
-			$biz['social']['x']  ?? '',
-			$biz['social']['yt'] ?? '',
-		] ) ),
 	];
 
-	// aggregateRating: emit ONLY when an admin-verified rating +
-	// review count are present. Never fabricate. The values are
-	// the same ones rendered visibly on the homepage + footer, so
-	// they're substantiated by on-page content (Google's policy).
-	// Prefer the live review helpers (Google Places-backed when an API
-	// key is configured) so the schema always matches the visible count.
-	$rating = function_exists( 'g2a_reviews_rating' ) ? (float) g2a_reviews_rating() : (float) ( $biz['review_rating'] ?? 0 );
-	$count  = function_exists( 'g2a_reviews_count' )  ? (int) g2a_reviews_count()    : (int)   ( $biz['review_count'] ?? 0 );
-	if ( $rating > 0 && $count > 0 ) {
-		$ld['aggregateRating'] = [
-			'@type'       => 'AggregateRating',
-			'ratingValue' => $rating,
-			'reviewCount' => $count,
-			'bestRating'  => '5',
-			'worstRating' => '1',
+	if ( $g2a_business_logo ) {
+		$ld['logo'] = $g2a_business_logo;
+	}
+	if ( $g2a_business_img ) {
+		$ld['image'] = $g2a_business_img;
+	}
+	if ( $g2a_phone ) {
+		$ld['telephone']  = $g2a_phone;
+		$ld['contactPoint'] = [
+			'@type'             => 'ContactPoint',
+			'telephone'         => $g2a_phone,
+			'contactType'       => 'customer service',
+			'areaServed'        => 'US',
+			'availableLanguage' => 'English',
 		];
+	}
+	if ( ! empty( $biz['founded_year'] ) ) {
+		$ld['foundingDate'] = (string) $biz['founded_year'];
+	}
+	if ( $hours_spec ) {
+		$ld['openingHoursSpecification'] = $hours_spec;
+	}
+	if ( $g2a_same_as ) {
+		$ld['sameAs'] = $g2a_same_as;
+	}
+	if ( ! empty( $biz['slogan'] ) ) {
+		$ld['slogan'] = (string) $biz['slogan'];
+	}
+
+	// Only publish membership prices when the live pricing source is loaded.
+	if ( function_exists( 'g2a_plan_price' ) ) {
+		$g2a_defender_price = (float) g2a_plan_price( 'defender', 'monthly' );
+		$g2a_patriot_price  = (float) g2a_plan_price( 'patriot', 'monthly' );
+		$g2a_guardian_price = (float) g2a_plan_price( 'guardian', 'monthly' );
+		if ( $g2a_defender_price > 0 && $g2a_patriot_price > 0 && $g2a_guardian_price > 0 ) {
+			$ld['hasOfferCatalog'] = [
+				'@type' => 'OfferCatalog',
+				'name'  => 'Guns 2 Ammo Range Memberships',
+				'itemListElement' => [
+					[ '@type' => 'Offer', 'name' => 'Defender Membership', 'description' => 'Individual range membership for one person.', 'price' => number_format( $g2a_defender_price, 2, '.', '' ), 'priceCurrency' => 'USD', 'url' => home_url( '/memberships/' ) ],
+					[ '@type' => 'Offer', 'name' => 'Patriot Membership',  'description' => 'Two-person range membership with linked member profiles.', 'price' => number_format( $g2a_patriot_price, 2, '.', '' ), 'priceCurrency' => 'USD', 'url' => home_url( '/memberships/' ) ],
+					[ '@type' => 'Offer', 'name' => 'Guardian Membership', 'description' => 'Four-person range membership for families and groups.', 'price' => number_format( $g2a_guardian_price, 2, '.', '' ), 'priceCurrency' => 'USD', 'url' => home_url( '/memberships/' ) ],
+				],
+			];
+		}
 	}
 
 	g2a_emit_jsonld( $ld );
@@ -514,22 +680,27 @@ add_action( 'wp_head', function () {
 
 	if ( is_singular( 'post' ) ) {
 		$p = get_queried_object();
-		g2a_emit_jsonld( [
+		$article = [
 			'@context'      => 'https://schema.org',
 			'@type'         => 'Article',
 			'mainEntityOfPage' => [ '@type' => 'WebPage', '@id' => get_permalink( $p ) ],
 			'headline'      => get_the_title( $p ),
-			'description'   => g2a_seo_description(),
-			'image'         => has_post_thumbnail( $p ) ? get_the_post_thumbnail_url( $p, 'large' ) : null,
 			'datePublished' => get_the_date( DATE_W3C, $p ),
-			'dateModified'  => get_the_modified_date( DATE_W3C, $p ),
-			// Brand byline — never expose a personal developer/admin login name.
-			// Reference the single Organization node (inc/aeo.php) by @id
-			// instead of inlining a fresh, disconnected duplicate — every
-			// Article on the site now points at the same canonical entity.
-			'author'        => [ '@id' => home_url( '/#organization' ) ],
+			'dateModified'  => function_exists( 'g2a_post_lastmod_timestamp' )
+				? gmdate( DATE_W3C, g2a_post_lastmod_timestamp( $p ) )
+				: get_the_modified_date( DATE_W3C, $p ),
+			'author'        => g2a_article_author_schema( $p ),
 			'publisher'     => [ '@id' => home_url( '/#organization' ) ],
-		] );
+		];
+		$article_desc = g2a_seo_description();
+		$article_img  = has_post_thumbnail( $p ) ? get_the_post_thumbnail_url( $p, 'large' ) : '';
+		if ( $article_desc ) {
+			$article['description'] = $article_desc;
+		}
+		if ( $article_img ) {
+			$article['image'] = [ $article_img ];
+		}
+		g2a_emit_jsonld( $article );
 	}
 }, 9 );
 
@@ -563,33 +734,17 @@ function g2a_emit_jsonld( $data ) {
 
 /* ---------- Robots + sitemap nudge ---------- */
 add_filter( 'wp_robots', function ( $robots ) {
-	// Private / transactional pages: noindex,nofollow. These have
-	// no search value and may carry session/PII context. We use
-	// meta-robots noindex (NOT just robots.txt Disallow) per
-	// Google's guidance — robots.txt only blocks crawl, noindex
-	// actually keeps them out of the index.
-	$private_slugs = array(
-		'account', 'my-account', 'cart', 'checkout', 'login',
-		'g2a-members-login', 'thank-you', 'payment-failed',
-		'staff-dashboard', 'renew-membership', 'membership-checkout-page',
-		'memberistic-account', 'memberistic-checkout',
-	);
-	$is_private = false;
-	if ( is_page() ) {
-		$slug = get_post_field( 'post_name', get_queried_object_id() );
-		if ( in_array( $slug, $private_slugs, true ) ) {
-			$is_private = true;
-		}
-	}
-	// WooCommerce cart/checkout/account pages by function (covers
-	// installs where the slug differs).
-	if ( function_exists( 'is_cart' ) && ( is_cart() || is_checkout() || is_account_page() ) ) {
-		$is_private = true;
-	}
+	$is_private          = function_exists( 'g2a_is_private_request' ) && g2a_is_private_request();
+	$is_filtered_archive = function_exists( 'g2a_is_filtered_commerce_archive' ) && g2a_is_filtered_commerce_archive();
 
-	if ( $is_private ) {
+	if ( $is_private || is_search() || is_404() || $is_filtered_archive ) {
 		$robots['noindex']  = true;
-		$robots['nofollow'] = true;
+		$robots['follow']   = true;
+		unset( $robots['index'] );
+		if ( $is_private ) {
+			$robots['nofollow'] = true;
+			unset( $robots['follow'] );
+		}
 		unset( $robots['max-image-preview'], $robots['max-snippet'], $robots['max-video-preview'] );
 		return $robots;
 	}
@@ -601,6 +756,27 @@ add_filter( 'wp_robots', function ( $robots ) {
 	}
 	return $robots;
 } );
+
+// Rank Math emits its own robots tag when active. Apply the same shared policy
+// there so plugin activation cannot reverse a private/filter noindex decision.
+add_filter( 'rank_math/frontend/robots', function ( $robots ) {
+	$is_private          = function_exists( 'g2a_is_private_request' ) && g2a_is_private_request();
+	$is_filtered_archive = function_exists( 'g2a_is_filtered_commerce_archive' ) && g2a_is_filtered_commerce_archive();
+	if ( ! $is_private && ! is_search() && ! is_404() && ! $is_filtered_archive ) {
+		return $robots;
+	}
+
+	unset( $robots['index'] );
+	$robots['noindex'] = 'noindex';
+	if ( $is_private ) {
+		unset( $robots['follow'] );
+		$robots['nofollow'] = 'nofollow';
+	} else {
+		unset( $robots['nofollow'] );
+		$robots['follow'] = 'follow';
+	}
+	return $robots;
+}, 40 );
 
 /* ---------- Helper: FAQ schema usable in templates ----------
  * Usage in a page template:

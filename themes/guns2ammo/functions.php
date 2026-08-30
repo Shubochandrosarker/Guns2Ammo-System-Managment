@@ -151,6 +151,8 @@ add_filter( 'body_class', function ( $classes ) {
 /* ---------- SEO + Schema ---------- */
 require_once G2A_DIR . '/inc/business-info.php';
 require_once G2A_DIR . '/inc/instructors.php';
+require_once G2A_DIR . '/inc/content-policy.php';
+require_once G2A_DIR . '/inc/security-headers.php';
 
 /* ---------- Membership pricing  single source of truth (reads
  * Memberistic's Plans_Repository when the plugin is active, falls back

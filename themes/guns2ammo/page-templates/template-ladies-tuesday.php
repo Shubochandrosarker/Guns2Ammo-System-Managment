@@ -24,8 +24,8 @@ $g2a_lt_close_ampm = $g2a_lt_fmt_hour( $g2a_lt_tue_hours['close'] );
 $g2a_lt_open_lc    = $g2a_lt_fmt_hour( $g2a_lt_tue_hours['open'], false );
 $g2a_lt_close_lc   = $g2a_lt_fmt_hour( $g2a_lt_tue_hours['close'], false );
 
-$g2a_lt_title       = 'Ladies Night Gun Range in Mesa, AZ | Free Range Time for Women Every Tuesday';
-$g2a_lt_description = 'Ladies Tuesday at our Mesa, AZ gun range: women get one free hour of lane time every Tuesday, ' . $g2a_lt_open_ampm . '-' . $g2a_lt_close_ampm . '. No membership needed, rentals 25% off, beginners welcome.';
+$g2a_lt_title       = 'Ladies Tuesday: Free Range Time in Mesa, AZ | G2A';
+$g2a_lt_description = 'Ladies Tuesday in Mesa, AZ: women get one free hour of range time, ' . $g2a_lt_open_ampm . '-' . $g2a_lt_close_ampm . '. No membership needed, rentals 25% off, and beginners are welcome.';
 $g2a_lt_url         = home_url( '/ladies-tuesday/' );
 
 /* Keep the page-specific search snippet consistent across WordPress, Rank Math,
@@ -54,10 +54,34 @@ if ( $g2a_lt_page instanceof WP_Post ) {
 /* Weekly Event JSON-LD — free, recurring every Tuesday. */
 add_action( 'wp_head', function () use ( $g2a_lt_url, $g2a_lt_description, $g2a_biz ) {
 	// Tuesday = weekday index 2 in the g2a_biz() hours table.
-	$g2a_lt_tue        = $g2a_biz['hours'][2] ?? array( 'open' => 600, 'close' => 1080 );
-	$g2a_lt_fmt_24h    = function ( $mins ) {
+	$g2a_lt_tue     = $g2a_biz['hours'][2] ?? array( 'open' => 600, 'close' => 1080 );
+	$g2a_lt_fmt_24h = function ( $mins ) {
 		return sprintf( '%02d:%02d', intdiv( $mins, 60 ), $mins % 60 );
 	};
+
+	// Pair the recurring Schedule with a concrete upcoming occurrence so
+	// validators can evaluate the Event fields on every crawl.
+	$g2a_lt_timezone   = new DateTimeZone( 'America/Phoenix' );
+	$g2a_lt_now        = new DateTimeImmutable( 'now', $g2a_lt_timezone );
+	$g2a_lt_days_until = ( 2 - (int) $g2a_lt_now->format( 'w' ) + 7 ) % 7;
+	$g2a_lt_date       = $g2a_lt_now->modify( '+' . $g2a_lt_days_until . ' days' );
+	$g2a_lt_start      = $g2a_lt_date->setTime( intdiv( $g2a_lt_tue['open'], 60 ), $g2a_lt_tue['open'] % 60 );
+	$g2a_lt_end        = $g2a_lt_date->setTime( intdiv( $g2a_lt_tue['close'], 60 ), $g2a_lt_tue['close'] % 60 );
+	if ( 0 === $g2a_lt_days_until && $g2a_lt_now >= $g2a_lt_end ) {
+		$g2a_lt_start = $g2a_lt_start->modify( '+7 days' );
+		$g2a_lt_end   = $g2a_lt_end->modify( '+7 days' );
+	}
+
+	$g2a_lt_page_id    = get_queried_object_id();
+	$g2a_lt_image      = has_post_thumbnail( $g2a_lt_page_id ) ? get_the_post_thumbnail_url( $g2a_lt_page_id, 'full' ) : '';
+	$g2a_lt_image      = $g2a_lt_image ?: g2a_asset( 'img/guns2ammo-happy-customer-target.jpg' );
+	$g2a_lt_valid_from = get_the_date( DATE_W3C, $g2a_lt_page_id ) ?: $g2a_lt_now->format( DATE_W3C );
+	$g2a_lt_organizer  = [
+		'@type' => 'Organization',
+		'@id'   => home_url( '/#organization' ),
+		'name'  => $g2a_biz['name'] ?? 'Guns 2 Ammo',
+		'url'   => home_url( '/' ),
+	];
 	$schema = [
 		'@context'            => 'https://schema.org',
 		'@type'               => 'Event',
@@ -68,6 +92,9 @@ add_action( 'wp_head', function () use ( $g2a_lt_url, $g2a_lt_description, $g2a_
 		'eventAttendanceMode' => 'https://schema.org/OfflineEventAttendanceMode',
 		'eventStatus'         => 'https://schema.org/EventScheduled',
 		'isAccessibleForFree' => true,
+		'startDate'           => $g2a_lt_start->format( DATE_W3C ),
+		'endDate'             => $g2a_lt_end->format( DATE_W3C ),
+		'image'               => [ $g2a_lt_image ],
 		'eventSchedule'       => [
 			'@type'            => 'Schedule',
 			'byDay'            => 'https://schema.org/Tuesday',
@@ -79,6 +106,7 @@ add_action( 'wp_head', function () use ( $g2a_lt_url, $g2a_lt_description, $g2a_
 		'location'            => [
 			'@type'   => 'Place',
 			'name'    => $g2a_biz['name'] ?? 'Guns 2 Ammo',
+			'url'     => home_url( '/' ),
 			'address' => [
 				'@type'           => 'PostalAddress',
 				'streetAddress'   => $g2a_biz['addr1'] ?? '6030 E Main St, Suite 103',
@@ -88,13 +116,14 @@ add_action( 'wp_head', function () use ( $g2a_lt_url, $g2a_lt_description, $g2a_
 				'addressCountry'  => $g2a_biz['country'] ?? 'US',
 			],
 		],
-		'organizer'           => [ '@id' => home_url( '/#business' ) ],
+		'organizer'           => $g2a_lt_organizer,
 		'offers'              => [
 			'@type'         => 'Offer',
 			'url'           => $g2a_lt_url,
 			'price'         => '0',
 			'priceCurrency' => 'USD',
 			'availability'  => 'https://schema.org/InStock',
+			'validFrom'     => $g2a_lt_valid_from,
 		],
 	];
 	echo "\n<!-- Ladies Tuesday Weekly Event Schema -->\n";

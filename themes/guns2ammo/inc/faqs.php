@@ -217,7 +217,7 @@ function g2a_home_faqs() {
 		),
 		array(
 			'q' => 'How much is the CCW class?',
-			'a' => 'Our Arizona CCW certification class is $85 and includes classroom instruction plus live-fire qualification with NRA-certified instructors. The Arizona permit is honored in 37 states.',
+			'a' => 'Current Arizona CCW course pricing, schedule, classroom topics and available live-fire options are published on our Arizona CCW Certification page. Review that page before booking because course details and legal requirements can change.',
 		),
 		array(
 			'q' => 'Are walk-ins okay, or do I need a reservation?',

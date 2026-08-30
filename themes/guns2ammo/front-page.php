@@ -396,32 +396,7 @@ $g2a_week_order = array( 1, 2, 3, 4, 5, 6, 0 );
       <h2 class="sec" style="font-family: var(--font-display); font-size: clamp(40px, 5vw, 60px); color: var(--color-white); letter-spacing: 0.02em; line-height: 1; margin: 14px 0 0;"><span class="g2a-underline">QUESTIONS, ANSWERED.</span></h2>
     </div>
     <?php
-    $g2a_home_faqs = array(
-      array(
-        'q' => 'How much does the shooting range cost?',
-        'a' => 'Lane rental is $20 per hour and each extra shooter on your lane is $15. Gun rentals start at $15, eye and ear protection is $3 combined, and members shoot on included lane time. Walk-ins are welcome seven days a week.',
-      ),
-      array(
-        'q' => 'Do I need to bring my own gun?',
-        'a' => 'No — we have a rental wall with 40+ pistols and rifles starting at $15, plus range ammo for sale at the counter. A Range Safety Officer will set you up and walk you through anything unfamiliar.',
-      ),
-      array(
-        'q' => 'Can complete beginners come?',
-        'a' => 'Absolutely. First-timers are our favorite guests: an RSO covers safety, grip, and stance before you shoot, and our $95 Basic Handgun class or $140/hr private instruction can take you further whenever you\'re ready.',
-      ),
-      array(
-        'q' => 'What are the age requirements?',
-        'a' => 'Shooters 8 and older are welcome with a parent or guardian on the lane; you must be 18+ to shoot solo. Bring a valid government-issued photo ID for check-in.',
-      ),
-      array(
-        'q' => 'Do you offer Arizona CCW classes?',
-        'a' => 'Yes — the $85 classroom CCW course runs Saturdays (4 hours, covers A.R.S. §13-3112, reciprocity in 37 states, and DPS paperwork) and a $149.99 CCW + Live Fire course adds an hour on the range.',
-      ),
-      array(
-        'q' => 'Can I really shoot a machine gun?',
-        'a' => 'Yes. We run Mesa\'s only indoor full-auto experience — MP5, M16, and AK-47 packages from $249 with a one-on-one RSO, ammo and targets included. No experience needed; book 4–6 weeks ahead.',
-      ),
-    );
+    $g2a_home_faqs = function_exists( 'g2a_home_faqs' ) ? g2a_home_faqs() : array();
     ?>
     <div class="g2a-faq" data-reveal-stagger>
       <?php foreach ( $g2a_home_faqs as $i => $f ) : ?>
@@ -431,20 +406,6 @@ $g2a_week_order = array( 1, 2, 3, 4, 5, 6, 0 );
         </details>
       <?php endforeach; ?>
     </div>
-    <script type="application/ld+json"><?php
-      $g2a_faq_ld = array(
-        '@context'   => 'https://schema.org',
-        '@type'      => 'FAQPage',
-        'mainEntity' => array_map( function ( $f ) {
-          return array(
-            '@type'          => 'Question',
-            'name'           => $f['q'],
-            'acceptedAnswer' => array( '@type' => 'Answer', 'text' => $f['a'] ),
-          );
-        }, $g2a_home_faqs ),
-      );
-      echo wp_json_encode( $g2a_faq_ld, JSON_UNESCAPED_SLASHES );
-    ?></script>
   </div>
 </section>
 

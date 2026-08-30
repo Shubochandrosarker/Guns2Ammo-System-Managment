@@ -35,7 +35,6 @@ $groups = [
 		[ 'MP5 Experience', '/machine-gun/mp5/' ],
 		[ 'M16 Experience', '/machine-gun/m16/' ],
 		[ 'AK-47 Experience', '/machine-gun/ak-47/' ],
-		[ 'Free Arizona CCW Class', '/free-ccw-class/' ],
 	],
 	'Shop' => [
 		[ 'All Products', '/shop/' ],

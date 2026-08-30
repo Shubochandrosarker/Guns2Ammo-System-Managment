@@ -38,7 +38,6 @@ $nav = [
 		[ 'label' => 'MP5 Submachine Gun',   'href' => home_url( '/machine-gun/mp5/' ),    'meta' => '01' ],
 		[ 'label' => 'M16 Rifle',            'href' => home_url( '/machine-gun/m16/' ),    'meta' => '02' ],
 		[ 'label' => 'AK-47 Rifle',          'href' => home_url( '/machine-gun/ak-47/' ),  'meta' => '03' ],
-		[ 'label' => 'Free Arizona CCW',     'href' => home_url( '/free-ccw-class/' ),     'meta' => '04' ],
 	] ],
 	[ 'label' => 'Shop',       'href' => home_url( '/shop/' ), 'sub' => [
 		[ 'label' => 'All Products', 'href' => home_url( '/shop/' ),                      'meta' => 'ALL' ],

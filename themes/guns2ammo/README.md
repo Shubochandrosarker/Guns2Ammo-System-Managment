@@ -55,7 +55,7 @@ pages. Create the WordPress Pages below and assign the listed template.
 | `mp5` | Arsenal Weapon | `/machine-gun/mp5/` |
 | `m16` | Arsenal Weapon | `/machine-gun/m16/` |
 | `ak-47` | Arsenal Weapon | `/machine-gun/ak-47/` |
-| `free-ccw-class` | Free CCW Class | `/free-ccw-class/` |
+| `arizona-ccw-certification` | Arizona CCW Certification | `/arizona-ccw-certification/` |
 
 Make the eight course pages children of `training`, and the three weapon
 pages children of `machine-gun`, so the URLs nest correctly. Arizona CCW keeps

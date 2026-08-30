@@ -35,7 +35,7 @@ fataling.
 
 | Component | Version | Purpose |
 | --- | --- | --- |
-| guns2ammo | 1.30.0 | Public site theme (Elementor-compatible) |
+| guns2ammo | 1.31.0 | Public site theme (SEO/schema/indexability hardening) |
 
 ## Applications & workers — `apps/`
 

@@ -1,51 +1,14 @@
 <?php
 /**
- * AEO / GEO / AIO layer — Organization + WebSite schema for every page.
+ * AEO / GEO / AIO layer — WebSite schema for every page.
  *
  * @package guns2ammo
  */
 if ( ! defined( 'ABSPATH' ) ) exit;
 
-/* ---------- Organization + WebSite JSON-LD (every page) ---------- */
+/* ---------- WebSite JSON-LD (every page) ---------- */
 add_action( 'wp_head', function () {
-	// Single source of truth for NAP — see inc/business-info.php.
-	$g2a_biz = function_exists( 'g2a_biz' ) ? g2a_biz() : array();
-	$home  = home_url( '/' );
-	$phone = $g2a_biz['phone'] ?? '(602) 715-2677';
-	$logo  = g2a_seo_image() ?: home_url( '/wp-content/uploads/g2a-logo.png' );
-
-	g2a_emit_jsonld( [
-		'@context' => 'https://schema.org',
-		'@type'    => 'Organization',
-		'@id'      => $home . '#organization',
-		'name'     => $g2a_biz['name'] ?? 'Guns 2 Ammo',
-		'url'      => $home,
-		'logo'     => $logo,
-		'image'    => $logo,
-		'telephone'=> $phone,
-		'description' => "Guns 2 Ammo is a Mesa, Arizona indoor shooting range, FFL-licensed firearm store, and NRA-certified training facility. We sell and buy firearms, run CCW certification courses, and offer range memberships.",
-		'address'  => [
-			'@type'           => 'PostalAddress',
-			'streetAddress'   => $g2a_biz['addr1'] ?? '6030 E Main St, Suite 103',
-			'addressLocality' => $g2a_biz['city'] ?? 'Mesa',
-			'addressRegion'   => $g2a_biz['region'] ?? 'AZ',
-			'postalCode'      => $g2a_biz['postal'] ?? '85205',
-			'addressCountry'  => $g2a_biz['country'] ?? 'US',
-		],
-		'contactPoint' => [
-			'@type'       => 'ContactPoint',
-			'telephone'   => $phone,
-			'contactType' => 'customer service',
-			'areaServed'  => 'US',
-			'availableLanguage' => 'English',
-		],
-		'sameAs' => array_values( array_filter( [
-			get_theme_mod( 'g2a_social_fb' ),
-			get_theme_mod( 'g2a_social_ig' ),
-			get_theme_mod( 'g2a_social_x' ),
-			get_theme_mod( 'g2a_social_yt' ),
-		] ) ),
-	] );
+	$home = home_url( '/' );
 
 	g2a_emit_jsonld( [
 		'@context' => 'https://schema.org',
@@ -80,6 +43,6 @@ add_action( 'wp_head', function () {
  *
  * inc/llms.php owns /llms.txt and /llms-full.txt; inc/sitemap.php owns
  * /sitemap.xml; inc/robots.php owns robots.txt. Do not re-add handlers for
- * any of them here — only the Organization/WebSite JSON-LD above belongs
+ * any of them here — only the WebSite JSON-LD above belongs
  * in this file.
  */

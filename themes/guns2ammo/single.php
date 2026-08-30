@@ -40,12 +40,17 @@ get_header();
 .sp-author { display:flex; gap:16px; align-items:center; background: var(--color-gunmetal); border:1px solid var(--color-hairline); padding:22px; margin-top:24px; }
 .sp-author .av { width:54px; height:54px; border-radius:50%; background: var(--color-brass); color:#111; display:grid; place-items:center; font-family: var(--font-display); font-size:22px; flex:0 0 auto; }
 .sp-author .nm { font-family: var(--font-condensed); font-weight:600; font-size:16px; color: var(--color-white); text-transform:uppercase; letter-spacing:0.03em; }
+.sp-author .nm a { color:inherit; text-decoration:none; }
 .sp-author .rl { font-family: var(--font-mono); font-size:10px; letter-spacing:0.2em; color: var(--color-silver); text-transform:uppercase; margin-top:3px; }
+.sp-author .bio { color:var(--color-fog); font-size:14px; line-height:1.55; margin:8px 0 0; max-width:64ch; }
 </style>
 
 <?php while ( have_posts() ) : the_post();
 	$cats = get_the_category();
 	$author = get_the_author();
+	$author_id  = (int) get_the_author_meta( 'ID' );
+	$author_url = (string) get_the_author_meta( 'user_url', $author_id );
+	$author_bio = trim( (string) get_the_author_meta( 'description', $author_id ) );
 ?>
 <header class="sp-hero">
   <div class="c">
@@ -63,7 +68,7 @@ get_header();
     <h1><?php the_title(); ?></h1>
     <div class="byline">
       <span><?php echo esc_html( get_the_date() ); ?></span>
-      <span>By <?php echo esc_html( $author ); ?></span>
+      <span>By <?php if ( $author_url ) : ?><a href="<?php echo esc_url( $author_url ); ?>" rel="author"><?php echo esc_html( $author ); ?></a><?php else : ?><?php echo esc_html( $author ); ?><?php endif; ?></span>
       <span><?php echo esc_html( max( 1, (int) round( str_word_count( wp_strip_all_tags( get_the_content() ) ) / 200 ) ) ); ?> min read</span>
     </div>
     <?php if ( has_post_thumbnail() ) : ?>
@@ -91,8 +96,9 @@ get_header();
       <div class="sp-author">
         <div class="av"><?php echo esc_html( strtoupper( substr( $author, 0, 2 ) ) ); ?></div>
         <div>
-          <div class="nm"><?php echo esc_html( $author ); ?></div>
+          <div class="nm"><?php if ( $author_url ) : ?><a href="<?php echo esc_url( $author_url ); ?>" rel="author"><?php echo esc_html( $author ); ?></a><?php else : ?><?php echo esc_html( $author ); ?><?php endif; ?></div>
           <div class="rl">Guns 2 Ammo  Mesa, Arizona</div>
+          <?php if ( $author_bio ) : ?><p class="bio"><?php echo esc_html( $author_bio ); ?></p><?php endif; ?>
         </div>
       </div>
       <div class="sp-nav" style="margin-top:24px;">

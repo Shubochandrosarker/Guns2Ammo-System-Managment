@@ -131,6 +131,7 @@ function g2a_redirect_map() {
 		'/lanes/'                    => '/book-a-lane/',
 		'/ccw/'                      => '/arizona-ccw-certification/',
 		'/ccw-class/'                => '/arizona-ccw-certification/',
+		'/free-ccw-class/'           => '/arizona-ccw-certification/',
 		'/classes/'                  => '/training/',
 		'/courses/'                  => '/training/',
 		'/lessons/'                  => '/training/',
